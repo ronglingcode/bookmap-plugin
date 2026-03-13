@@ -52,6 +52,48 @@ ws.onmessage = (event) => {
 };
 ```
 
+## Bookmap API Data vs Visual Display
+
+The Bookmap Java API provides **raw, unfiltered market data**. UI features like size filters, trade clustering, and zoom-based aggregation do not affect what the plugin receives.
+
+| What you see in Bookmap UI | What the API gives the plugin |
+|---|---|
+| Heatmap with size filter (hides small orders) | **All** depth updates, unfiltered |
+| Trade bubbles (clustered nearby trades) | **Individual** trades, one by one |
+| Zoom-dependent aggregation (price levels merge when zoomed out) | **Tick-level** data, unchanged by zoom |
+
+### Bookmap's clustering modes
+
+Bookmap's UI clusters trades into "bubbles" using one of four modes:
+
+| Mode | How it works |
+|------|-------------|
+| **By Price** | Aggregates all trades at the same price level within a time window into one bubble |
+| **By Time** | One bubble per fixed time interval (e.g., 100ms), aggregating all trades in that interval |
+| **By Volume** | Creates a new bubble every time accumulated volume reaches a threshold (e.g., 10,000 shares) |
+| **Smart** (default) | Weighted average of price and time — combines nearby trades using a proximity-based merge |
+
+The **Smart** mode positions each bubble at the **volume-weighted average price (VWAP)** and **time-weighted average timestamp** of the trades it contains. It is essentially a sliding-window aggregation that merges trades that are close in both price and time, rather than a complex ML algorithm. This produces the intuitive "bubble" visualization where a burst of buying at a price level shows as a single large dot instead of hundreds of tiny ones.
+
+Since the API only provides raw trades, any clustering must be implemented in the plugin itself.
+
+### How Bookmap renders "order walls"
+
+Bookmap has **no built-in wall detection algorithm**. The bright horizontal bands you see are a visual effect of the heatmap's relative color mapping:
+
+- **Color intensity is relative**: Bookmap maps all visible order sizes to a color gradient using Upper and Lower Cutoff settings. Sizes at or above the Upper Cutoff get the brightest color (red/orange); sizes at or below the Lower Cutoff get the dimmest (dark blue). Everything in between is interpolated along the gradient. The exact interpolation curve is proprietary (likely logarithmic given heavy-tailed order size distributions).
+- **Percentile-based auto mode**: When Upper Cutoff is set to "Auto 97%" (the default), Bookmap sorts all order sizes currently visible on screen and picks the 97th percentile value as the cutoff. The top 3% of sizes get maximum brightness. This recalculates dynamically as you scroll or zoom.
+- **Thickness = adjacent large levels**: A "thick wall" means multiple consecutive price levels all have large orders (e.g., 500K at $185.50, $185.51, $185.52 = a 3-cent thick band). A single large level appears as a thin bright line.
+- **The size filter dims, not hides**: Levels below the Lower Cutoff are dimmed but still visible — nothing is removed from the display.
+- **Auto-adjusting contrast**: The color mapping recalculates as you scroll or zoom, so the same 500K order may look bright in a quiet market but dim next to a 2M order.
+
+Bookmap also provides supporting tools (not wall detection):
+- **Large Lot Tracker** — estimates the single largest order at a price level using a proprietary approximation algorithm (not 100% accurate). Triggers when an order exceeds 20% of total size at that level AND 10% of the largest visible order bar.
+- **Iceberg Order Tracker** — detects hidden orders that replenish after being consumed. Recognizes when new limit orders appear instantly from the opposite side as a response to executions at the same price level.
+- **Imbalance Indicators** — shows buy vs sell pressure at each level.
+
+Our plugin takes a more explicit approach: any ask level with >= 500K shares is flagged as a wall, regardless of visual context. A future improvement could use percentile-based thresholds (similar to Bookmap's auto mode) by maintaining a running distribution of order sizes and flagging outliers.
+
 ## Configuration
 
 These are currently hardcoded constants in `WallBreakoutPlugin.java`:
