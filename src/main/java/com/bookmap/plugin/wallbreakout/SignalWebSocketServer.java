@@ -24,14 +24,18 @@ public class SignalWebSocketServer extends WebSocketServer {
         return t;
     });
     private final AtomicReference<Double> lastPrice = new AtomicReference<>(Double.NaN);
-    private final Path logFile;
-    private BufferedWriter logWriter;
+    private final Path heartbeatLogFile;
+    private final Path breakoutLogFile;
+    private BufferedWriter heartbeatWriter;
+    private BufferedWriter breakoutWriter;
 
     public SignalWebSocketServer(int port) {
         super(new InetSocketAddress("127.0.0.1", port));
         setDaemon(true);
         setReuseAddr(true);
-        this.logFile = Paths.get(System.getProperty("user.home"), "bookmap-signals", "heartbeat.jsonl");
+        Path signalsDir = Paths.get(System.getProperty("user.home"), "bookmap-signals");
+        this.heartbeatLogFile = signalsDir.resolve("heartbeat.jsonl");
+        this.breakoutLogFile = signalsDir.resolve("breakout.jsonl");
     }
 
     @Override
@@ -58,12 +62,14 @@ public class SignalWebSocketServer extends WebSocketServer {
     public void onStart() {
         System.out.println("[WallBreakout] WebSocket server started on port " + getPort());
         try {
-            Files.createDirectories(logFile.getParent());
-            logWriter = Files.newBufferedWriter(logFile,
+            Files.createDirectories(heartbeatLogFile.getParent());
+            heartbeatWriter = Files.newBufferedWriter(heartbeatLogFile,
                 StandardOpenOption.CREATE, StandardOpenOption.APPEND);
-            System.out.println("[WallBreakout] Logging heartbeats to " + logFile);
+            breakoutWriter = Files.newBufferedWriter(breakoutLogFile,
+                StandardOpenOption.CREATE, StandardOpenOption.APPEND);
+            System.out.println("[WallBreakout] Logging to " + heartbeatLogFile.getParent());
         } catch (IOException e) {
-            System.err.println("[WallBreakout] Failed to open log file: " + e.getMessage());
+            System.err.println("[WallBreakout] Failed to open log files: " + e.getMessage());
         }
         heartbeatScheduler.scheduleAtFixedRate(this::sendHeartbeat, 5, 5, TimeUnit.SECONDS);
     }
@@ -73,18 +79,14 @@ public class SignalWebSocketServer extends WebSocketServer {
     }
 
     public void broadcastSignal(String json) {
+        writeToFile(breakoutWriter, json);
         broadcast(json);
     }
 
     public void shutdown() {
         heartbeatScheduler.shutdownNow();
-        if (logWriter != null) {
-            try {
-                logWriter.close();
-            } catch (IOException e) {
-                System.err.println("[WallBreakout] Failed to close log file: " + e.getMessage());
-            }
-        }
+        closeWriter(heartbeatWriter);
+        closeWriter(breakoutWriter);
         try {
             stop(1000);
         } catch (InterruptedException e) {
@@ -100,20 +102,30 @@ public class SignalWebSocketServer extends WebSocketServer {
         String json = String.format(
             "{\"type\":\"heartbeat\",\"price\":%.6f,\"timestamp\":%d}",
             price, System.currentTimeMillis());
-        writeToLog(json);
+        writeToFile(heartbeatWriter, json);
         if (!getConnections().isEmpty()) {
             broadcast(json);
         }
     }
 
-    private void writeToLog(String json) {
-        if (logWriter != null) {
+    private void writeToFile(BufferedWriter writer, String json) {
+        if (writer != null) {
             try {
-                logWriter.write(json);
-                logWriter.newLine();
-                logWriter.flush();
+                writer.write(json);
+                writer.newLine();
+                writer.flush();
             } catch (IOException e) {
                 System.err.println("[WallBreakout] Failed to write to log: " + e.getMessage());
+            }
+        }
+    }
+
+    private void closeWriter(BufferedWriter writer) {
+        if (writer != null) {
+            try {
+                writer.close();
+            } catch (IOException e) {
+                System.err.println("[WallBreakout] Failed to close log file: " + e.getMessage());
             }
         }
     }
