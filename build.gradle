@@ -1,0 +1,35 @@
+plugins {
+    id 'java'
+    id 'com.gradleup.shadow' version '9.0.0-beta4'
+}
+
+group = 'com.bookmap.plugin'
+version = '1.0'
+
+java {
+    sourceCompatibility = JavaVersion.VERSION_11
+    targetCompatibility = JavaVersion.VERSION_11
+}
+
+repositories {
+    mavenCentral()
+    maven { url "https://maven.bookmap.com/maven2/releases/" }
+}
+
+dependencies {
+    compileOnly 'com.bookmap.api:api-core:7.1.0.35'
+    compileOnly 'com.bookmap.api:api-simplified:7.1.0.35'
+    implementation 'org.java-websocket:Java-WebSocket:1.5.7'
+}
+
+shadowJar {
+    archiveClassifier.set('all')
+    relocate 'org.java_websocket', 'com.bookmap.plugin.shaded.websocket'
+}
+
+jar {
+    manifest {
+        attributes 'Implementation-Title': 'Wall Breakout Detector'
+        attributes 'Implementation-Version': version
+    }
+}
