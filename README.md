@@ -52,6 +52,148 @@ ws.onmessage = (event) => {
 };
 ```
 
+## WebSocket API Reference
+
+The plugin exposes a WebSocket server on `ws://localhost:8765`. Clients receive heartbeat and breakout messages automatically on connect. Additionally, clients can subscribe to real-time order book snapshots.
+
+### Message types (server → client)
+
+| Type | Description | Frequency |
+|------|-------------|-----------|
+| `heartbeat` | Current price | Every 5s (or at subscription interval for subscribers) |
+| `breakout` | Wall breakout signal | On event |
+| `orderbook` | Order book snapshot (top N levels) | At subscription interval (default 1s) |
+| `subscribed` | Confirmation of orderbook subscription | Once on subscribe |
+| `unsubscribed` | Confirmation of orderbook unsubscription | Once on unsubscribe |
+
+### Subscribe to order book (client → server)
+
+```json
+{"type":"subscribe","channel":"orderbook"}
+{"type":"subscribe","channel":"orderbook","intervalMs":500,"levels":10}
+{"type":"unsubscribe","channel":"orderbook"}
+```
+
+| Parameter | Default | Description |
+|-----------|---------|-------------|
+| `intervalMs` | 1000 | How often to send snapshots (milliseconds) |
+| `levels` | 20 | Number of price levels per side (bids + asks) |
+
+### TypeScript example
+
+```typescript
+interface Heartbeat {
+  type: "heartbeat";
+  price: number;
+  timestamp: number;
+}
+
+interface Breakout {
+  type: "breakout";
+  breakoutLevel: number;
+  swingLow: number;
+  timestamp: number;
+}
+
+interface OrderBook {
+  type: "orderbook";
+  timestamp: number;
+  bids: [number, number][]; // [price, size][]
+  asks: [number, number][]; // [price, size][]
+}
+
+interface Subscribed {
+  type: "subscribed";
+  channel: string;
+  intervalMs: number;
+  levels: number;
+}
+
+type BookmapMessage = Heartbeat | Breakout | OrderBook | Subscribed;
+
+function connectToBookmap(
+  onBreakout: (signal: Breakout) => void,
+  onOrderBook?: (book: OrderBook) => void,
+  orderbookIntervalMs = 1000,
+  orderbookLevels = 20
+) {
+  const ws = new WebSocket("ws://localhost:8765");
+
+  ws.onopen = () => {
+    console.log("Connected to Bookmap plugin");
+    // Subscribe to order book snapshots
+    ws.send(
+      JSON.stringify({
+        type: "subscribe",
+        channel: "orderbook",
+        intervalMs: orderbookIntervalMs,
+        levels: orderbookLevels,
+      })
+    );
+  };
+
+  ws.onmessage = (event: MessageEvent) => {
+    const data: BookmapMessage = JSON.parse(event.data);
+
+    switch (data.type) {
+      case "heartbeat":
+        // Price update — use for connection health or last price display
+        break;
+
+      case "breakout":
+        onBreakout(data);
+        break;
+
+      case "orderbook":
+        onOrderBook?.(data);
+        break;
+
+      case "subscribed":
+        console.log(
+          `Subscribed to ${data.channel} (every ${data.intervalMs}ms, ${data.levels} levels)`
+        );
+        break;
+    }
+  };
+
+  ws.onclose = () => {
+    console.log("Disconnected from Bookmap plugin");
+    // Reconnect after 3 seconds
+    setTimeout(
+      () =>
+        connectToBookmap(
+          onBreakout,
+          onOrderBook,
+          orderbookIntervalMs,
+          orderbookLevels
+        ),
+      3000
+    );
+  };
+
+  return ws;
+}
+
+// Usage
+connectToBookmap(
+  (signal) => {
+    console.log(
+      `BREAKOUT above ${signal.breakoutLevel}, swing low at ${signal.swingLow}`
+    );
+    // Send to your trading bot logic...
+  },
+  (book) => {
+    const bestBid = book.bids[0];
+    const bestAsk = book.asks[0];
+    console.log(
+      `Book: ${bestBid[1]} @ ${bestBid[0]} | ${bestAsk[0]} @ ${bestAsk[1]}`
+    );
+  },
+  500, // 500ms interval
+  10 // top 10 levels
+);
+```
+
 ## Bookmap API Data vs Visual Display
 
 The Bookmap Java API provides **raw, unfiltered market data**. UI features like size filters, trade clustering, and zoom-based aggregation do not affect what the plugin receives.

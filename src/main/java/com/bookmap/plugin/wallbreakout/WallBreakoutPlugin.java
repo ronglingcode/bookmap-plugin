@@ -30,13 +30,16 @@ public class WallBreakoutPlugin implements CustomModuleAdapter,
     private SwingLowDetector swingDetector;
     private SignalWebSocketServer wsServer;
     private InstrumentInfo instrumentInfo;
+    private OrderBookState orderBook;
 
     @Override
     public void initialize(String alias, InstrumentInfo info, Api api, InitialState initialState) {
         this.instrumentInfo = info;
+        this.orderBook = new OrderBookState();
         this.wallTracker = new OrderWallTracker(WALL_THRESHOLD, WALL_CONSUMED_RATIO);
         this.swingDetector = new SwingLowDetector(SWING_LOOKBACK, BAR_SIZE);
-        this.wsServer = new SignalWebSocketServer(WS_PORT);
+        this.wsServer = new SignalWebSocketServer(WS_PORT, orderBook);
+        this.wsServer.setPips(info.pips);
         this.wsServer.start();
         System.out.println("[WallBreakout] Plugin initialized for " + alias);
     }
@@ -51,6 +54,7 @@ public class WallBreakoutPlugin implements CustomModuleAdapter,
 
     @Override
     public void onDepth(boolean isBid, int price, int size) {
+        orderBook.update(isBid, price, size);
         wallTracker.updateLevel(isBid, price, size);
     }
 
