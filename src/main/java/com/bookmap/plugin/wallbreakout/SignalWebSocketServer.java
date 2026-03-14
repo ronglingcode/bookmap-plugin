@@ -38,15 +38,17 @@ public class SignalWebSocketServer extends WebSocketServer {
 
     // Order book subscription state
     private final OrderBookState orderBook;
+    private final double orderbookPercentile;
     private double pips = 1.0;
     private final Set<WebSocket> orderbookSubscribers = Collections.newSetFromMap(new ConcurrentHashMap<>());
     private ScheduledFuture<?> orderbookBroadcastTask;
 
-    public SignalWebSocketServer(int port, OrderBookState orderBook) {
+    public SignalWebSocketServer(int port, OrderBookState orderBook, double orderbookPercentile) {
         super(new InetSocketAddress("127.0.0.1", port));
         setDaemon(true);
         setReuseAddr(true);
         this.orderBook = orderBook;
+        this.orderbookPercentile = orderbookPercentile;
         Path signalsDir = Paths.get(System.getProperty("user.home"), "bookmap-signals");
         this.heartbeatLogFile = signalsDir.resolve("heartbeat.jsonl");
         this.breakoutLogFile = signalsDir.resolve("breakout.jsonl");
@@ -80,8 +82,8 @@ public class SignalWebSocketServer extends WebSocketServer {
             int intervalMs = parseIntField(trimmed, "intervalMs", DEFAULT_ORDERBOOK_INTERVAL_MS);
             int levels = parseIntField(trimmed, "levels", DEFAULT_ORDERBOOK_LEVELS);
             ensureOrderbookBroadcast(intervalMs, levels);
-            conn.send("{\"type\":\"subscribed\",\"channel\":\"orderbook\",\"intervalMs\":" + intervalMs + ",\"levels\":" + levels + "}");
-            System.out.println("[WallBreakout] Client subscribed to orderbook (interval=" + intervalMs + "ms, levels=" + levels + ")");
+            conn.send("{\"type\":\"subscribed\",\"channel\":\"orderbook\",\"intervalMs\":" + intervalMs + ",\"levels\":" + levels + ",\"percentile\":" + orderbookPercentile + "}");
+            System.out.println("[WallBreakout] Client subscribed to orderbook (interval=" + intervalMs + "ms, levels=" + levels + ", percentile=" + orderbookPercentile + ")");
         } else if (trimmed.contains("\"unsubscribe\"") && trimmed.contains("\"orderbook\"")) {
             orderbookSubscribers.remove(conn);
             conn.send("{\"type\":\"unsubscribed\",\"channel\":\"orderbook\"}");
@@ -118,7 +120,7 @@ public class SignalWebSocketServer extends WebSocketServer {
             orderbookBroadcastTask.cancel(false);
         }
         orderbookBroadcastTask = scheduler.scheduleAtFixedRate(
-            () -> sendOrderbookSnapshot(levels),
+            () -> sendOrderbookSnapshot(levels, orderbookPercentile),
             0, intervalMs, TimeUnit.MILLISECONDS
         );
     }
@@ -164,9 +166,9 @@ public class SignalWebSocketServer extends WebSocketServer {
         }
     }
 
-    private void sendOrderbookSnapshot(int levels) {
+    private void sendOrderbookSnapshot(int levels, double percentile) {
         if (orderbookSubscribers.isEmpty()) return;
-        String orderbookJson = orderBook.toJson(levels, pips);
+        String orderbookJson = orderBook.toJson(levels, pips, percentile);
         double price = lastPrice.get();
         String heartbeatJson = Double.isNaN(price) ? null : String.format(
             "{\"type\":\"heartbeat\",\"price\":%.6f,\"timestamp\":%d}",

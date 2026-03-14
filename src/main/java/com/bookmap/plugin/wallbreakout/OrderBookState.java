@@ -1,7 +1,9 @@
 package com.bookmap.plugin.wallbreakout;
 
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
+import java.util.List;
 import java.util.Map;
 import java.util.NavigableMap;
 import java.util.TreeMap;
@@ -109,25 +111,56 @@ public class OrderBookState {
     }
 
     /**
+     * Calculate the size threshold at the given percentile across all levels.
+     * @param percentile 0-100 (e.g., 90 means only top 10% of sizes pass)
+     * @return the size value at that percentile, or 0 if book is empty
+     */
+    public int getPercentileThreshold(double percentile) {
+        List<Integer> allSizes = new ArrayList<>(bids.size() + asks.size());
+        allSizes.addAll(bids.values());
+        allSizes.addAll(asks.values());
+        if (allSizes.isEmpty()) return 0;
+        Collections.sort(allSizes);
+        int index = (int) Math.ceil(percentile / 100.0 * allSizes.size()) - 1;
+        index = Math.max(0, Math.min(index, allSizes.size() - 1));
+        return allSizes.get(index);
+    }
+
+    /**
      * Serialize the top N levels of bids and asks to JSON.
      * @param levels number of levels per side
      * @param pips multiplier to convert tick prices to real prices
      */
     public String toJson(int levels, double pips) {
+        return toJson(levels, pips, 0);
+    }
+
+    /**
+     * Serialize levels to JSON, filtered by percentile.
+     * Only levels with size >= the percentile threshold are included.
+     * @param levels max number of levels per side
+     * @param pips multiplier to convert tick prices to real prices
+     * @param percentile 0-100; 0 means no filtering
+     */
+    public String toJson(int levels, double pips, double percentile) {
+        int minSize = (percentile > 0) ? getPercentileThreshold(percentile) : 0;
         StringBuilder sb = new StringBuilder();
         sb.append("{\"type\":\"orderbook\",\"timestamp\":").append(System.currentTimeMillis());
+        sb.append(",\"percentile\":").append(percentile);
+        sb.append(",\"minSize\":").append(minSize);
         sb.append(",\"bids\":[");
-        appendLevels(sb, bids, levels, pips);
+        appendLevels(sb, bids, levels, pips, minSize);
         sb.append("],\"asks\":[");
-        appendLevels(sb, asks, levels, pips);
+        appendLevels(sb, asks, levels, pips, minSize);
         sb.append("]}");
         return sb.toString();
     }
 
-    private void appendLevels(StringBuilder sb, TreeMap<Integer, Integer> book, int levels, double pips) {
+    private void appendLevels(StringBuilder sb, TreeMap<Integer, Integer> book, int levels, double pips, int minSize) {
         int count = 0;
         for (Map.Entry<Integer, Integer> entry : book.entrySet()) {
             if (count >= levels) break;
+            if (entry.getValue() < minSize) continue;
             if (count > 0) sb.append(',');
             sb.append(String.format("[%.6f,%d]", entry.getKey() * pips, entry.getValue()));
             count++;

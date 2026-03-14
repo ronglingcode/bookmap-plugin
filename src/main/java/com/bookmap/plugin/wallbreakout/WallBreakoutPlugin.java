@@ -25,6 +25,7 @@ public class WallBreakoutPlugin implements CustomModuleAdapter,
     private static final double WALL_CONSUMED_RATIO = 0.20;
     private static final int SWING_LOOKBACK = 3;
     private static final int BAR_SIZE = 100;
+    private static final double ORDERBOOK_PERCENTILE = 90; // only broadcast levels above this percentile (0 = no filter)
 
     private OrderWallTracker wallTracker;
     private SwingLowDetector swingDetector;
@@ -38,7 +39,7 @@ public class WallBreakoutPlugin implements CustomModuleAdapter,
         this.orderBook = new OrderBookState();
         this.wallTracker = new OrderWallTracker(WALL_THRESHOLD, WALL_CONSUMED_RATIO);
         this.swingDetector = new SwingLowDetector(SWING_LOOKBACK, BAR_SIZE);
-        this.wsServer = new SignalWebSocketServer(WS_PORT, orderBook);
+        this.wsServer = new SignalWebSocketServer(WS_PORT, orderBook, ORDERBOOK_PERCENTILE);
         this.wsServer.setPips(info.pips);
         this.wsServer.start();
         System.out.println("[WallBreakout] Plugin initialized for " + alias);
