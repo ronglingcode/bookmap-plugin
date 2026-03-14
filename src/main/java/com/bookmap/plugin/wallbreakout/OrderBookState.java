@@ -127,43 +127,32 @@ public class OrderBookState {
     }
 
     /**
-     * Serialize the top N levels of bids and asks to JSON.
-     * @param levels number of levels per side
-     * @param pips multiplier to convert tick prices to real prices
-     */
-    public String toJson(int levels, double pips) {
-        return toJson(levels, pips, 0);
-    }
-
-    /**
-     * Serialize levels to JSON, filtered by percentile.
+     * Serialize all levels of bids and asks to JSON, filtered by percentile.
      * Only levels with size >= the percentile threshold are included.
-     * @param levels max number of levels per side
      * @param pips multiplier to convert tick prices to real prices
      * @param percentile 0-100; 0 means no filtering
      */
-    public String toJson(int levels, double pips, double percentile) {
+    public String toJson(double pips, double percentile) {
         int minSize = (percentile > 0) ? getPercentileThreshold(percentile) : 0;
         StringBuilder sb = new StringBuilder();
         sb.append("{\"type\":\"orderbook\",\"timestamp\":").append(System.currentTimeMillis());
         sb.append(",\"percentile\":").append(percentile);
         sb.append(",\"minSize\":").append(minSize);
         sb.append(",\"bids\":[");
-        appendLevels(sb, bids, levels, pips, minSize);
+        appendLevels(sb, bids, pips, minSize);
         sb.append("],\"asks\":[");
-        appendLevels(sb, asks, levels, pips, minSize);
+        appendLevels(sb, asks, pips, minSize);
         sb.append("]}");
         return sb.toString();
     }
 
-    private void appendLevels(StringBuilder sb, TreeMap<Integer, Integer> book, int levels, double pips, int minSize) {
-        int count = 0;
+    private void appendLevels(StringBuilder sb, TreeMap<Integer, Integer> book, double pips, int minSize) {
+        boolean first = true;
         for (Map.Entry<Integer, Integer> entry : book.entrySet()) {
-            if (count >= levels) break;
             if (entry.getValue() < minSize) continue;
-            if (count > 0) sb.append(',');
+            if (!first) sb.append(',');
             sb.append(String.format("[%.6f,%d]", entry.getKey() * pips, entry.getValue()));
-            count++;
+            first = false;
         }
     }
 
