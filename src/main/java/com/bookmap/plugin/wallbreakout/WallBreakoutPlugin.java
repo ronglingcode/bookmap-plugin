@@ -8,6 +8,7 @@ import velox.api.layer1.annotations.Layer1SimpleAttachable;
 import velox.api.layer1.annotations.Layer1StrategyName;
 import velox.api.layer1.data.InstrumentInfo;
 import velox.api.layer1.data.TradeInfo;
+import velox.api.layer1.messages.indicators.Layer1ApiUserMessageModifyScreenSpacePainter;
 import velox.api.layer1.simplified.Api;
 import velox.api.layer1.simplified.CustomModuleAdapter;
 import velox.api.layer1.simplified.DepthDataListener;
@@ -31,8 +32,10 @@ public class WallBreakoutPlugin implements CustomModuleAdapter,
     // Shared WebSocket server across all symbol instances
     private static SignalWebSocketServer sharedServer;
     private static int instanceCount = 0;
+    private static ChartClickHandler chartClickHandler;
 
     private String alias;
+    private Api api;
     private OrderWallTracker wallTracker;
     private SwingLowDetector swingDetector;
     private InstrumentInfo instrumentInfo;
@@ -41,6 +44,7 @@ public class WallBreakoutPlugin implements CustomModuleAdapter,
     @Override
     public void initialize(String alias, InstrumentInfo info, Api api, InitialState initialState) {
         this.alias = alias;
+        this.api = api;
         this.instrumentInfo = info;
         this.orderBook = new OrderBookState();
         this.wallTracker = new OrderWallTracker(WALL_THRESHOLD, WALL_CONSUMED_RATIO);
@@ -52,14 +56,36 @@ public class WallBreakoutPlugin implements CustomModuleAdapter,
                 sharedServer.start();
                 System.out.println("[WallBreakout] Shared WebSocket server started on port " + WS_PORT);
             }
+            if (chartClickHandler == null) {
+                chartClickHandler = new ChartClickHandler(sharedServer);
+            }
             instanceCount++;
         }
         sharedServer.registerSymbol(alias, orderBook, info.pips);
+        chartClickHandler.registerSymbol(alias, info.pips);
+
+        // Register ScreenSpacePainter to receive chart coordinate mappings
+        api.sendUserMessage(Layer1ApiUserMessageModifyScreenSpacePainter.builder(
+                WallBreakoutPlugin.class, "clickHandler")
+                .setScreenSpacePainterFactory(chartClickHandler)
+                .setIsAdd(true)
+                .build());
+
         System.out.println("[WallBreakout] Plugin initialized for " + alias);
     }
 
     @Override
     public void stop() {
+        if (chartClickHandler != null) {
+            chartClickHandler.unregisterSymbol(alias);
+        }
+        // Unregister ScreenSpacePainter
+        api.sendUserMessage(Layer1ApiUserMessageModifyScreenSpacePainter.builder(
+                WallBreakoutPlugin.class, "clickHandler")
+                .setScreenSpacePainterFactory(chartClickHandler)
+                .setIsAdd(false)
+                .build());
+
         if (sharedServer != null) {
             sharedServer.unregisterSymbol(alias);
         }
@@ -68,6 +94,7 @@ public class WallBreakoutPlugin implements CustomModuleAdapter,
             if (instanceCount <= 0 && sharedServer != null) {
                 sharedServer.shutdown();
                 sharedServer = null;
+                chartClickHandler = null;
                 instanceCount = 0;
                 System.out.println("[WallBreakout] Shared WebSocket server shut down");
             }
