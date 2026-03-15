@@ -90,24 +90,16 @@ public class ChartClickHandler implements ScreenSpacePainterFactory {
                 MouseEvent me = (MouseEvent) event;
 
                 // Require at least one key held during click (any key works)
-                if (heldKeys.isEmpty() && !me.isMetaDown() && !me.isControlDown()) return;
+                if (heldKeys.isEmpty() && !me.isMetaDown() && !me.isControlDown()
+                        && !me.isShiftDown() && !me.isAltDown()) return;
 
-                // Determine keyCode from held keys, ignoring pure modifier names
-                String keyCode = null;
-                for (String k : heldKeys) {
-                    if (!k.equals("meta") && !k.equals("ctrl") && !k.equals("control")
-                            && !k.equals("alt") && !k.equals("shift")
-                            && !k.equals("\u2318") && !k.equals("command")) {
-                        keyCode = k;
-                        break;
-                    }
-                }
-                if (keyCode == null) {
-                    // Only modifiers held
+                // Build keyCode from all held keys
+                String keyCode = String.join("+", heldKeys);
+                if (keyCode.isEmpty()) {
+                    // Only modifier flags detected (no KEY_PRESSED events for modifiers on some platforms)
                     if (me.isMetaDown() || me.isControlDown()) keyCode = "cmd";
                     else if (me.isShiftDown()) keyCode = "shift";
                     else if (me.isAltDown()) keyCode = "alt";
-                    else return; // no recognized key
                 }
 
                 int mouseY = me.getYOnScreen();
