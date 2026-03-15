@@ -1,4 +1,4 @@
-package com.bookmap.plugin.wallbreakout;
+package com.bookmap.plugin.activetrader;
 
 import java.util.List;
 
@@ -16,9 +16,9 @@ import velox.api.layer1.simplified.InitialState;
 import velox.api.layer1.simplified.TradeDataListener;
 
 @Layer1SimpleAttachable
-@Layer1StrategyName("Wall Breakout Detector")
+@Layer1StrategyName("Bookmap Active Trader")
 @Layer1ApiVersion(Layer1ApiVersionValue.VERSION1)
-public class WallBreakoutPlugin implements CustomModuleAdapter,
+public class BookmapActiveTraderPlugin implements CustomModuleAdapter,
         DepthDataListener, TradeDataListener {
 
     private static final int WS_PORT = 8765;
@@ -50,11 +50,11 @@ public class WallBreakoutPlugin implements CustomModuleAdapter,
         this.wallTracker = new OrderWallTracker(WALL_THRESHOLD, WALL_CONSUMED_RATIO);
         this.swingDetector = new SwingLowDetector(SWING_LOOKBACK, BAR_SIZE);
 
-        synchronized (WallBreakoutPlugin.class) {
+        synchronized (BookmapActiveTraderPlugin.class) {
             if (sharedServer == null) {
                 sharedServer = new SignalWebSocketServer(WS_PORT, ORDERBOOK_PERCENTILE, ORDERBOOK_INTERVAL_MS);
                 sharedServer.start();
-                System.out.println("[WallBreakout] Shared WebSocket server started on port " + WS_PORT);
+                System.out.println("[ActiveTrader] Shared WebSocket server started on port " + WS_PORT);
             }
             if (chartClickHandler == null) {
                 chartClickHandler = new ChartClickHandler(sharedServer);
@@ -66,12 +66,12 @@ public class WallBreakoutPlugin implements CustomModuleAdapter,
 
         // Register ScreenSpacePainter to receive chart coordinate mappings
         api.sendUserMessage(Layer1ApiUserMessageModifyScreenSpacePainter.builder(
-                WallBreakoutPlugin.class, "clickHandler")
+                BookmapActiveTraderPlugin.class, "clickHandler")
                 .setScreenSpacePainterFactory(chartClickHandler)
                 .setIsAdd(true)
                 .build());
 
-        System.out.println("[WallBreakout] Plugin initialized for " + alias);
+        System.out.println("[ActiveTrader] Plugin initialized for " + alias);
     }
 
     @Override
@@ -81,7 +81,7 @@ public class WallBreakoutPlugin implements CustomModuleAdapter,
         }
         // Unregister ScreenSpacePainter
         api.sendUserMessage(Layer1ApiUserMessageModifyScreenSpacePainter.builder(
-                WallBreakoutPlugin.class, "clickHandler")
+                BookmapActiveTraderPlugin.class, "clickHandler")
                 .setScreenSpacePainterFactory(chartClickHandler)
                 .setIsAdd(false)
                 .build());
@@ -89,17 +89,17 @@ public class WallBreakoutPlugin implements CustomModuleAdapter,
         if (sharedServer != null) {
             sharedServer.unregisterSymbol(alias);
         }
-        synchronized (WallBreakoutPlugin.class) {
+        synchronized (BookmapActiveTraderPlugin.class) {
             instanceCount--;
             if (instanceCount <= 0 && sharedServer != null) {
                 sharedServer.shutdown();
                 sharedServer = null;
                 chartClickHandler = null;
                 instanceCount = 0;
-                System.out.println("[WallBreakout] Shared WebSocket server shut down");
+                System.out.println("[ActiveTrader] Shared WebSocket server shut down");
             }
         }
-        System.out.println("[WallBreakout] Plugin stopped for " + alias);
+        System.out.println("[ActiveTrader] Plugin stopped for " + alias);
     }
 
     @Override
@@ -128,7 +128,7 @@ public class WallBreakoutPlugin implements CustomModuleAdapter,
                 if (!Double.isNaN(swingLow) && swingLow < wallRealPrice) {
                     BreakoutSignal signal = new BreakoutSignal(alias, wallRealPrice, swingLow);
                     sharedServer.broadcastSignal(signal.toJson());
-                    System.out.println("[WallBreakout] BREAKOUT signal: " + signal.toJson());
+                    System.out.println("[ActiveTrader] BREAKOUT signal: " + signal.toJson());
                 }
                 wallTracker.removeWall(wall.priceTick);
             }

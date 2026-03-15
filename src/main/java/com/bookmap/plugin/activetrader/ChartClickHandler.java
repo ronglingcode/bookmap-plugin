@@ -1,10 +1,13 @@
-package com.bookmap.plugin.wallbreakout;
+package com.bookmap.plugin.activetrader;
 
 import java.awt.AWTEvent;
 import java.awt.Toolkit;
 import java.awt.event.AWTEventListener;
+import java.awt.event.KeyEvent;
 import java.awt.event.MouseEvent;
 import java.util.Map;
+import java.util.Set;
+import java.util.Collections;
 import java.util.concurrent.ConcurrentHashMap;
 
 import velox.api.layer1.layers.strategies.interfaces.ScreenSpaceCanvasFactory;
@@ -20,7 +23,7 @@ import velox.api.layer1.layers.strategies.interfaces.ScreenSpacePainterFactory;
  * Converts the click Y coordinate to a price and broadcasts it via WebSocket.
  *
  * NOTE: The ScreenSpacePainterFactory creates one painter per chart.
- * The painter's alias parameter is the full painter name (e.g. "WallBreakoutPlugin#clickHandler"),
+ * The painter's alias parameter is the full painter name (e.g. "BookmapActiveTraderPlugin#clickHandler"),
  * NOT the instrument symbol. We maintain a separate mapping of painterAlias → instrumentAlias
  * to resolve the correct symbol when broadcasting.
  */
@@ -38,6 +41,9 @@ public class ChartClickHandler implements ScreenSpacePainterFactory {
     /** The most recently registered instrument alias — used as default. */
     private static volatile String lastRegisteredInstrument;
 
+    /** Currently held non-modifier keys (e.g. 'b', 's'). Tracked via KEY_PRESSED/KEY_RELEASED. */
+    private static final Set<String> heldKeys = Collections.newSetFromMap(new ConcurrentHashMap<>());
+
     /** Shared AWT listener — registered once. */
     private static volatile AWTEventListener awtListener;
     private static final Object listenerLock = new Object();
@@ -53,7 +59,7 @@ public class ChartClickHandler implements ScreenSpacePainterFactory {
     public void registerSymbol(String instrumentAlias, double pips) {
         instrumentPips.put(instrumentAlias, pips);
         lastRegisteredInstrument = instrumentAlias;
-        System.out.println("[WallBreakout] ChartClickHandler registered instrument: " + instrumentAlias + " pips=" + pips);
+        System.out.println("[ActiveTrader] ChartClickHandler registered instrument: " + instrumentAlias + " pips=" + pips);
     }
 
     public void unregisterSymbol(String instrumentAlias) {
@@ -67,12 +73,46 @@ public class ChartClickHandler implements ScreenSpacePainterFactory {
         synchronized (listenerLock) {
             if (awtListener != null) return;
             awtListener = event -> {
+                // Track key press/release state
+                if (event.getID() == KeyEvent.KEY_PRESSED) {
+                    KeyEvent ke = (KeyEvent) event;
+                    String key = KeyEvent.getKeyText(ke.getKeyCode()).toLowerCase();
+                    heldKeys.add(key);
+                    return;
+                }
+                if (event.getID() == KeyEvent.KEY_RELEASED) {
+                    KeyEvent ke = (KeyEvent) event;
+                    heldKeys.remove(KeyEvent.getKeyText(ke.getKeyCode()).toLowerCase());
+                    return;
+                }
+
                 if (event.getID() != MouseEvent.MOUSE_CLICKED) return;
                 MouseEvent me = (MouseEvent) event;
-                if (!me.isMetaDown() && !me.isControlDown()) return; // Cmd+Click (macOS) or Ctrl+Click (Windows)
+
+                // Require at least one key held during click (any key works)
+                if (heldKeys.isEmpty() && !me.isMetaDown() && !me.isControlDown()) return;
+
+                // Determine keyCode from held keys, ignoring pure modifier names
+                String keyCode = null;
+                for (String k : heldKeys) {
+                    if (!k.equals("meta") && !k.equals("ctrl") && !k.equals("control")
+                            && !k.equals("alt") && !k.equals("shift")
+                            && !k.equals("\u2318") && !k.equals("command")) {
+                        keyCode = k;
+                        break;
+                    }
+                }
+                if (keyCode == null) {
+                    // Only modifiers held
+                    if (me.isMetaDown() || me.isControlDown()) keyCode = "cmd";
+                    else if (me.isShiftDown()) keyCode = "shift";
+                    else if (me.isAltDown()) keyCode = "alt";
+                    else return; // no recognized key
+                }
 
                 int mouseY = me.getYOnScreen();
-                System.out.println("[WallBreakout] Cmd+Click detected at screenY=" + mouseY
+                System.out.println("[ActiveTrader] Click detected at screenY=" + mouseY
+                    + ", keyCode=" + keyCode
                     + ", painters tracked: " + painterCoords.keySet()
                     + ", instruments: " + painterToInstrument.values());
 
@@ -91,20 +131,19 @@ public class ChartClickHandler implements ScreenSpacePainterFactory {
                     double price = cs.yToPrice(mouseY, pips);
                     if (!Double.isNaN(price) && price > 0) {
                         String json = String.format(
-                            "{\"type\":\"priceSelect\",\"symbol\":\"%s\",\"price\":%.6f,\"timestamp\":%d}",
-                            instrument, price, System.currentTimeMillis());
+                            "{\"type\":\"priceSelect\",\"symbol\":\"%s\",\"price\":%.6f,\"keyCode\":\"%s\",\"timestamp\":%d}",
+                            instrument, price, keyCode, System.currentTimeMillis());
                         wsServer.broadcastSignal(json);
-                        System.out.println("[WallBreakout] Cmd+Click price select: " + instrument + " @ " + price
-                            + " (pips=" + pips
-                            + ", priceBottom=" + cs.priceBottom + ", priceHeight=" + cs.priceHeight
-                            + ", pixelsBottom=" + cs.pixelsBottom + ", pixelsHeight=" + cs.pixelsHeight + ")");
+                        System.out.println("[ActiveTrader] Price select: " + instrument + " @ " + price
+                            + " keyCode=" + keyCode);
                         return;
                     }
                 }
-                System.out.println("[WallBreakout] Cmd+Click: no valid coordinate mapping found");
+                System.out.println("[ActiveTrader] Click: no valid coordinate mapping found");
             };
-            Toolkit.getDefaultToolkit().addAWTEventListener(awtListener, AWTEvent.MOUSE_EVENT_MASK);
-            System.out.println("[WallBreakout] AWT mouse listener registered for Cmd+Click");
+            Toolkit.getDefaultToolkit().addAWTEventListener(awtListener,
+                AWTEvent.MOUSE_EVENT_MASK | AWTEvent.KEY_EVENT_MASK);
+            System.out.println("[ActiveTrader] AWT mouse listener registered for Cmd+Click");
         }
     }
 
@@ -118,7 +157,7 @@ public class ChartClickHandler implements ScreenSpacePainterFactory {
         if (lastRegisteredInstrument != null) {
             painterToInstrument.put(alias, lastRegisteredInstrument);
         }
-        System.out.println("[WallBreakout] ScreenSpacePainter created: painterAlias=" + alias
+        System.out.println("[ActiveTrader] ScreenSpacePainter created: painterAlias=" + alias
             + " → instrument=" + painterToInstrument.get(alias));
 
         return new ScreenSpacePainterAdapter() {
@@ -148,7 +187,7 @@ public class ChartClickHandler implements ScreenSpacePainterFactory {
             private void logOnce() {
                 if (!logged && coords.priceHeight > 0 && coords.pixelsHeight > 0) {
                     logged = true;
-                    System.out.println("[WallBreakout] Coordinate mapping active for painter " + alias
+                    System.out.println("[ActiveTrader] Coordinate mapping active for painter " + alias
                         + ": priceBottom=" + coords.priceBottom + ", priceHeight=" + coords.priceHeight
                         + ", pixelsBottom=" + coords.pixelsBottom + ", pixelsHeight=" + coords.pixelsHeight);
                 }
@@ -158,7 +197,7 @@ public class ChartClickHandler implements ScreenSpacePainterFactory {
             public void dispose() {
                 painterCoords.remove(alias);
                 painterToInstrument.remove(alias);
-                System.out.println("[WallBreakout] ScreenSpacePainter disposed for " + alias);
+                System.out.println("[ActiveTrader] ScreenSpacePainter disposed for " + alias);
             }
         };
     }

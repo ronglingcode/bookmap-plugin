@@ -1,4 +1,4 @@
-# Wall Breakout Detector - Bookmap Plugin
+# Bookmap Active Trader Plugin
 
 A Bookmap addon that detects when price breaks through large ask-side limit order walls on US equities and sends real-time signals via WebSocket.
 
@@ -25,8 +25,8 @@ Output JAR: `build/libs/wall-breakout-plugin-1.0-all.jar`
 1. Open Bookmap
 2. Go to **Settings** (gear icon) > **API Plugins Configuration**
 3. Click **Add** and select `wall-breakout-plugin-1.0-all.jar`
-4. In the popup, check **Wall Breakout Detector** and click OK
-5. Add the addon to a chart: right-click the chart > **Add Addon** > **Wall Breakout Detector**
+4. In the popup, check **Bookmap Active Trader** and click OK
+5. Add the addon to a chart: right-click the chart > **Add Addon** > **Bookmap Active Trader**
 
 The plugin starts a WebSocket server on `localhost:8765` when attached to an instrument.
 
@@ -238,7 +238,7 @@ Our plugin takes a more explicit approach: any ask level with >= 500K shares is 
 
 ## Configuration
 
-These are currently hardcoded constants in `WallBreakoutPlugin.java`:
+These are currently hardcoded constants in `BookmapActiveTraderPlugin.java`:
 
 | Parameter | Default | Description |
 |-----------|---------|-------------|
