@@ -18,13 +18,13 @@ Requires Java 11+ installed.
 ./gradlew shadowJar
 ```
 
-Output JAR: `build/libs/wall-breakout-plugin-1.0-all.jar`
+Output JAR: `build/libs/bookmap-active-trader-1.0-all.jar`
 
 ## Install in Bookmap
 
 1. Open Bookmap
 2. Go to **Settings** (gear icon) > **API Plugins Configuration**
-3. Click **Add** and select `wall-breakout-plugin-1.0-all.jar`
+3. Click **Add** and select `bookmap-active-trader-1.0-all.jar`
 4. In the popup, check **Bookmap Active Trader** and click OK
 5. Add the addon to a chart: right-click the chart > **Add Addon** > **Bookmap Active Trader**
 
