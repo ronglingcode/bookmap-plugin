@@ -25,33 +25,54 @@ public class WallBreakoutPlugin implements CustomModuleAdapter,
     private static final double WALL_CONSUMED_RATIO = 0.20;
     private static final int SWING_LOOKBACK = 3;
     private static final int BAR_SIZE = 100;
-    private static final double ORDERBOOK_PERCENTILE = 90; // only broadcast levels above this percentile (0 = no filter)
-    private static final int ORDERBOOK_INTERVAL_MS = 1000; // how often to broadcast orderbook snapshots
+    private static final double ORDERBOOK_PERCENTILE = 90;
+    private static final int ORDERBOOK_INTERVAL_MS = 1000;
 
+    // Shared WebSocket server across all symbol instances
+    private static SignalWebSocketServer sharedServer;
+    private static int instanceCount = 0;
+
+    private String alias;
     private OrderWallTracker wallTracker;
     private SwingLowDetector swingDetector;
-    private SignalWebSocketServer wsServer;
     private InstrumentInfo instrumentInfo;
     private OrderBookState orderBook;
 
     @Override
     public void initialize(String alias, InstrumentInfo info, Api api, InitialState initialState) {
+        this.alias = alias;
         this.instrumentInfo = info;
         this.orderBook = new OrderBookState();
         this.wallTracker = new OrderWallTracker(WALL_THRESHOLD, WALL_CONSUMED_RATIO);
         this.swingDetector = new SwingLowDetector(SWING_LOOKBACK, BAR_SIZE);
-        this.wsServer = new SignalWebSocketServer(WS_PORT, orderBook, ORDERBOOK_PERCENTILE, ORDERBOOK_INTERVAL_MS);
-        this.wsServer.setPips(info.pips);
-        this.wsServer.start();
+
+        synchronized (WallBreakoutPlugin.class) {
+            if (sharedServer == null) {
+                sharedServer = new SignalWebSocketServer(WS_PORT, ORDERBOOK_PERCENTILE, ORDERBOOK_INTERVAL_MS);
+                sharedServer.start();
+                System.out.println("[WallBreakout] Shared WebSocket server started on port " + WS_PORT);
+            }
+            instanceCount++;
+        }
+        sharedServer.registerSymbol(alias, orderBook, info.pips);
         System.out.println("[WallBreakout] Plugin initialized for " + alias);
     }
 
     @Override
     public void stop() {
-        if (wsServer != null) {
-            wsServer.shutdown();
+        if (sharedServer != null) {
+            sharedServer.unregisterSymbol(alias);
         }
-        System.out.println("[WallBreakout] Plugin stopped");
+        synchronized (WallBreakoutPlugin.class) {
+            instanceCount--;
+            if (instanceCount <= 0 && sharedServer != null) {
+                sharedServer.shutdown();
+                sharedServer = null;
+                instanceCount = 0;
+                System.out.println("[WallBreakout] Shared WebSocket server shut down");
+            }
+        }
+        System.out.println("[WallBreakout] Plugin stopped for " + alias);
     }
 
     @Override
@@ -66,7 +87,7 @@ public class WallBreakoutPlugin implements CustomModuleAdapter,
         int priceTick = (int) price;
 
         swingDetector.addPrice(realPrice);
-        wsServer.setLastPrice(realPrice);
+        sharedServer.setLastPrice(alias, realPrice);
         checkBreakout(realPrice, priceTick);
         wallTracker.cleanup(priceTick);
     }
@@ -78,8 +99,8 @@ public class WallBreakoutPlugin implements CustomModuleAdapter,
             if (currentPrice > wallRealPrice && wallTracker.isConsumed(wall)) {
                 double swingLow = swingDetector.getLastSwingLow();
                 if (!Double.isNaN(swingLow) && swingLow < wallRealPrice) {
-                    BreakoutSignal signal = new BreakoutSignal(wallRealPrice, swingLow);
-                    wsServer.broadcastSignal(signal.toJson());
+                    BreakoutSignal signal = new BreakoutSignal(alias, wallRealPrice, swingLow);
+                    sharedServer.broadcastSignal(signal.toJson());
                     System.out.println("[WallBreakout] BREAKOUT signal: " + signal.toJson());
                 }
                 wallTracker.removeWall(wall.priceTick);

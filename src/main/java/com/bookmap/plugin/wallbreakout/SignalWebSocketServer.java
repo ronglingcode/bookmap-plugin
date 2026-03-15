@@ -7,6 +7,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.StandardOpenOption;
+import java.util.Map;
 import java.util.Set;
 import java.util.Collections;
 import java.util.concurrent.ConcurrentHashMap;
@@ -14,7 +15,6 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicReference;
 
 import org.java_websocket.WebSocket;
 import org.java_websocket.handshake.ClientHandshake;
@@ -27,25 +27,26 @@ public class SignalWebSocketServer extends WebSocketServer {
         t.setDaemon(true);
         return t;
     });
-    private final AtomicReference<Double> lastPrice = new AtomicReference<>(Double.NaN);
     private final Path heartbeatLogFile;
     private final Path breakoutLogFile;
     private BufferedWriter heartbeatWriter;
     private BufferedWriter breakoutWriter;
 
-    // Order book subscription state
-    private final OrderBookState orderBook;
+    // Per-symbol state
+    private final Map<String, OrderBookState> symbolToOrderBook = new ConcurrentHashMap<>();
+    private final Map<String, Double> symbolToPips = new ConcurrentHashMap<>();
+    private final Map<String, Double> symbolToLastPrice = new ConcurrentHashMap<>();
+
+    // Broadcast config
     private final double orderbookPercentile;
     private final int orderbookIntervalMs;
-    private double pips = 1.0;
     private final Set<WebSocket> orderbookSubscribers = Collections.newSetFromMap(new ConcurrentHashMap<>());
     private ScheduledFuture<?> orderbookBroadcastTask;
 
-    public SignalWebSocketServer(int port, OrderBookState orderBook, double orderbookPercentile, int orderbookIntervalMs) {
+    public SignalWebSocketServer(int port, double orderbookPercentile, int orderbookIntervalMs) {
         super(new InetSocketAddress("127.0.0.1", port));
         setDaemon(true);
         setReuseAddr(true);
-        this.orderBook = orderBook;
         this.orderbookPercentile = orderbookPercentile;
         this.orderbookIntervalMs = orderbookIntervalMs;
         Path signalsDir = Paths.get(System.getProperty("user.home"), "ProgramLogs", "bookmap-signals");
@@ -53,8 +54,23 @@ public class SignalWebSocketServer extends WebSocketServer {
         this.breakoutLogFile = signalsDir.resolve("breakout.jsonl");
     }
 
-    public void setPips(double pips) {
-        this.pips = pips;
+    /** Register a symbol's order book and pips multiplier. */
+    public void registerSymbol(String symbol, OrderBookState orderBook, double pips) {
+        symbolToOrderBook.put(symbol, orderBook);
+        symbolToPips.put(symbol, pips);
+        System.out.println("[WallBreakout] Registered symbol: " + symbol);
+    }
+
+    /** Unregister a symbol when its plugin instance stops. */
+    public void unregisterSymbol(String symbol) {
+        symbolToOrderBook.remove(symbol);
+        symbolToPips.remove(symbol);
+        symbolToLastPrice.remove(symbol);
+        System.out.println("[WallBreakout] Unregistered symbol: " + symbol);
+    }
+
+    public void setLastPrice(String symbol, double price) {
+        symbolToLastPrice.put(symbol, price);
     }
 
     @Override
@@ -70,11 +86,6 @@ public class SignalWebSocketServer extends WebSocketServer {
 
     @Override
     public void onMessage(WebSocket conn, String message) {
-        // Handle subscription messages:
-        //   {"type":"subscribe","channel":"orderbook"}                    — subscribe with defaults
-        //   {"type":"subscribe","channel":"orderbook","intervalMs":500}   — custom interval
-        //   {"type":"subscribe","channel":"orderbook","levels":10}        — custom depth
-        //   {"type":"unsubscribe","channel":"orderbook"}                  — unsubscribe
         String trimmed = message.trim();
         if (trimmed.contains("\"subscribe\"") && trimmed.contains("\"orderbook\"")) {
             orderbookSubscribers.add(conn);
@@ -90,10 +101,10 @@ public class SignalWebSocketServer extends WebSocketServer {
 
     private synchronized void ensureOrderbookBroadcast() {
         if (orderbookBroadcastTask != null) {
-            return; // already broadcasting
+            return;
         }
         orderbookBroadcastTask = scheduler.scheduleAtFixedRate(
-            () -> sendOrderbookSnapshot(orderbookPercentile),
+            () -> sendOrderbookSnapshots(),
             0, orderbookIntervalMs, TimeUnit.MILLISECONDS
         );
     }
@@ -116,11 +127,7 @@ public class SignalWebSocketServer extends WebSocketServer {
         } catch (IOException e) {
             System.err.println("[WallBreakout] Failed to open log files: " + e.getMessage());
         }
-        scheduler.scheduleAtFixedRate(this::sendHeartbeat, 5, 5, TimeUnit.SECONDS);
-    }
-
-    public void setLastPrice(double price) {
-        lastPrice.set(price);
+        scheduler.scheduleAtFixedRate(this::sendHeartbeats, 5, 5, TimeUnit.SECONDS);
     }
 
     public void broadcastSignal(String json) {
@@ -139,34 +146,36 @@ public class SignalWebSocketServer extends WebSocketServer {
         }
     }
 
-    private void sendOrderbookSnapshot(double percentile) {
+    /** Send orderbook snapshots for ALL registered symbols. */
+    private void sendOrderbookSnapshots() {
         if (orderbookSubscribers.isEmpty()) return;
-        String orderbookJson = orderBook.toJson(pips, percentile);
-        double price = lastPrice.get();
-        String heartbeatJson = Double.isNaN(price) ? null : String.format(
-            "{\"type\":\"heartbeat\",\"price\":%.6f,\"timestamp\":%d}",
-            price, System.currentTimeMillis());
-        for (WebSocket conn : orderbookSubscribers) {
-            if (conn.isOpen()) {
-                if (heartbeatJson != null) {
-                    conn.send(heartbeatJson);
+        for (Map.Entry<String, OrderBookState> entry : symbolToOrderBook.entrySet()) {
+            String symbol = entry.getKey();
+            OrderBookState orderBook = entry.getValue();
+            Double pips = symbolToPips.get(symbol);
+            if (pips == null) continue;
+
+            String orderbookJson = orderBook.toJson(symbol, pips, orderbookPercentile);
+            for (WebSocket conn : orderbookSubscribers) {
+                if (conn.isOpen()) {
+                    conn.send(orderbookJson);
                 }
-                conn.send(orderbookJson);
             }
         }
     }
 
-    private void sendHeartbeat() {
-        double price = lastPrice.get();
-        if (Double.isNaN(price)) {
-            return;
-        }
-        String json = String.format(
-            "{\"type\":\"heartbeat\",\"price\":%.6f,\"timestamp\":%d}",
-            price, System.currentTimeMillis());
-        writeToFile(heartbeatWriter, json);
-        if (!getConnections().isEmpty()) {
-            broadcast(json);
+    /** Send heartbeats for ALL registered symbols. */
+    private void sendHeartbeats() {
+        for (Map.Entry<String, Double> entry : symbolToLastPrice.entrySet()) {
+            String symbol = entry.getKey();
+            double price = entry.getValue();
+            String json = String.format(
+                "{\"type\":\"heartbeat\",\"symbol\":\"%s\",\"price\":%.6f,\"timestamp\":%d}",
+                symbol, price, System.currentTimeMillis());
+            writeToFile(heartbeatWriter, json);
+            if (!getConnections().isEmpty()) {
+                broadcast(json);
+            }
         }
     }
 

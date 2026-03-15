@@ -132,10 +132,11 @@ public class OrderBookState {
      * @param pips multiplier to convert tick prices to real prices
      * @param percentile 0-100; 0 means no filtering
      */
-    public String toJson(double pips, double percentile) {
+    public String toJson(String symbol, double pips, double percentile) {
         int minSize = (percentile > 0) ? getPercentileThreshold(percentile) : 0;
         StringBuilder sb = new StringBuilder();
-        sb.append("{\"type\":\"orderbook\",\"timestamp\":").append(System.currentTimeMillis());
+        sb.append("{\"type\":\"orderbook\",\"symbol\":\"").append(symbol).append("\"");
+        sb.append(",\"timestamp\":").append(System.currentTimeMillis());
         sb.append(",\"percentile\":").append(percentile);
         sb.append(",\"minSize\":").append(minSize);
         // Always include unfiltered best bid/ask so clients know the current price
