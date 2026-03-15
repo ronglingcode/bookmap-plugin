@@ -138,9 +138,18 @@ public class OrderBookState {
         sb.append("{\"type\":\"orderbook\",\"timestamp\":").append(System.currentTimeMillis());
         sb.append(",\"percentile\":").append(percentile);
         sb.append(",\"minSize\":").append(minSize);
-        sb.append(",\"bids\":[");
+        // Always include unfiltered best bid/ask so clients know the current price
+        Integer bestBidTick = getBestBid();
+        Integer bestAskTick = getBestAsk();
+        if (bestBidTick != null) {
+            sb.append(",\"bestBid\":").append(String.format("%.6f", bestBidTick * pips));
+        }
+        if (bestAskTick != null) {
+            sb.append(",\"bestAsk\":").append(String.format("%.6f", bestAskTick * pips));
+        }
+        sb.append(",\"largeBids\":[");
         appendLevels(sb, bids, pips, minSize);
-        sb.append("],\"asks\":[");
+        sb.append("],\"largeAsks\":[");
         appendLevels(sb, asks, pips, minSize);
         sb.append("]}");
         return sb.toString();
