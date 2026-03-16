@@ -92,6 +92,7 @@ public class BookmapActiveTraderPlugin implements CustomModuleAdapter,
         synchronized (BookmapActiveTraderPlugin.class) {
             instanceCount--;
             if (instanceCount <= 0 && sharedServer != null) {
+                ChartClickHandler.removeAwtListener();
                 sharedServer.shutdown();
                 sharedServer = null;
                 chartClickHandler = null;

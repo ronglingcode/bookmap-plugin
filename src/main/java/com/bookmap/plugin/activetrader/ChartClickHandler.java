@@ -68,6 +68,20 @@ public class ChartClickHandler implements ScreenSpacePainterFactory {
         painterToInstrument.entrySet().removeIf(e -> e.getValue().equals(instrumentAlias));
     }
 
+    /** Remove the global AWT listener so a fresh one can be registered on next init. */
+    public static void removeAwtListener() {
+        synchronized (listenerLock) {
+            if (awtListener != null) {
+                Toolkit.getDefaultToolkit().removeAWTEventListener(awtListener);
+                awtListener = null;
+                heldKeys.clear();
+                painterCoords.clear();
+                painterToInstrument.clear();
+                System.out.println("[ActiveTrader] AWT listener removed");
+            }
+        }
+    }
+
     private void ensureAwtListener() {
         if (awtListener != null) return;
         synchronized (listenerLock) {
