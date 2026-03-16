@@ -1,0 +1,19 @@
+plugins {
+    id 'com.gradleup.shadow'
+}
+
+dependencies {
+    implementation project(':common')
+}
+
+shadowJar {
+    archiveClassifier.set('all')
+    relocate 'org.java_websocket', 'com.bookmap.plugin.shaded.websocket'
+}
+
+jar {
+    manifest {
+        attributes 'Implementation-Title': 'Bookmap Active Trader'
+        attributes 'Implementation-Version': version
+    }
+}

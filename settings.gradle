@@ -1,1 +1,2 @@
-rootProject.name = 'bookmap-active-trader'
+rootProject.name = 'bookmap-plugin'
+include 'common', 'rong', 'activetrader'

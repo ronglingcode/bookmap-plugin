@@ -1,4 +1,4 @@
-package com.bookmap.plugin.activetrader;
+package com.bookmap.plugin.common;
 
 import java.io.BufferedWriter;
 import java.io.IOException;

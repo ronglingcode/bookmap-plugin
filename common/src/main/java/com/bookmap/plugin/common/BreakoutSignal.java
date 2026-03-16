@@ -1,4 +1,4 @@
-package com.bookmap.plugin.activetrader;
+package com.bookmap.plugin.common;
 
 public class BreakoutSignal {
 

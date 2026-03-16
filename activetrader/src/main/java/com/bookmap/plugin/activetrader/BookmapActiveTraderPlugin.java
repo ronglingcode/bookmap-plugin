@@ -15,6 +15,13 @@ import velox.api.layer1.simplified.DepthDataListener;
 import velox.api.layer1.simplified.InitialState;
 import velox.api.layer1.simplified.TradeDataListener;
 
+import com.bookmap.plugin.common.BreakoutSignal;
+import com.bookmap.plugin.common.ChartClickHandler;
+import com.bookmap.plugin.common.OrderBookState;
+import com.bookmap.plugin.common.OrderWallTracker;
+import com.bookmap.plugin.common.SignalWebSocketServer;
+import com.bookmap.plugin.common.SwingLowDetector;
+
 @Layer1SimpleAttachable
 @Layer1StrategyName("Bookmap Active Trader")
 @Layer1ApiVersion(Layer1ApiVersionValue.VERSION1)
