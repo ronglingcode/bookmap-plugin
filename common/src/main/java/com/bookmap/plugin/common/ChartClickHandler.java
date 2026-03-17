@@ -222,6 +222,7 @@ public class ChartClickHandler implements ScreenSpacePainterFactory {
         double yToPrice(int screenY, double pips) {
             if (pixelsHeight <= 0 || priceHeight <= 0) return Double.NaN;
             double fraction = (double)(pixelsBottom - screenY) / pixelsHeight;
+            if (fraction < 0 || fraction > 1) return Double.NaN;
             double priceTick = priceBottom + priceHeight * fraction;
             return priceTick * pips;
         }
