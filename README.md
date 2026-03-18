@@ -33,7 +33,8 @@ bookmap-plugin/
 Requires Java 11+ installed.
 
 ```bash
-./gradlew shadowJar
+mac: ./gradlew shadowJar
+windows: gradlew shadowJar
 ```
 
 Output JARs:
