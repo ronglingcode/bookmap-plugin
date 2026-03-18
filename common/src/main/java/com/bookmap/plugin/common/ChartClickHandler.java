@@ -5,6 +5,12 @@ import java.awt.Toolkit;
 import java.awt.event.AWTEventListener;
 import java.awt.event.KeyEvent;
 import java.awt.event.MouseEvent;
+import java.io.BufferedWriter;
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.nio.file.StandardOpenOption;
 import java.util.Map;
 import java.util.Set;
 import java.util.Collections;
@@ -48,11 +54,35 @@ public class ChartClickHandler implements ScreenSpacePainterFactory {
     private static volatile AWTEventListener awtListener;
     private static final Object listenerLock = new Object();
 
+    private static volatile BufferedWriter clickLogWriter;
     private final SignalWebSocketServer wsServer;
 
     public ChartClickHandler(SignalWebSocketServer wsServer) {
         this.wsServer = wsServer;
+        initClickLog();
         ensureAwtListener();
+    }
+
+    private static void initClickLog() {
+        if (clickLogWriter != null) return;
+        try {
+            Path logFile = Paths.get(System.getProperty("user.home"), "ProgramLogs", "bookmap-signals", "click-debug.log");
+            Files.createDirectories(logFile.getParent());
+            clickLogWriter = Files.newBufferedWriter(logFile, StandardOpenOption.CREATE, StandardOpenOption.APPEND);
+        } catch (IOException e) {
+            System.err.println("[ActiveTrader] Failed to open click log: " + e.getMessage());
+        }
+    }
+
+    private static void logClick(String msg) {
+        System.out.println(msg);
+        if (clickLogWriter != null) {
+            try {
+                clickLogWriter.write(System.currentTimeMillis() + " " + msg);
+                clickLogWriter.newLine();
+                clickLogWriter.flush();
+            } catch (IOException ignored) {}
+        }
     }
 
     /** Register an instrument's pips before the painter is created. */
@@ -116,18 +146,17 @@ public class ChartClickHandler implements ScreenSpacePainterFactory {
                     else if (me.isAltDown()) keyCode = "alt";
                 }
 
-                int mouseY = me.getYOnScreen();
-                System.out.println("[ActiveTrader] Click detected at screenY=" + mouseY
-                    + ", keyCode=" + keyCode
-                    + ", painters tracked: " + painterCoords.keySet()
-                    + ", instruments: " + painterToInstrument.values());
+                int localY = me.getY();
+                java.awt.Component comp = me.getComponent();
+                int compHeight = (comp != null) ? comp.getHeight() : 0;
 
-                // First pass: find the painter whose chart contains the click (fraction in [0,1])
+                logClick("[ActiveTrader] Click: localY=" + localY
+                    + ", compHeight=" + compHeight
+                    + ", keyCode=" + keyCode);
+
+                // Find the painter whose chart contains the click (fraction in [0,1])
                 String bestInstrument = null;
                 double bestPrice = Double.NaN;
-                // Fallback: first painter with any valid price (in case coordinate spaces don't align)
-                String fallbackInstrument = null;
-                double fallbackPrice = Double.NaN;
 
                 for (Map.Entry<String, CoordinateState> entry : painterCoords.entrySet()) {
                     String painterAlias = entry.getKey();
@@ -138,42 +167,31 @@ public class ChartClickHandler implements ScreenSpacePainterFactory {
                     if (instrument == null) instrument = painterAlias;
                     double pips = instrumentPips.getOrDefault(instrument, 1.0);
 
-                    double fraction = cs.fraction(mouseY);
-                    double price = cs.yToPrice(mouseY, pips);
+                    double fraction = cs.fraction(localY, compHeight);
+                    double price = cs.yToPrice(localY, compHeight, pips);
 
-                    System.out.println("[ActiveTrader] Painter " + painterAlias + " → " + instrument
+                    logClick("[ActiveTrader] Painter " + painterAlias + " → " + instrument
                         + ": fraction=" + String.format("%.4f", fraction)
                         + ", price=" + String.format("%.6f", price)
-                        + ", pixelsBottom=" + cs.pixelsBottom + ", pixelsHeight=" + cs.pixelsHeight);
+                        + ", pixelsBottom=" + cs.pixelsBottom + ", pixelsHeight=" + cs.pixelsHeight
+                        + ", priceBottom=" + cs.priceBottom + ", priceHeight=" + cs.priceHeight);
 
                     if (fraction >= 0 && fraction <= 1 && !Double.isNaN(price) && price > 0) {
                         bestInstrument = instrument;
                         bestPrice = price;
                         break;
                     }
-                    if (fallbackInstrument == null && !Double.isNaN(price) && price > 0) {
-                        fallbackInstrument = instrument;
-                        fallbackPrice = price;
-                    }
                 }
 
-                String selectedInstrument = bestInstrument;
-                double selectedPrice = bestPrice;
-                if (selectedInstrument == null && fallbackInstrument != null) {
-                    selectedInstrument = fallbackInstrument;
-                    selectedPrice = fallbackPrice;
-                    System.out.println("[ActiveTrader] WARNING: No painter matched bounds, using fallback: " + fallbackInstrument);
-                }
-
-                if (selectedInstrument != null) {
+                if (bestInstrument != null) {
                     String json = String.format(
                         "{\"type\":\"priceSelect\",\"symbol\":\"%s\",\"price\":%.6f,\"keyCode\":\"%s\",\"timestamp\":%d}",
-                        selectedInstrument, selectedPrice, keyCode, System.currentTimeMillis());
+                        bestInstrument, bestPrice, keyCode, System.currentTimeMillis());
                     wsServer.broadcastSignal(json);
-                    System.out.println("[ActiveTrader] Price select: " + selectedInstrument + " @ " + selectedPrice
+                    logClick("[ActiveTrader] Price select: " + bestInstrument + " @ " + bestPrice
                         + " keyCode=" + keyCode);
                 } else {
-                    System.out.println("[ActiveTrader] Click: no valid coordinate mapping found");
+                    logClick("[ActiveTrader] Click: no painter matched bounds");
                 }
             };
             Toolkit.getDefaultToolkit().addAWTEventListener(awtListener,
@@ -241,22 +259,28 @@ public class ChartClickHandler implements ScreenSpacePainterFactory {
     private static class CoordinateState {
         volatile long priceBottom;  // price at bottom of chart (in ticks)
         volatile long priceHeight;  // price range visible (in ticks)
-        volatile int pixelsBottom;  // Y pixel of chart bottom edge
-        volatile int pixelsHeight;  // pixel height of chart area
+        volatile int pixelsBottom;  // pixels from component bottom to heatmap bottom (bottom margin)
+        volatile int pixelsHeight;  // pixel height of heatmap area
 
-        /** Compute where screenY falls relative to this chart (0 = bottom, 1 = top). */
-        double fraction(int screenY) {
+        /**
+         * Compute where a click falls in the heatmap (0 = bottom, 1 = top).
+         *
+         * Bookmap's pixelsBottom is a bottom margin: the heatmap bottom in
+         * component-local top-down coords is (compHeight - pixelsBottom).
+         * localY is also in component-local top-down coords (from getY()).
+         */
+        double fraction(int localY, int compHeight) {
             if (pixelsHeight <= 0) return Double.NaN;
-            return (double)(pixelsBottom - screenY) / pixelsHeight;
+            int heatmapBottom = compHeight - pixelsBottom;
+            return (double)(heatmapBottom - localY) / pixelsHeight;
         }
 
         /**
-         * Convert a screen Y coordinate to a real price.
-         * Y increases downward in screen coords, but price increases upward.
+         * Convert a component-local Y coordinate to a real price.
          */
-        double yToPrice(int screenY, double pips) {
+        double yToPrice(int localY, int compHeight, double pips) {
             if (pixelsHeight <= 0 || priceHeight <= 0) return Double.NaN;
-            double f = fraction(screenY);
+            double f = fraction(localY, compHeight);
             double priceTick = priceBottom + priceHeight * f;
             return priceTick * pips;
         }
