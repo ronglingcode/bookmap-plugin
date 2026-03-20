@@ -72,8 +72,9 @@ public class BookmapActiveTraderPlugin implements CustomModuleAdapter,
         chartClickHandler.registerSymbol(alias, info.pips);
 
         // Register ScreenSpacePainter to receive chart coordinate mappings
+        // Tag must be unique per instrument so each chart gets its own painter
         api.sendUserMessage(Layer1ApiUserMessageModifyScreenSpacePainter.builder(
-                BookmapActiveTraderPlugin.class, "clickHandler")
+                BookmapActiveTraderPlugin.class, "clickHandler_" + alias)
                 .setScreenSpacePainterFactory(chartClickHandler)
                 .setIsAdd(true)
                 .build());
@@ -88,7 +89,7 @@ public class BookmapActiveTraderPlugin implements CustomModuleAdapter,
         }
         // Unregister ScreenSpacePainter
         api.sendUserMessage(Layer1ApiUserMessageModifyScreenSpacePainter.builder(
-                BookmapActiveTraderPlugin.class, "clickHandler")
+                BookmapActiveTraderPlugin.class, "clickHandler_" + alias)
                 .setScreenSpacePainterFactory(chartClickHandler)
                 .setIsAdd(false)
                 .build());

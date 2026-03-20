@@ -72,8 +72,9 @@ public class RongPlugin implements CustomModuleAdapter,
         chartClickHandler.registerSymbol(alias, info.pips);
 
         // Register ScreenSpacePainter to receive chart coordinate mappings
+        // Tag must be unique per instrument so each chart gets its own painter
         api.sendUserMessage(Layer1ApiUserMessageModifyScreenSpacePainter.builder(
-                RongPlugin.class, "clickHandler")
+                RongPlugin.class, "clickHandler_" + alias)
                 .setScreenSpacePainterFactory(chartClickHandler)
                 .setIsAdd(true)
                 .build());
@@ -88,7 +89,7 @@ public class RongPlugin implements CustomModuleAdapter,
         }
         // Unregister ScreenSpacePainter
         api.sendUserMessage(Layer1ApiUserMessageModifyScreenSpacePainter.builder(
-                RongPlugin.class, "clickHandler")
+                RongPlugin.class, "clickHandler_" + alias)
                 .setScreenSpacePainterFactory(chartClickHandler)
                 .setIsAdd(false)
                 .build());
