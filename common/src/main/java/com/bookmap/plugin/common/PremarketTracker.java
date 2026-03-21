@@ -1,5 +1,6 @@
 package com.bookmap.plugin.common;
 
+import java.time.Instant;
 import java.time.LocalTime;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
@@ -32,8 +33,17 @@ public class PremarketTracker implements IndicatorConfig.ChangeListener {
         config.addChangeListener(this);
     }
 
+    /** Current data/replay time in epoch nanoseconds, updated via onTimestamp(). */
+    private volatile long currentTimestampNs;
+
+    /** Called by the plugin's TimeListener to keep the tracker in sync with data/replay time. */
+    public void setTimestamp(long timestampNs) {
+        this.currentTimestampNs = timestampNs;
+    }
+
     /**
      * Called on each trade. Updates premarket high/low if currently in premarket hours.
+     * Uses the data/replay timestamp (set via setTimestamp) instead of system clock.
      *
      * @param instrumentAlias instrument identifier
      * @param priceTick       price in tick units (for canvas coordinates)
@@ -41,8 +51,9 @@ public class PremarketTracker implements IndicatorConfig.ChangeListener {
      */
     public void onTrade(String instrumentAlias, double priceTick, double realPrice) {
         if (!config.isEnabled(IndicatorConfig.PREMARKET_HIGH_LOW)) return;
+        if (currentTimestampNs == 0) return; // no timestamp received yet
 
-        ZonedDateTime now = ZonedDateTime.now(ET);
+        ZonedDateTime now = Instant.ofEpochSecond(0, currentTimestampNs).atZone(ET);
         LocalTime timeET = now.toLocalTime();
 
         PremarketState state = states.computeIfAbsent(instrumentAlias, k -> new PremarketState());

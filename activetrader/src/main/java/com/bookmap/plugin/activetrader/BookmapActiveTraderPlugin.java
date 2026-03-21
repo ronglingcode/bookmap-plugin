@@ -14,6 +14,7 @@ import velox.api.layer1.simplified.Api;
 import velox.api.layer1.simplified.CustomModuleAdapter;
 import velox.api.layer1.simplified.DepthDataListener;
 import velox.api.layer1.simplified.InitialState;
+import velox.api.layer1.simplified.TimeListener;
 import velox.api.layer1.simplified.TradeDataListener;
 import velox.gui.StrategyPanel;
 
@@ -36,7 +37,7 @@ import com.bookmap.plugin.common.SwingLowDetector;
 @Layer1StrategyName("Bookmap Active Trader")
 @Layer1ApiVersion(Layer1ApiVersionValue.VERSION1)
 public class BookmapActiveTraderPlugin implements CustomModuleAdapter,
-        DepthDataListener, TradeDataListener, CustomSettingsPanelProvider {
+        DepthDataListener, TradeDataListener, TimeListener, CustomSettingsPanelProvider {
 
     private static final int WS_PORT = 8765;
     private static final int WALL_THRESHOLD = 500_000;
@@ -198,6 +199,13 @@ public class BookmapActiveTraderPlugin implements CustomModuleAdapter,
 
         if (premarketTracker != null) {
             premarketTracker.onTrade(alias, price, realPrice);
+        }
+    }
+
+    @Override
+    public void onTimestamp(long timestampNs) {
+        if (premarketTracker != null) {
+            premarketTracker.setTimestamp(timestampNs);
         }
     }
 
