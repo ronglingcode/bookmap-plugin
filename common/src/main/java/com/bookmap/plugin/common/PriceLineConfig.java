@@ -15,7 +15,9 @@ public class PriceLineConfig {
     public PriceLineConfig() {
         // Load defaults
         for (PriceLine.LineType type : PriceLine.LineType.values()) {
-            keyToLineType.put(type.defaultKey, type);
+            if (type.defaultKey != null) {
+                keyToLineType.put(type.defaultKey, type);
+            }
         }
     }
 
