@@ -33,6 +33,7 @@ import com.bookmap.plugin.common.PriceLinePainter;
 import com.bookmap.plugin.common.PriceLineStore;
 import com.bookmap.plugin.common.SignalWebSocketServer;
 import com.bookmap.plugin.common.SwingLowDetector;
+import com.bookmap.plugin.common.VwapTracker;
 
 @Layer1SimpleAttachable
 @Layer1StrategyName("Rong")
@@ -57,6 +58,7 @@ public class RongPlugin implements CustomModuleAdapter,
     private static PriceLinePainter priceLinePainter;
     private static IndicatorConfig indicatorConfig;
     private static PremarketTracker premarketTracker;
+    private static VwapTracker vwapTracker;
 
     private String alias;
     private Api api;
@@ -89,6 +91,7 @@ public class RongPlugin implements CustomModuleAdapter,
                 priceLinePainter = new PriceLinePainter(priceLineStore);
                 indicatorConfig = new IndicatorConfig();
                 premarketTracker = new PremarketTracker(priceLineStore, indicatorConfig);
+                vwapTracker = new VwapTracker(priceLineStore, indicatorConfig);
 
                 // Wire click callback: key+click creates a price line if key is bound
                 chartClickHandler.setClickCallback((instrument, priceInTicks, realPrice, keyCode) -> {
@@ -126,8 +129,13 @@ public class RongPlugin implements CustomModuleAdapter,
         final double pips = info.pips;
         final long initTime = initialState.getCurrentTime();
         api.sendUserMessage(new Layer1ApiDataInterfaceRequestMessage(dataInterface -> {
-            if (premarketTracker != null && dataInterface != null) {
-                premarketTracker.backfillFromHistory(dataInterface, instrumentAlias, pips, initTime);
+            if (dataInterface != null) {
+                if (premarketTracker != null) {
+                    premarketTracker.backfillFromHistory(dataInterface, instrumentAlias, pips, initTime);
+                }
+                if (vwapTracker != null) {
+                    vwapTracker.backfillFromHistory(dataInterface, instrumentAlias, pips, initTime);
+                }
             }
         }));
 
@@ -157,6 +165,9 @@ public class RongPlugin implements CustomModuleAdapter,
         if (premarketTracker != null) {
             premarketTracker.unregister(alias);
         }
+        if (vwapTracker != null) {
+            vwapTracker.unregister(alias);
+        }
         if (priceLineStore != null) {
             priceLineStore.clearAll(alias);
         }
@@ -170,6 +181,10 @@ public class RongPlugin implements CustomModuleAdapter,
                 if (premarketTracker != null) {
                     premarketTracker.shutdown();
                     premarketTracker = null;
+                }
+                if (vwapTracker != null) {
+                    vwapTracker.shutdown();
+                    vwapTracker = null;
                 }
                 sharedServer.shutdown();
                 sharedServer = null;
@@ -212,12 +227,18 @@ public class RongPlugin implements CustomModuleAdapter,
         if (premarketTracker != null) {
             premarketTracker.onTrade(alias, price, realPrice);
         }
+        if (vwapTracker != null) {
+            vwapTracker.onTrade(alias, price, realPrice, size);
+        }
     }
 
     @Override
     public void onTimestamp(long timestampNs) {
         if (premarketTracker != null) {
             premarketTracker.setTimestamp(timestampNs);
+        }
+        if (vwapTracker != null) {
+            vwapTracker.setTimestamp(timestampNs);
         }
     }
 

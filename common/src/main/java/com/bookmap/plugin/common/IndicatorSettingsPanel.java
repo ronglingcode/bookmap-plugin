@@ -30,5 +30,13 @@ public class IndicatorSettingsPanel extends StrategyPanel {
         premarketCheckbox.addActionListener(e ->
                 config.setEnabled(IndicatorConfig.PREMARKET_HIGH_LOW, premarketCheckbox.isSelected()));
         add(premarketCheckbox, gbc);
+
+        // VWAP toggle
+        gbc.gridy++;
+        JCheckBox vwapCheckbox = new JCheckBox("VWAP (Volume Weighted Average Price)",
+                config.isEnabled(IndicatorConfig.VWAP));
+        vwapCheckbox.addActionListener(e ->
+                config.setEnabled(IndicatorConfig.VWAP, vwapCheckbox.isSelected()));
+        add(vwapCheckbox, gbc);
     }
 }

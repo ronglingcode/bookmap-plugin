@@ -21,13 +21,14 @@ Both plugins share the same core logic in the `common` module. Features can be a
 **Chart drawing:**
 4. Hold a key (S/T/E by default) and click on the chart to draw a price line at that level
 5. Premarket high/low lines are drawn and updated automatically during 4:00-9:30 AM ET
+6. VWAP (Volume Weighted Average Price) is calculated and drawn from 4:00 AM ET through the entire trading day
 6. All lines use Bookmap's data coordinates so they track through scroll and zoom
 
 ## Features
 
 - **Order wall breakout detection** — monitors large ask-side walls and broadcasts signals when consumed
 - **Key+click price lines** — hold a configurable key and click to draw stop loss, take profit, or entry lines
-- **Auto-drawn indicators** — premarket high/low levels drawn and updated automatically
+- **Auto-drawn indicators** — premarket high/low and VWAP levels drawn and updated automatically
 - **WebSocket API** — real-time heartbeat, breakout, order book, and price select messages
 - **Settings panels** — configure key bindings and enable/disable indicators at runtime
 
@@ -42,6 +43,7 @@ bookmap-plugin/
 │   ├── PriceLinePainter     # ScreenSpaceCanvas drawing engine
 │   ├── PriceLineConfig      # Key binding configuration
 │   ├── PremarketTracker     # Auto premarket high/low tracking
+│   ├── VwapTracker          # Volume Weighted Average Price tracking
 │   ├── IndicatorConfig      # Enable/disable toggles for auto indicators
 │   ├── IndicatorSettingsPanel / KeyBindingSettingsPanel  # Settings UI
 │   ├── OrderBookState       # Full order book state
@@ -258,13 +260,27 @@ Automatically draws and updates horizontal lines at the premarket session high a
 - Resets automatically at the start of each new premarket session (4:00 AM ET)
 - Enabled by default; disable via the **Indicators** settings panel
 
-#### Replay & Multi-Day Data
+### VWAP (Volume Weighted Average Price)
 
-The premarket tracker uses Bookmap's **data/replay time** (not system clock), so it works correctly in both live and replay modes:
+Automatically draws and updates a horizontal line at the running VWAP — the average price weighted by trade volume.
 
-- **Multi-day replay**: When replaying feed data that spans multiple days, the tracker automatically resets at the start of each new day's premarket session. Previous day's lines are cleared and new lines are drawn for the current day.
-- **Mid-session attach**: If the plugin is attached after premarket has already started (e.g. you turn on your computer at 7 AM), it backfills from Bookmap's historical trade data to catch up on the premarket high/low from 4:00 AM onward.
-- **Time source**: All time decisions use the most recent data/replay timestamp received from Bookmap's `TimeListener`, which keeps the tracker in sync with whatever time the chart is showing.
+| Line | Color | Description |
+|------|-------|-------------|
+| VWAP | Teal | Cumulative volume-weighted average price for the day |
+
+- **Formula**: VWAP = Σ(price × volume) / Σ(volume)
+- **Session start**: 4:00 AM ET (includes premarket volume)
+- **Runs all day**: Unlike premarket high/low which stops updating at 9:30 AM, VWAP continues updating through the entire trading day (premarket + regular hours)
+- Resets automatically at the start of each new session (4:00 AM ET)
+- Enabled by default; disable via the **Indicators** settings panel
+
+### Replay & Multi-Day Data
+
+Both the premarket tracker and VWAP tracker use Bookmap's **data/replay time** (not system clock), so they work correctly in both live and replay modes:
+
+- **Multi-day replay**: When replaying feed data that spans multiple days, indicators automatically reset at the start of each new day's session. Previous day's lines are cleared and new lines are drawn for the current day.
+- **Mid-session attach**: If the plugin is attached after trading has already started (e.g. you turn on your computer at 7 AM), it backfills from Bookmap's historical trade data to catch up on premarket high/low and VWAP from 4:00 AM onward.
+- **Time source**: All time decisions use the most recent data/replay timestamp received from Bookmap's `TimeListener`, which keeps trackers in sync with whatever time the chart is showing.
 
 ## Configuration
 

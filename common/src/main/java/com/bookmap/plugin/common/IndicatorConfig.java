@@ -10,6 +10,7 @@ import java.util.concurrent.ConcurrentHashMap;
 public class IndicatorConfig {
 
     public static final String PREMARKET_HIGH_LOW = "premarket_high_low";
+    public static final String VWAP = "vwap";
 
     private final Map<String, Boolean> enabled = new ConcurrentHashMap<>();
 
@@ -24,6 +25,7 @@ public class IndicatorConfig {
     public IndicatorConfig() {
         // Defaults: all indicators enabled
         enabled.put(PREMARKET_HIGH_LOW, true);
+        enabled.put(VWAP, true);
     }
 
     public boolean isEnabled(String indicatorKey) {

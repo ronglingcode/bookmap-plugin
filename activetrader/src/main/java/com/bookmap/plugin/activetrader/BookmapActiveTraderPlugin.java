@@ -33,6 +33,7 @@ import com.bookmap.plugin.common.PriceLinePainter;
 import com.bookmap.plugin.common.PriceLineStore;
 import com.bookmap.plugin.common.SignalWebSocketServer;
 import com.bookmap.plugin.common.SwingLowDetector;
+import com.bookmap.plugin.common.VwapTracker;
 
 @Layer1SimpleAttachable
 @Layer1StrategyName("Bookmap Active Trader")
@@ -57,6 +58,7 @@ public class BookmapActiveTraderPlugin implements CustomModuleAdapter,
     private static PriceLinePainter priceLinePainter;
     private static IndicatorConfig indicatorConfig;
     private static PremarketTracker premarketTracker;
+    private static VwapTracker vwapTracker;
 
     private String alias;
     private Api api;
@@ -89,6 +91,7 @@ public class BookmapActiveTraderPlugin implements CustomModuleAdapter,
                 priceLinePainter = new PriceLinePainter(priceLineStore);
                 indicatorConfig = new IndicatorConfig();
                 premarketTracker = new PremarketTracker(priceLineStore, indicatorConfig);
+                vwapTracker = new VwapTracker(priceLineStore, indicatorConfig);
 
                 chartClickHandler.setClickCallback((instrument, priceInTicks, realPrice, keyCode) -> {
                     PriceLine.LineType lineType = priceLineConfig.getLineType(keyCode);
@@ -125,8 +128,13 @@ public class BookmapActiveTraderPlugin implements CustomModuleAdapter,
         final double pips = info.pips;
         final long initTime = initialState.getCurrentTime();
         api.sendUserMessage(new Layer1ApiDataInterfaceRequestMessage(dataInterface -> {
-            if (premarketTracker != null && dataInterface != null) {
-                premarketTracker.backfillFromHistory(dataInterface, instrumentAlias, pips, initTime);
+            if (dataInterface != null) {
+                if (premarketTracker != null) {
+                    premarketTracker.backfillFromHistory(dataInterface, instrumentAlias, pips, initTime);
+                }
+                if (vwapTracker != null) {
+                    vwapTracker.backfillFromHistory(dataInterface, instrumentAlias, pips, initTime);
+                }
             }
         }));
 
@@ -156,6 +164,9 @@ public class BookmapActiveTraderPlugin implements CustomModuleAdapter,
         if (premarketTracker != null) {
             premarketTracker.unregister(alias);
         }
+        if (vwapTracker != null) {
+            vwapTracker.unregister(alias);
+        }
         if (priceLineStore != null) {
             priceLineStore.clearAll(alias);
         }
@@ -169,6 +180,10 @@ public class BookmapActiveTraderPlugin implements CustomModuleAdapter,
                 if (premarketTracker != null) {
                     premarketTracker.shutdown();
                     premarketTracker = null;
+                }
+                if (vwapTracker != null) {
+                    vwapTracker.shutdown();
+                    vwapTracker = null;
                 }
                 sharedServer.shutdown();
                 sharedServer = null;
@@ -211,12 +226,18 @@ public class BookmapActiveTraderPlugin implements CustomModuleAdapter,
         if (premarketTracker != null) {
             premarketTracker.onTrade(alias, price, realPrice);
         }
+        if (vwapTracker != null) {
+            vwapTracker.onTrade(alias, price, realPrice, size);
+        }
     }
 
     @Override
     public void onTimestamp(long timestampNs) {
         if (premarketTracker != null) {
             premarketTracker.setTimestamp(timestampNs);
+        }
+        if (vwapTracker != null) {
+            vwapTracker.setTimestamp(timestampNs);
         }
     }
 

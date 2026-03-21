@@ -16,7 +16,8 @@ public class PriceLine {
 
         // Auto-drawn indicator line types (defaultKey = null)
         PREMARKET_HIGH("PM High", new Color(255, 165, 0), null),
-        PREMARKET_LOW("PM Low", new Color(180, 100, 255), null);
+        PREMARKET_LOW("PM Low", new Color(180, 100, 255), null),
+        VWAP("VWAP", new Color(0, 180, 180), null);
 
         public final String label;
         public final Color color;
