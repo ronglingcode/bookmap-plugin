@@ -9,6 +9,7 @@ import velox.api.layer1.annotations.Layer1SimpleAttachable;
 import velox.api.layer1.annotations.Layer1StrategyName;
 import velox.api.layer1.data.InstrumentInfo;
 import velox.api.layer1.data.TradeInfo;
+import velox.api.layer1.messages.indicators.Layer1ApiDataInterfaceRequestMessage;
 import velox.api.layer1.messages.indicators.Layer1ApiUserMessageModifyScreenSpacePainter;
 import velox.api.layer1.simplified.Api;
 import velox.api.layer1.simplified.CustomModuleAdapter;
@@ -119,6 +120,16 @@ public class RongPlugin implements CustomModuleAdapter,
                 .setScreenSpacePainterFactory(priceLinePainter)
                 .setIsAdd(true)
                 .build());
+
+        // Backfill premarket high/low from historical data (handles mid-session attach)
+        final String instrumentAlias = alias;
+        final double pips = info.pips;
+        final long initTime = initialState.getCurrentTime();
+        api.sendUserMessage(new Layer1ApiDataInterfaceRequestMessage(dataInterface -> {
+            if (premarketTracker != null && dataInterface != null) {
+                premarketTracker.backfillFromHistory(dataInterface, instrumentAlias, pips, initTime);
+            }
+        }));
 
         System.out.println("[Rong] Plugin initialized for " + alias);
     }

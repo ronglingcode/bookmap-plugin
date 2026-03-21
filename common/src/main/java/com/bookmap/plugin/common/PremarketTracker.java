@@ -1,11 +1,18 @@
 package com.bookmap.plugin.common;
 
 import java.time.Instant;
+import java.time.LocalDate;
 import java.time.LocalTime;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+
+import velox.api.layer1.datastructure.events.TradeAggregationEvent;
+import velox.api.layer1.messages.indicators.DataStructureInterface;
+import velox.api.layer1.messages.indicators.DataStructureInterface.StandardEvents;
+import velox.api.layer1.messages.indicators.DataStructureInterface.TreeResponseInterval;
 
 /**
  * Tracks premarket high and low prices per instrument.
@@ -89,6 +96,93 @@ public class PremarketTracker implements IndicatorConfig.ChangeListener {
                     priceTick, realPrice);
             store.replaceByType(instrumentAlias, PriceLine.LineType.PREMARKET_LOW, lowLine);
             changed = true;
+        }
+    }
+
+    /**
+     * Backfill premarket high/low from historical trade data.
+     * Called once during initialization to catch up on trades that happened
+     * before the plugin was attached (e.g. user turns on computer mid-premarket).
+     *
+     * @param dataInterface Bookmap's historical data query interface
+     * @param instrumentAlias instrument identifier
+     * @param pips price multiplier to convert ticks to real price
+     * @param currentTimeNs current data time in epoch nanoseconds
+     */
+    public void backfillFromHistory(DataStructureInterface dataInterface, String instrumentAlias,
+                                     double pips, long currentTimeNs) {
+        if (!config.isEnabled(IndicatorConfig.PREMARKET_HIGH_LOW)) return;
+
+        // Calculate today's premarket time range in nanoseconds
+        ZonedDateTime now = Instant.ofEpochSecond(0, currentTimeNs).atZone(ET);
+        LocalDate today = now.toLocalDate();
+        long premarketStartNs = today.atTime(PREMARKET_START).atZone(ET).toInstant().toEpochMilli() * 1_000_000L;
+        long premarketEndNs = today.atTime(PREMARKET_END).atZone(ET).toInstant().toEpochMilli() * 1_000_000L;
+
+        // Clamp the query end to the lesser of premarket end or current time
+        long queryEndNs = Math.min(premarketEndNs, currentTimeNs);
+        if (queryEndNs <= premarketStartNs) return; // no premarket data to query
+
+        try {
+            // Query trade data across the premarket window, 1 interval = full aggregation
+            List<TreeResponseInterval> intervals = dataInterface.get(
+                    premarketStartNs, queryEndNs, 1, instrumentAlias,
+                    new StandardEvents[]{StandardEvents.TRADE});
+
+            if (intervals == null || intervals.isEmpty()) return;
+
+            double highPrice = Double.NaN;
+            double lowPrice = Double.NaN;
+            double highPriceTick = Double.NaN;
+            double lowPriceTick = Double.NaN;
+
+            for (TreeResponseInterval interval : intervals) {
+                if (interval.events == null) continue;
+                for (Object eventObj : interval.events.values()) {
+                    if (!(eventObj instanceof TradeAggregationEvent)) continue;
+                    TradeAggregationEvent trade = (TradeAggregationEvent) eventObj;
+
+                    // Scan all traded prices from both bid and ask aggressor maps
+                    for (Map<Double, ?> priceMap : new Map[]{trade.bidAggressorMap, trade.askAggressorMap}) {
+                        if (priceMap == null) continue;
+                        for (Double priceTick : priceMap.keySet()) {
+                            if (priceTick == null) continue;
+                            double realPrice = priceTick * pips;
+                            if (Double.isNaN(highPrice) || realPrice > highPrice) {
+                                highPrice = realPrice;
+                                highPriceTick = priceTick;
+                            }
+                            if (Double.isNaN(lowPrice) || realPrice < lowPrice) {
+                                lowPrice = realPrice;
+                                lowPriceTick = priceTick;
+                            }
+                        }
+                    }
+                }
+            }
+
+            if (!Double.isNaN(highPrice)) {
+                PremarketState state = states.computeIfAbsent(instrumentAlias, k -> new PremarketState());
+                state.lastSessionDay = today.getDayOfYear();
+                state.highPrice = highPrice;
+                state.highPriceTick = highPriceTick;
+                state.lowPrice = lowPrice;
+                state.lowPriceTick = lowPriceTick;
+
+                PriceLine highLine = new PriceLine(instrumentAlias, PriceLine.LineType.PREMARKET_HIGH,
+                        highPriceTick, highPrice);
+                store.replaceByType(instrumentAlias, PriceLine.LineType.PREMARKET_HIGH, highLine);
+
+                PriceLine lowLine = new PriceLine(instrumentAlias, PriceLine.LineType.PREMARKET_LOW,
+                        lowPriceTick, lowPrice);
+                store.replaceByType(instrumentAlias, PriceLine.LineType.PREMARKET_LOW, lowLine);
+
+                System.out.println("[PremarketTracker] Backfilled " + instrumentAlias
+                        + ": PM High=" + highPrice + ", PM Low=" + lowPrice);
+            }
+        } catch (Exception e) {
+            System.err.println("[PremarketTracker] Backfill failed for " + instrumentAlias + ": " + e.getMessage());
+            e.printStackTrace();
         }
     }
 
