@@ -19,9 +19,12 @@ import velox.gui.StrategyPanel;
 
 import com.bookmap.plugin.common.BreakoutSignal;
 import com.bookmap.plugin.common.ChartClickHandler;
+import com.bookmap.plugin.common.IndicatorConfig;
+import com.bookmap.plugin.common.IndicatorSettingsPanel;
 import com.bookmap.plugin.common.KeyBindingSettingsPanel;
 import com.bookmap.plugin.common.OrderBookState;
 import com.bookmap.plugin.common.OrderWallTracker;
+import com.bookmap.plugin.common.PremarketTracker;
 import com.bookmap.plugin.common.PriceLine;
 import com.bookmap.plugin.common.PriceLineConfig;
 import com.bookmap.plugin.common.PriceLinePainter;
@@ -50,6 +53,8 @@ public class RongPlugin implements CustomModuleAdapter,
     private static PriceLineStore priceLineStore;
     private static PriceLineConfig priceLineConfig;
     private static PriceLinePainter priceLinePainter;
+    private static IndicatorConfig indicatorConfig;
+    private static PremarketTracker premarketTracker;
 
     private String alias;
     private Api api;
@@ -80,6 +85,8 @@ public class RongPlugin implements CustomModuleAdapter,
                 priceLineStore = new PriceLineStore();
                 priceLineConfig = new PriceLineConfig();
                 priceLinePainter = new PriceLinePainter(priceLineStore);
+                indicatorConfig = new IndicatorConfig();
+                premarketTracker = new PremarketTracker(priceLineStore, indicatorConfig);
 
                 // Wire click callback: key+click creates a price line if key is bound
                 chartClickHandler.setClickCallback((instrument, priceInTicks, realPrice, keyCode) -> {
@@ -135,6 +142,9 @@ public class RongPlugin implements CustomModuleAdapter,
                 .setIsAdd(false)
                 .build());
 
+        if (premarketTracker != null) {
+            premarketTracker.unregister(alias);
+        }
         if (priceLineStore != null) {
             priceLineStore.clearAll(alias);
         }
@@ -145,12 +155,17 @@ public class RongPlugin implements CustomModuleAdapter,
             instanceCount--;
             if (instanceCount <= 0 && sharedServer != null) {
                 ChartClickHandler.removeAwtListener();
+                if (premarketTracker != null) {
+                    premarketTracker.shutdown();
+                    premarketTracker = null;
+                }
                 sharedServer.shutdown();
                 sharedServer = null;
                 chartClickHandler = null;
                 priceLineStore = null;
                 priceLineConfig = null;
                 priceLinePainter = null;
+                indicatorConfig = null;
                 instanceCount = 0;
                 System.out.println("[Rong] Shared WebSocket server shut down");
             }
@@ -160,7 +175,10 @@ public class RongPlugin implements CustomModuleAdapter,
 
     @Override
     public StrategyPanel[] getCustomGuiFor(String alias, String indicatorName) {
-        return new StrategyPanel[] { new KeyBindingSettingsPanel(priceLineConfig, priceLineStore) };
+        return new StrategyPanel[] {
+            new KeyBindingSettingsPanel(priceLineConfig, priceLineStore),
+            new IndicatorSettingsPanel(indicatorConfig)
+        };
     }
 
     @Override
@@ -178,6 +196,10 @@ public class RongPlugin implements CustomModuleAdapter,
         sharedServer.setLastPrice(alias, realPrice);
         checkBreakout(realPrice, priceTick);
         wallTracker.cleanup(priceTick);
+
+        if (premarketTracker != null) {
+            premarketTracker.onTrade(alias, price, realPrice);
+        }
     }
 
     private void checkBreakout(double currentPrice, int currentPriceTick) {

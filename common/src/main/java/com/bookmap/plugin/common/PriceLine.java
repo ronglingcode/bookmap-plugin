@@ -9,18 +9,29 @@ import java.util.UUID;
 public class PriceLine {
 
     public enum LineType {
+        // Manual (key+click) line types
         STOP_LOSS("Stop Loss", new Color(220, 50, 50), "s"),
         TAKE_PROFIT("Take Profit", new Color(50, 180, 50), "t"),
-        ENTRY("Entry", new Color(50, 120, 220), "e");
+        ENTRY("Entry", new Color(50, 120, 220), "e"),
+
+        // Auto-drawn indicator line types (defaultKey = null)
+        PREMARKET_HIGH("PM High", new Color(255, 165, 0), null),
+        PREMARKET_LOW("PM Low", new Color(180, 100, 255), null);
 
         public final String label;
         public final Color color;
+        /** Key binding for manual types, null for auto-drawn indicators. */
         public final String defaultKey;
 
         LineType(String label, Color color, String defaultKey) {
             this.label = label;
             this.color = color;
             this.defaultKey = defaultKey;
+        }
+
+        /** Returns true if this type is drawn manually via key+click. */
+        public boolean isManual() {
+            return defaultKey != null;
         }
     }
 

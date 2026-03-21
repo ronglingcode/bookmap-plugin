@@ -27,6 +27,7 @@ public class KeyBindingSettingsPanel extends StrategyPanel {
 
         int row = 0;
         for (PriceLine.LineType type : PriceLine.LineType.values()) {
+            if (!type.isManual()) continue; // skip auto-drawn indicator types
             gbc.gridx = 0;
             gbc.gridy = row;
             gbc.fill = GridBagConstraints.NONE;

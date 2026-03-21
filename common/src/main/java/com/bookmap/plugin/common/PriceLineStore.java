@@ -55,6 +55,22 @@ public class PriceLineStore {
         }
     }
 
+    /** Replace the single line of a given type for the instrument, or add if none exists. */
+    public void replaceByType(String instrumentAlias, PriceLine.LineType type, PriceLine newLine) {
+        List<PriceLine> lines = linesByInstrument.computeIfAbsent(instrumentAlias, k -> new CopyOnWriteArrayList<>());
+        lines.removeIf(l -> l.getType() == type);
+        lines.add(newLine);
+        notifyListeners(instrumentAlias);
+    }
+
+    /** Remove all lines of a given type for the instrument. */
+    public void removeByType(String instrumentAlias, PriceLine.LineType type) {
+        List<PriceLine> lines = linesByInstrument.get(instrumentAlias);
+        if (lines != null && lines.removeIf(l -> l.getType() == type)) {
+            notifyListeners(instrumentAlias);
+        }
+    }
+
     public List<PriceLine> getLines(String instrumentAlias) {
         List<PriceLine> lines = linesByInstrument.get(instrumentAlias);
         return lines != null ? Collections.unmodifiableList(lines) : Collections.emptyList();

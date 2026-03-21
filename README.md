@@ -214,6 +214,25 @@ Each line displays a label with its type and price value.
 
 Key+click events also continue to broadcast `priceSelect` messages via WebSocket, so external clients still receive them.
 
+## Indicators (Auto-Drawn Levels)
+
+The plugin can automatically draw price levels based on market data. Each indicator can be enabled or disabled in the **Indicators** settings panel.
+
+### Premarket High / Low
+
+Automatically draws and updates horizontal lines at the premarket session high and low prices.
+
+| Line | Color | Description |
+|------|-------|-------------|
+| PM High | Orange | Highest trade price during premarket |
+| PM Low | Purple | Lowest trade price during premarket |
+
+- **Premarket hours**: 4:00 AM - 9:30 AM Eastern Time
+- Lines update in real-time as new highs/lows are made during premarket
+- Lines persist after premarket ends as reference levels for regular trading hours
+- Resets automatically at the start of each new premarket session (4:00 AM ET)
+- Enabled by default; disable via the **Indicators** settings panel
+
 ## Configuration
 
 The following parameters are hardcoded constants in each plugin's main class:
