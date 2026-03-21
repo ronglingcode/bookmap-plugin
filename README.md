@@ -258,6 +258,14 @@ Automatically draws and updates horizontal lines at the premarket session high a
 - Resets automatically at the start of each new premarket session (4:00 AM ET)
 - Enabled by default; disable via the **Indicators** settings panel
 
+#### Replay & Multi-Day Data
+
+The premarket tracker uses Bookmap's **data/replay time** (not system clock), so it works correctly in both live and replay modes:
+
+- **Multi-day replay**: When replaying feed data that spans multiple days, the tracker automatically resets at the start of each new day's premarket session. Previous day's lines are cleared and new lines are drawn for the current day.
+- **Mid-session attach**: If the plugin is attached after premarket has already started (e.g. you turn on your computer at 7 AM), it backfills from Bookmap's historical trade data to catch up on the premarket high/low from 4:00 AM onward.
+- **Time source**: All time decisions use the most recent data/replay timestamp received from Bookmap's `TimeListener`, which keeps the tracker in sync with whatever time the chart is showing.
+
 ## Configuration
 
 The following parameters are hardcoded constants in each plugin's main class:
