@@ -1,6 +1,6 @@
 # Bookmap Plugin
 
-A Bookmap addon that detects when price breaks through large ask-side limit order walls on US equities and sends real-time signals via WebSocket.
+A Bookmap addon that detects order wall breakouts, draws configurable price lines on charts, and sends real-time signals via WebSocket.
 
 This repository produces **two plugins** from a shared codebase:
 
@@ -13,19 +13,44 @@ Both plugins share the same core logic in the `common` module. Features can be a
 
 ## How It Works
 
+**Breakout detection:**
 1. Monitors the order book for large resting ask orders (default: >= 500,000 shares at a single price level)
 2. Tracks when these walls get consumed by aggressive buying (size drops below 20% of peak)
-3. When price trades above a consumed wall, broadcasts a breakout signal containing:
-   - **breakoutLevel**: the price level that was broken
-   - **swingLow**: the most recent pivot swing low before the breakout
+3. When price trades above a consumed wall, broadcasts a breakout signal via WebSocket
+
+**Chart drawing:**
+4. Hold a key (S/T/E by default) and click on the chart to draw a price line at that level
+5. Premarket high/low lines are drawn and updated automatically during 4:00-9:30 AM ET
+6. All lines use Bookmap's data coordinates so they track through scroll and zoom
+
+## Features
+
+- **Order wall breakout detection** — monitors large ask-side walls and broadcasts signals when consumed
+- **Key+click price lines** — hold a configurable key and click to draw stop loss, take profit, or entry lines
+- **Auto-drawn indicators** — premarket high/low levels drawn and updated automatically
+- **WebSocket API** — real-time heartbeat, breakout, order book, and price select messages
+- **Settings panels** — configure key bindings and enable/disable indicators at runtime
 
 ## Project Structure
 
 ```
 bookmap-plugin/
-├── common/          # Shared library (OrderBookState, SignalWebSocketServer, etc.)
-├── rong/            # Personal plugin — @Layer1StrategyName("Rong")
-└── activetrader/    # Product plugin — @Layer1StrategyName("Bookmap Active Trader")
+├── common/                  # Shared library
+│   ├── ChartClickHandler    # Key+click detection & coordinate mapping
+│   ├── PriceLine            # Line data model (manual + auto types)
+│   ├── PriceLineStore       # Thread-safe line storage with change listeners
+│   ├── PriceLinePainter     # ScreenSpaceCanvas drawing engine
+│   ├── PriceLineConfig      # Key binding configuration
+│   ├── PremarketTracker     # Auto premarket high/low tracking
+│   ├── IndicatorConfig      # Enable/disable toggles for auto indicators
+│   ├── IndicatorSettingsPanel / KeyBindingSettingsPanel  # Settings UI
+│   ├── OrderBookState       # Full order book state
+│   ├── OrderWallTracker     # Large wall detection & consumption
+│   ├── SwingLowDetector     # Pivot swing low detection
+│   ├── SignalWebSocketServer # WebSocket server for external clients
+│   └── BreakoutSignal       # Signal data model
+├── rong/                    # Personal plugin — @Layer1StrategyName("Rong")
+└── activetrader/            # Product plugin — @Layer1StrategyName("Bookmap Active Trader")
 ```
 
 ## Build
