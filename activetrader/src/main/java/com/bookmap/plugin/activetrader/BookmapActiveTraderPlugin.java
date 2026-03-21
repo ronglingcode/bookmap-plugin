@@ -2,6 +2,7 @@ package com.bookmap.plugin.activetrader;
 
 import java.util.List;
 
+import velox.api.layer1.Layer1CustomPanelsGetter;
 import velox.api.layer1.annotations.Layer1ApiVersion;
 import velox.api.layer1.annotations.Layer1ApiVersionValue;
 import velox.api.layer1.annotations.Layer1SimpleAttachable;
@@ -14,11 +15,17 @@ import velox.api.layer1.simplified.CustomModuleAdapter;
 import velox.api.layer1.simplified.DepthDataListener;
 import velox.api.layer1.simplified.InitialState;
 import velox.api.layer1.simplified.TradeDataListener;
+import velox.gui.StrategyPanel;
 
 import com.bookmap.plugin.common.BreakoutSignal;
 import com.bookmap.plugin.common.ChartClickHandler;
+import com.bookmap.plugin.common.KeyBindingSettingsPanel;
 import com.bookmap.plugin.common.OrderBookState;
 import com.bookmap.plugin.common.OrderWallTracker;
+import com.bookmap.plugin.common.PriceLine;
+import com.bookmap.plugin.common.PriceLineConfig;
+import com.bookmap.plugin.common.PriceLinePainter;
+import com.bookmap.plugin.common.PriceLineStore;
 import com.bookmap.plugin.common.SignalWebSocketServer;
 import com.bookmap.plugin.common.SwingLowDetector;
 
@@ -26,7 +33,7 @@ import com.bookmap.plugin.common.SwingLowDetector;
 @Layer1StrategyName("Bookmap Active Trader")
 @Layer1ApiVersion(Layer1ApiVersionValue.VERSION1)
 public class BookmapActiveTraderPlugin implements CustomModuleAdapter,
-        DepthDataListener, TradeDataListener {
+        DepthDataListener, TradeDataListener, Layer1CustomPanelsGetter {
 
     private static final int WS_PORT = 8765;
     private static final int WALL_THRESHOLD = 500_000;
@@ -40,6 +47,9 @@ public class BookmapActiveTraderPlugin implements CustomModuleAdapter,
     private static SignalWebSocketServer sharedServer;
     private static int instanceCount = 0;
     private static ChartClickHandler chartClickHandler;
+    private static PriceLineStore priceLineStore;
+    private static PriceLineConfig priceLineConfig;
+    private static PriceLinePainter priceLinePainter;
 
     private String alias;
     private Api api;
@@ -66,16 +76,38 @@ public class BookmapActiveTraderPlugin implements CustomModuleAdapter,
             if (chartClickHandler == null) {
                 chartClickHandler = new ChartClickHandler(sharedServer);
             }
+            if (priceLineStore == null) {
+                priceLineStore = new PriceLineStore();
+                priceLineConfig = new PriceLineConfig();
+                priceLinePainter = new PriceLinePainter(priceLineStore);
+
+                chartClickHandler.setClickCallback((instrument, priceInTicks, realPrice, keyCode) -> {
+                    PriceLine.LineType lineType = priceLineConfig.getLineType(keyCode);
+                    if (lineType != null) {
+                        PriceLine line = new PriceLine(instrument, lineType, priceInTicks, realPrice);
+                        priceLineStore.addLine(line);
+                        System.out.println("[ActiveTrader] Price line added: " + lineType.label
+                                + " @ " + realPrice + " for " + instrument);
+                    }
+                });
+            }
             instanceCount++;
         }
         sharedServer.registerSymbol(alias, orderBook, info.pips);
         chartClickHandler.registerSymbol(alias, info.pips);
+        priceLinePainter.registerInstrument(alias);
 
         // Register ScreenSpacePainter to receive chart coordinate mappings
-        // Tag must be unique per instrument so each chart gets its own painter
         api.sendUserMessage(Layer1ApiUserMessageModifyScreenSpacePainter.builder(
                 BookmapActiveTraderPlugin.class, "clickHandler_" + alias)
                 .setScreenSpacePainterFactory(chartClickHandler)
+                .setIsAdd(true)
+                .build());
+
+        // Register ScreenSpacePainter for drawing price lines
+        api.sendUserMessage(Layer1ApiUserMessageModifyScreenSpacePainter.builder(
+                BookmapActiveTraderPlugin.class, "priceLines_" + alias)
+                .setScreenSpacePainterFactory(priceLinePainter)
                 .setIsAdd(true)
                 .build());
 
@@ -87,13 +119,24 @@ public class BookmapActiveTraderPlugin implements CustomModuleAdapter,
         if (chartClickHandler != null) {
             chartClickHandler.unregisterSymbol(alias);
         }
-        // Unregister ScreenSpacePainter
+        if (priceLinePainter != null) {
+            priceLinePainter.unregisterInstrument(alias);
+        }
+        // Unregister ScreenSpacePainters
         api.sendUserMessage(Layer1ApiUserMessageModifyScreenSpacePainter.builder(
                 BookmapActiveTraderPlugin.class, "clickHandler_" + alias)
                 .setScreenSpacePainterFactory(chartClickHandler)
                 .setIsAdd(false)
                 .build());
+        api.sendUserMessage(Layer1ApiUserMessageModifyScreenSpacePainter.builder(
+                BookmapActiveTraderPlugin.class, "priceLines_" + alias)
+                .setScreenSpacePainterFactory(priceLinePainter)
+                .setIsAdd(false)
+                .build());
 
+        if (priceLineStore != null) {
+            priceLineStore.clearAll(alias);
+        }
         if (sharedServer != null) {
             sharedServer.unregisterSymbol(alias);
         }
@@ -104,11 +147,19 @@ public class BookmapActiveTraderPlugin implements CustomModuleAdapter,
                 sharedServer.shutdown();
                 sharedServer = null;
                 chartClickHandler = null;
+                priceLineStore = null;
+                priceLineConfig = null;
+                priceLinePainter = null;
                 instanceCount = 0;
                 System.out.println("[ActiveTrader] Shared WebSocket server shut down");
             }
         }
         System.out.println("[ActiveTrader] Plugin stopped for " + alias);
+    }
+
+    @Override
+    public StrategyPanel[] getCustomGuiFor(String alias, String indicatorName) {
+        return new StrategyPanel[] { new KeyBindingSettingsPanel(priceLineConfig, priceLineStore) };
     }
 
     @Override

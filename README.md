@@ -192,9 +192,31 @@ function connectToBookmap(
 }
 ```
 
+## Price Lines (Key+Click Drawing)
+
+Hold a key and left-click on the chart to draw a persistent horizontal price line at the clicked price. Lines automatically track the price level through scroll and zoom.
+
+### Default Key Bindings
+
+| Key | Line Type | Color | Style |
+|-----|-----------|-------|-------|
+| `S` | Stop Loss | Red | Dashed |
+| `T` | Take Profit | Green | Dashed |
+| `E` | Entry | Blue | Solid |
+
+Each line displays a label with its type and price value.
+
+### Configuring Key Bindings
+
+1. Right-click the chart > open the plugin's addon settings
+2. In the **Price Line Key Bindings** panel, change the key for each line type
+3. Use the **Clear All Price Lines** button to remove all drawn lines
+
+Key+click events also continue to broadcast `priceSelect` messages via WebSocket, so external clients still receive them.
+
 ## Configuration
 
-These are currently hardcoded constants in each plugin's main class:
+The following parameters are hardcoded constants in each plugin's main class:
 
 | Parameter | Default | Description |
 |-----------|---------|-------------|
@@ -205,3 +227,5 @@ These are currently hardcoded constants in each plugin's main class:
 | `BAR_SIZE` | 100 | Number of trades per tick bar for swing low calculation |
 | `ORDERBOOK_PERCENTILE` | 90 | Only send order book levels above this percentile threshold |
 | `ORDERBOOK_INTERVAL_MS` | 1000 | Order book snapshot broadcast interval |
+
+Price line key bindings are configurable at runtime via the plugin's settings panel (see above).

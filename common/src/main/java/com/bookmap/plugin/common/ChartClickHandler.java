@@ -35,6 +35,12 @@ import velox.api.layer1.layers.strategies.interfaces.ScreenSpacePainterFactory;
  */
 public class ChartClickHandler implements ScreenSpacePainterFactory {
 
+    /** Callback invoked when a key+click resolves to a price on a chart. */
+    @FunctionalInterface
+    public interface ClickCallback {
+        void onChartClick(String instrumentAlias, double priceInTicks, double realPrice, String keyCode);
+    }
+
     /** Coordinate state keyed by painter alias (from createScreenSpacePainter). */
     private static final Map<String, CoordinateState> painterCoords = new ConcurrentHashMap<>();
 
@@ -56,6 +62,7 @@ public class ChartClickHandler implements ScreenSpacePainterFactory {
 
     private static volatile BufferedWriter clickLogWriter;
     private final SignalWebSocketServer wsServer;
+    private volatile ClickCallback clickCallback;
 
     public ChartClickHandler(SignalWebSocketServer wsServer) {
         this.wsServer = wsServer;
@@ -83,6 +90,11 @@ public class ChartClickHandler implements ScreenSpacePainterFactory {
                 clickLogWriter.flush();
             } catch (IOException ignored) {}
         }
+    }
+
+    /** Set a callback to be invoked on key+click price selection. */
+    public void setClickCallback(ClickCallback callback) {
+        this.clickCallback = callback;
     }
 
     /** Register an instrument's pips before the painter is created. */
@@ -157,6 +169,7 @@ public class ChartClickHandler implements ScreenSpacePainterFactory {
                 // Find the painter whose chart contains the click (fraction in [0,1])
                 String bestInstrument = null;
                 double bestPrice = Double.NaN;
+                double bestPriceTick = Double.NaN;
 
                 for (Map.Entry<String, CoordinateState> entry : painterCoords.entrySet()) {
                     String painterAlias = entry.getKey();
@@ -168,7 +181,8 @@ public class ChartClickHandler implements ScreenSpacePainterFactory {
                     double pips = instrumentPips.getOrDefault(instrument, 1.0);
 
                     double fraction = cs.fraction(localY, compHeight);
-                    double price = cs.yToPrice(localY, compHeight, pips);
+                    double priceTick = cs.yToPriceTick(localY, compHeight);
+                    double price = priceTick * pips;
 
                     logClick("[ActiveTrader] Painter " + painterAlias + " → " + instrument
                         + ": fraction=" + String.format("%.4f", fraction)
@@ -179,6 +193,7 @@ public class ChartClickHandler implements ScreenSpacePainterFactory {
                     if (fraction >= 0 && fraction <= 1 && !Double.isNaN(price) && price > 0) {
                         bestInstrument = instrument;
                         bestPrice = price;
+                        bestPriceTick = priceTick;
                         break;
                     }
                 }
@@ -190,6 +205,12 @@ public class ChartClickHandler implements ScreenSpacePainterFactory {
                     wsServer.broadcastSignal(json);
                     logClick("[ActiveTrader] Price select: " + bestInstrument + " @ " + bestPrice
                         + " keyCode=" + keyCode);
+
+                    // Invoke click callback for price line drawing
+                    ClickCallback cb = clickCallback;
+                    if (cb != null) {
+                        cb.onChartClick(bestInstrument, bestPriceTick, bestPrice, keyCode);
+                    }
                 } else {
                     logClick("[ActiveTrader] Click: no painter matched bounds");
                 }
@@ -276,13 +297,12 @@ public class ChartClickHandler implements ScreenSpacePainterFactory {
         }
 
         /**
-         * Convert a component-local Y coordinate to a real price.
+         * Convert a component-local Y coordinate to a price tick value (before pips).
          */
-        double yToPrice(int localY, int compHeight, double pips) {
+        double yToPriceTick(int localY, int compHeight) {
             if (pixelsHeight <= 0 || priceHeight <= 0) return Double.NaN;
             double f = fraction(localY, compHeight);
-            double priceTick = priceBottom + priceHeight * f;
-            return priceTick * pips;
+            return priceBottom + priceHeight * f;
         }
     }
 }
