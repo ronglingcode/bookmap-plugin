@@ -2,7 +2,7 @@ package com.bookmap.plugin.rong;
 
 import java.util.List;
 
-import velox.api.layer1.Layer1CustomPanelsGetter;
+import velox.api.layer1.simplified.CustomSettingsPanelProvider;
 import velox.api.layer1.annotations.Layer1ApiVersion;
 import velox.api.layer1.annotations.Layer1ApiVersionValue;
 import velox.api.layer1.annotations.Layer1SimpleAttachable;
@@ -36,7 +36,7 @@ import com.bookmap.plugin.common.SwingLowDetector;
 @Layer1StrategyName("Rong")
 @Layer1ApiVersion(Layer1ApiVersionValue.VERSION1)
 public class RongPlugin implements CustomModuleAdapter,
-        DepthDataListener, TradeDataListener, Layer1CustomPanelsGetter {
+        DepthDataListener, TradeDataListener, CustomSettingsPanelProvider {
 
     private static final int WS_PORT = 8765;
     private static final int WALL_THRESHOLD = 500_000;
@@ -174,7 +174,7 @@ public class RongPlugin implements CustomModuleAdapter,
     }
 
     @Override
-    public StrategyPanel[] getCustomGuiFor(String alias, String indicatorName) {
+    public StrategyPanel[] getCustomSettingsPanels() {
         return new StrategyPanel[] {
             new KeyBindingSettingsPanel(priceLineConfig, priceLineStore),
             new IndicatorSettingsPanel(indicatorConfig)
