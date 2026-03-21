@@ -22,13 +22,15 @@ Both plugins share the same core logic in the `common` module. Features can be a
 4. Hold a key (S/T/E by default) and click on the chart to draw a price line at that level
 5. Premarket high/low lines are drawn and updated automatically during 4:00-9:30 AM ET
 6. VWAP (Volume Weighted Average Price) is calculated and drawn from 4:00 AM ET through the entire trading day
-6. All lines use Bookmap's data coordinates so they track through scroll and zoom
+7. Predefined key price levels can be loaded from a JSON config file and/or added at runtime via the settings panel
+8. All lines use Bookmap's data coordinates so they track through scroll and zoom
 
 ## Features
 
 - **Order wall breakout detection** — monitors large ask-side walls and broadcasts signals when consumed
 - **Key+click price lines** — hold a configurable key and click to draw stop loss, take profit, or entry lines
 - **Auto-drawn indicators** — premarket high/low and VWAP levels drawn and updated automatically
+- **Predefined key levels** — instrument-specific price levels loaded from a JSON config file or added via settings panel
 - **WebSocket API** — real-time heartbeat, breakout, order book, and price select messages
 - **Settings panels** — configure key bindings and enable/disable indicators at runtime
 
@@ -44,8 +46,11 @@ bookmap-plugin/
 │   ├── PriceLineConfig      # Key binding configuration
 │   ├── PremarketTracker     # Auto premarket high/low tracking
 │   ├── VwapTracker          # Volume Weighted Average Price tracking
+│   ├── KeyLevelDefinition   # Predefined key level data model
+│   ├── KeyLevelConfig       # JSON config file + session level storage
+│   ├── KeyLevelManager      # Converts key levels to drawn price lines
 │   ├── IndicatorConfig      # Enable/disable toggles for auto indicators
-│   ├── IndicatorSettingsPanel / KeyBindingSettingsPanel  # Settings UI
+│   ├── IndicatorSettingsPanel / KeyBindingSettingsPanel / KeyLevelSettingsPanel  # Settings UI
 │   ├── OrderBookState       # Full order book state
 │   ├── OrderWallTracker     # Large wall detection & consumption
 │   ├── SwingLowDetector     # Pivot swing low detection
@@ -273,6 +278,38 @@ Automatically draws and updates a horizontal line at the running VWAP — the av
 - **Runs all day**: Unlike premarket high/low which stops updating at 9:30 AM, VWAP continues updating through the entire trading day (premarket + regular hours)
 - Resets automatically at the start of each new session (4:00 AM ET)
 - Enabled by default; disable via the **Indicators** settings panel
+
+### Key Price Levels
+
+Draw predefined price levels on specific instruments' charts. Useful for marking significant support/resistance levels identified from daily or higher timeframe analysis.
+
+| Line | Color | Description |
+|------|-------|-------------|
+| Key Level | Gold | User-defined price level with optional custom label |
+
+Key levels are instrument-specific — a $180 level on NVDA will only appear on NVDA's chart, not on any other instrument.
+
+#### Sources
+
+Key levels can come from two sources:
+
+1. **JSON config file** — Create `~/bookmap-plugin/key-levels.json` to predefine levels that load on plugin startup:
+
+```json
+{
+  "levels": [
+    { "instrument": "NVDA", "price": 180.00, "label": "major support" },
+    { "instrument": "NVDA", "price": 200.00, "label": "round number" },
+    { "instrument": "ES", "price": 5400.00 }
+  ]
+}
+```
+
+- The `instrument` field must match the exact alias Bookmap uses (e.g., "NVDA", "ESM5")
+- The `label` field is optional — if omitted, the default "Key Level" label is used
+- File levels are read-only from the plugin; edit the file manually to change them
+
+2. **Settings panel** — Add levels at runtime via the **Key Price Levels** settings panel. Enter the instrument alias, price, and optional label, then click "Add Level". Session levels can be removed via the panel but are not saved — they exist only while the plugin is running.
 
 ### Replay & Multi-Day Data
 

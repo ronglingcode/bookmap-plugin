@@ -34,6 +34,9 @@ import com.bookmap.plugin.common.PriceLineStore;
 import com.bookmap.plugin.common.SignalWebSocketServer;
 import com.bookmap.plugin.common.SwingLowDetector;
 import com.bookmap.plugin.common.VwapTracker;
+import com.bookmap.plugin.common.KeyLevelConfig;
+import com.bookmap.plugin.common.KeyLevelManager;
+import com.bookmap.plugin.common.KeyLevelSettingsPanel;
 
 @Layer1SimpleAttachable
 @Layer1StrategyName("Bookmap Active Trader")
@@ -59,6 +62,8 @@ public class BookmapActiveTraderPlugin implements CustomModuleAdapter,
     private static IndicatorConfig indicatorConfig;
     private static PremarketTracker premarketTracker;
     private static VwapTracker vwapTracker;
+    private static KeyLevelConfig keyLevelConfig;
+    private static KeyLevelManager keyLevelManager;
 
     private String alias;
     private Api api;
@@ -92,6 +97,8 @@ public class BookmapActiveTraderPlugin implements CustomModuleAdapter,
                 indicatorConfig = new IndicatorConfig();
                 premarketTracker = new PremarketTracker(priceLineStore, indicatorConfig);
                 vwapTracker = new VwapTracker(priceLineStore, indicatorConfig);
+                keyLevelConfig = new KeyLevelConfig();
+                keyLevelManager = new KeyLevelManager(keyLevelConfig, priceLineStore);
 
                 chartClickHandler.setClickCallback((instrument, priceInTicks, realPrice, keyCode) -> {
                     PriceLine.LineType lineType = priceLineConfig.getLineType(keyCode);
@@ -123,7 +130,12 @@ public class BookmapActiveTraderPlugin implements CustomModuleAdapter,
                 .setIsAdd(true)
                 .build());
 
-        // Backfill premarket high/low from historical data (handles mid-session attach)
+        // Draw predefined key price levels for this instrument
+        if (keyLevelManager != null) {
+            keyLevelManager.onInstrumentInitialized(alias, info.pips);
+        }
+
+        // Backfill premarket high/low and VWAP from historical data (handles mid-session attach)
         final String instrumentAlias = alias;
         final double pips = info.pips;
         final long initTime = initialState.getCurrentTime();
@@ -167,6 +179,9 @@ public class BookmapActiveTraderPlugin implements CustomModuleAdapter,
         if (vwapTracker != null) {
             vwapTracker.unregister(alias);
         }
+        if (keyLevelManager != null) {
+            keyLevelManager.onInstrumentStopped(alias);
+        }
         if (priceLineStore != null) {
             priceLineStore.clearAll(alias);
         }
@@ -185,6 +200,11 @@ public class BookmapActiveTraderPlugin implements CustomModuleAdapter,
                     vwapTracker.shutdown();
                     vwapTracker = null;
                 }
+                if (keyLevelManager != null) {
+                    keyLevelManager.shutdown();
+                    keyLevelManager = null;
+                }
+                keyLevelConfig = null;
                 sharedServer.shutdown();
                 sharedServer = null;
                 chartClickHandler = null;
@@ -203,7 +223,8 @@ public class BookmapActiveTraderPlugin implements CustomModuleAdapter,
     public StrategyPanel[] getCustomSettingsPanels() {
         return new StrategyPanel[] {
             new KeyBindingSettingsPanel(priceLineConfig, priceLineStore),
-            new IndicatorSettingsPanel(indicatorConfig)
+            new IndicatorSettingsPanel(indicatorConfig),
+            new KeyLevelSettingsPanel(keyLevelConfig)
         };
     }
 

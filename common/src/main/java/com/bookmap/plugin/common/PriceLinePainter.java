@@ -152,17 +152,21 @@ public class PriceLinePainter implements ScreenSpacePainterFactory {
 
             // Draw the horizontal line
             g.setColor(color);
-            if (line.getType() == PriceLine.LineType.ENTRY) {
+            if (line.getType() == PriceLine.LineType.ENTRY
+                    || line.getType() == PriceLine.LineType.KEY_LEVEL) {
+                // Solid line for entry and key levels
                 g.setStroke(new BasicStroke(LINE_THICKNESS));
             } else {
-                // Dashed for stop loss and take profit
+                // Dashed for stop loss, take profit, and auto-drawn indicators
                 g.setStroke(new BasicStroke(LINE_THICKNESS, BasicStroke.CAP_BUTT, BasicStroke.JOIN_MITER,
                         10.0f, new float[]{8.0f, 6.0f}, 0.0f));
             }
             g.drawLine(0, lineY, width, lineY);
 
             // Draw label with background
-            String label = line.getType().label + " " + String.format("%.2f", line.getRealPrice());
+            // Use custom label if set (KEY_LEVEL lines have user-defined text), else use LineType.label
+            String labelText = line.getCustomLabel() != null ? line.getCustomLabel() : line.getType().label;
+            String label = labelText + " " + String.format("%.2f", line.getRealPrice());
             g.setFont(LABEL_FONT);
             FontMetrics fm = g.getFontMetrics();
             int textWidth = fm.stringWidth(label);
