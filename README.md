@@ -20,7 +20,7 @@ Both plugins share the same core logic in the `common` module. Features can be a
 
 **Chart drawing:**
 4. Hold a key (S/T/E by default) and click on the chart to draw a price line at that level
-5. Premarket high/low lines are drawn and updated automatically during 4:00-9:30 AM ET
+5. Premarket high/low lines are drawn and updated automatically during 4:00-6:30 AM ET
 6. All lines use Bookmap's data coordinates so they track through scroll and zoom
 
 ## Features
@@ -252,7 +252,7 @@ Automatically draws and updates horizontal lines at the premarket session high a
 | PM High | Orange | Highest trade price during premarket |
 | PM Low | Purple | Lowest trade price during premarket |
 
-- **Premarket hours**: 4:00 AM - 9:30 AM Eastern Time
+- **Premarket hours**: 4:00 AM - 6:30 AM Eastern Time
 - Lines update in real-time as new highs/lows are made during premarket
 - Lines persist after premarket ends as reference levels for regular trading hours
 - Resets automatically at the start of each new premarket session (4:00 AM ET)

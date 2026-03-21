@@ -18,7 +18,7 @@ import velox.api.layer1.messages.indicators.DataStructureInterface.TreeResponseI
  * Tracks premarket high and low prices per instrument.
  * Updates price lines in the store as new extremes are hit during premarket hours.
  *
- * Premarket session: 4:00 AM - 9:30 AM Eastern Time.
+ * Premarket session: 4:00 AM - 6:30 AM Eastern Time.
  * Lines persist after premarket ends so they serve as reference levels during regular hours.
  * Resets at the start of each new premarket session (4:00 AM ET).
  */
@@ -26,7 +26,7 @@ public class PremarketTracker implements IndicatorConfig.ChangeListener {
 
     private static final ZoneId ET = ZoneId.of("America/New_York");
     private static final LocalTime PREMARKET_START = LocalTime.of(4, 0);
-    private static final LocalTime PREMARKET_END = LocalTime.of(9, 30);
+    private static final LocalTime PREMARKET_END = LocalTime.of(6, 30);
 
     private final PriceLineStore store;
     private final IndicatorConfig config;
