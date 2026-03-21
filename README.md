@@ -32,7 +32,7 @@ Both plugins share the same core logic in the `common` module. Features can be a
 - **Auto-drawn indicators** — premarket high/low and VWAP levels drawn and updated automatically
 - **Predefined key levels** — instrument-specific price levels loaded from a JSON config file or added via settings panel
 - **WebSocket API** — real-time heartbeat, breakout, order book, and price select messages
-- **Settings panels** — configure key bindings and enable/disable indicators at runtime
+- **Settings panels** — configure key bindings, enable/disable indicators, and manage key price levels at runtime
 
 ## Project Structure
 
@@ -333,4 +333,12 @@ The following parameters are hardcoded constants in each plugin's main class:
 | `ORDERBOOK_PERCENTILE` | 90 | Only send order book levels above this percentile threshold |
 | `ORDERBOOK_INTERVAL_MS` | 1000 | Order book snapshot broadcast interval |
 
-Price line key bindings are configurable at runtime via the plugin's settings panel (see above).
+### Settings Panels
+
+The plugin provides three settings panels accessible via the addon's configuration in Bookmap:
+
+| Panel | Purpose |
+|-------|---------|
+| **Price Line Key Bindings** | Change which keys draw which line types (S/T/E defaults), clear all drawn lines |
+| **Indicators** | Enable/disable auto-drawn indicators (Premarket High/Low, VWAP) |
+| **Key Price Levels** | View file-loaded levels, add/remove session levels at runtime |
