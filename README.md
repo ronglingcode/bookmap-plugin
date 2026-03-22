@@ -4,16 +4,19 @@ A Bookmap addon that detects order wall breakouts, draws configurable price line
 
 This repository produces **two plugins** from a shared codebase:
 
-| Plugin | JAR | Description |
-|--------|-----|-------------|
-| **Rong** | `rong-1.0-all.jar` | Personal plugin (private use) |
+
+| Plugin                    | JAR                        | Description                       |
+| ------------------------- | -------------------------- | --------------------------------- |
+| **Rong**                  | `rong-1.0-all.jar`         | Personal plugin (private use)     |
 | **Bookmap Active Trader** | `activetrader-1.0-all.jar` | Product plugin (for distribution) |
+
 
 Both plugins share the same core logic in the `common` module. Features can be added independently to either plugin.
 
 ## How It Works
 
 **Breakout detection:**
+
 1. Monitors the order book for large resting ask orders (default: >= 500,000 shares at a single price level)
 2. Tracks when these walls get consumed by aggressive buying (size drops below 20% of peak)
 3. When price trades above a consumed wall, broadcasts a breakout signal via WebSocket
@@ -71,6 +74,7 @@ windows: gradlew shadowJar
 ```
 
 Output JARs:
+
 - `rong/build/libs/rong-1.0-all.jar`
 - `activetrader/build/libs/activetrader-1.0-all.jar`
 
@@ -114,14 +118,16 @@ The plugin exposes a WebSocket server on `ws://localhost:8765`. Clients receive 
 
 ### Message types (server → client)
 
-| Type | Description | Frequency |
-|------|-------------|-----------|
-| `heartbeat` | Current price per symbol | Every 5s |
-| `breakout` | Wall breakout signal | On event |
-| `orderbook` | Order book snapshot (filtered by percentile) | At subscription interval (default 1s) |
-| `priceSelect` | Key+click price selection from chart | On event |
-| `subscribed` | Confirmation of orderbook subscription | Once on subscribe |
-| `unsubscribed` | Confirmation of orderbook unsubscription | Once on unsubscribe |
+
+| Type           | Description                                  | Frequency                             |
+| -------------- | -------------------------------------------- | ------------------------------------- |
+| `heartbeat`    | Current price per symbol                     | Every 5s                              |
+| `breakout`     | Wall breakout signal                         | On event                              |
+| `orderbook`    | Order book snapshot (filtered by percentile) | At subscription interval (default 1s) |
+| `priceSelect`  | Key+click price selection from chart         | On event                              |
+| `subscribed`   | Confirmation of orderbook subscription       | Once on subscribe                     |
+| `unsubscribed` | Confirmation of orderbook unsubscription     | Once on unsubscribe                   |
+
 
 All messages include a `symbol` field identifying which instrument the data belongs to. Multiple instruments are supported simultaneously.
 
@@ -231,11 +237,13 @@ Hold a key and left-click on the chart to draw a persistent horizontal price lin
 
 ### Default Key Bindings
 
-| Key | Line Type | Color | Style |
-|-----|-----------|-------|-------|
-| `S` | Stop Loss | Red | Dashed |
+
+| Key | Line Type   | Color | Style  |
+| --- | ----------- | ----- | ------ |
+| `S` | Stop Loss   | Red   | Dashed |
 | `T` | Take Profit | Green | Dashed |
-| `E` | Entry | Blue | Solid |
+| `E` | Entry       | Blue  | Solid  |
+
 
 Each line displays a label with its type and price value.
 
@@ -255,10 +263,12 @@ The plugin can automatically draw price levels based on market data. Each indica
 
 Automatically draws and updates horizontal lines at the premarket session high and low prices.
 
-| Line | Color | Description |
-|------|-------|-------------|
+
+| Line    | Color  | Description                          |
+| ------- | ------ | ------------------------------------ |
 | PM High | Orange | Highest trade price during premarket |
-| PM Low | Purple | Lowest trade price during premarket |
+| PM Low  | Purple | Lowest trade price during premarket  |
+
 
 - **Premarket hours**: 4:00 AM - 9:30 AM Eastern Time
 - Lines update in real-time as new highs/lows are made during premarket
@@ -270,10 +280,12 @@ Automatically draws and updates horizontal lines at the premarket session high a
 
 Automatically draws all 12 Camarilla Pivot levels calculated from the previous day's high, low, and close.
 
-| Lines | Color | Description |
-|-------|-------|-------------|
-| R1–R6 | Red gradient (light → dark) | Resistance levels |
-| S1–S6 | Blue gradient (light → dark) | Support levels |
+
+| Lines | Color                        | Description       |
+| ----- | ---------------------------- | ----------------- |
+| R1–R6 | Red gradient (light → dark)  | Resistance levels |
+| S1–S6 | Blue gradient (light → dark) | Support levels    |
+
 
 - **Formula**: Uses a 1.1x range multiplier on previous day's range, with linear extensions for R5/R6 and S5/S6
 - **Data source**: Previous day's daily candle is fetched from the EdgeDesk API (`/api/intraday-indicators`) on plugin initialization. This avoids the need for Bookmap to have previous-day price data in its session.
@@ -285,9 +297,11 @@ Automatically draws all 12 Camarilla Pivot levels calculated from the previous d
 
 Draw predefined price levels on specific instruments' charts. Useful for marking significant support/resistance levels identified from daily or higher timeframe analysis.
 
-| Line | Color | Description |
-|------|-------|-------------|
-| Key Level | Gold | User-defined price level with optional custom label |
+
+| Line      | Color | Description                                         |
+| --------- | ----- | --------------------------------------------------- |
+| Key Level | Gold  | User-defined price level with optional custom label |
+
 
 Key levels are instrument-specific — a $180 level on NVDA will only appear on NVDA's chart, not on any other instrument.
 
@@ -311,7 +325,7 @@ Key levels can come from two sources:
 - The `label` field is optional — if omitted, the default "Key Level" label is used
 - File levels are read-only from the plugin; edit the file manually to change them
 
-2. **Settings panel** — Add levels at runtime via the **Key Price Levels** settings panel. Enter the instrument alias, price, and optional label, then click "Add Level". Session levels can be removed via the panel but are not saved — they exist only while the plugin is running.
+1. **Settings panel** — Add levels at runtime via the **Key Price Levels** settings panel. Enter the instrument alias, price, and optional label, then click "Add Level". Session levels can be removed via the panel but are not saved — they exist only while the plugin is running.
 
 ### Replay & Multi-Day Data
 
@@ -325,24 +339,28 @@ The premarket tracker uses Bookmap's **data/replay time** (not system clock), so
 
 The following parameters are hardcoded constants in each plugin's main class:
 
-| Parameter | Default | Description |
-|-----------|---------|-------------|
-| `WS_PORT` | 8765 | WebSocket server port |
-| `WALL_THRESHOLD` | 500,000 | Minimum shares at a price level to qualify as a wall |
-| `WALL_CONSUMED_RATIO` | 0.20 | Wall is "consumed" when size drops below this ratio of peak |
-| `SWING_LOOKBACK` | 3 | Pivot N for swing low detection (N bars on each side) |
-| `BAR_SIZE` | 100 | Number of trades per tick bar for swing low calculation |
-| `ORDERBOOK_PERCENTILE` | 90 | Only send order book levels above this percentile threshold |
-| `ORDERBOOK_INTERVAL_MS` | 1000 | Order book snapshot broadcast interval |
+
+| Parameter               | Default | Description                                                 |
+| ----------------------- | ------- | ----------------------------------------------------------- |
+| `WS_PORT`               | 8765    | WebSocket server port                                       |
+| `WALL_THRESHOLD`        | 500,000 | Minimum shares at a price level to qualify as a wall        |
+| `WALL_CONSUMED_RATIO`   | 0.20    | Wall is "consumed" when size drops below this ratio of peak |
+| `SWING_LOOKBACK`        | 3       | Pivot N for swing low detection (N bars on each side)       |
+| `BAR_SIZE`              | 100     | Number of trades per tick bar for swing low calculation     |
+| `ORDERBOOK_PERCENTILE`  | 90      | Only send order book levels above this percentile threshold |
+| `ORDERBOOK_INTERVAL_MS` | 1000    | Order book snapshot broadcast interval                      |
+
 
 ## Logging
 
 Plugin logs are written to a dedicated file, separate from Bookmap's system logs. Each plugin session creates a new log file named by the session start time.
 
-| OS | Log directory |
-|----|--------------|
+
+| OS          | Log directory                              |
+| ----------- | ------------------------------------------ |
 | **Windows** | `C:\Users\<username>\Bookmap\plugin_logs\` |
-| **macOS** | `~/Bookmap/plugin_logs/` |
+| **macOS**   | `~/Bookmap/plugin_logs/`                   |
+
 
 Log files are named by datetime, e.g. `2026-03-21_10-30-45.txt`. Each line includes a timestamp and level:
 
@@ -355,8 +373,11 @@ Log files are named by datetime, e.g. `2026-03-21_10-30-45.txt`. Each line inclu
 
 The plugin provides three settings panels accessible via the addon's configuration in Bookmap:
 
-| Panel | Purpose |
-|-------|---------|
+
+| Panel                       | Purpose                                                                         |
+| --------------------------- | ------------------------------------------------------------------------------- |
 | **Price Line Key Bindings** | Change which keys draw which line types (S/T/E defaults), clear all drawn lines |
-| **Indicators** | Enable/disable auto-drawn indicators (Premarket High/Low, Camarilla Pivots) |
-| **Key Price Levels** | View file-loaded levels, add/remove session levels at runtime |
+| **Indicators**              | Enable/disable auto-drawn indicators (Premarket High/Low, Camarilla Pivots)     |
+| **Key Price Levels**        | View file-loaded levels, add/remove session levels at runtime                   |
+
+

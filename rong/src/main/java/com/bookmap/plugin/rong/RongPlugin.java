@@ -39,6 +39,7 @@ import com.bookmap.plugin.common.IndicatorDataFetcher;
 import com.bookmap.plugin.common.KeyLevelConfig;
 import com.bookmap.plugin.common.KeyLevelManager;
 import com.bookmap.plugin.common.KeyLevelSettingsPanel;
+import com.bookmap.plugin.common.TradeButtonWindow;
 
 @Layer1SimpleAttachable
 @Layer1StrategyName("Rong")
@@ -73,6 +74,7 @@ public class RongPlugin implements CustomModuleAdapter,
     private SwingLowDetector swingDetector;
     private InstrumentInfo instrumentInfo;
     private OrderBookState orderBook;
+    private TradeButtonWindow tradeButtonWindow;
 
     @Override
     public void initialize(String alias, InstrumentInfo info, Api api, InitialState initialState) {
@@ -142,11 +144,17 @@ public class RongPlugin implements CustomModuleAdapter,
         // Fetch cam pivots + premarket high/low from EdgeDesk API (runs on background thread)
         IndicatorDataFetcher.fetch(alias, info.pips, camPivotTracker, premarketTracker);
 
+        tradeButtonWindow = new TradeButtonWindow(alias, sharedServer, priceLineStore);
+
         PluginLog.info("[Rong] Plugin initialized for " + alias);
     }
 
     @Override
     public void stop() {
+        if (tradeButtonWindow != null) {
+            tradeButtonWindow.dispose();
+            tradeButtonWindow = null;
+        }
         if (chartClickHandler != null) {
             chartClickHandler.unregisterSymbol(alias);
         }
