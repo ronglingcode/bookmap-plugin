@@ -10,13 +10,16 @@ import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 
 /**
- * Simple file logger for the plugin. Writes to ~/Bookmap/Logs/plugin.log
- * so plugin output is separated from Bookmap's own system logs.
+ * Simple file logger for the plugin. Writes to ~/Bookmap/plugin_logs/{datetime}.txt
+ * where datetime is captured once at first load, so each session gets its own log file.
  */
 public class PluginLog {
 
     private static final DateTimeFormatter TIMESTAMP_FMT =
             DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss.SSS");
+
+    private static final DateTimeFormatter FILE_NAME_FMT =
+            DateTimeFormatter.ofPattern("yyyy-MM-dd_HH-mm-ss");
 
     private static PrintWriter writer;
     private static boolean initFailed = false;
@@ -28,9 +31,10 @@ public class PluginLog {
         if (initFailed) return null;
 
         try {
-            Path logDir = Paths.get(System.getProperty("user.home"), "Bookmap", "Logs");
+            Path logDir = Paths.get(System.getProperty("user.home"), "Bookmap", "plugin_logs");
             Files.createDirectories(logDir);
-            Path logFile = logDir.resolve("plugin.log");
+            String fileName = LocalDateTime.now().format(FILE_NAME_FMT) + ".txt";
+            Path logFile = logDir.resolve(fileName);
             writer = new PrintWriter(new FileWriter(logFile.toFile(), true), true);
         } catch (IOException e) {
             initFailed = true;
