@@ -33,7 +33,6 @@ import com.bookmap.plugin.common.PriceLinePainter;
 import com.bookmap.plugin.common.PriceLineStore;
 import com.bookmap.plugin.common.SignalWebSocketServer;
 import com.bookmap.plugin.common.SwingLowDetector;
-import com.bookmap.plugin.common.VwapTracker;
 import com.bookmap.plugin.common.PluginLog;
 import com.bookmap.plugin.common.CamPivotTracker;
 import com.bookmap.plugin.common.IndicatorDataFetcher;
@@ -64,7 +63,6 @@ public class RongPlugin implements CustomModuleAdapter,
     private static PriceLinePainter priceLinePainter;
     private static IndicatorConfig indicatorConfig;
     private static PremarketTracker premarketTracker;
-    private static VwapTracker vwapTracker;
     private static KeyLevelConfig keyLevelConfig;
     private static KeyLevelManager keyLevelManager;
     private static CamPivotTracker camPivotTracker;
@@ -100,7 +98,6 @@ public class RongPlugin implements CustomModuleAdapter,
                 priceLinePainter = new PriceLinePainter(priceLineStore);
                 indicatorConfig = new IndicatorConfig();
                 premarketTracker = new PremarketTracker(priceLineStore, indicatorConfig);
-                vwapTracker = new VwapTracker(priceLineStore, indicatorConfig);
                 keyLevelConfig = new KeyLevelConfig();
                 keyLevelManager = new KeyLevelManager(keyLevelConfig, priceLineStore);
                 camPivotTracker = new CamPivotTracker(priceLineStore, indicatorConfig);
@@ -144,7 +141,7 @@ public class RongPlugin implements CustomModuleAdapter,
         // Fetch cam pivots + premarket high/low from EdgeDesk API (runs on background thread)
         IndicatorDataFetcher.fetch(alias, info.pips, camPivotTracker, premarketTracker);
 
-        // Backfill VWAP and premarket from Bookmap historical data as fallback
+        // Backfill premarket from Bookmap historical data as fallback
         final String instrumentAlias = alias;
         final double pips = info.pips;
         final long initTime = initialState.getCurrentTime();
@@ -152,9 +149,6 @@ public class RongPlugin implements CustomModuleAdapter,
             if (dataInterface != null) {
                 if (premarketTracker != null) {
                     premarketTracker.backfillFromHistory(dataInterface, instrumentAlias, pips, initTime);
-                }
-                if (vwapTracker != null) {
-                    vwapTracker.backfillFromHistory(dataInterface, instrumentAlias, pips, initTime);
                 }
             }
         }));
@@ -185,9 +179,6 @@ public class RongPlugin implements CustomModuleAdapter,
         if (premarketTracker != null) {
             premarketTracker.unregister(alias);
         }
-        if (vwapTracker != null) {
-            vwapTracker.unregister(alias);
-        }
         if (camPivotTracker != null) {
             camPivotTracker.unregister(alias);
         }
@@ -207,10 +198,6 @@ public class RongPlugin implements CustomModuleAdapter,
                 if (premarketTracker != null) {
                     premarketTracker.shutdown();
                     premarketTracker = null;
-                }
-                if (vwapTracker != null) {
-                    vwapTracker.shutdown();
-                    vwapTracker = null;
                 }
                 if (camPivotTracker != null) {
                     camPivotTracker.shutdown();
@@ -263,18 +250,12 @@ public class RongPlugin implements CustomModuleAdapter,
         if (premarketTracker != null) {
             premarketTracker.onTrade(alias, price, realPrice);
         }
-        if (vwapTracker != null) {
-            vwapTracker.onTrade(alias, price, realPrice, size);
-        }
     }
 
     @Override
     public void onTimestamp(long timestampNs) {
         if (premarketTracker != null) {
             premarketTracker.setTimestamp(timestampNs);
-        }
-        if (vwapTracker != null) {
-            vwapTracker.setTimestamp(timestampNs);
         }
     }
 

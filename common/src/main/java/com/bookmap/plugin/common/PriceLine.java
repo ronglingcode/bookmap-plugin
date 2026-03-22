@@ -17,7 +17,6 @@ public class PriceLine {
         // Auto-drawn indicator line types (defaultKey = null)
         PREMARKET_HIGH("PM High", new Color(255, 165, 0), null),
         PREMARKET_LOW("PM Low", new Color(180, 100, 255), null),
-        VWAP("VWAP", new Color(0, 180, 180), null),
         KEY_LEVEL("Key Level", new Color(255, 215, 0), null),
 
         // Camarilla Pivot levels — resistance (warm colors)

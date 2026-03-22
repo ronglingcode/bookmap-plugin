@@ -31,14 +31,6 @@ public class IndicatorSettingsPanel extends StrategyPanel {
                 config.setEnabled(IndicatorConfig.PREMARKET_HIGH_LOW, premarketCheckbox.isSelected()));
         add(premarketCheckbox, gbc);
 
-        // VWAP toggle
-        gbc.gridy++;
-        JCheckBox vwapCheckbox = new JCheckBox("VWAP (Volume Weighted Average Price)",
-                config.isEnabled(IndicatorConfig.VWAP));
-        vwapCheckbox.addActionListener(e ->
-                config.setEnabled(IndicatorConfig.VWAP, vwapCheckbox.isSelected()));
-        add(vwapCheckbox, gbc);
-
         // Cam Pivots toggle
         gbc.gridy++;
         JCheckBox camPivotsCheckbox = new JCheckBox("Camarilla Pivots (R1–R6, S1–S6)",

@@ -8,7 +8,7 @@ import java.util.concurrent.ConcurrentHashMap;
 /**
  * Draws Camarilla Pivot levels (R1–R6, S1–S6) as horizontal price lines on the chart.
  *
- * <p>Unlike PremarketTracker and VwapTracker, pivot levels are static for the entire trading day
+ * <p>Unlike PremarketTracker, pivot levels are static for the entire trading day
  * (they're based on the previous day's OHLC). The levels are fetched once during initialization
  * via {@link IndicatorDataFetcher} and drawn immediately — no streaming trade data is needed.</p>
  *
