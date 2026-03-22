@@ -33,6 +33,7 @@ import com.bookmap.plugin.common.PriceLineStore;
 import com.bookmap.plugin.common.SignalWebSocketServer;
 import com.bookmap.plugin.common.SwingLowDetector;
 import com.bookmap.plugin.common.PluginLog;
+import com.bookmap.plugin.common.SymbolUtils;
 import com.bookmap.plugin.common.CamPivotTracker;
 import com.bookmap.plugin.common.IndicatorDataFetcher;
 import com.bookmap.plugin.common.KeyLevelConfig;
@@ -75,6 +76,7 @@ public class BookmapActiveTraderPlugin implements CustomModuleAdapter,
 
     @Override
     public void initialize(String alias, InstrumentInfo info, Api api, InitialState initialState) {
+        alias = SymbolUtils.cleanSymbol(alias);
         this.alias = alias;
         this.api = api;
         this.instrumentInfo = info;

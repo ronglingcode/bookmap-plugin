@@ -38,16 +38,7 @@ public class IndicatorDataFetcher {
     public static void fetch(String instrumentAlias, double pips,
                               CamPivotTracker camPivotTracker,
                               PremarketTracker premarketTracker) {
-        // Extract ticker from instrument alias
-        // Bookmap may append suffixes like "@ISLAND" or ":NASDAQ:STOCKS"
-        String raw = instrumentAlias;
-        if (raw.contains("@")) {
-            raw = raw.substring(0, raw.indexOf("@"));
-        }
-        if (raw.contains(":")) {
-            raw = raw.substring(0, raw.indexOf(":"));
-        }
-        final String ticker = raw;
+        final String ticker = instrumentAlias;
 
         Thread thread = new Thread(() -> {
             try {
