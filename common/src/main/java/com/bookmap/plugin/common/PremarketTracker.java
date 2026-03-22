@@ -300,6 +300,50 @@ public class PremarketTracker implements IndicatorConfig.ChangeListener {
         }
     }
 
+    /**
+     * Seed premarket high/low from API data (called by IndicatorDataFetcher).
+     *
+     * <p>Sets initial premarket high/low before any streaming data arrives. If streaming
+     * {@code onTrade()} has already set values for today, this call is ignored to avoid
+     * overwriting more recent data.</p>
+     *
+     * @param instrumentAlias instrument identifier
+     * @param pips            price multiplier (tick-to-real-price conversion)
+     * @param high            premarket high price from API
+     * @param low             premarket low price from API
+     */
+    public void seedFromApi(String instrumentAlias, double pips, double high, double low) {
+        if (!config.isEnabled(IndicatorConfig.PREMARKET_HIGH_LOW)) return;
+
+        PremarketState state = states.computeIfAbsent(instrumentAlias, k -> new PremarketState());
+
+        // Don't overwrite if streaming data has already set values
+        if (!Double.isNaN(state.highPrice)) {
+            System.out.println("[PremarketTracker] API seed skipped for " + instrumentAlias
+                    + ": streaming data already present");
+            return;
+        }
+
+        double highTick = high / pips;
+        double lowTick = low / pips;
+
+        state.highPrice = high;
+        state.highPriceTick = highTick;
+        state.lowPrice = low;
+        state.lowPriceTick = lowTick;
+
+        PriceLine highLine = new PriceLine(instrumentAlias, PriceLine.LineType.PREMARKET_HIGH,
+                highTick, high);
+        store.replaceByType(instrumentAlias, PriceLine.LineType.PREMARKET_HIGH, highLine);
+
+        PriceLine lowLine = new PriceLine(instrumentAlias, PriceLine.LineType.PREMARKET_LOW,
+                lowTick, low);
+        store.replaceByType(instrumentAlias, PriceLine.LineType.PREMARKET_LOW, lowLine);
+
+        System.out.println("[PremarketTracker] Seeded from API " + instrumentAlias
+                + ": PM High=" + high + ", PM Low=" + low);
+    }
+
     /** Remove tracking state for an instrument (called when plugin stops for that symbol). */
     public void unregister(String instrumentAlias) {
         states.remove(instrumentAlias);

@@ -9,6 +9,7 @@ dependencies {
 shadowJar {
     archiveClassifier.set('all')
     relocate 'org.java_websocket', 'com.bookmap.plugin.shaded.websocket'
+    relocate 'com.google.gson', 'com.bookmap.plugin.shaded.gson'
 }
 
 jar {

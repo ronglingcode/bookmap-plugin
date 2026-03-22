@@ -38,5 +38,13 @@ public class IndicatorSettingsPanel extends StrategyPanel {
         vwapCheckbox.addActionListener(e ->
                 config.setEnabled(IndicatorConfig.VWAP, vwapCheckbox.isSelected()));
         add(vwapCheckbox, gbc);
+
+        // Cam Pivots toggle
+        gbc.gridy++;
+        JCheckBox camPivotsCheckbox = new JCheckBox("Camarilla Pivots (R1–R6, S1–S6)",
+                config.isEnabled(IndicatorConfig.CAM_PIVOTS));
+        camPivotsCheckbox.addActionListener(e ->
+                config.setEnabled(IndicatorConfig.CAM_PIVOTS, camPivotsCheckbox.isSelected()));
+        add(camPivotsCheckbox, gbc);
     }
 }

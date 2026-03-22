@@ -34,6 +34,8 @@ import com.bookmap.plugin.common.PriceLineStore;
 import com.bookmap.plugin.common.SignalWebSocketServer;
 import com.bookmap.plugin.common.SwingLowDetector;
 import com.bookmap.plugin.common.VwapTracker;
+import com.bookmap.plugin.common.CamPivotTracker;
+import com.bookmap.plugin.common.IndicatorDataFetcher;
 import com.bookmap.plugin.common.KeyLevelConfig;
 import com.bookmap.plugin.common.KeyLevelManager;
 import com.bookmap.plugin.common.KeyLevelSettingsPanel;
@@ -64,6 +66,7 @@ public class BookmapActiveTraderPlugin implements CustomModuleAdapter,
     private static VwapTracker vwapTracker;
     private static KeyLevelConfig keyLevelConfig;
     private static KeyLevelManager keyLevelManager;
+    private static CamPivotTracker camPivotTracker;
 
     private String alias;
     private Api api;
@@ -99,6 +102,7 @@ public class BookmapActiveTraderPlugin implements CustomModuleAdapter,
                 vwapTracker = new VwapTracker(priceLineStore, indicatorConfig);
                 keyLevelConfig = new KeyLevelConfig();
                 keyLevelManager = new KeyLevelManager(keyLevelConfig, priceLineStore);
+                camPivotTracker = new CamPivotTracker(priceLineStore, indicatorConfig);
 
                 chartClickHandler.setClickCallback((instrument, priceInTicks, realPrice, keyCode) -> {
                     PriceLine.LineType lineType = priceLineConfig.getLineType(keyCode);
@@ -135,7 +139,10 @@ public class BookmapActiveTraderPlugin implements CustomModuleAdapter,
             keyLevelManager.onInstrumentInitialized(alias, info.pips);
         }
 
-        // Backfill premarket high/low and VWAP from historical data (handles mid-session attach)
+        // Fetch cam pivots + premarket high/low from EdgeDesk API (runs on background thread)
+        IndicatorDataFetcher.fetch(alias, info.pips, camPivotTracker, premarketTracker);
+
+        // Backfill VWAP and premarket from Bookmap historical data as fallback
         final String instrumentAlias = alias;
         final double pips = info.pips;
         final long initTime = initialState.getCurrentTime();
@@ -179,6 +186,9 @@ public class BookmapActiveTraderPlugin implements CustomModuleAdapter,
         if (vwapTracker != null) {
             vwapTracker.unregister(alias);
         }
+        if (camPivotTracker != null) {
+            camPivotTracker.unregister(alias);
+        }
         if (keyLevelManager != null) {
             keyLevelManager.onInstrumentStopped(alias);
         }
@@ -199,6 +209,10 @@ public class BookmapActiveTraderPlugin implements CustomModuleAdapter,
                 if (vwapTracker != null) {
                     vwapTracker.shutdown();
                     vwapTracker = null;
+                }
+                if (camPivotTracker != null) {
+                    camPivotTracker.shutdown();
+                    camPivotTracker = null;
                 }
                 if (keyLevelManager != null) {
                     keyLevelManager.shutdown();

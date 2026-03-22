@@ -29,7 +29,7 @@ Both plugins share the same core logic in the `common` module. Features can be a
 
 - **Order wall breakout detection** — monitors large ask-side walls and broadcasts signals when consumed
 - **Key+click price lines** — hold a configurable key and click to draw stop loss, take profit, or entry lines
-- **Auto-drawn indicators** — premarket high/low and VWAP levels drawn and updated automatically
+- **Auto-drawn indicators** — premarket high/low, VWAP, and Camarilla Pivot levels drawn automatically
 - **Predefined key levels** — instrument-specific price levels loaded from a JSON config file or added via settings panel
 - **WebSocket API** — real-time heartbeat, breakout, order book, and price select messages
 - **Settings panels** — configure key bindings, enable/disable indicators, and manage key price levels at runtime
@@ -46,6 +46,8 @@ bookmap-plugin/
 │   ├── PriceLineConfig      # Key binding configuration
 │   ├── PremarketTracker     # Auto premarket high/low tracking
 │   ├── VwapTracker          # Volume Weighted Average Price tracking
+│   ├── CamPivotTracker      # Camarilla Pivot levels (R1–R6, S1–S6)
+│   ├── IndicatorDataFetcher # Fetches indicator data from EdgeDesk API
 │   ├── KeyLevelDefinition   # Predefined key level data model
 │   ├── KeyLevelConfig       # JSON config file + session level storage
 │   ├── KeyLevelManager      # Converts key levels to drawn price lines
@@ -279,6 +281,21 @@ Automatically draws and updates a horizontal line at the running VWAP — the av
 - Resets automatically at the start of each new session (4:00 AM ET)
 - Enabled by default; disable via the **Indicators** settings panel
 
+### Camarilla Pivots (R1–R6, S1–S6)
+
+Automatically draws all 12 Camarilla Pivot levels calculated from the previous day's high, low, and close.
+
+| Lines | Color | Description |
+|-------|-------|-------------|
+| R1–R6 | Red gradient (light → dark) | Resistance levels |
+| S1–S6 | Blue gradient (light → dark) | Support levels |
+
+- **Formula**: Uses a 1.1x range multiplier on previous day's range, with linear extensions for R5/R6 and S5/S6
+- **Data source**: Previous day's daily candle is fetched from the EdgeDesk API (`/api/intraday-indicators`) on plugin initialization. This avoids the need for Bookmap to have previous-day price data in its session.
+- **Static levels**: Pivots are calculated once and don't change during the day
+- **Premarket seeding**: The same API call also returns premarket high/low data, which seeds the premarket tracker before any streaming data arrives
+- Enabled by default; disable via the **Indicators** settings panel
+
 ### Key Price Levels
 
 Draw predefined price levels on specific instruments' charts. Useful for marking significant support/resistance levels identified from daily or higher timeframe analysis.
@@ -340,5 +357,5 @@ The plugin provides three settings panels accessible via the addon's configurati
 | Panel | Purpose |
 |-------|---------|
 | **Price Line Key Bindings** | Change which keys draw which line types (S/T/E defaults), clear all drawn lines |
-| **Indicators** | Enable/disable auto-drawn indicators (Premarket High/Low, VWAP) |
+| **Indicators** | Enable/disable auto-drawn indicators (Premarket High/Low, VWAP, Camarilla Pivots) |
 | **Key Price Levels** | View file-loaded levels, add/remove session levels at runtime |
