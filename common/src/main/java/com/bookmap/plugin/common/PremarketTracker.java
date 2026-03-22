@@ -5,14 +5,8 @@ import java.time.LocalDate;
 import java.time.LocalTime;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
-import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
-
-import velox.api.layer1.datastructure.events.TradeAggregationEvent;
-import velox.api.layer1.messages.indicators.DataStructureInterface;
-import velox.api.layer1.messages.indicators.DataStructureInterface.StandardEvents;
-import velox.api.layer1.messages.indicators.DataStructureInterface.TreeResponseInterval;
 
 /**
  * Tracks premarket high and low prices per instrument and draws them as price lines on the chart.
@@ -24,9 +18,8 @@ import velox.api.layer1.messages.indicators.DataStructureInterface.TreeResponseI
  *   <li>The plugin's {@code TradeDataListener.onTrade()} calls {@link #onTrade} on every trade.
  *       If the trade falls within the premarket window (4:00-9:30 AM ET), the tracker updates
  *       the high/low and writes price lines to the {@link PriceLineStore}.</li>
- *   <li>On initialization, {@link #backfillFromHistory} queries Bookmap's historical data API
- *       to catch up on premarket trades that happened before the plugin was attached
- *       (e.g. user turns on their computer mid-premarket).</li>
+ *   <li>On initialization, {@link #seedFromApi} receives premarket high/low from the
+ *       EdgeDesk API, so the plugin has data even if attached mid-premarket.</li>
  * </ol>
  *
  * <h3>Multi-day replay handling</h3>
@@ -37,15 +30,12 @@ import velox.api.layer1.messages.indicators.DataStructureInterface.TreeResponseI
  * <h3>Time source</h3>
  * <p>All time decisions use {@code currentTimestampNs} — the most recent data/replay timestamp
  * received via {@link #setTimestamp(long)}. This is critical for replay mode where system clock
- * time has no relation to the data being replayed. The backfill also uses this timestamp to
- * determine which day's premarket to query, ensuring it always queries the most recent day
- * even if the async callback fires late.</p>
+ * time has no relation to the data being replayed.</p>
  *
  * <h3>Threading</h3>
  * <p>{@code currentTimestampNs} is volatile because {@code setTimestamp()} and
- * {@code backfillFromHistory()} may be called from different threads. Per-instrument state
- * is stored in a ConcurrentHashMap. The backfill includes a guard against overwriting
- * streaming state that has already advanced to a newer day.</p>
+ * {@code seedFromApi()} may be called from different threads. Per-instrument state
+ * is stored in a ConcurrentHashMap.</p>
  *
  * <h3>Configuration</h3>
  * <p>Implements {@link IndicatorConfig.ChangeListener} so that when the user disables the
@@ -168,135 +158,6 @@ public class PremarketTracker implements IndicatorConfig.ChangeListener {
             PriceLine lowLine = new PriceLine(instrumentAlias, PriceLine.LineType.PREMARKET_LOW,
                     priceTick, realPrice);
             store.replaceByType(instrumentAlias, PriceLine.LineType.PREMARKET_LOW, lowLine);
-        }
-    }
-
-    /**
-     * Backfill premarket high/low from historical trade data.
-     *
-     * <p>Called once during plugin initialization via Bookmap's async
-     * {@code Layer1ApiDataInterfaceRequestMessage} callback. This handles the case where the
-     * user attaches the plugin mid-premarket — without backfill, the tracker would only see
-     * trades from the attachment point forward and miss earlier premarket extremes.</p>
-     *
-     * <h4>Which day's premarket is queried?</h4>
-     * <p>Uses {@code currentTimestampNs} (the most recent streaming timestamp) to determine
-     * the current date, falling back to {@code initTimeNs} only if no streaming data has
-     * arrived yet. This is important because this method runs asynchronously — by the time
-     * the callback fires, streaming may have already advanced past the initialization time.
-     * Using the latest known time ensures we always query the correct (most recent) day.</p>
-     *
-     * <h4>Race condition guard</h4>
-     * <p>If streaming {@code onTrade()} has already advanced to a newer day by the time this
-     * callback fires, the backfill result is discarded to avoid overwriting current-day data
-     * with stale previous-day data.</p>
-     *
-     * @param dataInterface   Bookmap's historical data query interface (obtained via
-     *                        {@code Layer1ApiDataInterfaceRequestMessage})
-     * @param instrumentAlias instrument identifier
-     * @param pips            price multiplier to convert tick values to real prices
-     * @param initTimeNs      initial data time in epoch nanoseconds from {@code InitialState.getCurrentTime()};
-     *                        used as fallback if no streaming timestamps have been received yet
-     */
-    public void backfillFromHistory(DataStructureInterface dataInterface, String instrumentAlias,
-                                     double pips, long initTimeNs) {
-        if (!config.isEnabled(IndicatorConfig.PREMARKET_HIGH_LOW)) return;
-
-        // Determine the effective "now" — prefer the most recent streaming timestamp
-        // over the init time, because this callback fires asynchronously and streaming
-        // may have already advanced to a newer day by the time we get here.
-        long effectiveTimeNs = currentTimestampNs > 0 ? currentTimestampNs : initTimeNs;
-
-        // Calculate the premarket window for the effective date in Eastern Time
-        ZonedDateTime now = Instant.ofEpochSecond(0, effectiveTimeNs).atZone(ET);
-        LocalDate today = now.toLocalDate();
-        long premarketStartNs = today.atTime(PREMARKET_START).atZone(ET).toInstant().toEpochMilli() * 1_000_000L;
-        long premarketEndNs = today.atTime(PREMARKET_END).atZone(ET).toInstant().toEpochMilli() * 1_000_000L;
-
-        // Only query if we're currently within or past the premarket window
-        // (if before 4 AM, there's no premarket data for today yet)
-        long queryEndNs = Math.min(premarketEndNs, effectiveTimeNs);
-        if (queryEndNs <= premarketStartNs) return;
-
-        try {
-            // Query Bookmap's historical data store for all trades in the premarket window.
-            // Using 1 interval aggregates everything into a single TradeAggregationEvent
-            // containing all traded prices (from both bid and ask aggressors).
-            List<TreeResponseInterval> intervals = dataInterface.get(
-                    premarketStartNs, queryEndNs, 1, instrumentAlias,
-                    new StandardEvents[]{StandardEvents.TRADE});
-
-            if (intervals == null || intervals.isEmpty()) return;
-
-            // Scan all historical trades to find the premarket high and low
-            double highPrice = Double.NaN;
-            double lowPrice = Double.NaN;
-            double highPriceTick = Double.NaN;
-            double lowPriceTick = Double.NaN;
-
-            for (TreeResponseInterval interval : intervals) {
-                if (interval.events == null) continue;
-                for (Object eventObj : interval.events.values()) {
-                    if (!(eventObj instanceof TradeAggregationEvent)) continue;
-                    TradeAggregationEvent trade = (TradeAggregationEvent) eventObj;
-
-                    // TradeAggregationEvent has two maps:
-                    //   - bidAggressorMap: trades where the aggressor was a buyer (hitting the ask)
-                    //   - askAggressorMap: trades where the aggressor was a seller (hitting the bid)
-                    // Both maps are Map<Double, Map<Integer, Integer>> where the key is price in ticks.
-                    // We scan both to find the full range of traded prices.
-                    for (Map<Double, ?> priceMap : new Map[]{trade.bidAggressorMap, trade.askAggressorMap}) {
-                        if (priceMap == null) continue;
-                        for (Double priceTick : priceMap.keySet()) {
-                            if (priceTick == null) continue;
-                            double realPrice = priceTick * pips;
-                            if (Double.isNaN(highPrice) || realPrice > highPrice) {
-                                highPrice = realPrice;
-                                highPriceTick = priceTick;
-                            }
-                            if (Double.isNaN(lowPrice) || realPrice < lowPrice) {
-                                lowPrice = realPrice;
-                                lowPriceTick = priceTick;
-                            }
-                        }
-                    }
-                }
-            }
-
-            if (!Double.isNaN(highPrice)) {
-                PremarketState state = states.computeIfAbsent(instrumentAlias, k -> new PremarketState());
-
-                // Race condition guard: if streaming onTrade() has already moved to a newer
-                // day, discard this backfill result to avoid overwriting current data with
-                // stale data from a previous day.
-                if (state.lastSessionDate != null && state.lastSessionDate.isAfter(today)) {
-                    PluginLog.info("[PremarketTracker] Backfill skipped for " + instrumentAlias
-                            + ": streaming already on " + state.lastSessionDate + ", backfill was for " + today);
-                    return;
-                }
-
-                // Apply backfill results to state and draw the lines
-                state.lastSessionDate = today;
-                state.highPrice = highPrice;
-                state.highPriceTick = highPriceTick;
-                state.lowPrice = lowPrice;
-                state.lowPriceTick = lowPriceTick;
-
-                PriceLine highLine = new PriceLine(instrumentAlias, PriceLine.LineType.PREMARKET_HIGH,
-                        highPriceTick, highPrice);
-                store.replaceByType(instrumentAlias, PriceLine.LineType.PREMARKET_HIGH, highLine);
-
-                PriceLine lowLine = new PriceLine(instrumentAlias, PriceLine.LineType.PREMARKET_LOW,
-                        lowPriceTick, lowPrice);
-                store.replaceByType(instrumentAlias, PriceLine.LineType.PREMARKET_LOW, lowLine);
-
-                PluginLog.info("[PremarketTracker] Backfilled " + instrumentAlias
-                        + ": PM High=" + highPrice + ", PM Low=" + lowPrice
-                        + " for " + today + " (effectiveTime=" + now + ")");
-            }
-        } catch (Exception e) {
-            PluginLog.error("[PremarketTracker] Backfill failed for " + instrumentAlias + ": " + e.getMessage());
-            e.printStackTrace();
         }
     }
 

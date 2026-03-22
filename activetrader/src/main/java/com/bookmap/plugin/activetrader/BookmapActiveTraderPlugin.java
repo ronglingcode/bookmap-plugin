@@ -9,7 +9,6 @@ import velox.api.layer1.annotations.Layer1SimpleAttachable;
 import velox.api.layer1.annotations.Layer1StrategyName;
 import velox.api.layer1.data.InstrumentInfo;
 import velox.api.layer1.data.TradeInfo;
-import velox.api.layer1.messages.indicators.Layer1ApiDataInterfaceRequestMessage;
 import velox.api.layer1.messages.indicators.Layer1ApiUserMessageModifyScreenSpacePainter;
 import velox.api.layer1.simplified.Api;
 import velox.api.layer1.simplified.CustomModuleAdapter;
@@ -139,18 +138,6 @@ public class BookmapActiveTraderPlugin implements CustomModuleAdapter,
 
         // Fetch cam pivots + premarket high/low from EdgeDesk API (runs on background thread)
         IndicatorDataFetcher.fetch(alias, info.pips, camPivotTracker, premarketTracker);
-
-        // Backfill premarket from Bookmap historical data as fallback
-        final String instrumentAlias = alias;
-        final double pips = info.pips;
-        final long initTime = initialState.getCurrentTime();
-        api.sendUserMessage(new Layer1ApiDataInterfaceRequestMessage(dataInterface -> {
-            if (dataInterface != null) {
-                if (premarketTracker != null) {
-                    premarketTracker.backfillFromHistory(dataInterface, instrumentAlias, pips, initTime);
-                }
-            }
-        }));
 
         PluginLog.info("[ActiveTrader] Plugin initialized for " + alias);
     }
