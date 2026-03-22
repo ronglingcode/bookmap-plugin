@@ -71,7 +71,7 @@ public class CamPivotTracker implements IndicatorConfig.ChangeListener {
             store.replaceByType(instrumentAlias, lineType, line);
         }
 
-        System.out.println("[CamPivotTracker] Drew " + pivotLevels.size()
+        PluginLog.info("[CamPivotTracker] Drew " + pivotLevels.size()
                 + " pivot levels for " + instrumentAlias);
     }
 

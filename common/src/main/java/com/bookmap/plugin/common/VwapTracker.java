@@ -154,7 +154,7 @@ public class VwapTracker implements IndicatorConfig.ChangeListener {
             state.lastSessionDate = today;
             // Clear the previous day's VWAP line from the chart
             store.removeByType(instrumentAlias, PriceLine.LineType.VWAP);
-            System.out.println("[VwapTracker] Reset for new session day " + today + " on " + instrumentAlias);
+            PluginLog.info("[VwapTracker] Reset for new session day " + today + " on " + instrumentAlias);
         }
 
         // Only accumulate trades after session start (4:00 AM ET)
@@ -284,7 +284,7 @@ public class VwapTracker implements IndicatorConfig.ChangeListener {
                 // Race condition guard: if streaming has already moved to a newer day,
                 // discard this backfill to avoid overwriting current data
                 if (state.lastSessionDate != null && state.lastSessionDate.isAfter(today)) {
-                    System.out.println("[VwapTracker] Backfill skipped for " + instrumentAlias
+                    PluginLog.info("[VwapTracker] Backfill skipped for " + instrumentAlias
                             + ": streaming already on " + state.lastSessionDate + ", backfill was for " + today);
                     return;
                 }
@@ -303,13 +303,13 @@ public class VwapTracker implements IndicatorConfig.ChangeListener {
                         vwapTick, vwapPrice);
                 store.replaceByType(instrumentAlias, PriceLine.LineType.VWAP, vwapLine);
 
-                System.out.println("[VwapTracker] Backfilled " + instrumentAlias
+                PluginLog.info("[VwapTracker] Backfilled " + instrumentAlias
                         + ": VWAP=" + String.format("%.4f", vwapPrice)
                         + " (vol=" + cumulativeVol + ")"
                         + " for " + today + " (effectiveTime=" + now + ")");
             }
         } catch (Exception e) {
-            System.err.println("[VwapTracker] Backfill failed for " + instrumentAlias + ": " + e.getMessage());
+            PluginLog.error("[VwapTracker] Backfill failed for " + instrumentAlias + ": " + e.getMessage());
             e.printStackTrace();
         }
     }

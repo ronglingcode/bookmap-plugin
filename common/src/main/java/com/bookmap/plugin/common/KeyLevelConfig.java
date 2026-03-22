@@ -62,9 +62,9 @@ public class KeyLevelConfig {
 
     public KeyLevelConfig() {
         this.fileLevels = loadFromFile();
-        System.out.println("[KeyLevelConfig] Loaded " + fileLevels.size() + " key levels from file");
+        PluginLog.info("[KeyLevelConfig] Loaded " + fileLevels.size() + " key levels from file");
         for (KeyLevelDefinition def : fileLevels) {
-            System.out.println("[KeyLevelConfig]   " + def);
+            PluginLog.info("[KeyLevelConfig]   " + def);
         }
     }
 
@@ -109,14 +109,14 @@ public class KeyLevelConfig {
     /** Add a key level at runtime (session-only, not persisted to file). */
     public void addSessionLevel(KeyLevelDefinition def) {
         sessionLevels.add(def);
-        System.out.println("[KeyLevelConfig] Session level added: " + def);
+        PluginLog.info("[KeyLevelConfig] Session level added: " + def);
         notifyListeners();
     }
 
     /** Remove a session-only key level. File levels cannot be removed. */
     public void removeSessionLevel(KeyLevelDefinition def) {
         if (sessionLevels.remove(def)) {
-            System.out.println("[KeyLevelConfig] Session level removed: " + def);
+            PluginLog.info("[KeyLevelConfig] Session level removed: " + def);
             notifyListeners();
         }
     }
@@ -154,9 +154,9 @@ public class KeyLevelConfig {
     private List<KeyLevelDefinition> loadFromFile() {
         File configFile = new File(System.getProperty("user.home"), CONFIG_DIR + File.separator + CONFIG_FILE);
         if (!configFile.exists()) {
-            System.out.println("[KeyLevelConfig] Config file not found: " + configFile.getAbsolutePath());
-            System.out.println("[KeyLevelConfig] To add predefined key levels, create this file. Example:");
-            System.out.println("[KeyLevelConfig]   { \"levels\": [ { \"instrument\": \"NVDA\", \"price\": 180.00, \"label\": \"support\" } ] }");
+            PluginLog.info("[KeyLevelConfig] Config file not found: " + configFile.getAbsolutePath());
+            PluginLog.info("[KeyLevelConfig] To add predefined key levels, create this file. Example:");
+            PluginLog.info("[KeyLevelConfig]   { \"levels\": [ { \"instrument\": \"NVDA\", \"price\": 180.00, \"label\": \"support\" } ] }");
             return Collections.emptyList();
         }
 
@@ -168,7 +168,7 @@ public class KeyLevelConfig {
             }
             return parseJson(sb.toString());
         } catch (Exception e) {
-            System.err.println("[KeyLevelConfig] Failed to load " + configFile.getAbsolutePath() + ": " + e.getMessage());
+            PluginLog.error("[KeyLevelConfig] Failed to load " + configFile.getAbsolutePath() + ": " + e.getMessage());
             e.printStackTrace();
             return Collections.emptyList();
         }
@@ -226,7 +226,7 @@ public class KeyLevelConfig {
         String label = extractStringValue(obj, "label");
 
         if (instrument == null || price == null) {
-            System.err.println("[KeyLevelConfig] Skipping invalid entry (missing instrument or price): " + obj.trim());
+            PluginLog.error("[KeyLevelConfig] Skipping invalid entry (missing instrument or price): " + obj.trim());
             return null;
         }
 

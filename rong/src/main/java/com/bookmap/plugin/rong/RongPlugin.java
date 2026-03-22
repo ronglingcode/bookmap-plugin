@@ -34,6 +34,7 @@ import com.bookmap.plugin.common.PriceLineStore;
 import com.bookmap.plugin.common.SignalWebSocketServer;
 import com.bookmap.plugin.common.SwingLowDetector;
 import com.bookmap.plugin.common.VwapTracker;
+import com.bookmap.plugin.common.PluginLog;
 import com.bookmap.plugin.common.CamPivotTracker;
 import com.bookmap.plugin.common.IndicatorDataFetcher;
 import com.bookmap.plugin.common.KeyLevelConfig;
@@ -88,7 +89,7 @@ public class RongPlugin implements CustomModuleAdapter,
             if (sharedServer == null) {
                 sharedServer = new SignalWebSocketServer(WS_PORT, ORDERBOOK_PERCENTILE, ORDERBOOK_INTERVAL_MS);
                 sharedServer.start();
-                System.out.println("[Rong] Shared WebSocket server started on port " + WS_PORT);
+                PluginLog.info("[Rong] Shared WebSocket server started on port " + WS_PORT);
             }
             if (chartClickHandler == null) {
                 chartClickHandler = new ChartClickHandler(sharedServer);
@@ -110,7 +111,7 @@ public class RongPlugin implements CustomModuleAdapter,
                     if (lineType != null) {
                         PriceLine line = new PriceLine(instrument, lineType, priceInTicks, realPrice);
                         priceLineStore.addLine(line);
-                        System.out.println("[Rong] Price line added: " + lineType.label
+                        PluginLog.info("[Rong] Price line added: " + lineType.label
                                 + " @ " + realPrice + " for " + instrument);
                     }
                 });
@@ -158,7 +159,7 @@ public class RongPlugin implements CustomModuleAdapter,
             }
         }));
 
-        System.out.println("[Rong] Plugin initialized for " + alias);
+        PluginLog.info("[Rong] Plugin initialized for " + alias);
     }
 
     @Override
@@ -228,10 +229,10 @@ public class RongPlugin implements CustomModuleAdapter,
                 priceLinePainter = null;
                 indicatorConfig = null;
                 instanceCount = 0;
-                System.out.println("[Rong] Shared WebSocket server shut down");
+                PluginLog.info("[Rong] Shared WebSocket server shut down");
             }
         }
-        System.out.println("[Rong] Plugin stopped for " + alias);
+        PluginLog.info("[Rong] Plugin stopped for " + alias);
     }
 
     @Override
@@ -286,7 +287,7 @@ public class RongPlugin implements CustomModuleAdapter,
                 if (!Double.isNaN(swingLow) && swingLow < wallRealPrice) {
                     BreakoutSignal signal = new BreakoutSignal(alias, wallRealPrice, swingLow);
                     sharedServer.broadcastSignal(signal.toJson());
-                    System.out.println("[Rong] BREAKOUT signal: " + signal.toJson());
+                    PluginLog.info("[Rong] BREAKOUT signal: " + signal.toJson());
                 }
                 wallTracker.removeWall(wall.priceTick);
             }

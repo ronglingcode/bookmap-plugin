@@ -66,7 +66,7 @@ public class KeyLevelManager implements KeyLevelConfig.ChangeListener {
         }
 
         if (!levels.isEmpty()) {
-            System.out.println("[KeyLevelManager] Drew " + levels.size()
+            PluginLog.info("[KeyLevelManager] Drew " + levels.size()
                     + " key level(s) for " + instrumentAlias);
         }
     }

@@ -58,7 +58,7 @@ public class SignalWebSocketServer extends WebSocketServer {
     public void registerSymbol(String symbol, OrderBookState orderBook, double pips) {
         symbolToOrderBook.put(symbol, orderBook);
         symbolToPips.put(symbol, pips);
-        System.out.println("[ActiveTrader] Registered symbol: " + symbol);
+        PluginLog.info("[ActiveTrader] Registered symbol: " + symbol);
     }
 
     /** Unregister a symbol when its plugin instance stops. */
@@ -66,7 +66,7 @@ public class SignalWebSocketServer extends WebSocketServer {
         symbolToOrderBook.remove(symbol);
         symbolToPips.remove(symbol);
         symbolToLastPrice.remove(symbol);
-        System.out.println("[ActiveTrader] Unregistered symbol: " + symbol);
+        PluginLog.info("[ActiveTrader] Unregistered symbol: " + symbol);
     }
 
     public void setLastPrice(String symbol, double price) {
@@ -75,13 +75,13 @@ public class SignalWebSocketServer extends WebSocketServer {
 
     @Override
     public void onOpen(WebSocket conn, ClientHandshake handshake) {
-        System.out.println("[ActiveTrader] Client connected: " + conn.getRemoteSocketAddress());
+        PluginLog.info("[ActiveTrader] Client connected: " + conn.getRemoteSocketAddress());
     }
 
     @Override
     public void onClose(WebSocket conn, int code, String reason, boolean remote) {
         orderbookSubscribers.remove(conn);
-        System.out.println("[ActiveTrader] Client disconnected: " + conn.getRemoteSocketAddress());
+        PluginLog.info("[ActiveTrader] Client disconnected: " + conn.getRemoteSocketAddress());
     }
 
     @Override
@@ -91,11 +91,11 @@ public class SignalWebSocketServer extends WebSocketServer {
             orderbookSubscribers.add(conn);
             ensureOrderbookBroadcast();
             conn.send("{\"type\":\"subscribed\",\"channel\":\"orderbook\",\"intervalMs\":" + orderbookIntervalMs + ",\"percentile\":" + orderbookPercentile + "}");
-            System.out.println("[ActiveTrader] Client subscribed to orderbook (interval=" + orderbookIntervalMs + "ms, percentile=" + orderbookPercentile + ")");
+            PluginLog.info("[ActiveTrader] Client subscribed to orderbook (interval=" + orderbookIntervalMs + "ms, percentile=" + orderbookPercentile + ")");
         } else if (trimmed.contains("\"unsubscribe\"") && trimmed.contains("\"orderbook\"")) {
             orderbookSubscribers.remove(conn);
             conn.send("{\"type\":\"unsubscribed\",\"channel\":\"orderbook\"}");
-            System.out.println("[ActiveTrader] Client unsubscribed from orderbook");
+            PluginLog.info("[ActiveTrader] Client unsubscribed from orderbook");
         }
     }
 
@@ -111,21 +111,21 @@ public class SignalWebSocketServer extends WebSocketServer {
 
     @Override
     public void onError(WebSocket conn, Exception ex) {
-        System.err.println("[ActiveTrader] WebSocket error: " + ex.getMessage());
+        PluginLog.error("[ActiveTrader] WebSocket error: " + ex.getMessage());
     }
 
     @Override
     public void onStart() {
-        System.out.println("[ActiveTrader] WebSocket server started on port " + getPort());
+        PluginLog.info("[ActiveTrader] WebSocket server started on port " + getPort());
         try {
             Files.createDirectories(heartbeatLogFile.getParent());
             heartbeatWriter = Files.newBufferedWriter(heartbeatLogFile,
                 StandardOpenOption.CREATE, StandardOpenOption.APPEND);
             breakoutWriter = Files.newBufferedWriter(breakoutLogFile,
                 StandardOpenOption.CREATE, StandardOpenOption.APPEND);
-            System.out.println("[ActiveTrader] Logging to " + heartbeatLogFile.getParent());
+            PluginLog.info("[ActiveTrader] Logging to " + heartbeatLogFile.getParent());
         } catch (IOException e) {
-            System.err.println("[ActiveTrader] Failed to open log files: " + e.getMessage());
+            PluginLog.error("[ActiveTrader] Failed to open log files: " + e.getMessage());
         }
         scheduler.scheduleAtFixedRate(this::sendHeartbeats, 5, 5, TimeUnit.SECONDS);
     }
@@ -186,7 +186,7 @@ public class SignalWebSocketServer extends WebSocketServer {
                 writer.newLine();
                 writer.flush();
             } catch (IOException e) {
-                System.err.println("[ActiveTrader] Failed to write to log: " + e.getMessage());
+                PluginLog.error("[ActiveTrader] Failed to write to log: " + e.getMessage());
             }
         }
     }
@@ -196,7 +196,7 @@ public class SignalWebSocketServer extends WebSocketServer {
             try {
                 writer.close();
             } catch (IOException e) {
-                System.err.println("[ActiveTrader] Failed to close log file: " + e.getMessage());
+                PluginLog.error("[ActiveTrader] Failed to close log file: " + e.getMessage());
             }
         }
     }

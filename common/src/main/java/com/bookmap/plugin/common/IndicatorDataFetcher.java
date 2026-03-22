@@ -45,8 +45,8 @@ public class IndicatorDataFetcher {
 
         Thread thread = new Thread(() -> {
             try {
-                String urlStr = API_BASE_URL + "/api/intraday-indicators?ticker=" + ticker;
-                System.out.println("[IndicatorDataFetcher] Fetching: " + urlStr);
+                String urlStr = API_BASE_URL + "/api/intraday-indicators?test=true&ticker=" + ticker;
+                PluginLog.info("[IndicatorDataFetcher] Fetching: " + urlStr);
 
                 HttpURLConnection conn = (HttpURLConnection) new URL(urlStr).openConnection();
                 conn.setRequestMethod("GET");
@@ -55,7 +55,7 @@ public class IndicatorDataFetcher {
 
                 int status = conn.getResponseCode();
                 if (status != 200) {
-                    System.err.println("[IndicatorDataFetcher] HTTP " + status + " for " + ticker);
+                    PluginLog.error("[IndicatorDataFetcher] HTTP " + status + " for " + ticker);
                     return;
                 }
 
@@ -99,10 +99,10 @@ public class IndicatorDataFetcher {
                     }
                 }
 
-                System.out.println("[IndicatorDataFetcher] Successfully loaded indicators for " + ticker);
+                PluginLog.info("[IndicatorDataFetcher] Successfully loaded indicators for " + ticker);
 
             } catch (Exception e) {
-                System.err.println("[IndicatorDataFetcher] Failed for " + ticker + ": " + e.getMessage());
+                PluginLog.error("[IndicatorDataFetcher] Failed for " + ticker + ": " + e.getMessage());
             }
         }, "IndicatorDataFetcher-" + ticker);
 

@@ -143,7 +143,7 @@ public class PremarketTracker implements IndicatorConfig.ChangeListener {
             // Clear the previous day's premarket lines from the chart
             store.removeByType(instrumentAlias, PriceLine.LineType.PREMARKET_HIGH);
             store.removeByType(instrumentAlias, PriceLine.LineType.PREMARKET_LOW);
-            System.out.println("[PremarketTracker] Reset for new session day " + today + " on " + instrumentAlias);
+            PluginLog.info("[PremarketTracker] Reset for new session day " + today + " on " + instrumentAlias);
         }
 
         // Only track prices during the premarket window (4:00 AM - 9:30 AM ET)
@@ -270,7 +270,7 @@ public class PremarketTracker implements IndicatorConfig.ChangeListener {
                 // day, discard this backfill result to avoid overwriting current data with
                 // stale data from a previous day.
                 if (state.lastSessionDate != null && state.lastSessionDate.isAfter(today)) {
-                    System.out.println("[PremarketTracker] Backfill skipped for " + instrumentAlias
+                    PluginLog.info("[PremarketTracker] Backfill skipped for " + instrumentAlias
                             + ": streaming already on " + state.lastSessionDate + ", backfill was for " + today);
                     return;
                 }
@@ -290,12 +290,12 @@ public class PremarketTracker implements IndicatorConfig.ChangeListener {
                         lowPriceTick, lowPrice);
                 store.replaceByType(instrumentAlias, PriceLine.LineType.PREMARKET_LOW, lowLine);
 
-                System.out.println("[PremarketTracker] Backfilled " + instrumentAlias
+                PluginLog.info("[PremarketTracker] Backfilled " + instrumentAlias
                         + ": PM High=" + highPrice + ", PM Low=" + lowPrice
                         + " for " + today + " (effectiveTime=" + now + ")");
             }
         } catch (Exception e) {
-            System.err.println("[PremarketTracker] Backfill failed for " + instrumentAlias + ": " + e.getMessage());
+            PluginLog.error("[PremarketTracker] Backfill failed for " + instrumentAlias + ": " + e.getMessage());
             e.printStackTrace();
         }
     }
@@ -319,7 +319,7 @@ public class PremarketTracker implements IndicatorConfig.ChangeListener {
 
         // Don't overwrite if streaming data has already set values
         if (!Double.isNaN(state.highPrice)) {
-            System.out.println("[PremarketTracker] API seed skipped for " + instrumentAlias
+            PluginLog.info("[PremarketTracker] API seed skipped for " + instrumentAlias
                     + ": streaming data already present");
             return;
         }
@@ -340,7 +340,7 @@ public class PremarketTracker implements IndicatorConfig.ChangeListener {
                 lowTick, low);
         store.replaceByType(instrumentAlias, PriceLine.LineType.PREMARKET_LOW, lowLine);
 
-        System.out.println("[PremarketTracker] Seeded from API " + instrumentAlias
+        PluginLog.info("[PremarketTracker] Seeded from API " + instrumentAlias
                 + ": PM High=" + high + ", PM Low=" + low);
     }
 

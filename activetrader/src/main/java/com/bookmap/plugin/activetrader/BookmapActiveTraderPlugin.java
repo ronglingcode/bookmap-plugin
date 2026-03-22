@@ -34,6 +34,7 @@ import com.bookmap.plugin.common.PriceLineStore;
 import com.bookmap.plugin.common.SignalWebSocketServer;
 import com.bookmap.plugin.common.SwingLowDetector;
 import com.bookmap.plugin.common.VwapTracker;
+import com.bookmap.plugin.common.PluginLog;
 import com.bookmap.plugin.common.CamPivotTracker;
 import com.bookmap.plugin.common.IndicatorDataFetcher;
 import com.bookmap.plugin.common.KeyLevelConfig;
@@ -88,7 +89,7 @@ public class BookmapActiveTraderPlugin implements CustomModuleAdapter,
             if (sharedServer == null) {
                 sharedServer = new SignalWebSocketServer(WS_PORT, ORDERBOOK_PERCENTILE, ORDERBOOK_INTERVAL_MS);
                 sharedServer.start();
-                System.out.println("[ActiveTrader] Shared WebSocket server started on port " + WS_PORT);
+                PluginLog.info("[ActiveTrader] Shared WebSocket server started on port " + WS_PORT);
             }
             if (chartClickHandler == null) {
                 chartClickHandler = new ChartClickHandler(sharedServer);
@@ -109,7 +110,7 @@ public class BookmapActiveTraderPlugin implements CustomModuleAdapter,
                     if (lineType != null) {
                         PriceLine line = new PriceLine(instrument, lineType, priceInTicks, realPrice);
                         priceLineStore.addLine(line);
-                        System.out.println("[ActiveTrader] Price line added: " + lineType.label
+                        PluginLog.info("[ActiveTrader] Price line added: " + lineType.label
                                 + " @ " + realPrice + " for " + instrument);
                     }
                 });
@@ -157,7 +158,7 @@ public class BookmapActiveTraderPlugin implements CustomModuleAdapter,
             }
         }));
 
-        System.out.println("[ActiveTrader] Plugin initialized for " + alias);
+        PluginLog.info("[ActiveTrader] Plugin initialized for " + alias);
     }
 
     @Override
@@ -227,10 +228,10 @@ public class BookmapActiveTraderPlugin implements CustomModuleAdapter,
                 priceLinePainter = null;
                 indicatorConfig = null;
                 instanceCount = 0;
-                System.out.println("[ActiveTrader] Shared WebSocket server shut down");
+                PluginLog.info("[ActiveTrader] Shared WebSocket server shut down");
             }
         }
-        System.out.println("[ActiveTrader] Plugin stopped for " + alias);
+        PluginLog.info("[ActiveTrader] Plugin stopped for " + alias);
     }
 
     @Override
@@ -285,7 +286,7 @@ public class BookmapActiveTraderPlugin implements CustomModuleAdapter,
                 if (!Double.isNaN(swingLow) && swingLow < wallRealPrice) {
                     BreakoutSignal signal = new BreakoutSignal(alias, wallRealPrice, swingLow);
                     sharedServer.broadcastSignal(signal.toJson());
-                    System.out.println("[ActiveTrader] BREAKOUT signal: " + signal.toJson());
+                    PluginLog.info("[ActiveTrader] BREAKOUT signal: " + signal.toJson());
                 }
                 wallTracker.removeWall(wall.priceTick);
             }

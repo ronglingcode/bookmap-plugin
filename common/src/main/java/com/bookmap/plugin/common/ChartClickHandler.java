@@ -77,12 +77,12 @@ public class ChartClickHandler implements ScreenSpacePainterFactory {
             Files.createDirectories(logFile.getParent());
             clickLogWriter = Files.newBufferedWriter(logFile, StandardOpenOption.CREATE, StandardOpenOption.APPEND);
         } catch (IOException e) {
-            System.err.println("[ActiveTrader] Failed to open click log: " + e.getMessage());
+            PluginLog.error("[ActiveTrader] Failed to open click log: " + e.getMessage());
         }
     }
 
     private static void logClick(String msg) {
-        System.out.println(msg);
+        PluginLog.info(msg);
         if (clickLogWriter != null) {
             try {
                 clickLogWriter.write(System.currentTimeMillis() + " " + msg);
@@ -101,7 +101,7 @@ public class ChartClickHandler implements ScreenSpacePainterFactory {
     public void registerSymbol(String instrumentAlias, double pips) {
         instrumentPips.put(instrumentAlias, pips);
         lastRegisteredInstrument = instrumentAlias;
-        System.out.println("[ActiveTrader] ChartClickHandler registered instrument: " + instrumentAlias + " pips=" + pips);
+        PluginLog.info("[ActiveTrader] ChartClickHandler registered instrument: " + instrumentAlias + " pips=" + pips);
     }
 
     public void unregisterSymbol(String instrumentAlias) {
@@ -119,7 +119,7 @@ public class ChartClickHandler implements ScreenSpacePainterFactory {
                 heldKeys.clear();
                 painterCoords.clear();
                 painterToInstrument.clear();
-                System.out.println("[ActiveTrader] AWT listener removed");
+                PluginLog.info("[ActiveTrader] AWT listener removed");
             }
         }
     }
@@ -217,7 +217,7 @@ public class ChartClickHandler implements ScreenSpacePainterFactory {
             };
             Toolkit.getDefaultToolkit().addAWTEventListener(awtListener,
                 AWTEvent.MOUSE_EVENT_MASK | AWTEvent.KEY_EVENT_MASK);
-            System.out.println("[ActiveTrader] AWT mouse listener registered for Cmd+Click");
+            PluginLog.info("[ActiveTrader] AWT mouse listener registered for Cmd+Click");
         }
     }
 
@@ -231,7 +231,7 @@ public class ChartClickHandler implements ScreenSpacePainterFactory {
         if (lastRegisteredInstrument != null) {
             painterToInstrument.put(alias, lastRegisteredInstrument);
         }
-        System.out.println("[ActiveTrader] ScreenSpacePainter created: painterAlias=" + alias
+        PluginLog.info("[ActiveTrader] ScreenSpacePainter created: painterAlias=" + alias
             + " → instrument=" + painterToInstrument.get(alias));
 
         return new ScreenSpacePainterAdapter() {
@@ -261,7 +261,7 @@ public class ChartClickHandler implements ScreenSpacePainterFactory {
             private void logOnce() {
                 if (!logged && coords.priceHeight > 0 && coords.pixelsHeight > 0) {
                     logged = true;
-                    System.out.println("[ActiveTrader] Coordinate mapping active for painter " + alias
+                    PluginLog.info("[ActiveTrader] Coordinate mapping active for painter " + alias
                         + ": priceBottom=" + coords.priceBottom + ", priceHeight=" + coords.priceHeight
                         + ", pixelsBottom=" + coords.pixelsBottom + ", pixelsHeight=" + coords.pixelsHeight);
                 }
@@ -271,7 +271,7 @@ public class ChartClickHandler implements ScreenSpacePainterFactory {
             public void dispose() {
                 painterCoords.remove(alias);
                 painterToInstrument.remove(alias);
-                System.out.println("[ActiveTrader] ScreenSpacePainter disposed for " + alias);
+                PluginLog.info("[ActiveTrader] ScreenSpacePainter disposed for " + alias);
             }
         };
     }

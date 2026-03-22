@@ -62,7 +62,7 @@ public class PriceLinePainter implements ScreenSpacePainterFactory {
         }
         String instrumentAlias = painterToInstrument.getOrDefault(alias, lastRegisteredInstrument);
 
-        System.out.println("[PriceLinePainter] Created painter: " + alias + " → " + instrumentAlias);
+        PluginLog.info("[PriceLinePainter] Created painter: " + alias + " → " + instrumentAlias);
 
         return new PainterInstance(alias, instrumentAlias, canvas);
     }
@@ -197,7 +197,7 @@ public class PriceLinePainter implements ScreenSpacePainterFactory {
             activeShapes.clear();
             canvas.dispose();
             painterToInstrument.remove(painterAlias);
-            System.out.println("[PriceLinePainter] Disposed painter: " + painterAlias);
+            PluginLog.info("[PriceLinePainter] Disposed painter: " + painterAlias);
         }
     }
 }
