@@ -21,15 +21,14 @@ Both plugins share the same core logic in the `common` module. Features can be a
 **Chart drawing:**
 4. Hold a key (S/T/E by default) and click on the chart to draw a price line at that level
 5. Premarket high/low lines are drawn and updated automatically during 4:00-9:30 AM ET
-6. VWAP (Volume Weighted Average Price) is calculated and drawn from 4:00 AM ET through the entire trading day
-7. Predefined key price levels can be loaded from a JSON config file and/or added at runtime via the settings panel
+6. Predefined key price levels can be loaded from a JSON config file and/or added at runtime via the settings panel
 8. All lines use Bookmap's data coordinates so they track through scroll and zoom
 
 ## Features
 
 - **Order wall breakout detection** — monitors large ask-side walls and broadcasts signals when consumed
 - **Key+click price lines** — hold a configurable key and click to draw stop loss, take profit, or entry lines
-- **Auto-drawn indicators** — premarket high/low, VWAP, and Camarilla Pivot levels drawn automatically
+- **Auto-drawn indicators** — premarket high/low and Camarilla Pivot levels drawn automatically
 - **Predefined key levels** — instrument-specific price levels loaded from a JSON config file or added via settings panel
 - **WebSocket API** — real-time heartbeat, breakout, order book, and price select messages
 - **Settings panels** — configure key bindings, enable/disable indicators, and manage key price levels at runtime
@@ -45,12 +44,12 @@ bookmap-plugin/
 │   ├── PriceLinePainter     # ScreenSpaceCanvas drawing engine
 │   ├── PriceLineConfig      # Key binding configuration
 │   ├── PremarketTracker     # Auto premarket high/low tracking
-│   ├── VwapTracker          # Volume Weighted Average Price tracking
 │   ├── CamPivotTracker      # Camarilla Pivot levels (R1–R6, S1–S6)
 │   ├── IndicatorDataFetcher # Fetches indicator data from EdgeDesk API
 │   ├── KeyLevelDefinition   # Predefined key level data model
 │   ├── KeyLevelConfig       # JSON config file + session level storage
 │   ├── KeyLevelManager      # Converts key levels to drawn price lines
+│   ├── PluginLog            # File logger (per-session log files)
 │   ├── IndicatorConfig      # Enable/disable toggles for auto indicators
 │   ├── IndicatorSettingsPanel / KeyBindingSettingsPanel / KeyLevelSettingsPanel  # Settings UI
 │   ├── OrderBookState       # Full order book state
@@ -267,20 +266,6 @@ Automatically draws and updates horizontal lines at the premarket session high a
 - Resets automatically at the start of each new premarket session (4:00 AM ET)
 - Enabled by default; disable via the **Indicators** settings panel
 
-### VWAP (Volume Weighted Average Price)
-
-Automatically draws and updates a horizontal line at the running VWAP — the average price weighted by trade volume.
-
-| Line | Color | Description |
-|------|-------|-------------|
-| VWAP | Teal | Cumulative volume-weighted average price for the day |
-
-- **Formula**: VWAP = Σ(price × volume) / Σ(volume)
-- **Session start**: 4:00 AM ET (includes premarket volume)
-- **Runs all day**: Unlike premarket high/low which stops updating at 9:30 AM, VWAP continues updating through the entire trading day (premarket + regular hours)
-- Resets automatically at the start of each new session (4:00 AM ET)
-- Enabled by default; disable via the **Indicators** settings panel
-
 ### Camarilla Pivots (R1–R6, S1–S6)
 
 Automatically draws all 12 Camarilla Pivot levels calculated from the previous day's high, low, and close.
@@ -330,10 +315,10 @@ Key levels can come from two sources:
 
 ### Replay & Multi-Day Data
 
-Both the premarket tracker and VWAP tracker use Bookmap's **data/replay time** (not system clock), so they work correctly in both live and replay modes:
+The premarket tracker uses Bookmap's **data/replay time** (not system clock), so it works correctly in both live and replay modes:
 
 - **Multi-day replay**: When replaying feed data that spans multiple days, indicators automatically reset at the start of each new day's session. Previous day's lines are cleared and new lines are drawn for the current day.
-- **Mid-session attach**: If the plugin is attached after trading has already started (e.g. you turn on your computer at 7 AM), it backfills from Bookmap's historical trade data to catch up on premarket high/low and VWAP from 4:00 AM onward.
+- **Mid-session attach**: If the plugin is attached after trading has already started (e.g. you turn on your computer at 7 AM), it backfills from Bookmap's historical trade data to catch up on premarket high/low from 4:00 AM onward.
 - **Time source**: All time decisions use the most recent data/replay timestamp received from Bookmap's `TimeListener`, which keeps trackers in sync with whatever time the chart is showing.
 
 ## Configuration
@@ -350,6 +335,22 @@ The following parameters are hardcoded constants in each plugin's main class:
 | `ORDERBOOK_PERCENTILE` | 90 | Only send order book levels above this percentile threshold |
 | `ORDERBOOK_INTERVAL_MS` | 1000 | Order book snapshot broadcast interval |
 
+## Logging
+
+Plugin logs are written to a dedicated file, separate from Bookmap's system logs. Each plugin session creates a new log file named by the session start time.
+
+| OS | Log directory |
+|----|--------------|
+| **Windows** | `C:\Users\<username>\Bookmap\plugin_logs\` |
+| **macOS** | `~/Bookmap/plugin_logs/` |
+
+Log files are named by datetime, e.g. `2026-03-21_10-30-45.txt`. Each line includes a timestamp and level:
+
+```
+2026-03-21 10:30:45.123 [INFO] [PremarketTracker] Backfilled NVDA: PM High=120.50, PM Low=118.20
+2026-03-21 10:30:45.456 [ERROR] [IndicatorDataFetcher] HTTP 500 for AAPL
+```
+
 ### Settings Panels
 
 The plugin provides three settings panels accessible via the addon's configuration in Bookmap:
@@ -357,5 +358,5 @@ The plugin provides three settings panels accessible via the addon's configurati
 | Panel | Purpose |
 |-------|---------|
 | **Price Line Key Bindings** | Change which keys draw which line types (S/T/E defaults), clear all drawn lines |
-| **Indicators** | Enable/disable auto-drawn indicators (Premarket High/Low, VWAP, Camarilla Pivots) |
+| **Indicators** | Enable/disable auto-drawn indicators (Premarket High/Low, Camarilla Pivots) |
 | **Key Price Levels** | View file-loaded levels, add/remove session levels at runtime |
