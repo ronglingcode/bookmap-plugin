@@ -42,7 +42,7 @@ public class IndicatorDataFetcher {
 
         Thread thread = new Thread(() -> {
             try {
-                String urlStr = API_BASE_URL + "/api/intraday-indicators?test=true&ticker=" + ticker;
+                String urlStr = API_BASE_URL + "/api/intraday-indicators?ticker=" + ticker;
                 PluginLog.info("[IndicatorDataFetcher] Fetching: " + urlStr);
 
                 HttpURLConnection conn = (HttpURLConnection) new URL(urlStr).openConnection();
