@@ -6,7 +6,8 @@
       "Bash(netstat -ano)",
       "Bash(findstr \":8765\")",
       "Bash(grep -r \"onHeatmap\\\\|pixelsBottom\\\\|priceBottom\\\\|priceHeight\" /c/Users/lingr/code/bookmap-plugin --include=*.java)",
-      "Bash(xargs ls:*)"
+      "Bash(xargs ls:*)",
+      "Bash(grep -E \"\\\\.\\(json|xml|properties|gradle|md\\)$\")"
     ]
   }
 }
