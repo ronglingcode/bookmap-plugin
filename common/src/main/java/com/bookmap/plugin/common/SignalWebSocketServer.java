@@ -49,7 +49,7 @@ public class SignalWebSocketServer extends WebSocketServer {
         setReuseAddr(true);
         this.orderbookPercentile = orderbookPercentile;
         this.orderbookIntervalMs = orderbookIntervalMs;
-        Path signalsDir = Paths.get(System.getProperty("user.home"), "ProgramLogs", "bookmap-signals");
+        Path signalsDir = Paths.get(System.getProperty("user.home"), "Bookmap", "bookmap-signals");
         this.heartbeatLogFile = signalsDir.resolve("heartbeat.jsonl");
         this.breakoutLogFile = signalsDir.resolve("breakout.jsonl");
     }

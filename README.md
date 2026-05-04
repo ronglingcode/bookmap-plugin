@@ -353,21 +353,25 @@ The following parameters are hardcoded constants in each plugin's main class:
 
 ## Logging
 
-Plugin logs are written to a dedicated file, separate from Bookmap's system logs. Each plugin session creates a new log file named by the session start time.
+All logs are written under `~/Bookmap/` (`C:\Users\{username}\Bookmap\` on Windows).
 
+| Log | Directory | Files |
+| --- | --------- | ----- |
+| **Plugin logs** | `~/Bookmap/plugin_logs/` | `{datetime}.txt` — one per session |
+| **Signal logs** | `~/Bookmap/bookmap-signals/` | `heartbeat.jsonl`, `breakout.jsonl`, `click-debug.log` |
 
-| OS          | Log directory                              |
-| ----------- | ------------------------------------------ |
-| **Windows** | `C:\Users\<username>\Bookmap\plugin_logs\` |
-| **macOS**   | `~/Bookmap/plugin_logs/`                   |
+On Windows, the full paths are:
+- `C:\Users\{username}\Bookmap\plugin_logs\`
+- `C:\Users\{username}\Bookmap\bookmap-signals\`
 
-
-Log files are named by datetime, e.g. `2026-03-21_10-30-45.txt`. Each line includes a timestamp and level:
+Plugin log files are named by session start time, e.g. `2026-03-21_10-30-45.txt`. Each line includes a timestamp and level:
 
 ```
 2026-03-21 10:30:45.123 [INFO] [PremarketTracker] Backfilled NVDA: PM High=120.50, PM Low=118.20
 2026-03-21 10:30:45.456 [ERROR] [IndicatorDataFetcher] HTTP 500 for AAPL
 ```
+
+Signal logs (`heartbeat.jsonl`, `breakout.jsonl`) are appended in JSONL format (one JSON object per line). The `click-debug.log` records key+click events with millisecond timestamps.
 
 ### Settings Panels
 
