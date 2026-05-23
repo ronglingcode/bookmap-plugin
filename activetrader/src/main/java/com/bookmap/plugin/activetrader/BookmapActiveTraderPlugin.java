@@ -42,7 +42,6 @@ import com.bookmap.plugin.common.IndicatorDataFetcher;
 import com.bookmap.plugin.common.KeyLevelConfig;
 import com.bookmap.plugin.common.KeyLevelManager;
 import com.bookmap.plugin.common.KeyLevelSettingsPanel;
-import com.bookmap.plugin.common.TradeButtonWindow;
 
 @Layer1SimpleAttachable
 @Layer1StrategyName("Bookmap Active Trader")
@@ -86,7 +85,6 @@ public class BookmapActiveTraderPlugin implements CustomModuleAdapter,
     private boolean wallLabelsDirty;
     private long lastWallLabelRefreshMs;
     private long lastTimestampNs;
-    private TradeButtonWindow tradeButtonWindow;
 
     @Override
     public void initialize(String alias, InstrumentInfo info, Api api, InitialState initialState) {
@@ -165,17 +163,11 @@ public class BookmapActiveTraderPlugin implements CustomModuleAdapter,
         // Fetch cam pivots + premarket high/low from EdgeDesk API (runs on background thread)
         IndicatorDataFetcher.fetch(alias, info.pips, camPivotTracker, premarketTracker);
 
-        tradeButtonWindow = new TradeButtonWindow(alias, sharedServer);
-
         PluginLog.info("[ActiveTrader] Plugin initialized for " + alias);
     }
 
     @Override
     public void stop() {
-        if (tradeButtonWindow != null) {
-            tradeButtonWindow.dispose();
-            tradeButtonWindow = null;
-        }
         if (chartClickHandler != null) {
             chartClickHandler.unregisterSymbol(alias);
         }
