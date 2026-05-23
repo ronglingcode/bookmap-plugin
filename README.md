@@ -2,16 +2,11 @@
 
 A Bookmap addon that detects order wall breakouts, draws configurable price lines on charts, and sends real-time signals via WebSocket.
 
-This repository produces **two plugins** from a shared codebase:
+This repository produces one Bookmap plugin:
 
-
-| Plugin                    | JAR                        | Description                       |
-| ------------------------- | -------------------------- | --------------------------------- |
-| **Rong**                  | `rong-1.0-all.jar`         | Personal plugin (private use)     |
-| **Bookmap Active Trader** | `activetrader-1.0-all.jar` | Product plugin (for distribution) |
-
-
-Both plugins share the same core logic in the `common` module. Features can be added independently to either plugin.
+| Plugin   | JAR                | Description                   |
+| -------- | ------------------ | ----------------------------- |
+| **Rong** | `rong-1.0-all.jar` | Personal plugin (private use) |
 
 ## How It Works
 
@@ -42,28 +37,20 @@ Both plugins share the same core logic in the `common` module. Features can be a
 
 ```
 bookmap-plugin/
-├── common/                  # Shared library
-│   ├── ChartClickHandler    # Key+click detection & coordinate mapping
-│   ├── PriceLine            # Line data model (manual + auto types)
-│   ├── PriceLineStore       # Thread-safe line storage with change listeners
-│   ├── PriceLinePainter     # ScreenSpaceCanvas drawing engine
-│   ├── PriceLineConfig      # Key binding configuration
-│   ├── PremarketTracker     # Auto premarket high/low tracking
-│   ├── CamPivotTracker      # Camarilla Pivot levels (R1–R6, S1–S6)
-│   ├── IndicatorDataFetcher # Fetches indicator data from EdgeDesk API
-│   ├── KeyLevelDefinition   # Predefined key level data model
-│   ├── KeyLevelConfig       # JSON config file + session level storage
-│   ├── KeyLevelManager      # Converts key levels to drawn price lines
-│   ├── PluginLog            # File logger (per-session log files)
-│   ├── IndicatorConfig      # Enable/disable toggles for auto indicators
-│   ├── IndicatorSettingsPanel / KeyBindingSettingsPanel / KeyLevelSettingsPanel  # Settings UI
-│   ├── OrderBookState       # Full order book state
-│   ├── OrderWallTracker     # Large wall detection & consumption
-│   ├── SwingLowDetector     # Pivot swing low detection
-│   ├── SignalWebSocketServer # WebSocket server for external clients
-│   └── BreakoutSignal       # Signal data model
-├── rong/                    # Personal plugin — @Layer1StrategyName("Rong")
-└── activetrader/            # Product plugin — @Layer1StrategyName("Bookmap Active Trader")
+├── build.gradle
+├── settings.gradle
+└── src/main/java/com/bookmap/plugin/rong/
+    ├── RongPlugin              # @Layer1StrategyName("Rong")
+    ├── ChartClickHandler       # Key+click detection & coordinate mapping
+    ├── PriceLine*              # Line model, storage, painting, and key config
+    ├── PremarketTracker        # Auto premarket high/low tracking
+    ├── CamPivotTracker         # Camarilla Pivot levels (R1-R6, S1-S6)
+    ├── KeyLevel*               # Predefined key level config, UI, and drawing
+    ├── OrderBookState          # Full order book state
+    ├── OrderWall*              # Large wall detection, labels, and painting
+    ├── SignalWebSocketServer   # WebSocket server for external clients
+    ├── TradeButtonWindow       # Floating trade button panel
+    └── PluginLog               # File logger
 ```
 
 ## Build
@@ -77,8 +64,7 @@ windows: gradlew shadowJar
 
 Output JARs:
 
-- `rong/build/libs/rong-1.0-all.jar`
-- `activetrader/build/libs/activetrader-1.0-all.jar`
+- `build/libs/rong-1.0-all.jar`
 
 ## Install in Bookmap
 
@@ -89,8 +75,6 @@ Output JARs:
 5. Add the addon to a chart: right-click the chart > **Add Addon** > select the plugin
 
 The plugin starts a WebSocket server on `localhost:8765` when attached to an instrument.
-
-> **Note:** Do not run both plugins simultaneously — they share the same WebSocket port (8765).
 
 ## Connect Your Trading Bot
 
@@ -385,5 +369,4 @@ The plugin provides three settings panels accessible via the addon's configurati
 | **Price Line Key Bindings** | Change which keys draw which line types (S/T/E defaults), clear all drawn lines |
 | **Indicators**              | Enable/disable auto-drawn indicators (Premarket High/Low, Camarilla Pivots)     |
 | **Key Price Levels**        | View file-loaded levels, add/remove session levels at runtime                   |
-
 
