@@ -1,4 +1,4 @@
-package com.bookmap.plugin.rong;
+package com.bookmap.plugin.rong.pricelines;
 
 import java.awt.BasicStroke;
 import java.awt.Color;
@@ -10,6 +10,8 @@ import java.awt.image.BufferedImage;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+
+import com.bookmap.plugin.rong.PluginLog;
 
 import velox.api.layer1.layers.strategies.interfaces.ScreenSpaceCanvas;
 import velox.api.layer1.layers.strategies.interfaces.ScreenSpaceCanvas.CanvasIcon;

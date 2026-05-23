@@ -41,15 +41,19 @@ bookmap-plugin/
 ├── settings.gradle
 └── src/main/java/com/bookmap/plugin/rong/
     ├── RongPlugin              # @Layer1StrategyName("Rong")
-    ├── ChartClickHandler       # Key+click detection & coordinate mapping
-    ├── PriceLine*              # Line model, storage, painting, and key config
+    ├── pricelines/             # Line model, storage, painting, key+click, and key config
+    │   ├── ChartClickHandler   # Key+click detection & coordinate mapping
+    │   └── PriceLine*          # Line model, storage, painting, and key config
+    ├── orderwall/              # Large wall detection, labels, and painting
+    │   └── OrderWall*
+    ├── tradebuttons/           # Floating trade button panel and tradebook button config
+    │   ├── TradeButtonWindow
+    │   └── TradebookButtonGroup
     ├── PremarketTracker        # Auto premarket high/low tracking
     ├── CamPivotTracker         # Camarilla Pivot levels (R1-R6, S1-S6)
     ├── KeyLevel*               # Predefined key level config, UI, and drawing
     ├── OrderBookState          # Full order book state
-    ├── OrderWall*              # Large wall detection, labels, and painting
     ├── SignalWebSocketServer   # WebSocket server for external clients
-    ├── TradeButtonWindow       # Floating trade button panel
     └── PluginLog               # File logger
 ```
 

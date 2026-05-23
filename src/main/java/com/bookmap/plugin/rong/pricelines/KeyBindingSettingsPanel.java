@@ -1,4 +1,4 @@
-package com.bookmap.plugin.rong;
+package com.bookmap.plugin.rong.pricelines;
 
 import java.awt.GridBagConstraints;
 import java.awt.GridBagLayout;

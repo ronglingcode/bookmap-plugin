@@ -4,6 +4,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
+import com.bookmap.plugin.rong.pricelines.PriceLine;
+import com.bookmap.plugin.rong.pricelines.PriceLineStore;
+
 /**
  * Bridge between {@link KeyLevelConfig} (raw key level definitions with real prices) and
  * {@link PriceLineStore} (rendered price lines with tick coordinates on the chart).

@@ -1,4 +1,4 @@
-package com.bookmap.plugin.rong;
+package com.bookmap.plugin.rong.tradebuttons;
 
 import java.util.ArrayList;
 import java.util.Collections;

@@ -1,4 +1,6 @@
-package com.bookmap.plugin.rong;
+package com.bookmap.plugin.rong.orderwall;
+
+import com.bookmap.plugin.rong.OrderBookState;
 
 /**
  * Tracks large liquidity walls and retains the largest observed size at each level.
