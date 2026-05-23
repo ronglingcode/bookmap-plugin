@@ -22,6 +22,9 @@ public class OrderBookState {
     private final TreeMap<Integer, Integer> bids = new TreeMap<>(Comparator.reverseOrder());
     // Asks sorted ascending (best ask = first entry)
     private final TreeMap<Integer, Integer> asks = new TreeMap<>();
+    // Histogram of depth sizes across both sides for faster percentile lookups.
+    private final TreeMap<Integer, Integer> sizeCounts = new TreeMap<>();
+    private int totalLevels;
 
     /**
      * Update a price level with an absolute size.
@@ -29,10 +32,19 @@ public class OrderBookState {
      */
     public void update(boolean isBid, int price, int size) {
         TreeMap<Integer, Integer> book = isBid ? bids : asks;
+        Integer previousSize = book.get(price);
+
+        if (previousSize != null) {
+            decrementSizeCount(previousSize);
+            totalLevels--;
+        }
+
         if (size == 0) {
             book.remove(price);
         } else {
             book.put(price, size);
+            incrementSizeCount(size);
+            totalLevels++;
         }
     }
 
@@ -116,14 +128,19 @@ public class OrderBookState {
      * @return the size value at that percentile, or 0 if book is empty
      */
     public int getPercentileThreshold(double percentile) {
-        List<Integer> allSizes = new ArrayList<>(bids.size() + asks.size());
-        allSizes.addAll(bids.values());
-        allSizes.addAll(asks.values());
-        if (allSizes.isEmpty()) return 0;
-        Collections.sort(allSizes);
-        int index = (int) Math.ceil(percentile / 100.0 * allSizes.size()) - 1;
-        index = Math.max(0, Math.min(index, allSizes.size() - 1));
-        return allSizes.get(index);
+        if (totalLevels == 0) return 0;
+
+        int index = (int) Math.ceil(percentile / 100.0 * totalLevels) - 1;
+        index = Math.max(0, Math.min(index, totalLevels - 1));
+
+        int cumulative = 0;
+        for (Map.Entry<Integer, Integer> entry : sizeCounts.entrySet()) {
+            cumulative += entry.getValue();
+            if (cumulative > index) {
+                return entry.getKey();
+            }
+        }
+        return sizeCounts.lastKey();
     }
 
     /**
@@ -175,5 +192,13 @@ public class OrderBookState {
             count++;
         }
         return result;
+    }
+
+    private void incrementSizeCount(int size) {
+        sizeCounts.merge(size, 1, Integer::sum);
+    }
+
+    private void decrementSizeCount(int size) {
+        sizeCounts.computeIfPresent(size, (ignored, count) -> count > 1 ? count - 1 : null);
     }
 }

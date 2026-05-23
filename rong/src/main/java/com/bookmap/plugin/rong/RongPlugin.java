@@ -24,6 +24,9 @@ import com.bookmap.plugin.common.IndicatorConfig;
 import com.bookmap.plugin.common.IndicatorSettingsPanel;
 import com.bookmap.plugin.common.KeyBindingSettingsPanel;
 import com.bookmap.plugin.common.OrderBookState;
+import com.bookmap.plugin.common.OrderWallLabelPainter;
+import com.bookmap.plugin.common.OrderWallLabelStore;
+import com.bookmap.plugin.common.OrderWallLabelTracker;
 import com.bookmap.plugin.common.OrderWallTracker;
 import com.bookmap.plugin.common.PremarketTracker;
 import com.bookmap.plugin.common.PriceLine;
@@ -53,6 +56,9 @@ public class RongPlugin implements CustomModuleAdapter,
     private static final int BAR_SIZE = 100;
     private static final double ORDERBOOK_PERCENTILE = 90;
     private static final int ORDERBOOK_INTERVAL_MS = 1000;
+    private static final double WALL_LABEL_PERCENTILE = 95.0;
+    private static final int WALL_LABEL_RETAIN_TICKS = 2_000;
+    private static final int WALL_LABEL_REFRESH_MS = 200;
 
     // Shared WebSocket server across all symbol instances
     private static SignalWebSocketServer sharedServer;
@@ -61,6 +67,8 @@ public class RongPlugin implements CustomModuleAdapter,
     private static PriceLineStore priceLineStore;
     private static PriceLineConfig priceLineConfig;
     private static PriceLinePainter priceLinePainter;
+    private static OrderWallLabelStore wallLabelStore;
+    private static OrderWallLabelPainter wallLabelPainter;
     private static IndicatorConfig indicatorConfig;
     private static PremarketTracker premarketTracker;
     private static KeyLevelConfig keyLevelConfig;
@@ -73,6 +81,10 @@ public class RongPlugin implements CustomModuleAdapter,
     private SwingLowDetector swingDetector;
     private InstrumentInfo instrumentInfo;
     private OrderBookState orderBook;
+    private OrderWallLabelTracker wallLabelTracker;
+    private boolean wallLabelsDirty;
+    private long lastWallLabelRefreshMs;
+    private long lastTimestampNs;
 
     @Override
     public void initialize(String alias, InstrumentInfo info, Api api, InitialState initialState) {
@@ -98,6 +110,8 @@ public class RongPlugin implements CustomModuleAdapter,
                 priceLineConfig = new PriceLineConfig();
                 priceLinePainter = new PriceLinePainter(priceLineStore);
                 indicatorConfig = new IndicatorConfig();
+                wallLabelStore = new OrderWallLabelStore();
+                wallLabelPainter = new OrderWallLabelPainter(wallLabelStore, indicatorConfig);
                 premarketTracker = new PremarketTracker(priceLineStore, indicatorConfig);
                 keyLevelConfig = new KeyLevelConfig();
                 keyLevelManager = new KeyLevelManager(keyLevelConfig, priceLineStore);
@@ -116,9 +130,12 @@ public class RongPlugin implements CustomModuleAdapter,
             }
             instanceCount++;
         }
+        this.wallLabelTracker = new OrderWallLabelTracker(
+                alias, info.pips, wallLabelStore, WALL_LABEL_PERCENTILE, WALL_LABEL_RETAIN_TICKS);
         sharedServer.registerSymbol(alias, orderBook, info.pips);
         chartClickHandler.registerSymbol(alias, info.pips);
         priceLinePainter.registerInstrument(alias);
+        wallLabelPainter.registerInstrument(alias);
 
         // Register ScreenSpacePainter to receive chart coordinate mappings
         api.sendUserMessage(Layer1ApiUserMessageModifyScreenSpacePainter.builder(
@@ -131,6 +148,11 @@ public class RongPlugin implements CustomModuleAdapter,
         api.sendUserMessage(Layer1ApiUserMessageModifyScreenSpacePainter.builder(
                 RongPlugin.class, "priceLines_" + alias)
                 .setScreenSpacePainterFactory(priceLinePainter)
+                .setIsAdd(true)
+                .build());
+        api.sendUserMessage(Layer1ApiUserMessageModifyScreenSpacePainter.builder(
+                RongPlugin.class, OrderWallLabelPainter.PAINTER_NAME_PREFIX + alias)
+                .setScreenSpacePainterFactory(wallLabelPainter)
                 .setIsAdd(true)
                 .build());
 
@@ -153,6 +175,9 @@ public class RongPlugin implements CustomModuleAdapter,
         if (priceLinePainter != null) {
             priceLinePainter.unregisterInstrument(alias);
         }
+        if (wallLabelPainter != null) {
+            wallLabelPainter.unregisterInstrument(alias);
+        }
         // Unregister ScreenSpacePainters
         api.sendUserMessage(Layer1ApiUserMessageModifyScreenSpacePainter.builder(
                 RongPlugin.class, "clickHandler_" + alias)
@@ -162,6 +187,11 @@ public class RongPlugin implements CustomModuleAdapter,
         api.sendUserMessage(Layer1ApiUserMessageModifyScreenSpacePainter.builder(
                 RongPlugin.class, "priceLines_" + alias)
                 .setScreenSpacePainterFactory(priceLinePainter)
+                .setIsAdd(false)
+                .build());
+        api.sendUserMessage(Layer1ApiUserMessageModifyScreenSpacePainter.builder(
+                RongPlugin.class, OrderWallLabelPainter.PAINTER_NAME_PREFIX + alias)
+                .setScreenSpacePainterFactory(wallLabelPainter)
                 .setIsAdd(false)
                 .build());
 
@@ -176,6 +206,9 @@ public class RongPlugin implements CustomModuleAdapter,
         }
         if (priceLineStore != null) {
             priceLineStore.clearAll(alias);
+        }
+        if (wallLabelStore != null) {
+            wallLabelStore.clearAll(alias);
         }
         if (sharedServer != null) {
             sharedServer.unregisterSymbol(alias);
@@ -197,12 +230,17 @@ public class RongPlugin implements CustomModuleAdapter,
                     keyLevelManager = null;
                 }
                 keyLevelConfig = null;
+                if (wallLabelPainter != null) {
+                    wallLabelPainter.shutdown();
+                }
                 sharedServer.shutdown();
                 sharedServer = null;
                 chartClickHandler = null;
                 priceLineStore = null;
                 priceLineConfig = null;
                 priceLinePainter = null;
+                wallLabelStore = null;
+                wallLabelPainter = null;
                 indicatorConfig = null;
                 instanceCount = 0;
                 PluginLog.info("[Rong] Shared WebSocket server shut down");
@@ -224,6 +262,10 @@ public class RongPlugin implements CustomModuleAdapter,
     public void onDepth(boolean isBid, int price, int size) {
         orderBook.update(isBid, price, size);
         wallTracker.updateLevel(isBid, price, size);
+        if (wallLabelTracker != null && wallLabelTracker.onDepth(orderBook, isBid, price, size, getEventTimeNs())) {
+            wallLabelsDirty = true;
+            refreshWallLabelsIfNeeded(false);
+        }
     }
 
     @Override
@@ -235,6 +277,10 @@ public class RongPlugin implements CustomModuleAdapter,
         sharedServer.setLastPrice(alias, realPrice);
         checkBreakout(realPrice, priceTick);
         wallTracker.cleanup(priceTick);
+        if (wallLabelTracker != null && wallLabelTracker.cleanup(priceTick)) {
+            wallLabelsDirty = true;
+        }
+        refreshWallLabelsIfNeeded(true);
 
         if (premarketTracker != null) {
             premarketTracker.onTrade(alias, price, realPrice);
@@ -243,6 +289,7 @@ public class RongPlugin implements CustomModuleAdapter,
 
     @Override
     public void onTimestamp(long timestampNs) {
+        this.lastTimestampNs = timestampNs;
         if (premarketTracker != null) {
             premarketTracker.setTimestamp(timestampNs);
         }
@@ -262,5 +309,22 @@ public class RongPlugin implements CustomModuleAdapter,
                 wallTracker.removeWall(wall.priceTick);
             }
         }
+    }
+
+    private void refreshWallLabelsIfNeeded(boolean force) {
+        if (!wallLabelsDirty || wallLabelPainter == null) {
+            return;
+        }
+        long now = System.currentTimeMillis();
+        if (!force && now - lastWallLabelRefreshMs < WALL_LABEL_REFRESH_MS) {
+            return;
+        }
+        wallLabelPainter.refreshInstrument(alias);
+        wallLabelsDirty = false;
+        lastWallLabelRefreshMs = now;
+    }
+
+    private long getEventTimeNs() {
+        return lastTimestampNs > 0 ? lastTimestampNs : System.currentTimeMillis() * 1_000_000L;
     }
 }

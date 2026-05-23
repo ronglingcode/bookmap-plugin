@@ -12,6 +12,7 @@ import java.util.Set;
 import java.util.Collections;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executors;
+import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
@@ -22,11 +23,8 @@ import org.java_websocket.server.WebSocketServer;
 
 public class SignalWebSocketServer extends WebSocketServer {
 
-    private final ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(2, r -> {
-        Thread t = new Thread(r, "ws-scheduler");
-        t.setDaemon(true);
-        return t;
-    });
+    private final Object schedulerLock = new Object();
+    private ScheduledExecutorService scheduler;
     private final Path heartbeatLogFile;
     private final Path breakoutLogFile;
     private BufferedWriter heartbeatWriter;
@@ -42,6 +40,8 @@ public class SignalWebSocketServer extends WebSocketServer {
     private final int orderbookIntervalMs;
     private final Set<WebSocket> orderbookSubscribers = Collections.newSetFromMap(new ConcurrentHashMap<>());
     private ScheduledFuture<?> orderbookBroadcastTask;
+    private ScheduledFuture<?> heartbeatTask;
+    private volatile boolean shuttingDown;
 
     public SignalWebSocketServer(int port, double orderbookPercentile, int orderbookIntervalMs) {
         super(new InetSocketAddress("127.0.0.1", port));
@@ -100,13 +100,17 @@ public class SignalWebSocketServer extends WebSocketServer {
     }
 
     private synchronized void ensureOrderbookBroadcast() {
-        if (orderbookBroadcastTask != null) {
+        if (shuttingDown || orderbookBroadcastTask != null) {
             return;
         }
-        orderbookBroadcastTask = scheduler.scheduleAtFixedRate(
-            () -> sendOrderbookSnapshots(),
-            0, orderbookIntervalMs, TimeUnit.MILLISECONDS
-        );
+        try {
+            orderbookBroadcastTask = getOrCreateScheduler().scheduleAtFixedRate(
+                () -> sendOrderbookSnapshots(),
+                0, orderbookIntervalMs, TimeUnit.MILLISECONDS
+            );
+        } catch (RejectedExecutionException e) {
+            PluginLog.error("[ActiveTrader] Failed to schedule orderbook broadcast: " + e.getMessage());
+        }
     }
 
     @Override
@@ -116,6 +120,9 @@ public class SignalWebSocketServer extends WebSocketServer {
 
     @Override
     public void onStart() {
+        if (shuttingDown) {
+            return;
+        }
         PluginLog.info("[ActiveTrader] WebSocket server started on port " + getPort());
         try {
             Files.createDirectories(heartbeatLogFile.getParent());
@@ -127,7 +134,16 @@ public class SignalWebSocketServer extends WebSocketServer {
         } catch (IOException e) {
             PluginLog.error("[ActiveTrader] Failed to open log files: " + e.getMessage());
         }
-        scheduler.scheduleAtFixedRate(this::sendHeartbeats, 5, 5, TimeUnit.SECONDS);
+        synchronized (schedulerLock) {
+            if (shuttingDown || heartbeatTask != null) {
+                return;
+            }
+            try {
+                heartbeatTask = getOrCreateScheduler().scheduleAtFixedRate(this::sendHeartbeats, 5, 5, TimeUnit.SECONDS);
+            } catch (RejectedExecutionException e) {
+                PluginLog.error("[ActiveTrader] Failed to schedule heartbeats: " + e.getMessage());
+            }
+        }
     }
 
     public void broadcastSignal(String json) {
@@ -136,7 +152,21 @@ public class SignalWebSocketServer extends WebSocketServer {
     }
 
     public void shutdown() {
-        scheduler.shutdownNow();
+        shuttingDown = true;
+        synchronized (schedulerLock) {
+            if (heartbeatTask != null) {
+                heartbeatTask.cancel(true);
+                heartbeatTask = null;
+            }
+            if (orderbookBroadcastTask != null) {
+                orderbookBroadcastTask.cancel(true);
+                orderbookBroadcastTask = null;
+            }
+            if (scheduler != null) {
+                scheduler.shutdownNow();
+                scheduler = null;
+            }
+        }
         closeWriter(heartbeatWriter);
         closeWriter(breakoutWriter);
         try {
@@ -198,6 +228,19 @@ public class SignalWebSocketServer extends WebSocketServer {
             } catch (IOException e) {
                 PluginLog.error("[ActiveTrader] Failed to close log file: " + e.getMessage());
             }
+        }
+    }
+
+    private ScheduledExecutorService getOrCreateScheduler() {
+        synchronized (schedulerLock) {
+            if (scheduler == null || scheduler.isShutdown()) {
+                scheduler = Executors.newScheduledThreadPool(2, r -> {
+                    Thread t = new Thread(r, "ws-scheduler");
+                    t.setDaemon(true);
+                    return t;
+                });
+            }
+            return scheduler;
         }
     }
 }

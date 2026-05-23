@@ -3,6 +3,7 @@ package com.bookmap.plugin.common;
 import java.awt.GridBagConstraints;
 import java.awt.GridBagLayout;
 import java.awt.Insets;
+
 import javax.swing.JCheckBox;
 
 import velox.gui.StrategyPanel;
@@ -24,19 +25,27 @@ public class IndicatorSettingsPanel extends StrategyPanel {
         gbc.fill = GridBagConstraints.HORIZONTAL;
         gbc.weightx = 1.0;
 
-        // Premarket High/Low toggle
-        JCheckBox premarketCheckbox = new JCheckBox("Premarket High / Low",
+        JCheckBox premarketCheckbox = new JCheckBox(
+                "Premarket High / Low",
                 config.isEnabled(IndicatorConfig.PREMARKET_HIGH_LOW));
         premarketCheckbox.addActionListener(e ->
                 config.setEnabled(IndicatorConfig.PREMARKET_HIGH_LOW, premarketCheckbox.isSelected()));
         add(premarketCheckbox, gbc);
 
-        // Cam Pivots toggle
         gbc.gridy++;
-        JCheckBox camPivotsCheckbox = new JCheckBox("Camarilla Pivots (R1–R6, S1–S6)",
+        JCheckBox camPivotsCheckbox = new JCheckBox(
+                "Camarilla Pivots (R1-R6, S1-S6)",
                 config.isEnabled(IndicatorConfig.CAM_PIVOTS));
         camPivotsCheckbox.addActionListener(e ->
                 config.setEnabled(IndicatorConfig.CAM_PIVOTS, camPivotsCheckbox.isSelected()));
         add(camPivotsCheckbox, gbc);
+
+        gbc.gridy++;
+        JCheckBox wallLabelsCheckbox = new JCheckBox(
+                "Order Wall Size Labels",
+                config.isEnabled(IndicatorConfig.ORDER_WALL_SIZE_LABELS));
+        wallLabelsCheckbox.addActionListener(e ->
+                config.setEnabled(IndicatorConfig.ORDER_WALL_SIZE_LABELS, wallLabelsCheckbox.isSelected()));
+        add(wallLabelsCheckbox, gbc);
     }
 }
