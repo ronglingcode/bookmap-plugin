@@ -27,9 +27,7 @@ public class RongPlugin implements CustomModuleAdapter,
 
     private static final int WS_PORT = 8765;
     private static final int WALL_THRESHOLD = 500_000;
-    private static final double WALL_CONSUMED_RATIO = 0.20;
-    private static final int SWING_LOOKBACK = 3;
-    private static final int BAR_SIZE = 100;
+    private static final double WALL_CONSUMED_RATIO = 0.10;
     private static final double ORDERBOOK_PERCENTILE = 90;
     private static final int ORDERBOOK_INTERVAL_MS = 1000;
     private static final double WALL_LABEL_PERCENTILE = 95.0;
@@ -54,7 +52,6 @@ public class RongPlugin implements CustomModuleAdapter,
     private String alias;
     private Api api;
     private OrderWallTracker wallTracker;
-    private SwingLowDetector swingDetector;
     private InstrumentInfo instrumentInfo;
     private OrderBookState orderBook;
     private OrderWallLabelTracker wallLabelTracker;
@@ -71,7 +68,6 @@ public class RongPlugin implements CustomModuleAdapter,
         this.instrumentInfo = info;
         this.orderBook = new OrderBookState();
         this.wallTracker = new OrderWallTracker(WALL_THRESHOLD, WALL_CONSUMED_RATIO);
-        this.swingDetector = new SwingLowDetector(SWING_LOOKBACK, BAR_SIZE);
 
         synchronized (RongPlugin.class) {
             if (sharedServer == null) {
@@ -256,9 +252,8 @@ public class RongPlugin implements CustomModuleAdapter,
         double realPrice = price * instrumentInfo.pips;
         int priceTick = (int) price;
 
-        swingDetector.addPrice(realPrice);
         sharedServer.setLastPrice(alias, realPrice);
-        checkBreakout(realPrice, priceTick);
+        checkBreakout(realPrice);
         wallTracker.cleanup(priceTick);
         if (wallLabelTracker != null && wallLabelTracker.cleanup(priceTick)) {
             wallLabelsDirty = true;
@@ -278,17 +273,14 @@ public class RongPlugin implements CustomModuleAdapter,
         }
     }
 
-    private void checkBreakout(double currentPrice, int currentPriceTick) {
+    private void checkBreakout(double currentPrice) {
         List<OrderWallTracker.WallInfo> walls = wallTracker.getActiveWalls();
         for (OrderWallTracker.WallInfo wall : walls) {
             double wallRealPrice = wall.priceTick * instrumentInfo.pips;
             if (currentPrice > wallRealPrice && wallTracker.isConsumed(wall)) {
-                double swingLow = swingDetector.getLastSwingLow();
-                if (!Double.isNaN(swingLow) && swingLow < wallRealPrice) {
-                    BreakoutSignal signal = new BreakoutSignal(alias, wallRealPrice, swingLow);
-                    sharedServer.broadcastSignal(signal.toJson());
-                    PluginLog.info("[Rong] BREAKOUT signal: " + signal.toJson());
-                }
+                BreakoutSignal signal = new BreakoutSignal(alias, wallRealPrice);
+                sharedServer.broadcastSignal(signal.toJson());
+                PluginLog.info("[Rong] BREAKOUT signal: " + signal.toJson());
                 wallTracker.removeWall(wall.priceTick);
             }
         }

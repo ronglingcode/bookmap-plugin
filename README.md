@@ -13,7 +13,7 @@ This repository produces one Bookmap plugin:
 **Breakout detection:**
 
 1. Monitors the order book for large resting ask orders (default: >= 500,000 shares at a single price level)
-2. Tracks when these walls get consumed by aggressive buying (size drops below 20% of peak)
+2. Tracks when these walls get consumed by aggressive buying (size drops to 10% or less of peak)
 3. When price trades above a consumed wall, broadcasts a breakout signal via WebSocket
 
 **Chart drawing:**
@@ -93,7 +93,7 @@ ws.onmessage = (event) => {
 
   if (data.type === 'breakout') {
     // Sent when price breaks through a large order wall
-    // { "type": "breakout", "symbol": "AAPL", "breakoutLevel": 185.50, "swingLow": 184.20, "timestamp": 1710345600000 }
+    // { "type": "breakout", "symbol": "AAPL", "breakoutLevel": 185.50, "timestamp": 1710345600000 }
   }
 };
 ```
@@ -138,7 +138,6 @@ interface Breakout {
   type: "breakout";
   symbol: string;
   breakoutLevel: number;
-  swingLow: number;
   timestamp: number;
 }
 
@@ -330,9 +329,7 @@ The following parameters are hardcoded constants in each plugin's main class:
 | ----------------------- | ------- | ----------------------------------------------------------- |
 | `WS_PORT`               | 8765    | WebSocket server port                                       |
 | `WALL_THRESHOLD`        | 500,000 | Minimum shares at a price level to qualify as a wall        |
-| `WALL_CONSUMED_RATIO`   | 0.20    | Wall is "consumed" when size drops below this ratio of peak |
-| `SWING_LOOKBACK`        | 3       | Pivot N for swing low detection (N bars on each side)       |
-| `BAR_SIZE`              | 100     | Number of trades per tick bar for swing low calculation     |
+| `WALL_CONSUMED_RATIO`   | 0.10    | Wall is "consumed" when size drops to this ratio of peak    |
 | `ORDERBOOK_PERCENTILE`  | 90      | Only send order book levels above this percentile threshold |
 | `ORDERBOOK_INTERVAL_MS` | 1000    | Order book snapshot broadcast interval                      |
 
@@ -369,4 +366,3 @@ The plugin provides three settings panels accessible via the addon's configurati
 | **Price Line Key Bindings** | Change which keys draw which line types (S/T/E defaults), clear all drawn lines |
 | **Indicators**              | Enable/disable auto-drawn indicators (Premarket High/Low, Camarilla Pivots)     |
 | **Key Price Levels**        | View file-loaded levels, add/remove session levels at runtime                   |
-
