@@ -7,6 +7,8 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.StandardOpenOption;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.Collections;
@@ -21,7 +23,17 @@ import org.java_websocket.WebSocket;
 import org.java_websocket.handshake.ClientHandshake;
 import org.java_websocket.server.WebSocketServer;
 
+import com.google.gson.JsonArray;
+import com.google.gson.JsonElement;
+import com.google.gson.JsonObject;
+import com.google.gson.JsonParser;
+
 public class SignalWebSocketServer extends WebSocketServer {
+
+    @FunctionalInterface
+    public interface TradeButtonConfigListener {
+        void onTradeButtonsChanged(List<TradebookButtonGroup> tradebooks);
+    }
 
     private final Object schedulerLock = new Object();
     private ScheduledExecutorService scheduler;
@@ -34,6 +46,8 @@ public class SignalWebSocketServer extends WebSocketServer {
     private final Map<String, OrderBookState> symbolToOrderBook = new ConcurrentHashMap<>();
     private final Map<String, Double> symbolToPips = new ConcurrentHashMap<>();
     private final Map<String, Double> symbolToLastPrice = new ConcurrentHashMap<>();
+    private final Map<String, List<TradebookButtonGroup>> symbolToTradebooks = new ConcurrentHashMap<>();
+    private final Map<String, Set<TradeButtonConfigListener>> symbolToTradeButtonListeners = new ConcurrentHashMap<>();
 
     // Broadcast config
     private final double orderbookPercentile;
@@ -73,6 +87,30 @@ public class SignalWebSocketServer extends WebSocketServer {
         symbolToLastPrice.put(symbol, price);
     }
 
+    public void registerTradeButtonConfigListener(String symbol, TradeButtonConfigListener listener) {
+        String cleanSymbol = SymbolUtils.cleanSymbol(symbol);
+        symbolToTradeButtonListeners
+                .computeIfAbsent(cleanSymbol, ignored -> Collections.newSetFromMap(new ConcurrentHashMap<>()))
+                .add(listener);
+
+        List<TradebookButtonGroup> existingTradebooks = symbolToTradebooks.get(cleanSymbol);
+        if (existingTradebooks != null) {
+            listener.onTradeButtonsChanged(existingTradebooks);
+        }
+    }
+
+    public void unregisterTradeButtonConfigListener(String symbol, TradeButtonConfigListener listener) {
+        String cleanSymbol = SymbolUtils.cleanSymbol(symbol);
+        Set<TradeButtonConfigListener> listeners = symbolToTradeButtonListeners.get(cleanSymbol);
+        if (listeners == null) {
+            return;
+        }
+        listeners.remove(listener);
+        if (listeners.isEmpty()) {
+            symbolToTradeButtonListeners.remove(cleanSymbol, listeners);
+        }
+    }
+
     @Override
     public void onOpen(WebSocket conn, ClientHandshake handshake) {
         PluginLog.info("[ActiveTrader] Client connected: " + conn.getRemoteSocketAddress());
@@ -87,6 +125,14 @@ public class SignalWebSocketServer extends WebSocketServer {
     @Override
     public void onMessage(WebSocket conn, String message) {
         String trimmed = message.trim();
+        JsonObject json = parseJsonObject(trimmed);
+        if (json != null) {
+            String type = getString(json, "type");
+            if ("trade_button_config".equals(type) || "trade_buttons_config".equals(type)) {
+                handleTradeButtonConfig(json);
+                return;
+            }
+        }
         if (trimmed.contains("\"subscribe\"") && trimmed.contains("\"orderbook\"")) {
             orderbookSubscribers.add(conn);
             ensureOrderbookBroadcast();
@@ -96,6 +142,124 @@ public class SignalWebSocketServer extends WebSocketServer {
             orderbookSubscribers.remove(conn);
             conn.send("{\"type\":\"unsubscribed\",\"channel\":\"orderbook\"}");
             PluginLog.info("[ActiveTrader] Client unsubscribed from orderbook");
+        }
+    }
+
+    private JsonObject parseJsonObject(String message) {
+        try {
+            JsonElement element = JsonParser.parseString(message);
+            if (element != null && element.isJsonObject()) {
+                return element.getAsJsonObject();
+            }
+        } catch (RuntimeException e) {
+            PluginLog.error("[TradeButton] Failed to parse WebSocket message: " + e.getMessage());
+        }
+        return null;
+    }
+
+    private void handleTradeButtonConfig(JsonObject json) {
+        String symbol = SymbolUtils.cleanSymbol(getString(json, "symbol"));
+        if (symbol.isEmpty()) {
+            PluginLog.error("[TradeButton] Ignoring button config with missing symbol");
+            return;
+        }
+
+        JsonArray tradebooksArray = null;
+        JsonElement tradebooksElement = json.get("tradebooks");
+        if (tradebooksElement != null && tradebooksElement.isJsonArray()) {
+            tradebooksArray = tradebooksElement.getAsJsonArray();
+        }
+        if (tradebooksArray == null) {
+            PluginLog.error("[TradeButton] Ignoring button config with missing tradebooks array for " + symbol);
+            return;
+        }
+
+        List<TradebookButtonGroup> tradebooks = new ArrayList<>();
+        for (JsonElement element : tradebooksArray) {
+            if (element == null || !element.isJsonObject()) {
+                continue;
+            }
+            JsonObject tradebookJson = element.getAsJsonObject();
+            String id = getString(tradebookJson, "id");
+            String tradebookId = getString(tradebookJson, "tradebookId");
+            String tradebookName = getString(tradebookJson, "tradebookName");
+            String label = getString(tradebookJson, "label");
+            if (label.isEmpty()) {
+                label = tradebookName;
+            }
+            if (label.isEmpty()) {
+                label = tradebookId;
+            }
+            if (label.isEmpty()) {
+                continue;
+            }
+            if (id.isEmpty()) {
+                id = tradebookId.isEmpty() ? label : tradebookId;
+            }
+            List<String> entryMethods = getStringArray(tradebookJson, "entryMethods");
+            if (entryMethods.isEmpty()) {
+                continue;
+            }
+            tradebooks.add(new TradebookButtonGroup(
+                    id,
+                    label,
+                    getString(tradebookJson, "side"),
+                    tradebookId,
+                    tradebookName,
+                    entryMethods));
+        }
+
+        List<TradebookButtonGroup> immutableTradebooks = Collections.unmodifiableList(tradebooks);
+        symbolToTradebooks.put(symbol, immutableTradebooks);
+        notifyTradeButtonListeners(symbol, immutableTradebooks);
+        PluginLog.info("[TradeButton] Updated " + tradebooks.size() + " tradebook button groups for " + symbol);
+    }
+
+    private void notifyTradeButtonListeners(String symbol, List<TradebookButtonGroup> tradebooks) {
+        Set<TradeButtonConfigListener> listeners = symbolToTradeButtonListeners.get(symbol);
+        if (listeners == null) {
+            return;
+        }
+        for (TradeButtonConfigListener listener : listeners) {
+            try {
+                listener.onTradeButtonsChanged(tradebooks);
+            } catch (RuntimeException e) {
+                PluginLog.error("[TradeButton] Failed to update button listener for " + symbol + ": " + e.getMessage());
+            }
+        }
+    }
+
+    private List<String> getStringArray(JsonObject json, String field) {
+        JsonElement element = json.get(field);
+        if (element == null || !element.isJsonArray()) {
+            return Collections.emptyList();
+        }
+        List<String> values = new ArrayList<>();
+        for (JsonElement item : element.getAsJsonArray()) {
+            if (item == null || item.isJsonNull()) {
+                continue;
+            }
+            try {
+                String value = item.getAsString();
+                if (!value.isEmpty()) {
+                    values.add(value);
+                }
+            } catch (RuntimeException e) {
+                // Ignore malformed entries and keep the rest of the config usable.
+            }
+        }
+        return values;
+    }
+
+    private String getString(JsonObject json, String field) {
+        JsonElement element = json.get(field);
+        if (element == null || element.isJsonNull()) {
+            return "";
+        }
+        try {
+            return element.getAsString();
+        } catch (RuntimeException e) {
+            return "";
         }
     }
 
