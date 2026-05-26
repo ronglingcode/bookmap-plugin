@@ -42,7 +42,8 @@ public class OrderWallLabelPainter implements ScreenSpacePainterFactory, Indicat
     private static final int LABEL_HEIGHT = 18;
     private static final int LABEL_PADDING_X = 6;
     private static final int MAX_VISIBLE_ACTIVE_LABELS = 5;
-    private static final int DISPLAY_SIZE_UNIT = 1_000;
+    private static final int MAX_RENDERED_SIZE_PATH_POINTS = 4;
+    private static final String SIZE_PATH_SEPARATOR = String.valueOf((char) 0x2192);
 
     private static final Color ASK_ACCENT = new Color(235, 107, 82);
     private static final Color BID_ACCENT = new Color(91, 188, 255);
@@ -237,7 +238,7 @@ public class OrderWallLabelPainter implements ScreenSpacePainterFactory, Indicat
         }
 
         private boolean isDisplayable(OrderWallLabel label) {
-            return label.getPeakSize() >= DISPLAY_SIZE_UNIT;
+            return label.getPeakSize() >= OrderWallLabel.DISPLAY_SIZE_UNIT;
         }
 
         private List<OrderWallLabel> limit(List<OrderWallLabel> labels, int maxCount) {
@@ -292,7 +293,7 @@ public class OrderWallLabelPainter implements ScreenSpacePainterFactory, Indicat
         }
 
         private BufferedImage renderLabelImage(OrderWallLabel label) {
-            String text = formatSize(label.getPeakSize());
+            String text = formatSizePath(label);
 
             BufferedImage probe = new BufferedImage(1, 1, BufferedImage.TYPE_INT_ARGB);
             Graphics2D probeGraphics = probe.createGraphics();
@@ -370,8 +371,39 @@ public class OrderWallLabelPainter implements ScreenSpacePainterFactory, Indicat
         }
     }
 
-    private static String formatSize(int size) {
-        return Integer.toString(size / DISPLAY_SIZE_UNIT);
+    private static String formatSizePath(OrderWallLabel label) {
+        List<Integer> sizePath = label.getSizePath();
+        if (sizePath.isEmpty()) {
+            return Integer.toString(OrderWallLabel.toDisplaySize(label.getPeakSize()));
+        }
+        List<Integer> renderedPath = compactSizePath(sizePath);
+        StringBuilder builder = new StringBuilder();
+        for (int i = 0; i < renderedPath.size(); i++) {
+            if (i > 0) {
+                builder.append(SIZE_PATH_SEPARATOR);
+            }
+            builder.append(renderedPath.get(i));
+        }
+        return builder.toString();
+    }
+
+    private static List<Integer> compactSizePath(List<Integer> sizePath) {
+        if (sizePath.size() <= MAX_RENDERED_SIZE_PATH_POINTS) {
+            return sizePath;
+        }
+        List<Integer> compactPath = new ArrayList<>();
+        appendIfDifferent(compactPath, sizePath.get(0));
+        int start = sizePath.size() - (MAX_RENDERED_SIZE_PATH_POINTS - 1);
+        for (int i = start; i < sizePath.size(); i++) {
+            appendIfDifferent(compactPath, sizePath.get(i));
+        }
+        return compactPath;
+    }
+
+    private static void appendIfDifferent(List<Integer> values, int value) {
+        if (values.isEmpty() || values.get(values.size() - 1) != value) {
+            values.add(value);
+        }
     }
 
     static String extractInstrumentFromPainterName(String painterAlias, String fullName) {

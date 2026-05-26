@@ -20,8 +20,8 @@ This repository produces one Bookmap plugin:
 4. Hold a key (S/T/E by default) and click on the chart to draw a price line at that level
 5. Premarket high/low lines are drawn and updated automatically during 4:00-9:30 AM ET
 6. Key price levels received over WebSocket are drawn on the matching instrument
-7. Large liquidity walls are labeled directly on the heatmap using compact values like `14K`
-8. Wall labels retain the largest size seen at each level so the size remains visible after the wall is cleared
+7. Large liquidity walls are labeled directly on the heatmap using compact values like `5→10→8`
+8. Wall labels retain the size path seen at each level so growth and pullbacks remain visible after the wall is cleared
 9. All lines and labels use Bookmap's data coordinates so they track through scroll and zoom
 
 ## Features

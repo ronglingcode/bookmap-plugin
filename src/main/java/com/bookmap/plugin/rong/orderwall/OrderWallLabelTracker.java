@@ -1,9 +1,12 @@
 package com.bookmap.plugin.rong.orderwall;
 
+import java.util.ArrayList;
+import java.util.List;
+
 import com.bookmap.plugin.rong.OrderBookState;
 
 /**
- * Tracks large liquidity walls and retains the largest observed size at each level.
+ * Tracks large liquidity walls and retains meaningful size changes at each level.
  */
 public class OrderWallLabelTracker {
 
@@ -58,11 +61,13 @@ public class OrderWallLabelTracker {
         // never overwrite that historical maximum with a smaller reloaded wall.
         int peakSize = Math.max(existing.getPeakSize(), size);
         int currentSize = qualifiesNow ? size : 0;
+        List<Integer> sizePath = appendSizePath(existing.getSizePath(), size);
         long startTimeNs = existing.isActive() ? existing.getStartTimeNs() : timestampNs;
         long endTimeNs = timestampNs;
 
         if (existing.getCurrentSize() == currentSize
                 && existing.getPeakSize() == peakSize
+                && existing.getSizePath().equals(sizePath)
                 && existing.getEndTimeNs() == endTimeNs
                 && existing.getStartTimeNs() == startTimeNs) {
             return false;
@@ -79,9 +84,22 @@ public class OrderWallLabelTracker {
                 startTimeNs,
                 endTimeNs,
                 System.currentTimeMillis(),
-                existing.hasBeenDisplayed());
+                existing.hasBeenDisplayed(),
+                sizePath);
         store.putLabel(updated);
         return true;
+    }
+
+    private List<Integer> appendSizePath(List<Integer> existingPath, int rawSize) {
+        int displaySize = OrderWallLabel.toDisplaySize(rawSize);
+        List<Integer> sizePath = new ArrayList<>(existingPath);
+        if (displaySize <= 0) {
+            return sizePath;
+        }
+        if (sizePath.isEmpty() || sizePath.get(sizePath.size() - 1) != displaySize) {
+            sizePath.add(displaySize);
+        }
+        return sizePath;
     }
 
     /**
