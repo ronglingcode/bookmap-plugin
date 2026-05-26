@@ -21,7 +21,7 @@ This repository produces one Bookmap plugin:
 5. Premarket high/low lines are drawn and updated automatically during 4:00-9:30 AM ET
 6. Key price levels received over WebSocket are drawn on the matching instrument
 7. Large liquidity walls are labeled directly on the heatmap using compact growth paths like `5→7→10`
-8. Wall labels retain the increasing size path seen at each level so growth remains visible after the wall is cleared
+8. Wall labels retain the increasing size path seen at each level and start a new phase label after 2x growth
 9. All lines and labels use Bookmap's data coordinates so they track through scroll and zoom
 
 ## Features

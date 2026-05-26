@@ -10,6 +10,8 @@ import com.bookmap.plugin.rong.OrderBookState;
  */
 public class OrderWallLabelTracker {
 
+    private static final int GROWTH_PHASE_SPLIT_MULTIPLIER = 2;
+
     private final String instrumentAlias;
     private final double pips;
     private final OrderWallLabelStore store;
@@ -61,6 +63,21 @@ public class OrderWallLabelTracker {
         // never overwrite that historical maximum with a smaller reloaded wall.
         int peakSize = Math.max(existing.getPeakSize(), size);
         int currentSize = qualifiesNow ? size : 0;
+        if (qualifiesNow && shouldStartNewGrowthPhase(existing, size)) {
+            freezeExistingLabel(existing, timestampNs);
+            store.putLabel(new OrderWallLabel(
+                    instrumentAlias,
+                    isBid,
+                    priceTick,
+                    priceTick * pips,
+                    size,
+                    size,
+                    timestampNs,
+                    timestampNs,
+                    System.currentTimeMillis()));
+            return true;
+        }
+
         List<Integer> sizePath = appendSizePath(existing.getSizePath(), size);
         long startTimeNs = existing.isActive() ? existing.getStartTimeNs() : timestampNs;
         long endTimeNs = timestampNs;
@@ -88,6 +105,35 @@ public class OrderWallLabelTracker {
                 sizePath);
         store.putLabel(updated);
         return true;
+    }
+
+    private boolean shouldStartNewGrowthPhase(OrderWallLabel existing, int rawSize) {
+        int displaySize = OrderWallLabel.toDisplaySize(rawSize);
+        List<Integer> sizePath = existing.getSizePath();
+        if (displaySize <= 0 || sizePath.isEmpty()) {
+            return false;
+        }
+        int firstDisplaySize = sizePath.get(0);
+        int lastDisplaySize = sizePath.get(sizePath.size() - 1);
+        return displaySize > lastDisplaySize
+                && displaySize >= firstDisplaySize * GROWTH_PHASE_SPLIT_MULTIPLIER;
+    }
+
+    private void freezeExistingLabel(OrderWallLabel existing, long timestampNs) {
+        OrderWallLabel frozen = new OrderWallLabel(
+                existing.getId(),
+                instrumentAlias,
+                existing.isBid(),
+                existing.getPriceTick(),
+                existing.getRealPrice(),
+                0,
+                existing.getPeakSize(),
+                existing.getStartTimeNs(),
+                timestampNs,
+                System.currentTimeMillis(),
+                existing.hasBeenDisplayed(),
+                existing.getSizePath());
+        store.putLabel(frozen);
     }
 
     private List<Integer> appendSizePath(List<Integer> existingPath, int rawSize) {
