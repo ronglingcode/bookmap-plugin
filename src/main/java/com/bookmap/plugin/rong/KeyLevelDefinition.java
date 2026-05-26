@@ -1,16 +1,11 @@
 package com.bookmap.plugin.rong;
 
 /**
- * Represents a predefined price level that the user wants drawn on a specific instrument's chart.
+ * Represents a key price level sent by an external client for a specific instrument's chart.
  *
- * <p>Key levels are significant price points identified from higher timeframe analysis
- * (e.g., daily chart support/resistance levels). Unlike key+click lines which are placed
- * interactively, key levels are defined in advance — either via a JSON config file or
- * through the settings panel at runtime.</p>
- *
- * <p>This is a raw definition that holds the real price (e.g., $180.00). Conversion to
- * tick coordinates happens later in {@link KeyLevelManager} when the instrument's
- * {@code pips} multiplier becomes available from Bookmap's {@code InstrumentInfo}.</p>
+ * <p>This is a raw definition that holds the real price (e.g., $180.00). Conversion
+ * to tick coordinates happens later in {@link KeyLevelManager} when the instrument's
+ * {@code pips} multiplier becomes available from Bookmap.</p>
  *
  * <p>Each definition is instrument-specific: a $180 key level on NVDA does NOT appear
  * on any other instrument's chart.</p>
@@ -30,9 +25,9 @@ public class KeyLevelDefinition {
     private final String label;
 
     public KeyLevelDefinition(String instrument, double price, String label) {
-        this.instrument = instrument;
+        this.instrument = SymbolUtils.cleanSymbol(instrument);
         this.price = price;
-        this.label = label;
+        this.label = label == null || label.trim().isEmpty() ? null : label.trim();
     }
 
     public String getInstrument() { return instrument; }

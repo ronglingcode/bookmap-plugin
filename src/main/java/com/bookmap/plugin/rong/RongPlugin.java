@@ -57,7 +57,6 @@ public class RongPlugin implements CustomModuleAdapter,
     private static OrderWallLabelPainter wallLabelPainter;
     private static IndicatorConfig indicatorConfig;
     private static PremarketTracker premarketTracker;
-    private static KeyLevelConfig keyLevelConfig;
     private static KeyLevelManager keyLevelManager;
     private static CamPivotTracker camPivotTracker;
 
@@ -98,8 +97,8 @@ public class RongPlugin implements CustomModuleAdapter,
                 wallLabelStore = new OrderWallLabelStore();
                 wallLabelPainter = new OrderWallLabelPainter(wallLabelStore, indicatorConfig);
                 premarketTracker = new PremarketTracker(priceLineStore, indicatorConfig);
-                keyLevelConfig = new KeyLevelConfig();
-                keyLevelManager = new KeyLevelManager(keyLevelConfig, priceLineStore);
+                keyLevelManager = new KeyLevelManager(priceLineStore);
+                sharedServer.registerKeyLevelConfigListener(keyLevelManager);
                 camPivotTracker = new CamPivotTracker(priceLineStore, indicatorConfig);
 
                 // Wire click callback: key+click creates a price line if key is bound
@@ -217,10 +216,10 @@ public class RongPlugin implements CustomModuleAdapter,
                     camPivotTracker = null;
                 }
                 if (keyLevelManager != null) {
+                    sharedServer.unregisterKeyLevelConfigListener(keyLevelManager);
                     keyLevelManager.shutdown();
                     keyLevelManager = null;
                 }
-                keyLevelConfig = null;
                 if (wallLabelPainter != null) {
                     wallLabelPainter.shutdown();
                 }
@@ -244,8 +243,7 @@ public class RongPlugin implements CustomModuleAdapter,
     public StrategyPanel[] getCustomSettingsPanels() {
         return new StrategyPanel[] {
             new KeyBindingSettingsPanel(priceLineConfig, priceLineStore),
-            new IndicatorSettingsPanel(indicatorConfig),
-            new KeyLevelSettingsPanel(keyLevelConfig)
+            new IndicatorSettingsPanel(indicatorConfig)
         };
     }
 

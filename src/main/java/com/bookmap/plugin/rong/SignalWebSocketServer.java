@@ -36,6 +36,11 @@ public class SignalWebSocketServer extends WebSocketServer {
         void onTradeButtonsChanged(List<TradebookButtonGroup> tradebooks);
     }
 
+    @FunctionalInterface
+    public interface KeyLevelConfigListener {
+        void onKeyLevelsChanged(String symbol, List<KeyLevelDefinition> levels);
+    }
+
     private final Object schedulerLock = new Object();
     private ScheduledExecutorService scheduler;
     private final Path heartbeatLogFile;
@@ -48,7 +53,10 @@ public class SignalWebSocketServer extends WebSocketServer {
     private final Map<String, Double> symbolToPips = new ConcurrentHashMap<>();
     private final Map<String, Double> symbolToLastPrice = new ConcurrentHashMap<>();
     private final Map<String, List<TradebookButtonGroup>> symbolToTradebooks = new ConcurrentHashMap<>();
+    private final Map<String, List<KeyLevelDefinition>> symbolToKeyLevels = new ConcurrentHashMap<>();
     private final Map<String, Set<TradeButtonConfigListener>> symbolToTradeButtonListeners = new ConcurrentHashMap<>();
+    private final Set<KeyLevelConfigListener> keyLevelConfigListeners =
+            Collections.newSetFromMap(new ConcurrentHashMap<>());
 
     // Broadcast config
     private final double orderbookPercentile;
@@ -112,6 +120,17 @@ public class SignalWebSocketServer extends WebSocketServer {
         }
     }
 
+    public void registerKeyLevelConfigListener(KeyLevelConfigListener listener) {
+        keyLevelConfigListeners.add(listener);
+        for (Map.Entry<String, List<KeyLevelDefinition>> entry : symbolToKeyLevels.entrySet()) {
+            listener.onKeyLevelsChanged(entry.getKey(), entry.getValue());
+        }
+    }
+
+    public void unregisterKeyLevelConfigListener(KeyLevelConfigListener listener) {
+        keyLevelConfigListeners.remove(listener);
+    }
+
     @Override
     public void onOpen(WebSocket conn, ClientHandshake handshake) {
         PluginLog.info("[Rong] Client connected: " + conn.getRemoteSocketAddress());
@@ -131,6 +150,10 @@ public class SignalWebSocketServer extends WebSocketServer {
             String type = getString(json, "type");
             if ("trade_button_config".equals(type) || "trade_buttons_config".equals(type)) {
                 handleTradeButtonConfig(json);
+                return;
+            }
+            if ("key_levels_config".equals(type) || "key_level_config".equals(type)) {
+                handleKeyLevelsConfig(json);
                 return;
             }
         }
@@ -216,6 +239,72 @@ public class SignalWebSocketServer extends WebSocketServer {
         PluginLog.info("[TradeButton] Updated " + tradebooks.size() + " tradebook button groups for " + symbol);
     }
 
+    private void handleKeyLevelsConfig(JsonObject json) {
+        String symbol = SymbolUtils.cleanSymbol(getString(json, "symbol"));
+        if (symbol.isEmpty()) {
+            PluginLog.error("[KeyLevel] Ignoring config with missing symbol");
+            return;
+        }
+
+        JsonElement levelsElement = json.get("levels");
+        if (levelsElement == null) {
+            levelsElement = json.get("keyLevels");
+        }
+        if (levelsElement == null || !levelsElement.isJsonArray()) {
+            PluginLog.error("[KeyLevel] Ignoring config with missing levels array for " + symbol);
+            return;
+        }
+
+        List<KeyLevelDefinition> levels = new ArrayList<>();
+        JsonArray levelsArray = levelsElement.getAsJsonArray();
+        for (JsonElement element : levelsArray) {
+            KeyLevelDefinition level = parseKeyLevel(symbol, element);
+            if (level != null) {
+                levels.add(level);
+            }
+        }
+
+        List<KeyLevelDefinition> immutableLevels = Collections.unmodifiableList(levels);
+        symbolToKeyLevels.put(symbol, immutableLevels);
+        notifyKeyLevelConfigListeners(symbol, immutableLevels);
+        PluginLog.info("[KeyLevel] Updated " + levels.size() + " websocket key levels for " + symbol);
+    }
+
+    private KeyLevelDefinition parseKeyLevel(String symbol, JsonElement element) {
+        if (element == null || element.isJsonNull()) {
+            return null;
+        }
+        try {
+            if (element.isJsonPrimitive()) {
+                double price = element.getAsDouble();
+                return price > 0 ? new KeyLevelDefinition(symbol, price, null) : null;
+            }
+            if (!element.isJsonObject()) {
+                return null;
+            }
+            JsonObject levelJson = element.getAsJsonObject();
+            double price = getDouble(levelJson, "price");
+            if (price <= 0) {
+                return null;
+            }
+            String label = getString(levelJson, "label");
+            return new KeyLevelDefinition(symbol, price, label);
+        } catch (RuntimeException e) {
+            PluginLog.error("[KeyLevel] Ignoring malformed level for " + symbol + ": " + e.getMessage());
+            return null;
+        }
+    }
+
+    private void notifyKeyLevelConfigListeners(String symbol, List<KeyLevelDefinition> levels) {
+        for (KeyLevelConfigListener listener : keyLevelConfigListeners) {
+            try {
+                listener.onKeyLevelsChanged(symbol, levels);
+            } catch (RuntimeException e) {
+                PluginLog.error("[KeyLevel] Failed to update listener for " + symbol + ": " + e.getMessage());
+            }
+        }
+    }
+
     private void notifyTradeButtonListeners(String symbol, List<TradebookButtonGroup> tradebooks) {
         Set<TradeButtonConfigListener> listeners = symbolToTradeButtonListeners.get(symbol);
         if (listeners == null) {
@@ -261,6 +350,18 @@ public class SignalWebSocketServer extends WebSocketServer {
             return element.getAsString();
         } catch (RuntimeException e) {
             return "";
+        }
+    }
+
+    private double getDouble(JsonObject json, String field) {
+        JsonElement element = json.get(field);
+        if (element == null || element.isJsonNull()) {
+            return Double.NaN;
+        }
+        try {
+            return element.getAsDouble();
+        } catch (RuntimeException e) {
+            return Double.NaN;
         }
     }
 

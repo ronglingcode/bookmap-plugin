@@ -19,7 +19,7 @@ This repository produces one Bookmap plugin:
 **Chart drawing:**
 4. Hold a key (S/T/E by default) and click on the chart to draw a price line at that level
 5. Premarket high/low lines are drawn and updated automatically during 4:00-9:30 AM ET
-6. Predefined key price levels can be loaded from a JSON config file and/or added at runtime via the settings panel
+6. Key price levels received over WebSocket are drawn on the matching instrument
 7. Large liquidity walls are labeled directly on the heatmap using compact values like `14K`
 8. Wall labels retain the largest size seen at each level so the size remains visible after the wall is cleared
 9. All lines and labels use Bookmap's data coordinates so they track through scroll and zoom
@@ -29,9 +29,9 @@ This repository produces one Bookmap plugin:
 - **Order wall breakout detection** — monitors large ask-side walls and broadcasts signals when consumed
 - **Key+click price lines** — hold a configurable key and click to draw stop loss, take profit, or entry lines
 - **Auto-drawn indicators** — premarket high/low and Camarilla Pivot levels drawn automatically
-- **Predefined key levels** — instrument-specific price levels loaded from a JSON config file or added via settings panel
+- **WebSocket key levels** — instrument-specific price levels pushed by an external app
 - **WebSocket API** — real-time heartbeat, breakout, order book, and price select messages
-- **Settings panels** — configure key bindings, enable/disable indicators, and manage key price levels at runtime
+- **Settings panels** — configure key bindings and enable/disable indicators
 
 ## Project Structure
 
@@ -51,7 +51,7 @@ bookmap-plugin/
     │   └── TradebookButtonGroup
     ├── PremarketTracker        # Auto premarket high/low tracking
     ├── CamPivotTracker         # Camarilla Pivot levels (R1-R6, S1-S6)
-    ├── KeyLevel*               # Predefined key level config, UI, and drawing
+    ├── KeyLevel*               # WebSocket key level definitions and drawing bridge
     ├── OrderBookState          # Full order book state
     ├── SignalWebSocketServer   # WebSocket server for external clients
     └── PluginLog               # File logger
@@ -104,7 +104,7 @@ ws.onmessage = (event) => {
 
 ## WebSocket API Reference
 
-The plugin exposes a WebSocket server on `ws://localhost:8765`. Clients receive heartbeat and breakout messages automatically on connect. Additionally, clients can subscribe to real-time order book snapshots.
+The plugin exposes a WebSocket server on `ws://localhost:8765`. Clients receive heartbeat and breakout messages automatically on connect. Additionally, clients can subscribe to real-time order book snapshots and send key levels to draw.
 
 ### Message types (server → client)
 
@@ -127,6 +127,22 @@ All messages include a `symbol` field identifying which instrument the data belo
 {"type":"subscribe","channel":"orderbook"}
 {"type":"unsubscribe","channel":"orderbook"}
 ```
+
+### Send key levels (client → server)
+
+```json
+{
+  "type": "key_levels_config",
+  "symbol": "AAPL",
+  "levels": [
+    { "price": 185.50, "label": "daily resistance" },
+    { "price": 180.00 }
+  ],
+  "timestamp": 1710345600000
+}
+```
+
+Sending an empty `levels` array clears existing key level lines for that symbol.
 
 ### TypeScript example
 
@@ -284,7 +300,7 @@ Automatically draws all 12 Camarilla Pivot levels calculated from the previous d
 
 ### Key Price Levels
 
-Draw predefined price levels on specific instruments' charts. Useful for marking significant support/resistance levels identified from daily or higher timeframe analysis.
+Draw key price levels on specific instruments' charts. Useful for marking significant support/resistance levels identified from daily or higher timeframe analysis.
 
 
 | Line      | Color | Description                                         |
@@ -292,29 +308,7 @@ Draw predefined price levels on specific instruments' charts. Useful for marking
 | Key Level | Gold  | User-defined price level with optional custom label |
 
 
-Key levels are instrument-specific — a $180 level on NVDA will only appear on NVDA's chart, not on any other instrument.
-
-#### Sources
-
-Key levels can come from two sources:
-
-1. **JSON config file** — Create `~/bookmap-plugin/key-levels.json` to predefine levels that load on plugin startup:
-
-```json
-{
-  "levels": [
-    { "instrument": "NVDA", "price": 180.00, "label": "major support" },
-    { "instrument": "NVDA", "price": 200.00, "label": "round number" },
-    { "instrument": "ES", "price": 5400.00 }
-  ]
-}
-```
-
-- The `instrument` field must match the exact alias Bookmap uses (e.g., "NVDA", "ESM5")
-- The `label` field is optional — if omitted, the default "Key Level" label is used
-- File levels are read-only from the plugin; edit the file manually to change them
-
-1. **Settings panel** — Add levels at runtime via the **Key Price Levels** settings panel. Enter the instrument alias, price, and optional label, then click "Add Level". Session levels can be removed via the panel but are not saved — they exist only while the plugin is running.
+Key levels are instrument-specific — a $180 level sent for NVDA will only appear on NVDA's chart, not on any other instrument. Bookmap does not read key levels from a local config file and does not expose a key-level entry UI; the external client owns the source data and pushes the latest levels over WebSocket.
 
 ### Replay & Multi-Day Data
 
@@ -362,11 +356,10 @@ Signal logs (`heartbeat.jsonl`, `breakout.jsonl`) are appended in JSONL format (
 
 ### Settings Panels
 
-The plugin provides three settings panels accessible via the addon's configuration in Bookmap:
+The plugin provides two settings panels accessible via the addon's configuration in Bookmap:
 
 
 | Panel                       | Purpose                                                                         |
 | --------------------------- | ------------------------------------------------------------------------------- |
 | **Price Line Key Bindings** | Change which keys draw which line types (S/T/E defaults), clear all drawn lines |
 | **Indicators**              | Enable/disable auto-drawn indicators (Premarket High/Low, Camarilla Pivots)     |
-| **Key Price Levels**        | View file-loaded levels, add/remove session levels at runtime                   |
