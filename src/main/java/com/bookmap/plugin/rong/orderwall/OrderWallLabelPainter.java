@@ -43,7 +43,7 @@ public class OrderWallLabelPainter implements ScreenSpacePainterFactory, Indicat
     private static final int LABEL_PADDING_X = 6;
     private static final int MAX_VISIBLE_ACTIVE_LABELS = 5;
     private static final int MAX_RENDERED_SIZE_PATH_POINTS = 4;
-    private static final String SIZE_PATH_SEPARATOR = String.valueOf((char) 0x2192);
+    private static final String SIZE_PATH_SEPARATOR = " -> ";
 
     private static final Color ASK_ACCENT = new Color(235, 107, 82);
     private static final Color BID_ACCENT = new Color(91, 188, 255);
