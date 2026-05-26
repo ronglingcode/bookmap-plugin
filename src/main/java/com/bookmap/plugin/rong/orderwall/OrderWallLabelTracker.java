@@ -96,7 +96,7 @@ public class OrderWallLabelTracker {
         if (displaySize <= 0) {
             return sizePath;
         }
-        if (sizePath.isEmpty() || sizePath.get(sizePath.size() - 1) != displaySize) {
+        if (sizePath.isEmpty() || displaySize > sizePath.get(sizePath.size() - 1)) {
             sizePath.add(displaySize);
         }
         return sizePath;
