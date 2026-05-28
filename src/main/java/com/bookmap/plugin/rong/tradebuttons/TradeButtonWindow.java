@@ -62,22 +62,42 @@ public class TradeButtonWindow {
             return;
         }
         buttonPanel.removeAll();
-        if (tradebooks == null || tradebooks.isEmpty()) {
-            buttonPanel.setLayout(new GridLayout(1, 1, 6, 6));
-            buttonPanel.add(new JLabel("Waiting for buttons", SwingConstants.CENTER));
-        } else {
-            buttonPanel.setLayout(new BoxLayout(buttonPanel, BoxLayout.Y_AXIS));
+        buttonPanel.setLayout(new BoxLayout(buttonPanel, BoxLayout.Y_AXIS));
+        buttonPanel.add(createHotkeyPanel());
+
+        boolean hasTradebookButtons = false;
+        if (tradebooks != null && !tradebooks.isEmpty()) {
             for (TradebookButtonGroup tradebook : tradebooks) {
                 if (!tradebook.getEntryMethods().isEmpty()) {
                     buttonPanel.add(createTradebookPanel(tradebook));
+                    hasTradebookButtons = true;
                 }
             }
+        }
+        if (!hasTradebookButtons) {
+            buttonPanel.add(new JLabel("Waiting for buttons", SwingConstants.CENTER));
         }
         buttonPanel.revalidate();
         buttonPanel.repaint();
         if (frame != null) {
             frame.pack();
         }
+    }
+
+    private JPanel createHotkeyPanel() {
+        JPanel hotkeyPanel = new JPanel(new GridLayout(1, 3, 6, 6));
+        hotkeyPanel.setBorder(BorderFactory.createEmptyBorder(0, 0, 8, 0));
+        hotkeyPanel.add(createHotkeyButton("Cancel", "cancel", "KeyC"));
+        hotkeyPanel.add(createHotkeyButton("Flatten", "flatten", "KeyF"));
+        hotkeyPanel.add(createHotkeyButton("Market Out 1", "market_out_1_partial", "KeyM"));
+        return hotkeyPanel;
+    }
+
+    private JButton createHotkeyButton(String label, String id, String keyCode) {
+        JButton button = new JButton(label);
+        button.setToolTipText(label + " - " + keyCode);
+        button.addActionListener(e -> sendHotkeyButtonMessage(id, label, keyCode));
+        return button;
     }
 
     private JPanel createTradebookPanel(TradebookButtonGroup tradebook) {
@@ -135,6 +155,19 @@ public class TradeButtonWindow {
         server.broadcast(json.toString());
         PluginLog.info("[TradeButton] " + orderType + " " + tradebook.getLabel() + ": " + entryMethod
                 + " clicked for " + symbol);
+    }
+
+    private void sendHotkeyButtonMessage(String buttonId, String buttonName, String keyCode) {
+        JsonObject json = new JsonObject();
+        json.addProperty("type", "custom_button_click");
+        json.addProperty("symbol", symbol);
+        json.addProperty("button_id", "hotkey:" + buttonId);
+        json.addProperty("button_name", buttonName);
+        json.addProperty("keyCode", keyCode);
+        json.addProperty("key_code", keyCode);
+        json.addProperty("timestamp", System.currentTimeMillis());
+        server.broadcast(json.toString());
+        PluginLog.info("[TradeButton] " + buttonName + " clicked for " + symbol + " as " + keyCode);
     }
 
     public void dispose() {
