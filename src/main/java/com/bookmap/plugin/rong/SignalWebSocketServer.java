@@ -43,15 +43,12 @@ public class SignalWebSocketServer extends WebSocketServer {
 
     private final Object schedulerLock = new Object();
     private ScheduledExecutorService scheduler;
-    private final Path heartbeatLogFile;
     private final Path breakoutLogFile;
-    private BufferedWriter heartbeatWriter;
     private BufferedWriter breakoutWriter;
 
     // Per-symbol state
     private final Map<String, OrderBookState> symbolToOrderBook = new ConcurrentHashMap<>();
     private final Map<String, Double> symbolToPips = new ConcurrentHashMap<>();
-    private final Map<String, Double> symbolToLastPrice = new ConcurrentHashMap<>();
     private final Map<String, List<TradebookButtonGroup>> symbolToTradebooks = new ConcurrentHashMap<>();
     private final Map<String, List<KeyLevelDefinition>> symbolToKeyLevels = new ConcurrentHashMap<>();
     private final Map<String, Set<TradeButtonConfigListener>> symbolToTradeButtonListeners = new ConcurrentHashMap<>();
@@ -63,7 +60,6 @@ public class SignalWebSocketServer extends WebSocketServer {
     private final int orderbookIntervalMs;
     private final Set<WebSocket> orderbookSubscribers = Collections.newSetFromMap(new ConcurrentHashMap<>());
     private ScheduledFuture<?> orderbookBroadcastTask;
-    private ScheduledFuture<?> heartbeatTask;
     private volatile boolean shuttingDown;
 
     public SignalWebSocketServer(int port, double orderbookPercentile, int orderbookIntervalMs) {
@@ -73,7 +69,6 @@ public class SignalWebSocketServer extends WebSocketServer {
         this.orderbookPercentile = orderbookPercentile;
         this.orderbookIntervalMs = orderbookIntervalMs;
         Path signalsDir = Paths.get(System.getProperty("user.home"), "Bookmap", "bookmap-signals");
-        this.heartbeatLogFile = signalsDir.resolve("heartbeat.jsonl");
         this.breakoutLogFile = signalsDir.resolve("breakout.jsonl");
     }
 
@@ -88,12 +83,7 @@ public class SignalWebSocketServer extends WebSocketServer {
     public void unregisterSymbol(String symbol) {
         symbolToOrderBook.remove(symbol);
         symbolToPips.remove(symbol);
-        symbolToLastPrice.remove(symbol);
         PluginLog.info("[Rong] Unregistered symbol: " + symbol);
-    }
-
-    public void setLastPrice(String symbol, double price) {
-        symbolToLastPrice.put(symbol, price);
     }
 
     public void registerTradeButtonConfigListener(String symbol, TradeButtonConfigListener listener) {
@@ -391,24 +381,12 @@ public class SignalWebSocketServer extends WebSocketServer {
         }
         PluginLog.info("[Rong] WebSocket server started on port " + getPort());
         try {
-            Files.createDirectories(heartbeatLogFile.getParent());
-            heartbeatWriter = Files.newBufferedWriter(heartbeatLogFile,
-                StandardOpenOption.CREATE, StandardOpenOption.APPEND);
+            Files.createDirectories(breakoutLogFile.getParent());
             breakoutWriter = Files.newBufferedWriter(breakoutLogFile,
                 StandardOpenOption.CREATE, StandardOpenOption.APPEND);
-            PluginLog.info("[Rong] Logging to " + heartbeatLogFile.getParent());
+            PluginLog.info("[Rong] Logging to " + breakoutLogFile.getParent());
         } catch (IOException e) {
             PluginLog.error("[Rong] Failed to open log files: " + e.getMessage());
-        }
-        synchronized (schedulerLock) {
-            if (shuttingDown || heartbeatTask != null) {
-                return;
-            }
-            try {
-                heartbeatTask = getOrCreateScheduler().scheduleAtFixedRate(this::sendHeartbeats, 5, 5, TimeUnit.SECONDS);
-            } catch (RejectedExecutionException e) {
-                PluginLog.error("[Rong] Failed to schedule heartbeats: " + e.getMessage());
-            }
         }
     }
 
@@ -420,10 +398,6 @@ public class SignalWebSocketServer extends WebSocketServer {
     public void shutdown() {
         shuttingDown = true;
         synchronized (schedulerLock) {
-            if (heartbeatTask != null) {
-                heartbeatTask.cancel(true);
-                heartbeatTask = null;
-            }
             if (orderbookBroadcastTask != null) {
                 orderbookBroadcastTask.cancel(true);
                 orderbookBroadcastTask = null;
@@ -433,7 +407,6 @@ public class SignalWebSocketServer extends WebSocketServer {
                 scheduler = null;
             }
         }
-        closeWriter(heartbeatWriter);
         closeWriter(breakoutWriter);
         try {
             stop(1000);
@@ -457,21 +430,6 @@ public class SignalWebSocketServer extends WebSocketServer {
                     // Orderbook snapshot sending is disabled; keep snapshot computation available for now.
                     // conn.send(orderbookJson);
                 }
-            }
-        }
-    }
-
-    /** Send heartbeats for ALL registered symbols. */
-    private void sendHeartbeats() {
-        for (Map.Entry<String, Double> entry : symbolToLastPrice.entrySet()) {
-            String symbol = entry.getKey();
-            double price = entry.getValue();
-            String json = String.format(
-                "{\"type\":\"heartbeat\",\"symbol\":\"%s\",\"price\":%.6f,\"timestamp\":%d}",
-                symbol, price, System.currentTimeMillis());
-            writeToFile(heartbeatWriter, json);
-            if (!getConnections().isEmpty()) {
-                broadcast(json);
             }
         }
     }

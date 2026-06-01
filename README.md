@@ -30,7 +30,7 @@ This repository produces one Bookmap plugin:
 - **Key+click price lines** — hold a configurable key and click to draw stop loss, take profit, or entry lines
 - **Auto-drawn indicators** — premarket high/low and Camarilla Pivot levels drawn automatically
 - **WebSocket key levels** — instrument-specific price levels pushed by an external app
-- **WebSocket API** — real-time heartbeat, breakout, order book, and price select messages
+- **WebSocket API** — real-time breakout, order book, and price select messages
 - **Settings panels** — configure key bindings and enable/disable indicators
 
 ## Project Structure
@@ -90,11 +90,6 @@ const ws = new WebSocket('ws://localhost:8765');
 ws.onmessage = (event) => {
   const data = JSON.parse(event.data);
 
-  if (data.type === 'heartbeat') {
-    // Sent every 5 seconds with current price
-    // { "type": "heartbeat", "symbol": "AAPL", "price": 185.32, "timestamp": 1710345600000 }
-  }
-
   if (data.type === 'breakout') {
     // Sent when price breaks through a large order wall
     // { "type": "breakout", "symbol": "AAPL", "breakoutLevel": 185.50, "timestamp": 1710345600000 }
@@ -104,14 +99,13 @@ ws.onmessage = (event) => {
 
 ## WebSocket API Reference
 
-The plugin exposes a WebSocket server on `ws://localhost:8765`. Clients receive heartbeat and breakout messages automatically on connect. Additionally, clients can subscribe to real-time order book snapshots and send key levels to draw.
+The plugin exposes a WebSocket server on `ws://localhost:8765`. Clients receive breakout messages as events occur. Additionally, clients can subscribe to real-time order book snapshots and send key levels to draw.
 
 ### Message types (server → client)
 
 
 | Type           | Description                                  | Frequency                             |
 | -------------- | -------------------------------------------- | ------------------------------------- |
-| `heartbeat`    | Current price per symbol                     | Every 5s                              |
 | `breakout`     | Wall breakout signal                         | On event                              |
 | `orderbook`    | Order book snapshot (filtered by percentile) | At subscription interval (default 1s) |
 | `priceSelect`  | Key+click price selection from chart         | On event                              |
@@ -147,13 +141,6 @@ Sending an empty `levels` array clears existing key level lines for that symbol.
 ### TypeScript example
 
 ```typescript
-interface Heartbeat {
-  type: "heartbeat";
-  symbol: string;
-  price: number;
-  timestamp: number;
-}
-
 interface Breakout {
   type: "breakout";
   symbol: string;
@@ -188,7 +175,7 @@ interface Subscribed {
   percentile: number;
 }
 
-type BookmapMessage = Heartbeat | Breakout | OrderBook | PriceSelect | Subscribed;
+type BookmapMessage = Breakout | OrderBook | PriceSelect | Subscribed;
 
 function connectToBookmap(
   onBreakout: (signal: Breakout) => void,
@@ -206,9 +193,6 @@ function connectToBookmap(
     const data: BookmapMessage = JSON.parse(event.data);
 
     switch (data.type) {
-      case "heartbeat":
-        break;
-
       case "breakout":
         onBreakout(data);
         break;
@@ -339,7 +323,7 @@ All logs are written under `~/Bookmap/` (`C:\Users\{username}\Bookmap\` on Windo
 | Log | Directory | Files |
 | --- | --------- | ----- |
 | **Plugin logs** | `~/Bookmap/plugin_logs/` | `{datetime}.txt` — one per session |
-| **Signal logs** | `~/Bookmap/bookmap-signals/` | `heartbeat.jsonl`, `breakout.jsonl`, `click-debug.log` |
+| **Signal logs** | `~/Bookmap/bookmap-signals/` | `breakout.jsonl`, `click-debug.log` |
 
 On Windows, the full paths are:
 - `C:\Users\{username}\Bookmap\plugin_logs\`
@@ -352,7 +336,7 @@ Plugin log files are named by session start time, e.g. `2026-03-21_10-30-45.txt`
 2026-03-21 10:30:45.456 [ERROR] [IndicatorDataFetcher] HTTP 500 for AAPL
 ```
 
-Signal logs (`heartbeat.jsonl`, `breakout.jsonl`) are appended in JSONL format (one JSON object per line). The `click-debug.log` records key+click events with millisecond timestamps.
+Signal logs (`breakout.jsonl`) are appended in JSONL format (one JSON object per line). The `click-debug.log` records key+click events with millisecond timestamps.
 
 ### Settings Panels
 
