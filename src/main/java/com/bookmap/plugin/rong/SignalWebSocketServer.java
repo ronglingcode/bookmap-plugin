@@ -454,7 +454,8 @@ public class SignalWebSocketServer extends WebSocketServer {
             String orderbookJson = orderBook.toJson(symbol, pips, orderbookPercentile);
             for (WebSocket conn : orderbookSubscribers) {
                 if (conn.isOpen()) {
-                    conn.send(orderbookJson);
+                    // Orderbook snapshot sending is disabled; keep snapshot computation available for now.
+                    // conn.send(orderbookJson);
                 }
             }
         }
