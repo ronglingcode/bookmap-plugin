@@ -288,7 +288,7 @@ public class RongPlugin implements CustomModuleAdapter,
             double wallRealPrice = wall.priceTick * instrumentInfo.pips;
             if (currentPrice > wallRealPrice && wallTracker.isConsumed(wall)) {
                 BreakoutSignal signal = new BreakoutSignal(alias, wallRealPrice);
-                sharedServer.broadcastSignal(signal.toJson());
+                // sharedServer.broadcastSignal(signal.toJson());
                 PluginLog.info("[Rong] BREAKOUT signal: " + signal.toJson());
                 wallTracker.removeWall(wall.priceTick);
             }
