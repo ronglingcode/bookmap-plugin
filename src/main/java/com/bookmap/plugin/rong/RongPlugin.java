@@ -59,6 +59,7 @@ public class RongPlugin implements CustomModuleAdapter,
     private static PremarketTracker premarketTracker;
     private static KeyLevelManager keyLevelManager;
     private static CamPivotTracker camPivotTracker;
+    private static ExitOrderManager exitOrderManager;
 
     private String alias;
     private Api api;
@@ -99,6 +100,8 @@ public class RongPlugin implements CustomModuleAdapter,
                 premarketTracker = new PremarketTracker(priceLineStore, indicatorConfig);
                 keyLevelManager = new KeyLevelManager(priceLineStore);
                 sharedServer.registerKeyLevelConfigListener(keyLevelManager);
+                exitOrderManager = new ExitOrderManager(priceLineStore);
+                sharedServer.registerExitOrderPairsConfigListener(exitOrderManager);
                 camPivotTracker = new CamPivotTracker(priceLineStore, indicatorConfig);
 
                 // Wire click callback: key+click creates a price line if key is bound
@@ -143,6 +146,9 @@ public class RongPlugin implements CustomModuleAdapter,
         // Draw predefined key price levels for this instrument
         if (keyLevelManager != null) {
             keyLevelManager.onInstrumentInitialized(alias, info.pips);
+        }
+        if (exitOrderManager != null) {
+            exitOrderManager.onInstrumentInitialized(alias, info.pips);
         }
 
         // Fetch cam pivots + premarket high/low from EdgeDesk API (runs on background thread)
@@ -194,6 +200,9 @@ public class RongPlugin implements CustomModuleAdapter,
         if (keyLevelManager != null) {
             keyLevelManager.onInstrumentStopped(alias);
         }
+        if (exitOrderManager != null) {
+            exitOrderManager.onInstrumentStopped(alias);
+        }
         if (priceLineStore != null) {
             priceLineStore.clearAll(alias);
         }
@@ -219,6 +228,11 @@ public class RongPlugin implements CustomModuleAdapter,
                     sharedServer.unregisterKeyLevelConfigListener(keyLevelManager);
                     keyLevelManager.shutdown();
                     keyLevelManager = null;
+                }
+                if (exitOrderManager != null) {
+                    sharedServer.unregisterExitOrderPairsConfigListener(exitOrderManager);
+                    exitOrderManager.shutdown();
+                    exitOrderManager = null;
                 }
                 if (wallLabelPainter != null) {
                     wallLabelPainter.shutdown();

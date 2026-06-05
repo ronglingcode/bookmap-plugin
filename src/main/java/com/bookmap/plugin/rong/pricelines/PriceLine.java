@@ -18,6 +18,7 @@ public class PriceLine {
         PREMARKET_HIGH("PM High", new Color(255, 165, 0), null),
         PREMARKET_LOW("PM Low", new Color(180, 100, 255), null),
         KEY_LEVEL("Key Level", new Color(255, 215, 0), null),
+        EXIT_ORDER("Exit", new Color(120, 120, 120), null),
 
         // Camarilla Pivot levels — resistance (warm colors)
         CAM_R1("R1", new Color(255, 200, 200), null),
@@ -65,6 +66,7 @@ public class PriceLine {
      * Null means use the default LineType.label.
      */
     private final String customLabel;
+    private final Color customColor;
 
     public PriceLine(String instrumentAlias, LineType type, double priceInTicks, double realPrice) {
         this(instrumentAlias, type, priceInTicks, realPrice, null);
@@ -72,6 +74,11 @@ public class PriceLine {
 
     public PriceLine(String instrumentAlias, LineType type, double priceInTicks, double realPrice,
                      String customLabel) {
+        this(instrumentAlias, type, priceInTicks, realPrice, customLabel, null);
+    }
+
+    public PriceLine(String instrumentAlias, LineType type, double priceInTicks, double realPrice,
+                     String customLabel, Color customColor) {
         this.id = UUID.randomUUID().toString();
         this.instrumentAlias = instrumentAlias;
         this.type = type;
@@ -79,6 +86,7 @@ public class PriceLine {
         this.realPrice = realPrice;
         this.createdAt = System.currentTimeMillis();
         this.customLabel = customLabel;
+        this.customColor = customColor;
     }
 
     public String getId() { return id; }
@@ -89,4 +97,6 @@ public class PriceLine {
     public long getCreatedAt() { return createdAt; }
     /** Returns custom label text, or null if default LineType.label should be used. */
     public String getCustomLabel() { return customLabel; }
+    /** Returns custom line color, or null if LineType.color should be used. */
+    public Color getCustomColor() { return customColor; }
 }

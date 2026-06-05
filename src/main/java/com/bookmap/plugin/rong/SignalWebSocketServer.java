@@ -41,6 +41,11 @@ public class SignalWebSocketServer extends WebSocketServer {
         void onKeyLevelsChanged(String symbol, List<KeyLevelDefinition> levels);
     }
 
+    @FunctionalInterface
+    public interface ExitOrderPairsConfigListener {
+        void onExitOrderPairsChanged(String symbol, List<ExitOrderPairDefinition> pairs);
+    }
+
     private final Object schedulerLock = new Object();
     private ScheduledExecutorService scheduler;
     private final Path breakoutLogFile;
@@ -51,8 +56,11 @@ public class SignalWebSocketServer extends WebSocketServer {
     private final Map<String, Double> symbolToPips = new ConcurrentHashMap<>();
     private final Map<String, List<TradebookButtonGroup>> symbolToTradebooks = new ConcurrentHashMap<>();
     private final Map<String, List<KeyLevelDefinition>> symbolToKeyLevels = new ConcurrentHashMap<>();
+    private final Map<String, List<ExitOrderPairDefinition>> symbolToExitOrderPairs = new ConcurrentHashMap<>();
     private final Map<String, Set<TradeButtonConfigListener>> symbolToTradeButtonListeners = new ConcurrentHashMap<>();
     private final Set<KeyLevelConfigListener> keyLevelConfigListeners =
+            Collections.newSetFromMap(new ConcurrentHashMap<>());
+    private final Set<ExitOrderPairsConfigListener> exitOrderPairsConfigListeners =
             Collections.newSetFromMap(new ConcurrentHashMap<>());
 
     // Broadcast config
@@ -121,6 +129,17 @@ public class SignalWebSocketServer extends WebSocketServer {
         keyLevelConfigListeners.remove(listener);
     }
 
+    public void registerExitOrderPairsConfigListener(ExitOrderPairsConfigListener listener) {
+        exitOrderPairsConfigListeners.add(listener);
+        for (Map.Entry<String, List<ExitOrderPairDefinition>> entry : symbolToExitOrderPairs.entrySet()) {
+            listener.onExitOrderPairsChanged(entry.getKey(), entry.getValue());
+        }
+    }
+
+    public void unregisterExitOrderPairsConfigListener(ExitOrderPairsConfigListener listener) {
+        exitOrderPairsConfigListeners.remove(listener);
+    }
+
     @Override
     public void onOpen(WebSocket conn, ClientHandshake handshake) {
         PluginLog.info("[Rong] Client connected: " + conn.getRemoteSocketAddress());
@@ -144,6 +163,10 @@ public class SignalWebSocketServer extends WebSocketServer {
             }
             if ("key_levels_config".equals(type) || "key_level_config".equals(type)) {
                 handleKeyLevelsConfig(json);
+                return;
+            }
+            if ("exit_order_pairs_config".equals(type) || "exit_order_pair_config".equals(type)) {
+                handleExitOrderPairsConfig(json);
                 return;
             }
         }
@@ -285,12 +308,100 @@ public class SignalWebSocketServer extends WebSocketServer {
         }
     }
 
+    private void handleExitOrderPairsConfig(JsonObject json) {
+        String symbol = SymbolUtils.cleanSymbol(getString(json, "symbol"));
+        if (symbol.isEmpty()) {
+            PluginLog.error("[ExitOrder] Ignoring config with missing symbol");
+            return;
+        }
+
+        JsonElement pairsElement = json.get("pairs");
+        if (pairsElement == null || !pairsElement.isJsonArray()) {
+            PluginLog.error("[ExitOrder] Ignoring config with missing pairs array for " + symbol);
+            return;
+        }
+
+        List<ExitOrderPairDefinition> pairs = new ArrayList<>();
+        JsonArray pairsArray = pairsElement.getAsJsonArray();
+        for (JsonElement element : pairsArray) {
+            ExitOrderPairDefinition pair = parseExitOrderPair(symbol, element, pairs.size() + 1);
+            if (pair != null) {
+                pairs.add(pair);
+            }
+        }
+
+        List<ExitOrderPairDefinition> immutablePairs = Collections.unmodifiableList(pairs);
+        symbolToExitOrderPairs.put(symbol, immutablePairs);
+        notifyExitOrderPairsConfigListeners(symbol, immutablePairs);
+        PluginLog.info("[ExitOrder] Updated " + pairs.size() + " websocket exit pair(s) for " + symbol);
+    }
+
+    private ExitOrderPairDefinition parseExitOrderPair(String symbol, JsonElement element, int fallbackIndex) {
+        if (element == null || !element.isJsonObject()) {
+            return null;
+        }
+        try {
+            JsonObject pairJson = element.getAsJsonObject();
+            int index = getInt(pairJson, "index");
+            if (index <= 0) {
+                index = fallbackIndex;
+            }
+            ExitOrderLegDefinition stop = parseExitOrderLeg(pairJson.get("STOP"));
+            if (stop == null) {
+                stop = parseExitOrderLeg(pairJson.get("stop"));
+            }
+            ExitOrderLegDefinition limit = parseExitOrderLeg(pairJson.get("LIMIT"));
+            if (limit == null) {
+                limit = parseExitOrderLeg(pairJson.get("limit"));
+            }
+            if (stop == null && limit == null) {
+                return null;
+            }
+            return new ExitOrderPairDefinition(
+                    symbol,
+                    index,
+                    getString(pairJson, "source"),
+                    getString(pairJson, "parentOrderID"),
+                    stop,
+                    limit);
+        } catch (RuntimeException e) {
+            PluginLog.error("[ExitOrder] Ignoring malformed pair for " + symbol + ": " + e.getMessage());
+            return null;
+        }
+    }
+
+    private ExitOrderLegDefinition parseExitOrderLeg(JsonElement element) {
+        if (element == null || element.isJsonNull() || !element.isJsonObject()) {
+            return null;
+        }
+        JsonObject legJson = element.getAsJsonObject();
+        double price = getDouble(legJson, "price");
+        if (price <= 0 || !Double.isFinite(price)) {
+            return null;
+        }
+        return new ExitOrderLegDefinition(
+                getString(legJson, "orderID"),
+                price,
+                getInt(legJson, "quantity"),
+                getBoolean(legJson, "isBuy"));
+    }
+
     private void notifyKeyLevelConfigListeners(String symbol, List<KeyLevelDefinition> levels) {
         for (KeyLevelConfigListener listener : keyLevelConfigListeners) {
             try {
                 listener.onKeyLevelsChanged(symbol, levels);
             } catch (RuntimeException e) {
                 PluginLog.error("[KeyLevel] Failed to update listener for " + symbol + ": " + e.getMessage());
+            }
+        }
+    }
+
+    private void notifyExitOrderPairsConfigListeners(String symbol, List<ExitOrderPairDefinition> pairs) {
+        for (ExitOrderPairsConfigListener listener : exitOrderPairsConfigListeners) {
+            try {
+                listener.onExitOrderPairsChanged(symbol, pairs);
+            } catch (RuntimeException e) {
+                PluginLog.error("[ExitOrder] Failed to update listener for " + symbol + ": " + e.getMessage());
             }
         }
     }
@@ -352,6 +463,30 @@ public class SignalWebSocketServer extends WebSocketServer {
             return element.getAsDouble();
         } catch (RuntimeException e) {
             return Double.NaN;
+        }
+    }
+
+    private int getInt(JsonObject json, String field) {
+        JsonElement element = json.get(field);
+        if (element == null || element.isJsonNull()) {
+            return 0;
+        }
+        try {
+            return element.getAsInt();
+        } catch (RuntimeException e) {
+            return 0;
+        }
+    }
+
+    private boolean getBoolean(JsonObject json, String field) {
+        JsonElement element = json.get(field);
+        if (element == null || element.isJsonNull()) {
+            return false;
+        }
+        try {
+            return element.getAsBoolean();
+        } catch (RuntimeException e) {
+            return false;
         }
     }
 

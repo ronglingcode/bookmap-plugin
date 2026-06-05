@@ -151,13 +151,13 @@ public class ChartClickHandler implements ScreenSpacePainterFactory {
                 // Track key press/release state
                 if (event.getID() == KeyEvent.KEY_PRESSED) {
                     KeyEvent ke = (KeyEvent) event;
-                    String key = KeyEvent.getKeyText(ke.getKeyCode()).toLowerCase();
+                    String key = normalizeKey(ke);
                     heldKeys.add(key);
                     return;
                 }
                 if (event.getID() == KeyEvent.KEY_RELEASED) {
                     KeyEvent ke = (KeyEvent) event;
-                    heldKeys.remove(KeyEvent.getKeyText(ke.getKeyCode()).toLowerCase());
+                    heldKeys.remove(normalizeKey(ke));
                     return;
                 }
 
@@ -316,6 +316,17 @@ public class ChartClickHandler implements ScreenSpacePainterFactory {
                 PluginLog.info("[Rong] ScreenSpacePainter disposed for " + alias);
             }
         };
+    }
+
+    private static String normalizeKey(KeyEvent event) {
+        int keyCode = event.getKeyCode();
+        if (keyCode >= KeyEvent.VK_0 && keyCode <= KeyEvent.VK_9) {
+            return Integer.toString(keyCode - KeyEvent.VK_0);
+        }
+        if (keyCode >= KeyEvent.VK_NUMPAD0 && keyCode <= KeyEvent.VK_NUMPAD9) {
+            return Integer.toString(keyCode - KeyEvent.VK_NUMPAD0);
+        }
+        return KeyEvent.getKeyText(keyCode).toLowerCase();
     }
 
     /**
