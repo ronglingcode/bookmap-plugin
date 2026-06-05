@@ -239,6 +239,10 @@ public class ChartClickHandler implements ScreenSpacePainterFactory {
                     wsServer.broadcastSignal(json);
                     logClick("[Rong] Price select: " + bestInstrument + " @ " + bestPrice
                         + " keyCode=" + keyCode);
+                    if (isActionKey(keyCode)) {
+                        PluginLog.action(bestInstrument, "Click send " + keyCode + " @ "
+                                + String.format("%.2f", bestPrice));
+                    }
 
                     // Invoke click callback for price line drawing
                     ClickCallback cb = clickCallback;
@@ -327,6 +331,14 @@ public class ChartClickHandler implements ScreenSpacePainterFactory {
             return Integer.toString(keyCode - KeyEvent.VK_NUMPAD0);
         }
         return KeyEvent.getKeyText(keyCode).toLowerCase();
+    }
+
+    private static boolean isActionKey(String keyCode) {
+        if (keyCode == null) {
+            return false;
+        }
+        String key = keyCode.toLowerCase();
+        return key.matches("(^|.*\\+)([0-9]|b|s|g|t)(\\+.*|$)");
     }
 
     /**

@@ -55,6 +55,26 @@ public class PluginLog {
         log("ERROR", msg + ": " + t.getMessage());
     }
 
+    public static void action(String msg) {
+        log("ACTION", msg);
+        ActionLogWindow.append("", "", msg);
+    }
+
+    public static void action(String symbol, String msg) {
+        action(symbol, "", msg);
+    }
+
+    public static void action(String symbol, String source, String msg) {
+        String cleanSymbol = symbol == null ? "" : symbol.trim();
+        String cleanSource = source == null ? "" : source.trim();
+        String logMessage = cleanSymbol.isEmpty() ? msg : cleanSymbol + " " + msg;
+        if (!cleanSource.isEmpty()) {
+            logMessage = "[" + cleanSource + "] " + logMessage;
+        }
+        log("ACTION", logMessage);
+        ActionLogWindow.append(cleanSymbol, cleanSource, msg);
+    }
+
     private static void log(String level, String msg) {
         String line = LocalDateTime.now().format(TIMESTAMP_FMT) + " [" + level + "] " + msg;
         PrintWriter w = getWriter();

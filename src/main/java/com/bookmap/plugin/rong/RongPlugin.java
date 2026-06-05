@@ -85,6 +85,7 @@ public class RongPlugin implements CustomModuleAdapter,
             if (sharedServer == null) {
                 sharedServer = new SignalWebSocketServer(WS_PORT, ORDERBOOK_PERCENTILE, ORDERBOOK_INTERVAL_MS);
                 sharedServer.start();
+                ActionLogWindow.showWindow();
                 PluginLog.info("[Rong] Shared WebSocket server started on port " + WS_PORT);
             }
             if (chartClickHandler == null) {
@@ -237,6 +238,7 @@ public class RongPlugin implements CustomModuleAdapter,
                 if (wallLabelPainter != null) {
                     wallLabelPainter.shutdown();
                 }
+                ActionLogWindow.dispose();
                 sharedServer.shutdown();
                 sharedServer = null;
                 chartClickHandler = null;

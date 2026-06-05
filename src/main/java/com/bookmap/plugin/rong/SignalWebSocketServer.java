@@ -169,6 +169,10 @@ public class SignalWebSocketServer extends WebSocketServer {
                 handleExitOrderPairsConfig(json);
                 return;
             }
+            if ("action_log".equals(type)) {
+                handleActionLog(json);
+                return;
+            }
         }
         if (trimmed.contains("\"subscribe\"") && trimmed.contains("\"orderbook\"")) {
             orderbookSubscribers.add(conn);
@@ -334,6 +338,15 @@ public class SignalWebSocketServer extends WebSocketServer {
         symbolToExitOrderPairs.put(symbol, immutablePairs);
         notifyExitOrderPairsConfigListeners(symbol, immutablePairs);
         PluginLog.info("[ExitOrder] Updated " + pairs.size() + " websocket exit pair(s) for " + symbol);
+    }
+
+    private void handleActionLog(JsonObject json) {
+        String message = getString(json, "message").trim();
+        String symbol = SymbolUtils.cleanSymbol(getString(json, "symbol"));
+        String source = getString(json, "source").trim();
+        if (!message.isEmpty()) {
+            PluginLog.action(symbol, source, message);
+        }
     }
 
     private ExitOrderPairDefinition parseExitOrderPair(String symbol, JsonElement element, int fallbackIndex) {

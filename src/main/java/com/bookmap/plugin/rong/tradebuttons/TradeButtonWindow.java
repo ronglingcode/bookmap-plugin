@@ -153,6 +153,7 @@ public class TradeButtonWindow {
         json.addProperty("entry_method", entryMethod);
         json.addProperty("timestamp", System.currentTimeMillis());
         server.broadcast(json.toString());
+        PluginLog.action(symbol, "Button send " + orderType + " " + tradebook.getLabel() + " " + entryMethod);
         PluginLog.info("[TradeButton] " + orderType + " " + tradebook.getLabel() + ": " + entryMethod
                 + " clicked for " + symbol);
     }
@@ -167,6 +168,9 @@ public class TradeButtonWindow {
         json.addProperty("key_code", keyCode);
         json.addProperty("timestamp", System.currentTimeMillis());
         server.broadcast(json.toString());
+        if (!"KeyF".equals(keyCode)) {
+            PluginLog.action(symbol, "Button send " + buttonName);
+        }
         PluginLog.info("[TradeButton] " + buttonName + " clicked for " + symbol + " as " + keyCode);
     }
 
