@@ -2,11 +2,12 @@
 
 A Bookmap addon that detects order wall breakouts, draws configurable price lines on charts, and sends real-time signals via WebSocket.
 
-This repository produces one Bookmap plugin:
+This repository produces two Bookmap addon plugins in the same build:
 
 | Plugin   | JAR                | Description                   |
 | -------- | ------------------ | ----------------------------- |
 | **Rong** | `rong-1.0-all.jar` | Personal plugin (private use) |
+| **Rong Backtest Exporter** | `rong-1.0-all.jar` | Replay data exporter for Bookmap backtests |
 
 ## How It Works
 
@@ -68,7 +69,7 @@ windows: gradlew shadowJar
 
 Output JARs:
 
-- `build/libs/rong-1.0-all.jar`
+- `build/libs/rong-1.0-all.jar` contains both `Rong` and `Rong Backtest Exporter`
 
 ## Install in Bookmap
 
@@ -78,7 +79,39 @@ Output JARs:
 4. In the popup, check the plugin name and click OK
 5. Add the addon to a chart: right-click the chart > **Add Addon** > select the plugin
 
-The plugin starts a WebSocket server on `localhost:8765` when attached to an instrument.
+The `Rong` plugin starts a WebSocket server on `localhost:8765` when attached to an instrument. The `Rong Backtest Exporter` plugin does not start a server; it writes replay data to disk.
+
+## Backtest Exporter
+
+Use `Rong Backtest Exporter` when replaying a `.bmf` file in Bookmap. Attach it to each instrument you want to export. It writes normalized JSONL events that can be consumed later by a standalone backtest engine.
+
+Default output:
+
+```text
+C:\Users\{username}\Bookmap\backtest-exports\{run-id}\{symbol}\
+  metadata.json
+  events.jsonl
+```
+
+The event stream includes:
+
+- `session_start`
+- `depth`
+- `trade`
+- `bbo`
+- `snapshot_end`
+- `realtime_start`
+- `session_end`
+
+Optional Java system properties:
+
+| Property | Default | Description |
+| -------- | ------- | ----------- |
+| `bookmap.export.dir` | `~/Bookmap/backtest-exports` | Export root directory |
+| `bookmap.export.depthMinSize` | `0` | Minimum absolute depth level size to export; `0` exports all depth updates |
+| `bookmap.export.flushEvery` | `1000` | Flush after this many JSONL events |
+
+Design details are in `docs/bookmap-backtest-system-design.md`.
 
 ## Connect Your Trading Bot
 

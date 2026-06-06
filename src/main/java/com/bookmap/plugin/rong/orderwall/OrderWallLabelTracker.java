@@ -142,10 +142,16 @@ public class OrderWallLabelTracker {
         if (displaySize <= 0) {
             return sizePath;
         }
-        if (sizePath.isEmpty() || displaySize > sizePath.get(sizePath.size() - 1)) {
+        if (sizePath.isEmpty() || isMeaningfulSizePathChange(sizePath, displaySize)) {
             sizePath.add(displaySize);
         }
         return sizePath;
+    }
+
+    private boolean isMeaningfulSizePathChange(List<Integer> sizePath, int displaySize) {
+        int lastDisplaySize = sizePath.get(sizePath.size() - 1);
+        int peakDisplaySize = sizePath.stream().mapToInt(Integer::intValue).max().orElse(lastDisplaySize);
+        return displaySize > peakDisplaySize || displaySize * 2 < lastDisplaySize;
     }
 
     /**
