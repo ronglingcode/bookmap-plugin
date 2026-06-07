@@ -113,7 +113,7 @@ public class BookmapBacktestExporterPlugin implements CustomModuleAdapter,
 
     @Override
     public void onTrade(double price, int size, TradeInfo tradeInfo) {
-        if (writer == null) {
+        if (writer == null || size <= 0) {
             return;
         }
         tradeEvents++;
