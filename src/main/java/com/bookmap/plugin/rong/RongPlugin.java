@@ -1,15 +1,15 @@
 package com.bookmap.plugin.rong;
 
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.List;
 
+import com.bookmap.plugin.rong.exporter.BookmapReplayExportSession;
 import com.bookmap.plugin.rong.orderwall.OrderWallLabelPainter;
 import com.bookmap.plugin.rong.orderwall.OrderWallLabelStore;
 import com.bookmap.plugin.rong.orderwall.OrderWallLabelTracker;
 import com.bookmap.plugin.rong.orderwall.OrderWallTracker;
 import com.bookmap.plugin.rong.pricelines.ChartClickHandler;
-import com.bookmap.plugin.rong.pricelines.KeyBindingSettingsPanel;
-import com.bookmap.plugin.rong.pricelines.PriceLine;
-import com.bookmap.plugin.rong.pricelines.PriceLineConfig;
 import com.bookmap.plugin.rong.pricelines.PriceLinePainter;
 import com.bookmap.plugin.rong.pricelines.PriceLineStore;
 import com.bookmap.plugin.rong.tradebuttons.TradeButtonWindow;
@@ -23,9 +23,12 @@ import velox.api.layer1.data.InstrumentInfo;
 import velox.api.layer1.data.TradeInfo;
 import velox.api.layer1.messages.indicators.Layer1ApiUserMessageModifyScreenSpacePainter;
 import velox.api.layer1.simplified.Api;
+import velox.api.layer1.simplified.BboListener;
 import velox.api.layer1.simplified.CustomModuleAdapter;
 import velox.api.layer1.simplified.DepthDataListener;
+import velox.api.layer1.simplified.HistoricalModeListener;
 import velox.api.layer1.simplified.InitialState;
+import velox.api.layer1.simplified.SnapshotEndListener;
 import velox.api.layer1.simplified.TimeListener;
 import velox.api.layer1.simplified.TradeDataListener;
 import velox.gui.StrategyPanel;
@@ -35,9 +38,14 @@ import velox.gui.StrategyPanel;
 @Layer1StrategyName("Rong")
 @Layer1ApiVersion(Layer1ApiVersionValue.VERSION1)
 public class RongPlugin implements CustomModuleAdapter,
-        DepthDataListener, TradeDataListener, TimeListener, CustomSettingsPanelProvider {
+        DepthDataListener, TradeDataListener, TimeListener,
+        SnapshotEndListener, BboListener, HistoricalModeListener,
+        CustomSettingsPanelProvider, ReplayExportConfig.ChangeListener {
 
     private static final int WS_PORT = 8765;
+    private static final DateTimeFormatter EXPORT_RUN_ID_FORMAT =
+            DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss");
+    private static final String EXPORT_RUN_ID = LocalDateTime.now().format(EXPORT_RUN_ID_FORMAT);
     private static final int WALL_THRESHOLD = 500_000;
     private static final double WALL_CONSUMED_RATIO = 0.10;
     private static final double ORDERBOOK_PERCENTILE = 90;
@@ -51,16 +59,17 @@ public class RongPlugin implements CustomModuleAdapter,
     private static int instanceCount = 0;
     private static ChartClickHandler chartClickHandler;
     private static PriceLineStore priceLineStore;
-    private static PriceLineConfig priceLineConfig;
     private static PriceLinePainter priceLinePainter;
     private static OrderWallLabelStore wallLabelStore;
     private static OrderWallLabelPainter wallLabelPainter;
     private static IndicatorConfig indicatorConfig;
+    private static ReplayExportConfig replayExportConfig;
     private static PremarketTracker premarketTracker;
     private static KeyLevelManager keyLevelManager;
     private static CamPivotTracker camPivotTracker;
     private static ExitOrderManager exitOrderManager;
 
+    private String rawAlias;
     private String alias;
     private Api api;
     private OrderWallTracker wallTracker;
@@ -70,14 +79,19 @@ public class RongPlugin implements CustomModuleAdapter,
     private boolean wallLabelsDirty;
     private long lastWallLabelRefreshMs;
     private long lastTimestampNs;
+    private long initialTimestampNs;
     private TradeButtonWindow tradeButtonWindow;
+    private volatile BookmapReplayExportSession replayExportSession;
 
     @Override
     public void initialize(String alias, InstrumentInfo info, Api api, InitialState initialState) {
-        alias = SymbolUtils.cleanSymbol(alias);
-        this.alias = alias;
+        this.rawAlias = alias;
+        String cleanAlias = SymbolUtils.cleanSymbol(alias);
+        this.alias = cleanAlias;
         this.api = api;
         this.instrumentInfo = info;
+        this.initialTimestampNs = initialState != null ? initialState.getCurrentTime() : 0L;
+        this.lastTimestampNs = initialTimestampNs;
         this.orderBook = new OrderBookState();
         this.wallTracker = new OrderWallTracker(WALL_THRESHOLD, WALL_CONSUMED_RATIO);
 
@@ -93,9 +107,9 @@ public class RongPlugin implements CustomModuleAdapter,
             }
             if (priceLineStore == null) {
                 priceLineStore = new PriceLineStore();
-                priceLineConfig = new PriceLineConfig();
                 priceLinePainter = new PriceLinePainter(priceLineStore);
                 indicatorConfig = new IndicatorConfig();
+                replayExportConfig = new ReplayExportConfig();
                 wallLabelStore = new OrderWallLabelStore();
                 wallLabelPainter = new OrderWallLabelPainter(wallLabelStore, indicatorConfig);
                 premarketTracker = new PremarketTracker(priceLineStore, indicatorConfig);
@@ -104,42 +118,32 @@ public class RongPlugin implements CustomModuleAdapter,
                 exitOrderManager = new ExitOrderManager(priceLineStore);
                 sharedServer.registerExitOrderPairsConfigListener(exitOrderManager);
                 camPivotTracker = new CamPivotTracker(priceLineStore, indicatorConfig);
-
-                // Wire click callback: key+click creates a price line if key is bound
-                chartClickHandler.setClickCallback((instrument, priceInTicks, realPrice, keyCode) -> {
-                    PriceLine.LineType lineType = priceLineConfig.getLineType(keyCode);
-                    if (lineType != null) {
-                        PriceLine line = new PriceLine(instrument, lineType, priceInTicks, realPrice);
-                        priceLineStore.addLine(line);
-                        PluginLog.info("[Rong] Price line added: " + lineType.label
-                                + " @ " + realPrice + " for " + instrument);
-                    }
-                });
             }
             instanceCount++;
         }
+        replayExportConfig.addChangeListener(this);
         this.wallLabelTracker = new OrderWallLabelTracker(
-                alias, info.pips, wallLabelStore, WALL_LABEL_PERCENTILE, WALL_LABEL_RETAIN_TICKS);
-        sharedServer.registerSymbol(alias, orderBook, info.pips);
-        chartClickHandler.registerSymbol(alias, info.pips);
-        priceLinePainter.registerInstrument(alias);
-        wallLabelPainter.registerInstrument(alias);
+                cleanAlias, info.pips, wallLabelStore, WALL_LABEL_PERCENTILE, WALL_LABEL_RETAIN_TICKS);
+        sharedServer.registerSymbol(cleanAlias, orderBook, info.pips);
+        chartClickHandler.registerSymbol(cleanAlias, info.pips);
+        priceLinePainter.registerInstrument(cleanAlias);
+        wallLabelPainter.registerInstrument(cleanAlias);
 
         // Register ScreenSpacePainter to receive chart coordinate mappings
         api.sendUserMessage(Layer1ApiUserMessageModifyScreenSpacePainter.builder(
-                RongPlugin.class, "clickHandler_" + alias)
+                RongPlugin.class, "clickHandler_" + cleanAlias)
                 .setScreenSpacePainterFactory(chartClickHandler)
                 .setIsAdd(true)
                 .build());
 
         // Register ScreenSpacePainter for drawing price lines
         api.sendUserMessage(Layer1ApiUserMessageModifyScreenSpacePainter.builder(
-                RongPlugin.class, "priceLines_" + alias)
+                RongPlugin.class, "priceLines_" + cleanAlias)
                 .setScreenSpacePainterFactory(priceLinePainter)
                 .setIsAdd(true)
                 .build());
         api.sendUserMessage(Layer1ApiUserMessageModifyScreenSpacePainter.builder(
-                RongPlugin.class, OrderWallLabelPainter.PAINTER_NAME_PREFIX + alias)
+                RongPlugin.class, OrderWallLabelPainter.PAINTER_NAME_PREFIX + cleanAlias)
                 .setScreenSpacePainterFactory(wallLabelPainter)
                 .setIsAdd(true)
                 .build());
@@ -153,15 +157,23 @@ public class RongPlugin implements CustomModuleAdapter,
         }
 
         // Fetch cam pivots + premarket high/low from EdgeDesk API (runs on background thread)
-        IndicatorDataFetcher.fetch(alias, info.pips, camPivotTracker, premarketTracker);
+        IndicatorDataFetcher.fetch(cleanAlias, info.pips, camPivotTracker, premarketTracker);
 
-        tradeButtonWindow = new TradeButtonWindow(alias, sharedServer);
+        tradeButtonWindow = new TradeButtonWindow(cleanAlias, sharedServer);
 
-        PluginLog.info("[Rong] Plugin initialized for " + alias);
+        if (replayExportConfig.isEnabled()) {
+            startReplayExport();
+        }
+
+        PluginLog.info("[Rong] Plugin initialized for " + cleanAlias);
     }
 
     @Override
     public void stop() {
+        if (replayExportConfig != null) {
+            replayExportConfig.removeChangeListener(this);
+        }
+        stopReplayExport();
         if (tradeButtonWindow != null) {
             tradeButtonWindow.dispose();
             tradeButtonWindow = null;
@@ -243,11 +255,11 @@ public class RongPlugin implements CustomModuleAdapter,
                 sharedServer = null;
                 chartClickHandler = null;
                 priceLineStore = null;
-                priceLineConfig = null;
                 priceLinePainter = null;
                 wallLabelStore = null;
                 wallLabelPainter = null;
                 indicatorConfig = null;
+                replayExportConfig = null;
                 instanceCount = 0;
                 PluginLog.info("[Rong] Shared WebSocket server shut down");
             }
@@ -258,13 +270,17 @@ public class RongPlugin implements CustomModuleAdapter,
     @Override
     public StrategyPanel[] getCustomSettingsPanels() {
         return new StrategyPanel[] {
-            new KeyBindingSettingsPanel(priceLineConfig, priceLineStore),
-            new IndicatorSettingsPanel(indicatorConfig)
+            new IndicatorSettingsPanel(indicatorConfig),
+            new ReplayExportSettingsPanel(replayExportConfig)
         };
     }
 
     @Override
     public void onDepth(boolean isBid, int price, int size) {
+        BookmapReplayExportSession exportSession = replayExportSession;
+        if (exportSession != null) {
+            exportSession.onDepth(isBid, price, size);
+        }
         orderBook.update(isBid, price, size);
         wallTracker.updateLevel(isBid, price, size);
         if (wallLabelTracker != null && wallLabelTracker.onDepth(orderBook, isBid, price, size, getEventTimeNs())) {
@@ -275,6 +291,10 @@ public class RongPlugin implements CustomModuleAdapter,
 
     @Override
     public void onTrade(double price, int size, TradeInfo tradeInfo) {
+        BookmapReplayExportSession exportSession = replayExportSession;
+        if (exportSession != null) {
+            exportSession.onTrade(price, size, tradeInfo);
+        }
         double realPrice = price * instrumentInfo.pips;
         int priceTick = (int) price;
 
@@ -293,8 +313,45 @@ public class RongPlugin implements CustomModuleAdapter,
     @Override
     public void onTimestamp(long timestampNs) {
         this.lastTimestampNs = timestampNs;
+        BookmapReplayExportSession exportSession = replayExportSession;
+        if (exportSession != null) {
+            exportSession.onTimestamp(timestampNs);
+        }
         if (premarketTracker != null) {
             premarketTracker.setTimestamp(timestampNs);
+        }
+    }
+
+    @Override
+    public void onBbo(int bidPrice, int bidSize, int askPrice, int askSize) {
+        BookmapReplayExportSession exportSession = replayExportSession;
+        if (exportSession != null) {
+            exportSession.onBbo(bidPrice, bidSize, askPrice, askSize);
+        }
+    }
+
+    @Override
+    public void onSnapshotEnd() {
+        BookmapReplayExportSession exportSession = replayExportSession;
+        if (exportSession != null) {
+            exportSession.onSnapshotEnd();
+        }
+    }
+
+    @Override
+    public void onRealtimeStart() {
+        BookmapReplayExportSession exportSession = replayExportSession;
+        if (exportSession != null) {
+            exportSession.onRealtimeStart();
+        }
+    }
+
+    @Override
+    public void onReplayExportConfigChanged(boolean enabled) {
+        if (enabled) {
+            startReplayExport();
+        } else {
+            stopReplayExport();
         }
     }
 
@@ -326,5 +383,30 @@ public class RongPlugin implements CustomModuleAdapter,
 
     private long getEventTimeNs() {
         return lastTimestampNs > 0 ? lastTimestampNs : System.currentTimeMillis() * 1_000_000L;
+    }
+
+    private synchronized void startReplayExport() {
+        if (replayExportSession != null) {
+            return;
+        }
+        replayExportSession = BookmapReplayExportSession.open(
+                EXPORT_RUN_ID,
+                "Rong",
+                rawAlias,
+                alias,
+                instrumentInfo,
+                lastTimestampNs > 0 ? lastTimestampNs : initialTimestampNs);
+        if (replayExportSession != null) {
+            PluginLog.info("[Rong] Replay export enabled for " + alias);
+        }
+    }
+
+    private synchronized void stopReplayExport() {
+        if (replayExportSession == null) {
+            return;
+        }
+        replayExportSession.stop();
+        replayExportSession = null;
+        PluginLog.info("[Rong] Replay export disabled for " + alias);
     }
 }

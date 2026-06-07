@@ -83,13 +83,6 @@ public class PriceLineStore {
         }
     }
 
-    public void clearAll() {
-        for (String alias : linesByInstrument.keySet()) {
-            linesByInstrument.remove(alias);
-            notifyListeners(alias);
-        }
-    }
-
     private void notifyListeners(String instrumentAlias) {
         for (ChangeListener listener : listeners) {
             listener.onLinesChanged(instrumentAlias);

@@ -1,6 +1,6 @@
 # Bookmap Plugin
 
-A Bookmap addon that detects order wall breakouts, draws configurable price lines on charts, and sends real-time signals via WebSocket.
+A Bookmap addon that detects order wall breakouts, draws chart price levels, and sends real-time signals via WebSocket.
 
 This repository produces two Bookmap addon plugins in the same build:
 
@@ -18,7 +18,7 @@ This repository produces two Bookmap addon plugins in the same build:
 3. When price trades above a consumed wall, broadcasts a breakout signal via WebSocket
 
 **Chart drawing:**
-4. Hold a key (S/T/E by default) and click on the chart to draw a price line at that level
+4. Hold an action key and left-click on the chart to send the key and clicked price via WebSocket
 5. Premarket high/low lines are drawn and updated automatically during 4:00-9:30 AM ET
 6. Key price levels received over WebSocket are drawn on the matching instrument
 7. Large liquidity walls are labeled directly on the heatmap using compact growth paths like `5→7→10`
@@ -28,11 +28,11 @@ This repository produces two Bookmap addon plugins in the same build:
 ## Features
 
 - **Order wall breakout detection** — monitors large ask-side walls and broadcasts signals when consumed
-- **Key+click price lines** — hold a configurable key and click to draw stop loss, take profit, or entry lines
+- **Key+left-click pass-through** — sends the pressed key and clicked chart price to the trading bot
 - **Auto-drawn indicators** — premarket high/low and Camarilla Pivot levels drawn automatically
 - **WebSocket key levels** — instrument-specific price levels pushed by an external app
 - **WebSocket API** — real-time breakout, order book, and price select messages
-- **Settings panels** — configure key bindings and enable/disable indicators
+- **Settings panels** — enable/disable indicators and optionally export replay data
 
 ## Project Structure
 
@@ -42,9 +42,9 @@ bookmap-plugin/
 ├── settings.gradle
 └── src/main/java/com/bookmap/plugin/rong/
     ├── RongPlugin              # @Layer1StrategyName("Rong")
-    ├── pricelines/             # Line model, storage, painting, key+click, and key config
-    │   ├── ChartClickHandler   # Key+click detection & coordinate mapping
-    │   └── PriceLine*          # Line model, storage, painting, and key config
+    ├── pricelines/             # Line model, storage, painting, and click price mapping
+    │   ├── ChartClickHandler   # Key+left-click detection & coordinate mapping
+    │   └── PriceLine*          # Line model, storage, and painting
     ├── orderwall/              # Large wall detection, labels, and painting
     │   └── OrderWall*
     ├── tradebuttons/           # Floating trade button panel and tradebook button config
@@ -85,6 +85,8 @@ The `Rong` plugin starts a WebSocket server on `localhost:8765` when attached to
 
 Use `Rong Backtest Exporter` when replaying a `.bmf` file in Bookmap. Attach it to each instrument you want to export. It writes normalized JSONL events that can be consumed later by a standalone backtest engine.
 
+The live `Rong` plugin can also export the same replay event format, but this is disabled by default. To enable it, open the `Rong` addon configuration and turn on **Replay Export > Export replay data from Rong**. This lets you keep the Rong plugin attached while replaying feeds and collect the same historical data without attaching the separate exporter addon.
+
 Default output:
 
 ```text
@@ -110,6 +112,7 @@ Optional Java system properties:
 | `bookmap.export.dir` | `~/Bookmap/backtest-exports` | Export root directory |
 | `bookmap.export.depthMinSize` | `0` | Minimum absolute depth level size to export; `0` exports all depth updates |
 | `bookmap.export.flushEvery` | `1000` | Flush after this many JSONL events |
+| `rong.replayExport.enabled` | `false` | Optional startup default for Rong's own replay export toggle |
 
 Design details are in `docs/bookmap-backtest-system-design.md`.
 
@@ -141,7 +144,7 @@ The plugin exposes a WebSocket server on `ws://localhost:8765`. Clients receive 
 | -------------- | -------------------------------------------- | ------------------------------------- |
 | `breakout`     | Wall breakout signal                         | On event                              |
 | `orderbook`    | Order book snapshot (filtered by percentile) | At subscription interval (default 1s) |
-| `priceSelect`  | Key+click price selection from chart         | On event                              |
+| `priceSelect`  | Key+left-click price selection from chart    | On event                              |
 | `subscribed`   | Confirmation of orderbook subscription       | Once on subscribe                     |
 | `unsubscribed` | Confirmation of orderbook unsubscription     | Once on unsubscribe                   |
 
@@ -253,29 +256,11 @@ function connectToBookmap(
 }
 ```
 
-## Price Lines (Key+Click Drawing)
+## Price Select Clicks
 
-Hold a key and left-click on the chart to draw a persistent horizontal price line at the clicked price. Lines automatically track the price level through scroll and zoom.
+Hold an action key and left-click on the chart to broadcast a `priceSelect` message via WebSocket. The plugin sends the pressed key and clicked price to the trading bot; it does not interpret those keys or draw manual stop loss, take profit, or entry lines locally.
 
-### Default Key Bindings
-
-
-| Key | Line Type   | Color | Style  |
-| --- | ----------- | ----- | ------ |
-| `S` | Stop Loss   | Red   | Dashed |
-| `T` | Take Profit | Green | Dashed |
-| `E` | Entry       | Blue  | Solid  |
-
-
-Each line displays a label with its type and price value.
-
-### Configuring Key Bindings
-
-1. Right-click the chart > open the plugin's addon settings
-2. In the **Price Line Key Bindings** panel, change the key for each line type
-3. Use the **Clear All Price Lines** button to remove all drawn lines
-
-Key+click events also continue to broadcast `priceSelect` messages via WebSocket, so external clients still receive them.
+Auto-drawn price levels still track through scroll and zoom. These include premarket high/low, Camarilla Pivot levels, key levels received over WebSocket, and broker-managed exits.
 
 ## Indicators (Auto-Drawn Levels)
 
@@ -369,14 +354,14 @@ Plugin log files are named by session start time, e.g. `2026-03-21_10-30-45.txt`
 2026-03-21 10:30:45.456 [ERROR] [IndicatorDataFetcher] HTTP 500 for AAPL
 ```
 
-Signal logs (`breakout.jsonl`) are appended in JSONL format (one JSON object per line). The `click-debug.log` records key+click events with millisecond timestamps.
+Signal logs (`breakout.jsonl`) are appended in JSONL format (one JSON object per line). The `click-debug.log` records key+left-click events with millisecond timestamps.
 
 ### Settings Panels
 
-The plugin provides two settings panels accessible via the addon's configuration in Bookmap:
+The plugin provides settings panels accessible via the addon's configuration in Bookmap:
 
 
 | Panel                       | Purpose                                                                         |
 | --------------------------- | ------------------------------------------------------------------------------- |
-| **Price Line Key Bindings** | Change which keys draw which line types (S/T/E defaults), clear all drawn lines |
 | **Indicators**              | Enable/disable auto-drawn indicators (Premarket High/Low, Camarilla Pivots)     |
+| **Replay Export**           | Enable/disable JSONL replay export from the live Rong plugin                    |

@@ -209,7 +209,7 @@ The default is intentionally lossless. If exported JSONL is too large, rerun wit
 - Files are append-only JSONL so a partial export can still be inspected.
 - A metadata file duplicates the first `session_start` event for quick indexing.
 - No network server is opened by the exporter.
-- The live `Rong` plugin remains untouched except for shared utility reuse.
+- The live `Rong` plugin can optionally use the shared exporter, but its replay export toggle defaults off.
 
 ### Exporter Acceptance Criteria
 

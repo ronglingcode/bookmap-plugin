@@ -154,13 +154,12 @@ public class PriceLinePainter implements ScreenSpacePainterFactory {
 
             // Draw the horizontal line
             g.setColor(color);
-            if (line.getType() == PriceLine.LineType.ENTRY
-                    || line.getType() == PriceLine.LineType.KEY_LEVEL
+            if (line.getType() == PriceLine.LineType.KEY_LEVEL
                     || line.getType() == PriceLine.LineType.EXIT_ORDER) {
-                // Solid line for entry, key levels, and broker-managed exits
+                // Solid line for key levels and broker-managed exits
                 g.setStroke(new BasicStroke(LINE_THICKNESS));
             } else {
-                // Dashed for stop loss, take profit, and auto-drawn indicators
+                // Dashed for auto-drawn indicators
                 g.setStroke(new BasicStroke(LINE_THICKNESS, BasicStroke.CAP_BUTT, BasicStroke.JOIN_MITER,
                         10.0f, new float[]{8.0f, 6.0f}, 0.0f));
             }

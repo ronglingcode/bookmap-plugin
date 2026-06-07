@@ -31,10 +31,10 @@ import velox.api.layer1.layers.strategies.interfaces.ScreenSpacePainterAdapter;
 import velox.api.layer1.layers.strategies.interfaces.ScreenSpacePainterFactory;
 
 /**
- * Handles Cmd+Click on Bookmap chart to select a price level.
+ * Handles key+left-click on Bookmap chart to select a price level.
  *
  * Uses ScreenSpacePainterAdapter to receive chart coordinate mappings,
- * and a global AWT mouse listener to detect Cmd+Click events.
+ * and a global AWT mouse listener to detect key+left-click events.
  * Converts the click Y coordinate to a price and broadcasts it via WebSocket.
  *
  * NOTE: The ScreenSpacePainterFactory creates one painter per chart.
@@ -46,12 +46,6 @@ public class ChartClickHandler implements ScreenSpacePainterFactory {
 
     /** Prefix used when registering this painter (see plugin initialize methods). */
     public static final String PAINTER_NAME_PREFIX = "clickHandler_";
-
-    /** Callback invoked when a key+click resolves to a price on a chart. */
-    @FunctionalInterface
-    public interface ClickCallback {
-        void onChartClick(String instrumentAlias, double priceInTicks, double realPrice, String keyCode);
-    }
 
     /** Coordinate state keyed by painter alias (from createScreenSpacePainter). */
     private static final Map<String, CoordinateState> painterCoords = new ConcurrentHashMap<>();
@@ -78,7 +72,6 @@ public class ChartClickHandler implements ScreenSpacePainterFactory {
 
     private static volatile BufferedWriter clickLogWriter;
     private final SignalWebSocketServer wsServer;
-    private volatile ClickCallback clickCallback;
 
     public ChartClickHandler(SignalWebSocketServer wsServer) {
         this.wsServer = wsServer;
@@ -106,11 +99,6 @@ public class ChartClickHandler implements ScreenSpacePainterFactory {
                 clickLogWriter.flush();
             } catch (IOException ignored) {}
         }
-    }
-
-    /** Set a callback to be invoked on key+click price selection. */
-    public void setClickCallback(ClickCallback callback) {
-        this.clickCallback = callback;
     }
 
     /** Register an instrument's pips before the painter is created. */
@@ -163,6 +151,7 @@ public class ChartClickHandler implements ScreenSpacePainterFactory {
 
                 if (event.getID() != MouseEvent.MOUSE_CLICKED) return;
                 MouseEvent me = (MouseEvent) event;
+                if (me.getButton() != MouseEvent.BUTTON1) return;
 
                 // Require at least one key held during click (any key works)
                 if (heldKeys.isEmpty() && !me.isMetaDown() && !me.isControlDown()
@@ -197,7 +186,6 @@ public class ChartClickHandler implements ScreenSpacePainterFactory {
                 // that map to that instrument.
                 String bestInstrument = null;
                 double bestPrice = Double.NaN;
-                double bestPriceTick = Double.NaN;
 
                 for (Map.Entry<String, CoordinateState> entry : painterCoords.entrySet()) {
                     String painterAlias = entry.getKey();
@@ -227,7 +215,6 @@ public class ChartClickHandler implements ScreenSpacePainterFactory {
                     if (fraction >= 0 && fraction <= 1 && !Double.isNaN(price) && price > 0) {
                         bestInstrument = instrument;
                         bestPrice = price;
-                        bestPriceTick = priceTick;
                         break;
                     }
                 }
@@ -243,19 +230,13 @@ public class ChartClickHandler implements ScreenSpacePainterFactory {
                         PluginLog.action(bestInstrument, "Click send " + keyCode + " @ "
                                 + String.format("%.2f", bestPrice));
                     }
-
-                    // Invoke click callback for price line drawing
-                    ClickCallback cb = clickCallback;
-                    if (cb != null) {
-                        cb.onChartClick(bestInstrument, bestPriceTick, bestPrice, keyCode);
-                    }
                 } else {
                     logClick("[Rong] Click: no painter matched bounds");
                 }
             };
             Toolkit.getDefaultToolkit().addAWTEventListener(awtListener,
                 AWTEvent.MOUSE_EVENT_MASK | AWTEvent.KEY_EVENT_MASK);
-            PluginLog.info("[Rong] AWT mouse listener registered for Cmd+Click");
+            PluginLog.info("[Rong] AWT mouse listener registered for key+left-click");
         }
     }
 

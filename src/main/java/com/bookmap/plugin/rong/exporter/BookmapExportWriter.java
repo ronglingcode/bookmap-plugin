@@ -10,7 +10,7 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.StandardOpenOption;
 
-class BookmapExportWriter {
+public class BookmapExportWriter {
 
     static final int SCHEMA_VERSION = 1;
 
@@ -102,7 +102,7 @@ class BookmapExportWriter {
         return eventsPath;
     }
 
-    static Path resolveOutputRoot() {
+    public static Path resolveOutputRoot() {
         String configured = System.getProperty("bookmap.export.dir", "");
         if (configured.trim().isEmpty()) {
             return Paths.get(System.getProperty("user.home"), "Bookmap", "backtest-exports");
