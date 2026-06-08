@@ -14,6 +14,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 
 import com.bookmap.plugin.rong.IndicatorConfig;
 import com.bookmap.plugin.rong.PluginLog;
@@ -34,13 +37,21 @@ import velox.api.layer1.layers.strategies.interfaces.ScreenSpacePainterFactory;
 /**
  * Draws compact order wall size labels directly over visible wall segments.
  */
-public class OrderWallLabelPainter implements ScreenSpacePainterFactory, IndicatorConfig.ChangeListener {
+public class OrderWallLabelPainter implements ScreenSpacePainterFactory,
+        IndicatorConfig.ChangeListener, OrderWallChangeStore.ChangeListener {
 
     public static final String PAINTER_NAME_PREFIX = "wallLabels_";
 
     private static final Font LABEL_FONT = new Font("SansSerif", Font.BOLD, 11);
     private static final int LABEL_HEIGHT = 18;
     private static final int LABEL_PADDING_X = 6;
+    private static final Font CHANGE_LABEL_FONT = new Font("SansSerif", Font.BOLD, 14);
+    private static final int CHANGE_LABEL_HEIGHT = 28;
+    private static final int CHANGE_LABEL_PADDING_X = 8;
+    private static final int CHANGE_ICON_SIZE = 20;
+    private static final int CHANGE_ICON_GAP = 6;
+    private static final long CHANGE_LABEL_TTL_MS = 30_000;
+    private static final long CHANGE_LABEL_FLASH_MS = 8_000;
     private static final int MAX_VISIBLE_ACTIVE_LABELS = 5;
     private static final int MAX_RENDERED_SIZE_PATH_POINTS = 4;
     private static final String SIZE_PATH_SEPARATOR = " -> ";
@@ -51,17 +62,32 @@ public class OrderWallLabelPainter implements ScreenSpacePainterFactory, Indicat
     private static final Color INACTIVE_BACKGROUND = new Color(18, 26, 34, 130);
     private static final Color ACTIVE_TEXT = new Color(255, 255, 255);
     private static final Color INACTIVE_TEXT = new Color(216, 223, 228, 190);
+    private static final Color ADDED_ACCENT = new Color(60, 220, 148);
+    private static final Color REDUCED_ACCENT = new Color(255, 91, 78);
+    private static final Color CHANGED_ACCENT = new Color(255, 196, 73);
 
     private final OrderWallLabelStore store;
     private final IndicatorConfig config;
+    private final OrderWallChangeStore wallChangeStore;
     private final Map<String, String> painterToInstrument = new ConcurrentHashMap<>();
     private final Map<String, CopyOnWriteArrayList<PainterInstance>> paintersByInstrument = new ConcurrentHashMap<>();
+    private final ScheduledExecutorService scheduler;
     private volatile String lastRegisteredInstrument;
 
-    public OrderWallLabelPainter(OrderWallLabelStore store, IndicatorConfig config) {
+    public OrderWallLabelPainter(OrderWallLabelStore store, IndicatorConfig config,
+                                 OrderWallChangeStore wallChangeStore) {
         this.store = store;
         this.config = config;
+        this.wallChangeStore = wallChangeStore;
         this.config.addChangeListener(this);
+        this.wallChangeStore.addListener(this);
+        this.scheduler = Executors.newSingleThreadScheduledExecutor(r -> {
+            Thread t = new Thread(r, "wall-label-painter");
+            t.setDaemon(true);
+            return t;
+        });
+        this.scheduler.scheduleAtFixedRate(this::refreshAnimatedChangeLabels,
+                250, 250, TimeUnit.MILLISECONDS);
     }
 
     public void registerInstrument(String instrumentAlias) {
@@ -86,7 +112,8 @@ public class OrderWallLabelPainter implements ScreenSpacePainterFactory, Indicat
 
     @Override
     public void onIndicatorConfigChanged(String indicatorKey, boolean enabled) {
-        if (!IndicatorConfig.ORDER_WALL_SIZE_LABELS.equals(indicatorKey)) {
+        if (!IndicatorConfig.ORDER_WALL_SIZE_LABELS.equals(indicatorKey)
+                && !IndicatorConfig.ORDER_WALL_CHANGE_ALERTS.equals(indicatorKey)) {
             return;
         }
         for (String instrumentAlias : paintersByInstrument.keySet()) {
@@ -94,8 +121,15 @@ public class OrderWallLabelPainter implements ScreenSpacePainterFactory, Indicat
         }
     }
 
+    @Override
+    public void onWallChangeEventsChanged(String instrumentAlias) {
+        refreshInstrument(instrumentAlias);
+    }
+
     public void shutdown() {
         config.removeChangeListener(this);
+        wallChangeStore.removeListener(this);
+        scheduler.shutdownNow();
     }
 
     @Override
@@ -119,6 +153,16 @@ public class OrderWallLabelPainter implements ScreenSpacePainterFactory, Indicat
         }
         PluginLog.info("[OrderWallLabelPainter] Created painter: " + alias + " -> " + instrumentAlias);
         return instance;
+    }
+
+    private void refreshAnimatedChangeLabels() {
+        long nowMs = System.currentTimeMillis();
+        if (!wallChangeStore.hasRecentEvents(CHANGE_LABEL_TTL_MS, nowMs)) {
+            return;
+        }
+        for (String instrumentAlias : paintersByInstrument.keySet()) {
+            refreshInstrument(instrumentAlias);
+        }
     }
 
     private class PainterInstance implements ScreenSpacePainterAdapter {
@@ -205,6 +249,7 @@ public class OrderWallLabelPainter implements ScreenSpacePainterFactory, Indicat
         private List<LabelPlacement> selectLabelsToDraw() {
             List<OrderWallLabel> activeLabels = new ArrayList<>();
             List<OrderWallLabel> clearedLabels = new ArrayList<>();
+            long nowMs = System.currentTimeMillis();
 
             for (OrderWallLabel label : store.getLabels(instrumentAlias)) {
                 if (!isVisible(label) || !isDisplayable(label)) {
@@ -212,13 +257,16 @@ public class OrderWallLabelPainter implements ScreenSpacePainterFactory, Indicat
                 }
                 if (label.isActive()) {
                     activeLabels.add(label);
-                } else if (store.hasBeenDisplayed(instrumentAlias, label.getId())) {
+                } else if (store.hasBeenDisplayed(instrumentAlias, label.getId())
+                        || findRecentChange(label, nowMs) != null) {
                     clearedLabels.add(label);
                 }
             }
 
             Comparator<OrderWallLabel> priority = Comparator
-                    .comparingInt(OrderWallLabel::getPeakSize).reversed()
+                    .comparing((OrderWallLabel label) -> findRecentChange(label, nowMs) != null,
+                            Comparator.reverseOrder())
+                    .thenComparing(Comparator.comparingInt(OrderWallLabel::getPeakSize).reversed())
                     .thenComparing(Comparator.comparingLong(OrderWallLabel::getEndTimeNs).reversed());
 
             activeLabels.sort(priority);
@@ -250,7 +298,9 @@ public class OrderWallLabelPainter implements ScreenSpacePainterFactory, Indicat
 
         private CanvasIcon createLabelIcon(LabelPlacement placement) {
             OrderWallLabel label = placement.label;
-            BufferedImage image = renderLabelImage(label);
+            long nowMs = System.currentTimeMillis();
+            OrderWallChangeEvent recentChange = findRecentChange(label, nowMs);
+            BufferedImage image = renderLabelImage(label, recentChange, nowMs);
             PreparedImage prepared = new PreparedImage(image);
             long anchorTime = anchorTimeNs(label);
             CompositeHorizontalCoordinate anchor = new CompositeHorizontalCoordinate(
@@ -260,10 +310,11 @@ public class OrderWallLabelPainter implements ScreenSpacePainterFactory, Indicat
             ScreenSpaceCanvas.HorizontalCoordinate x2 =
                     new RelativePixelHorizontalCoordinate(anchor, image.getWidth() - image.getWidth() / 2);
 
+            int imageHeight = image.getHeight();
             CompositeVerticalCoordinate y1 = new CompositeVerticalCoordinate(
-                    CompositeCoordinateBase.DATA_ZERO, -LABEL_HEIGHT / 2, label.getPriceTick());
+                    CompositeCoordinateBase.DATA_ZERO, -imageHeight / 2, label.getPriceTick());
             CompositeVerticalCoordinate y2 = new CompositeVerticalCoordinate(
-                    CompositeCoordinateBase.DATA_ZERO, LABEL_HEIGHT / 2, label.getPriceTick());
+                    CompositeCoordinateBase.DATA_ZERO, imageHeight / 2, label.getPriceTick());
 
             return new CanvasIcon(prepared, x1, y1, x2, y2);
         }
@@ -292,7 +343,18 @@ public class OrderWallLabelPainter implements ScreenSpacePainterFactory, Indicat
             return start + (end - start) / 2;
         }
 
-        private BufferedImage renderLabelImage(OrderWallLabel label) {
+        private OrderWallChangeEvent findRecentChange(OrderWallLabel label, long nowMs) {
+            if (!config.isEnabled(IndicatorConfig.ORDER_WALL_CHANGE_ALERTS)) {
+                return null;
+            }
+            return wallChangeStore.getLatestEvent(
+                    instrumentAlias, label.isBid(), label.getPriceTick(), CHANGE_LABEL_TTL_MS, nowMs);
+        }
+
+        private BufferedImage renderLabelImage(OrderWallLabel label, OrderWallChangeEvent recentChange, long nowMs) {
+            if (recentChange != null) {
+                return renderChangeLabelImage(label, recentChange, nowMs);
+            }
             String text = formatSizePath(label);
 
             BufferedImage probe = new BufferedImage(1, 1, BufferedImage.TYPE_INT_ARGB);
@@ -322,6 +384,52 @@ public class OrderWallLabelPainter implements ScreenSpacePainterFactory, Indicat
             FontMetrics fm = g.getFontMetrics();
             int textY = (LABEL_HEIGHT - fm.getHeight()) / 2 + fm.getAscent();
             g.drawString(text, LABEL_PADDING_X, textY);
+            g.dispose();
+            return image;
+        }
+
+        private BufferedImage renderChangeLabelImage(OrderWallLabel label, OrderWallChangeEvent event, long nowMs) {
+            String text = formatChangeText(event);
+
+            BufferedImage probe = new BufferedImage(1, 1, BufferedImage.TYPE_INT_ARGB);
+            Graphics2D probeGraphics = probe.createGraphics();
+            probeGraphics.setFont(CHANGE_LABEL_FONT);
+            FontMetrics metrics = probeGraphics.getFontMetrics();
+            int textWidth = metrics.stringWidth(text);
+            probeGraphics.dispose();
+
+            int width = CHANGE_LABEL_PADDING_X * 2 + CHANGE_ICON_SIZE + CHANGE_ICON_GAP + textWidth;
+            int height = CHANGE_LABEL_HEIGHT;
+            BufferedImage image = new BufferedImage(width, height, BufferedImage.TYPE_INT_ARGB);
+            Graphics2D g = image.createGraphics();
+            g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+
+            Color accent = changeAccent(event);
+            int outlineAlpha = changePulseAlpha(event, nowMs);
+            Color background = label.isActive()
+                    ? new Color(10, 14, 18, 238)
+                    : new Color(10, 14, 18, 205);
+
+            g.setColor(new Color(accent.getRed(), accent.getGreen(), accent.getBlue(), 42));
+            g.fillRoundRect(0, 0, width - 1, height - 1, 12, 12);
+
+            g.setColor(background);
+            g.fillRoundRect(2, 2, width - 5, height - 5, 10, 10);
+
+            g.setColor(new Color(accent.getRed(), accent.getGreen(), accent.getBlue(), outlineAlpha));
+            g.setStroke(new BasicStroke(2.4f));
+            g.drawRoundRect(2, 2, width - 5, height - 5, 10, 10);
+
+            int iconX = CHANGE_LABEL_PADDING_X + CHANGE_ICON_SIZE / 2;
+            int iconY = height / 2;
+            drawChangeIcon(g, event.getType(), accent, iconX, iconY, outlineAlpha);
+
+            g.setFont(CHANGE_LABEL_FONT);
+            g.setColor(ACTIVE_TEXT);
+            FontMetrics fm = g.getFontMetrics();
+            int textX = CHANGE_LABEL_PADDING_X + CHANGE_ICON_SIZE + CHANGE_ICON_GAP;
+            int textY = (height - fm.getHeight()) / 2 + fm.getAscent();
+            g.drawString(text, textX, textY);
             g.dispose();
             return image;
         }
@@ -368,6 +476,59 @@ public class OrderWallLabelPainter implements ScreenSpacePainterFactory, Indicat
                 this.label = label;
                 this.historicalSlot = historicalSlot;
             }
+        }
+    }
+
+    private static String formatChangeText(OrderWallChangeEvent event) {
+        return OrderWallChangeEvent.formatSize(event.getPreviousSize())
+                + " -> "
+                + OrderWallChangeEvent.formatSize(event.getCurrentSize());
+    }
+
+    private static Color changeAccent(OrderWallChangeEvent event) {
+        switch (event.getType()) {
+            case ADDED:
+                return ADDED_ACCENT;
+            case REPLACED_SMALLER:
+                return CHANGED_ACCENT;
+            case REDUCED:
+            default:
+                return REDUCED_ACCENT;
+        }
+    }
+
+    private static int changePulseAlpha(OrderWallChangeEvent event, long nowMs) {
+        long age = Math.max(0, nowMs - event.getCreatedAtMs());
+        if (age < CHANGE_LABEL_FLASH_MS) {
+            double pulse = (Math.sin(nowMs / 85.0) + 1.0) / 2.0;
+            return 150 + (int) (105 * pulse);
+        }
+        double remaining = 1.0 - ((double) (age - CHANGE_LABEL_FLASH_MS)
+                / (CHANGE_LABEL_TTL_MS - CHANGE_LABEL_FLASH_MS));
+        return Math.max(80, Math.min(180, (int) (80 + 100 * remaining)));
+    }
+
+    private static void drawChangeIcon(Graphics2D g, OrderWallChangeEvent.Type type, Color accent,
+                                       int centerX, int centerY, int alpha) {
+        int radius = CHANGE_ICON_SIZE / 2;
+        g.setColor(new Color(accent.getRed(), accent.getGreen(), accent.getBlue(), Math.min(255, alpha)));
+        g.fillOval(centerX - radius, centerY - radius, CHANGE_ICON_SIZE, CHANGE_ICON_SIZE);
+        g.setColor(new Color(255, 255, 255, 245));
+        g.setStroke(new BasicStroke(2.2f, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
+
+        switch (type) {
+            case ADDED:
+                g.drawLine(centerX - 5, centerY, centerX + 5, centerY);
+                g.drawLine(centerX, centerY - 5, centerX, centerY + 5);
+                break;
+            case REPLACED_SMALLER:
+                g.drawLine(centerX - 5, centerY - 3, centerX, centerY + 4);
+                g.drawLine(centerX, centerY + 4, centerX + 5, centerY - 3);
+                break;
+            case REDUCED:
+            default:
+                g.drawLine(centerX - 5, centerY, centerX + 5, centerY);
+                break;
         }
     }
 

@@ -5,6 +5,9 @@ import java.time.format.DateTimeFormatter;
 import java.util.List;
 
 import com.bookmap.plugin.rong.exporter.BookmapReplayExportSession;
+import com.bookmap.plugin.rong.orderwall.OrderWallChangePainter;
+import com.bookmap.plugin.rong.orderwall.OrderWallChangeStore;
+import com.bookmap.plugin.rong.orderwall.OrderWallChangeTracker;
 import com.bookmap.plugin.rong.orderwall.OrderWallLabelPainter;
 import com.bookmap.plugin.rong.orderwall.OrderWallLabelStore;
 import com.bookmap.plugin.rong.orderwall.OrderWallLabelTracker;
@@ -53,6 +56,9 @@ public class RongPlugin implements CustomModuleAdapter,
     private static final double WALL_LABEL_PERCENTILE = 95.0;
     private static final int WALL_LABEL_RETAIN_TICKS = 2_000;
     private static final int WALL_LABEL_REFRESH_MS = 200;
+    private static final int WALL_CHANGE_THRESHOLD = 5_000;
+    private static final double WALL_CHANGE_REMAINING_RATIO = 0.50;
+    private static final long WALL_CHANGE_DECISION_DELAY_MS = 500;
 
     // Shared WebSocket server across all symbol instances
     private static SignalWebSocketServer sharedServer;
@@ -62,6 +68,8 @@ public class RongPlugin implements CustomModuleAdapter,
     private static PriceLinePainter priceLinePainter;
     private static OrderWallLabelStore wallLabelStore;
     private static OrderWallLabelPainter wallLabelPainter;
+    private static OrderWallChangeStore wallChangeStore;
+    private static OrderWallChangePainter wallChangePainter;
     private static IndicatorConfig indicatorConfig;
     private static ReplayExportConfig replayExportConfig;
     private static PremarketTracker premarketTracker;
@@ -76,6 +84,7 @@ public class RongPlugin implements CustomModuleAdapter,
     private InstrumentInfo instrumentInfo;
     private OrderBookState orderBook;
     private OrderWallLabelTracker wallLabelTracker;
+    private OrderWallChangeTracker wallChangeTracker;
     private boolean wallLabelsDirty;
     private long lastWallLabelRefreshMs;
     private long lastTimestampNs;
@@ -111,7 +120,9 @@ public class RongPlugin implements CustomModuleAdapter,
                 indicatorConfig = new IndicatorConfig();
                 replayExportConfig = new ReplayExportConfig();
                 wallLabelStore = new OrderWallLabelStore();
-                wallLabelPainter = new OrderWallLabelPainter(wallLabelStore, indicatorConfig);
+                wallChangeStore = new OrderWallChangeStore();
+                wallLabelPainter = new OrderWallLabelPainter(wallLabelStore, indicatorConfig, wallChangeStore);
+                wallChangePainter = new OrderWallChangePainter(wallChangeStore, indicatorConfig);
                 premarketTracker = new PremarketTracker(priceLineStore, indicatorConfig);
                 keyLevelManager = new KeyLevelManager(priceLineStore);
                 sharedServer.registerKeyLevelConfigListener(keyLevelManager);
@@ -124,10 +135,18 @@ public class RongPlugin implements CustomModuleAdapter,
         replayExportConfig.addChangeListener(this);
         this.wallLabelTracker = new OrderWallLabelTracker(
                 cleanAlias, info.pips, wallLabelStore, WALL_LABEL_PERCENTILE, WALL_LABEL_RETAIN_TICKS);
+        this.wallChangeTracker = new OrderWallChangeTracker(
+                cleanAlias,
+                info.pips,
+                WALL_CHANGE_THRESHOLD,
+                WALL_CHANGE_REMAINING_RATIO,
+                WALL_CHANGE_DECISION_DELAY_MS,
+                wallChangeStore::addEvent);
         sharedServer.registerSymbol(cleanAlias, orderBook, info.pips);
         chartClickHandler.registerSymbol(cleanAlias, info.pips);
         priceLinePainter.registerInstrument(cleanAlias);
         wallLabelPainter.registerInstrument(cleanAlias);
+        wallChangePainter.registerInstrument(cleanAlias);
 
         // Register ScreenSpacePainter to receive chart coordinate mappings
         api.sendUserMessage(Layer1ApiUserMessageModifyScreenSpacePainter.builder(
@@ -145,6 +164,11 @@ public class RongPlugin implements CustomModuleAdapter,
         api.sendUserMessage(Layer1ApiUserMessageModifyScreenSpacePainter.builder(
                 RongPlugin.class, OrderWallLabelPainter.PAINTER_NAME_PREFIX + cleanAlias)
                 .setScreenSpacePainterFactory(wallLabelPainter)
+                .setIsAdd(true)
+                .build());
+        api.sendUserMessage(Layer1ApiUserMessageModifyScreenSpacePainter.builder(
+                RongPlugin.class, OrderWallChangePainter.PAINTER_NAME_PREFIX + cleanAlias)
+                .setScreenSpacePainterFactory(wallChangePainter)
                 .setIsAdd(true)
                 .build());
 
@@ -174,6 +198,10 @@ public class RongPlugin implements CustomModuleAdapter,
             replayExportConfig.removeChangeListener(this);
         }
         stopReplayExport();
+        if (wallChangeTracker != null) {
+            wallChangeTracker.shutdown();
+            wallChangeTracker = null;
+        }
         if (tradeButtonWindow != null) {
             tradeButtonWindow.dispose();
             tradeButtonWindow = null;
@@ -186,6 +214,9 @@ public class RongPlugin implements CustomModuleAdapter,
         }
         if (wallLabelPainter != null) {
             wallLabelPainter.unregisterInstrument(alias);
+        }
+        if (wallChangePainter != null) {
+            wallChangePainter.unregisterInstrument(alias);
         }
         // Unregister ScreenSpacePainters
         api.sendUserMessage(Layer1ApiUserMessageModifyScreenSpacePainter.builder(
@@ -201,6 +232,11 @@ public class RongPlugin implements CustomModuleAdapter,
         api.sendUserMessage(Layer1ApiUserMessageModifyScreenSpacePainter.builder(
                 RongPlugin.class, OrderWallLabelPainter.PAINTER_NAME_PREFIX + alias)
                 .setScreenSpacePainterFactory(wallLabelPainter)
+                .setIsAdd(false)
+                .build());
+        api.sendUserMessage(Layer1ApiUserMessageModifyScreenSpacePainter.builder(
+                RongPlugin.class, OrderWallChangePainter.PAINTER_NAME_PREFIX + alias)
+                .setScreenSpacePainterFactory(wallChangePainter)
                 .setIsAdd(false)
                 .build());
 
@@ -221,6 +257,9 @@ public class RongPlugin implements CustomModuleAdapter,
         }
         if (wallLabelStore != null) {
             wallLabelStore.clearAll(alias);
+        }
+        if (wallChangeStore != null) {
+            wallChangeStore.clearAll(alias);
         }
         if (sharedServer != null) {
             sharedServer.unregisterSymbol(alias);
@@ -250,6 +289,9 @@ public class RongPlugin implements CustomModuleAdapter,
                 if (wallLabelPainter != null) {
                     wallLabelPainter.shutdown();
                 }
+                if (wallChangePainter != null) {
+                    wallChangePainter.shutdown();
+                }
                 ActionLogWindow.dispose();
                 sharedServer.shutdown();
                 sharedServer = null;
@@ -258,6 +300,8 @@ public class RongPlugin implements CustomModuleAdapter,
                 priceLinePainter = null;
                 wallLabelStore = null;
                 wallLabelPainter = null;
+                wallChangeStore = null;
+                wallChangePainter = null;
                 indicatorConfig = null;
                 replayExportConfig = null;
                 instanceCount = 0;
@@ -281,6 +325,9 @@ public class RongPlugin implements CustomModuleAdapter,
         if (exportSession != null) {
             exportSession.onDepth(isBid, price, size);
         }
+        if (wallChangeTracker != null) {
+            wallChangeTracker.onDepth(isBid, price, size, getEventTimeNs());
+        }
         orderBook.update(isBid, price, size);
         wallTracker.updateLevel(isBid, price, size);
         if (wallLabelTracker != null && wallLabelTracker.onDepth(orderBook, isBid, price, size, getEventTimeNs())) {
@@ -294,6 +341,9 @@ public class RongPlugin implements CustomModuleAdapter,
         BookmapReplayExportSession exportSession = replayExportSession;
         if (exportSession != null) {
             exportSession.onTrade(price, size, tradeInfo);
+        }
+        if (wallChangeTracker != null) {
+            wallChangeTracker.onTrade((int) Math.round(price), size, tradeInfo);
         }
         double realPrice = price * instrumentInfo.pips;
         int priceTick = (int) price;
@@ -336,6 +386,9 @@ public class RongPlugin implements CustomModuleAdapter,
         if (exportSession != null) {
             exportSession.onSnapshotEnd();
         }
+        if (wallChangeTracker != null) {
+            wallChangeTracker.markReady();
+        }
     }
 
     @Override
@@ -343,6 +396,9 @@ public class RongPlugin implements CustomModuleAdapter,
         BookmapReplayExportSession exportSession = replayExportSession;
         if (exportSession != null) {
             exportSession.onRealtimeStart();
+        }
+        if (wallChangeTracker != null) {
+            wallChangeTracker.markReady();
         }
     }
 

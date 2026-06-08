@@ -12,6 +12,7 @@ public class IndicatorConfig {
     public static final String PREMARKET_HIGH_LOW = "premarket_high_low";
     public static final String CAM_PIVOTS = "cam_pivots";
     public static final String ORDER_WALL_SIZE_LABELS = "order_wall_size_labels";
+    public static final String ORDER_WALL_CHANGE_ALERTS = "order_wall_change_alerts";
 
     private final Map<String, Boolean> enabled = new ConcurrentHashMap<>();
 
@@ -28,6 +29,7 @@ public class IndicatorConfig {
         enabled.put(PREMARKET_HIGH_LOW, true);
         enabled.put(CAM_PIVOTS, true);
         enabled.put(ORDER_WALL_SIZE_LABELS, true);
+        enabled.put(ORDER_WALL_CHANGE_ALERTS, true);
     }
 
     public boolean isEnabled(String indicatorKey) {

@@ -47,5 +47,13 @@ public class IndicatorSettingsPanel extends StrategyPanel {
         wallLabelsCheckbox.addActionListener(e ->
                 config.setEnabled(IndicatorConfig.ORDER_WALL_SIZE_LABELS, wallLabelsCheckbox.isSelected()));
         add(wallLabelsCheckbox, gbc);
+
+        gbc.gridy++;
+        JCheckBox wallChangeAlertsCheckbox = new JCheckBox(
+                "Order Wall Change Alerts",
+                config.isEnabled(IndicatorConfig.ORDER_WALL_CHANGE_ALERTS));
+        wallChangeAlertsCheckbox.addActionListener(e ->
+                config.setEnabled(IndicatorConfig.ORDER_WALL_CHANGE_ALERTS, wallChangeAlertsCheckbox.isSelected()));
+        add(wallChangeAlertsCheckbox, gbc);
     }
 }
