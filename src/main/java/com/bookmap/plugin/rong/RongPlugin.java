@@ -1,11 +1,14 @@
 package com.bookmap.plugin.rong;
 
+import java.time.Duration;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
 
 import com.bookmap.plugin.rong.exporter.BookmapReplayExportSession;
+import com.bookmap.plugin.rong.orderwall.OrderWallChangeEvent;
 import com.bookmap.plugin.rong.orderwall.OrderWallChangePainter;
+import com.bookmap.plugin.rong.orderwall.OrderWallChangeSound;
 import com.bookmap.plugin.rong.orderwall.OrderWallChangeStore;
 import com.bookmap.plugin.rong.orderwall.OrderWallChangeTracker;
 import com.bookmap.plugin.rong.orderwall.OrderWallLabelPainter;
@@ -24,6 +27,7 @@ import velox.api.layer1.annotations.Layer1SimpleAttachable;
 import velox.api.layer1.annotations.Layer1StrategyName;
 import velox.api.layer1.data.InstrumentInfo;
 import velox.api.layer1.data.TradeInfo;
+import velox.api.layer1.messages.Layer1ApiSoundAlertMessage;
 import velox.api.layer1.messages.indicators.Layer1ApiUserMessageModifyScreenSpacePainter;
 import velox.api.layer1.simplified.Api;
 import velox.api.layer1.simplified.BboListener;
@@ -59,6 +63,7 @@ public class RongPlugin implements CustomModuleAdapter,
     private static final int WALL_CHANGE_THRESHOLD = 5_000;
     private static final double WALL_CHANGE_REMAINING_RATIO = 0.50;
     private static final long WALL_CHANGE_DECISION_DELAY_MS = 500;
+    private static final byte[] WALL_CHANGE_SOUND = OrderWallChangeSound.createAlertSound();
 
     // Shared WebSocket server across all symbol instances
     private static SignalWebSocketServer sharedServer;
@@ -141,7 +146,7 @@ public class RongPlugin implements CustomModuleAdapter,
                 WALL_CHANGE_THRESHOLD,
                 WALL_CHANGE_REMAINING_RATIO,
                 WALL_CHANGE_DECISION_DELAY_MS,
-                wallChangeStore::addEvent);
+                this::handleWallChangeEvent);
         sharedServer.registerSymbol(cleanAlias, orderBook, info.pips);
         chartClickHandler.registerSymbol(cleanAlias, info.pips);
         priceLinePainter.registerInstrument(cleanAlias);
@@ -421,6 +426,39 @@ public class RongPlugin implements CustomModuleAdapter,
                 PluginLog.info("[Rong] BREAKOUT signal: " + signal.toJson());
                 wallTracker.removeWall(wall.priceTick);
             }
+        }
+    }
+
+    private void handleWallChangeEvent(OrderWallChangeEvent event) {
+        if (wallLabelStore != null) {
+            wallLabelStore.markBestMatchDisplayed(
+                    event.getInstrumentAlias(),
+                    event.isBid(),
+                    event.getPriceTick(),
+                    event.getEventTimeNs());
+        }
+        if (wallChangeStore != null) {
+            wallChangeStore.addEvent(event);
+        }
+        playWallChangeSound(event);
+    }
+
+    private void playWallChangeSound(OrderWallChangeEvent event) {
+        if (api == null || indicatorConfig == null
+                || !indicatorConfig.isEnabled(IndicatorConfig.ORDER_WALL_CHANGE_SOUND)) {
+            return;
+        }
+        try {
+            api.sendUserMessage(new Layer1ApiSoundAlertMessage(
+                    WALL_CHANGE_SOUND,
+                    event.getLogMessage(),
+                    1,
+                    Duration.ZERO,
+                    null,
+                    RongPlugin.class,
+                    event.getId()));
+        } catch (RuntimeException e) {
+            PluginLog.error("[WallChange] Failed to play alert sound", e);
         }
     }
 

@@ -52,6 +52,8 @@ public class OrderWallLabelPainter implements ScreenSpacePainterFactory,
     private static final int CHANGE_ICON_GAP = 6;
     private static final long CHANGE_LABEL_TTL_MS = 30_000;
     private static final long CHANGE_LABEL_FLASH_MS = 8_000;
+    private static final long CHANGE_EVENT_MATCH_TOLERANCE_NS = 2_000_000_000L;
+    private static final int STACKED_LABEL_GAP = 3;
     private static final int MAX_VISIBLE_ACTIVE_LABELS = 5;
     private static final int MAX_RENDERED_SIZE_PATH_POINTS = 4;
     private static final String SIZE_PATH_SEPARATOR = " -> ";
@@ -224,13 +226,13 @@ public class OrderWallLabelPainter implements ScreenSpacePainterFactory,
 
                 for (LabelPlacement placement : labels) {
                     OrderWallLabel label = placement.label;
-                    if (label.isActive()) {
+                    if (label.isActive() || placement.changeEvent != null) {
                         store.markDisplayed(instrumentAlias, label.getId());
                     }
-                    CanvasIcon icon = createLabelIcon(new LabelPlacement(label, placement.historicalSlot));
+                    CanvasIcon icon = createLabelIcon(placement);
                     if (icon != null) {
                         canvas.addShape(icon);
-                        activeShapes.put(label.getKey(), icon);
+                        activeShapes.put(placement.shapeKey(), icon);
                     }
                 }
             }
@@ -272,17 +274,24 @@ public class OrderWallLabelPainter implements ScreenSpacePainterFactory,
             activeLabels.sort(priority);
             clearedLabels.sort(priority);
 
-            List<LabelPlacement> selected = new ArrayList<>();
+            List<OrderWallLabel> selected = new ArrayList<>();
             for (OrderWallLabel label : limit(activeLabels, MAX_VISIBLE_ACTIVE_LABELS)) {
-                selected.add(new LabelPlacement(label, 0));
+                selected.add(label);
             }
-            for (OrderWallLabel label : clearedLabels) {
-                selected.add(new LabelPlacement(label, 0));
-            }
+            selected.addAll(clearedLabels);
             selected.sort(Comparator
-                    .comparingLong((LabelPlacement placement) -> anchorTimeNs(placement.label)).reversed()
-                    .thenComparing(Comparator.comparingInt((LabelPlacement placement) -> placement.label.getPeakSize()).reversed()));
-            return selected;
+                    .comparingLong((OrderWallLabel label) -> anchorTimeNs(label)).reversed()
+                    .thenComparing(Comparator.comparingInt(OrderWallLabel::getPeakSize).reversed()));
+
+            List<LabelPlacement> placements = new ArrayList<>();
+            for (OrderWallLabel label : selected) {
+                placements.add(new LabelPlacement(label, null, 0));
+                OrderWallChangeEvent change = findRecentChange(label, nowMs);
+                if (change != null) {
+                    placements.add(new LabelPlacement(label, change, 0));
+                }
+            }
+            return assignStackingSlots(placements);
         }
 
         private boolean isDisplayable(OrderWallLabel label) {
@@ -296,13 +305,25 @@ public class OrderWallLabelPainter implements ScreenSpacePainterFactory,
             return new ArrayList<>(labels.subList(0, maxCount));
         }
 
+        private List<LabelPlacement> assignStackingSlots(List<LabelPlacement> placements) {
+            Map<String, Integer> nextSlotByPrice = new HashMap<>();
+            List<LabelPlacement> stacked = new ArrayList<>(placements.size());
+            for (LabelPlacement placement : placements) {
+                String priceKey = placement.label.getPriceKey();
+                int slot = nextSlotByPrice.getOrDefault(priceKey, 0);
+                nextSlotByPrice.put(priceKey, slot + 1);
+                stacked.add(new LabelPlacement(placement.label, placement.changeEvent, slot));
+            }
+            return stacked;
+        }
+
         private CanvasIcon createLabelIcon(LabelPlacement placement) {
             OrderWallLabel label = placement.label;
             long nowMs = System.currentTimeMillis();
-            OrderWallChangeEvent recentChange = findRecentChange(label, nowMs);
+            OrderWallChangeEvent recentChange = placement.changeEvent;
             BufferedImage image = renderLabelImage(label, recentChange, nowMs);
             PreparedImage prepared = new PreparedImage(image);
-            long anchorTime = anchorTimeNs(label);
+            long anchorTime = anchorTimeNs(label, recentChange);
             CompositeHorizontalCoordinate anchor = new CompositeHorizontalCoordinate(
                     CompositeCoordinateBase.DATA_ZERO, 0, anchorTime);
             ScreenSpaceCanvas.HorizontalCoordinate x1 =
@@ -311,10 +332,11 @@ public class OrderWallLabelPainter implements ScreenSpacePainterFactory,
                     new RelativePixelHorizontalCoordinate(anchor, image.getWidth() - image.getWidth() / 2);
 
             int imageHeight = image.getHeight();
+            int verticalOffset = placement.historicalSlot * (imageHeight + STACKED_LABEL_GAP);
             CompositeVerticalCoordinate y1 = new CompositeVerticalCoordinate(
-                    CompositeCoordinateBase.DATA_ZERO, -imageHeight / 2, label.getPriceTick());
+                    CompositeCoordinateBase.DATA_ZERO, -imageHeight / 2 + verticalOffset, label.getPriceTick());
             CompositeVerticalCoordinate y2 = new CompositeVerticalCoordinate(
-                    CompositeCoordinateBase.DATA_ZERO, imageHeight / 2, label.getPriceTick());
+                    CompositeCoordinateBase.DATA_ZERO, imageHeight / 2 + verticalOffset, label.getPriceTick());
 
             return new CanvasIcon(prepared, x1, y1, x2, y2);
         }
@@ -339,6 +361,27 @@ public class OrderWallLabelPainter implements ScreenSpacePainterFactory,
             return midpoint(visibleStart, visibleEnd);
         }
 
+        private long anchorTimeNs(OrderWallLabel label, OrderWallChangeEvent recentChange) {
+            if (recentChange == null) {
+                return anchorTimeNs(label);
+            }
+            long eventTimeNs = recentChange.getEventTimeNs() > 0
+                    ? recentChange.getEventTimeNs()
+                    : label.getEndTimeNs();
+            if (timeWidth <= 0) {
+                return eventTimeNs;
+            }
+            long visibleStart = timeLeft;
+            long visibleEnd = timeLeft + timeWidth;
+            if (eventTimeNs < visibleStart) {
+                return visibleStart;
+            }
+            if (eventTimeNs > visibleEnd) {
+                return visibleEnd;
+            }
+            return eventTimeNs;
+        }
+
         private long midpoint(long start, long end) {
             return start + (end - start) / 2;
         }
@@ -347,8 +390,41 @@ public class OrderWallLabelPainter implements ScreenSpacePainterFactory,
             if (!config.isEnabled(IndicatorConfig.ORDER_WALL_CHANGE_ALERTS)) {
                 return null;
             }
-            return wallChangeStore.getLatestEvent(
-                    instrumentAlias, label.isBid(), label.getPriceTick(), CHANGE_LABEL_TTL_MS, nowMs);
+            OrderWallChangeEvent bestEvent = null;
+            long bestDistanceNs = Long.MAX_VALUE;
+            for (OrderWallChangeEvent event : wallChangeStore.getRecentEvents(instrumentAlias, CHANGE_LABEL_TTL_MS, nowMs)) {
+                if (event.isBid() != label.isBid() || event.getPriceTick() != label.getPriceTick()) {
+                    continue;
+                }
+                if (!isEventTypeCompatible(label, event)) {
+                    continue;
+                }
+                long eventTimeNs = event.getEventTimeNs();
+                if (eventTimeNs <= 0) {
+                    continue;
+                }
+                long start = label.getStartTimeNs() - CHANGE_EVENT_MATCH_TOLERANCE_NS;
+                long end = label.getEndTimeNs() + CHANGE_EVENT_MATCH_TOLERANCE_NS;
+                if (eventTimeNs < start || eventTimeNs > end) {
+                    continue;
+                }
+                long anchor = event.getType() == OrderWallChangeEvent.Type.ADDED
+                        ? label.getStartTimeNs()
+                        : label.getEndTimeNs();
+                long distanceNs = Math.abs(eventTimeNs - anchor);
+                if (distanceNs < bestDistanceNs) {
+                    bestEvent = event;
+                    bestDistanceNs = distanceNs;
+                }
+            }
+            return bestEvent;
+        }
+
+        private boolean isEventTypeCompatible(OrderWallLabel label, OrderWallChangeEvent event) {
+            if (!label.isActive()) {
+                return event.getType() != OrderWallChangeEvent.Type.ADDED;
+            }
+            return true;
         }
 
         private BufferedImage renderLabelImage(OrderWallLabel label, OrderWallChangeEvent recentChange, long nowMs) {
@@ -470,11 +546,18 @@ public class OrderWallLabelPainter implements ScreenSpacePainterFactory,
 
         private class LabelPlacement {
             private final OrderWallLabel label;
+            private final OrderWallChangeEvent changeEvent;
             private final int historicalSlot;
 
-            private LabelPlacement(OrderWallLabel label, int historicalSlot) {
+            private LabelPlacement(OrderWallLabel label, OrderWallChangeEvent changeEvent, int historicalSlot) {
                 this.label = label;
+                this.changeEvent = changeEvent;
                 this.historicalSlot = historicalSlot;
+            }
+
+            private String shapeKey() {
+                String suffix = changeEvent == null ? "normal" : "change:" + changeEvent.getId();
+                return label.getKey() + ":" + suffix + ":" + historicalSlot;
             }
         }
     }

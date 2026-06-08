@@ -5,6 +5,7 @@ import java.awt.GridBagLayout;
 import java.awt.Insets;
 
 import javax.swing.JCheckBox;
+import javax.swing.JLabel;
 
 import velox.gui.StrategyPanel;
 
@@ -25,6 +26,10 @@ public class IndicatorSettingsPanel extends StrategyPanel {
         gbc.fill = GridBagConstraints.HORIZONTAL;
         gbc.weightx = 1.0;
 
+        JLabel versionLabel = new JLabel("Rong Version: " + PluginVersion.VERSION);
+        add(versionLabel, gbc);
+
+        gbc.gridy++;
         JCheckBox premarketCheckbox = new JCheckBox(
                 "Premarket High / Low",
                 config.isEnabled(IndicatorConfig.PREMARKET_HIGH_LOW));
@@ -55,5 +60,13 @@ public class IndicatorSettingsPanel extends StrategyPanel {
         wallChangeAlertsCheckbox.addActionListener(e ->
                 config.setEnabled(IndicatorConfig.ORDER_WALL_CHANGE_ALERTS, wallChangeAlertsCheckbox.isSelected()));
         add(wallChangeAlertsCheckbox, gbc);
+
+        gbc.gridy++;
+        JCheckBox wallChangeSoundCheckbox = new JCheckBox(
+                "Order Wall Change Sound",
+                config.isEnabled(IndicatorConfig.ORDER_WALL_CHANGE_SOUND));
+        wallChangeSoundCheckbox.addActionListener(e ->
+                config.setEnabled(IndicatorConfig.ORDER_WALL_CHANGE_SOUND, wallChangeSoundCheckbox.isSelected()));
+        add(wallChangeSoundCheckbox, gbc);
     }
 }

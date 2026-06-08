@@ -26,6 +26,7 @@ import velox.api.layer1.layers.strategies.interfaces.ScreenSpaceCanvas.Composite
 import velox.api.layer1.layers.strategies.interfaces.ScreenSpaceCanvas.CompositeHorizontalCoordinate;
 import velox.api.layer1.layers.strategies.interfaces.ScreenSpaceCanvas.CompositeVerticalCoordinate;
 import velox.api.layer1.layers.strategies.interfaces.ScreenSpaceCanvas.PreparedImage;
+import velox.api.layer1.layers.strategies.interfaces.ScreenSpaceCanvas.RelativePixelHorizontalCoordinate;
 import velox.api.layer1.layers.strategies.interfaces.ScreenSpaceCanvasFactory;
 import velox.api.layer1.layers.strategies.interfaces.ScreenSpaceCanvasFactory.ScreenSpaceCanvasType;
 import velox.api.layer1.layers.strategies.interfaces.ScreenSpacePainter;
@@ -47,8 +48,13 @@ public class OrderWallChangePainter implements ScreenSpacePainterFactory,
     private static final int BANNER_HEIGHT = 32;
     private static final int BANNER_GAP = 6;
     private static final int MARKER_HEIGHT = 34;
+    private static final int EVENT_BADGE_HEIGHT = 28;
+    private static final int EVENT_BADGE_PADDING_X = 8;
+    private static final int EVENT_BADGE_ICON_SIZE = 20;
+    private static final int EVENT_BADGE_ICON_GAP = 6;
     private static final Font BANNER_FONT = new Font("SansSerif", Font.BOLD, 13);
     private static final Font MARKER_FONT = new Font("SansSerif", Font.BOLD, 12);
+    private static final Font EVENT_BADGE_FONT = new Font("SansSerif", Font.BOLD, 14);
 
     private static final Color ADD_COLOR = new Color(60, 220, 148);
     private static final Color REDUCE_COLOR = new Color(255, 91, 78);
@@ -200,6 +206,7 @@ public class OrderWallChangePainter implements ScreenSpacePainterFactory,
 
                 addBannerShapes(events, nowMs);
                 addMarkerShapes(events, nowMs);
+                addEventBadgeShapes(events, nowMs);
             }
         }
 
@@ -238,6 +245,24 @@ public class OrderWallChangePainter implements ScreenSpacePainterFactory,
             }
         }
 
+        private void addEventBadgeShapes(List<OrderWallChangeEvent> events, long nowMs) {
+            int count = 0;
+            for (OrderWallChangeEvent event : events) {
+                if (event.getType() != OrderWallChangeEvent.Type.ADDED) {
+                    continue;
+                }
+                CanvasIcon icon = createEventBadgeIcon(event, nowMs);
+                if (icon != null) {
+                    canvas.addShape(icon);
+                    activeShapes.put(event.getId() + ":eventBadge", icon);
+                    count++;
+                }
+                if (count >= MAX_MARKERS) {
+                    return;
+                }
+            }
+        }
+
         private CanvasIcon createBannerIcon(OrderWallChangeEvent event, int y, long nowMs) {
             BufferedImage image = renderBannerImage(event, nowMs);
             PreparedImage prepared = new PreparedImage(image);
@@ -266,6 +291,26 @@ public class OrderWallChangePainter implements ScreenSpacePainterFactory,
                     CompositeCoordinateBase.DATA_ZERO, -MARKER_HEIGHT / 2, event.getPriceTick());
             CompositeVerticalCoordinate y2 = new CompositeVerticalCoordinate(
                     CompositeCoordinateBase.DATA_ZERO, MARKER_HEIGHT / 2, event.getPriceTick());
+            return new CanvasIcon(prepared, x1, y1, x2, y2);
+        }
+
+        private CanvasIcon createEventBadgeIcon(OrderWallChangeEvent event, long nowMs) {
+            if (event.getEventTimeNs() <= 0) {
+                return null;
+            }
+            BufferedImage image = renderEventBadgeImage(event, nowMs);
+            PreparedImage prepared = new PreparedImage(image);
+            CompositeHorizontalCoordinate anchor = new CompositeHorizontalCoordinate(
+                    CompositeCoordinateBase.DATA_ZERO, 0, event.getEventTimeNs());
+            ScreenSpaceCanvas.HorizontalCoordinate x1 =
+                    new RelativePixelHorizontalCoordinate(anchor, -image.getWidth() / 2);
+            ScreenSpaceCanvas.HorizontalCoordinate x2 =
+                    new RelativePixelHorizontalCoordinate(anchor, image.getWidth() - image.getWidth() / 2);
+
+            CompositeVerticalCoordinate y1 = new CompositeVerticalCoordinate(
+                    CompositeCoordinateBase.DATA_ZERO, EVENT_BADGE_HEIGHT / 2 + 4, event.getPriceTick());
+            CompositeVerticalCoordinate y2 = new CompositeVerticalCoordinate(
+                    CompositeCoordinateBase.DATA_ZERO, EVENT_BADGE_HEIGHT / 2 + 4 + image.getHeight(), event.getPriceTick());
             return new CanvasIcon(prepared, x1, y1, x2, y2);
         }
 
@@ -310,21 +355,52 @@ public class OrderWallChangePainter implements ScreenSpacePainterFactory,
             g.setStroke(new BasicStroke(3.0f, BasicStroke.CAP_BUTT, BasicStroke.JOIN_MITER,
                     10.0f, new float[]{12.0f, 7.0f}, 0.0f));
             g.drawLine(0, y, width, y);
+            g.dispose();
+            return image;
+        }
 
-            g.setFont(MARKER_FONT);
+        private BufferedImage renderEventBadgeImage(OrderWallChangeEvent event, long nowMs) {
+            String text = OrderWallChangeEvent.formatSize(event.getPreviousSize())
+                    + " -> "
+                    + OrderWallChangeEvent.formatSize(event.getCurrentSize());
+            BufferedImage probe = new BufferedImage(1, 1, BufferedImage.TYPE_INT_ARGB);
+            Graphics2D probeGraphics = probe.createGraphics();
+            probeGraphics.setFont(EVENT_BADGE_FONT);
+            FontMetrics metrics = probeGraphics.getFontMetrics();
+            int textWidth = metrics.stringWidth(text);
+            probeGraphics.dispose();
+
+            int width = EVENT_BADGE_PADDING_X * 2 + EVENT_BADGE_ICON_SIZE + EVENT_BADGE_ICON_GAP + textWidth;
+            BufferedImage image = new BufferedImage(width, EVENT_BADGE_HEIGHT, BufferedImage.TYPE_INT_ARGB);
+            Graphics2D g = image.createGraphics();
+            g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+
+            Color accent = colorFor(event);
+            int outlineAlpha = markerAlpha(event, nowMs);
+            g.setColor(new Color(accent.getRed(), accent.getGreen(), accent.getBlue(), 46));
+            g.fillRoundRect(0, 0, width - 1, EVENT_BADGE_HEIGHT - 1, 12, 12);
+            g.setColor(new Color(10, 14, 18, 235));
+            g.fillRoundRect(2, 2, width - 5, EVENT_BADGE_HEIGHT - 5, 10, 10);
+            g.setColor(new Color(accent.getRed(), accent.getGreen(), accent.getBlue(), Math.min(255, outlineAlpha + 60)));
+            g.setStroke(new BasicStroke(2.4f));
+            g.drawRoundRect(2, 2, width - 5, EVENT_BADGE_HEIGHT - 5, 10, 10);
+
+            int iconX = EVENT_BADGE_PADDING_X + EVENT_BADGE_ICON_SIZE / 2;
+            int iconY = EVENT_BADGE_HEIGHT / 2;
+            g.setColor(new Color(accent.getRed(), accent.getGreen(), accent.getBlue(), Math.min(255, outlineAlpha + 70)));
+            g.fillOval(iconX - EVENT_BADGE_ICON_SIZE / 2, iconY - EVENT_BADGE_ICON_SIZE / 2,
+                    EVENT_BADGE_ICON_SIZE, EVENT_BADGE_ICON_SIZE);
+            g.setColor(new Color(255, 255, 255, 245));
+            g.setStroke(new BasicStroke(2.2f, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
+            g.drawLine(iconX - 5, iconY, iconX + 5, iconY);
+            g.drawLine(iconX, iconY - 5, iconX, iconY + 5);
+
+            g.setFont(EVENT_BADGE_FONT);
+            g.setColor(TEXT_COLOR);
             FontMetrics fm = g.getFontMetrics();
-            String label = clipText(g, event.getShortMessage(), Math.min(width - 28, 360));
-            int labelWidth = fm.stringWidth(label) + 14;
-            int labelHeight = 20;
-            int labelX = 12;
-            int labelY = y - labelHeight / 2;
-
-            g.setColor(new Color(8, 12, 16, Math.min(210, alpha + 40)));
-            g.fillRoundRect(labelX, labelY, labelWidth, labelHeight, 7, 7);
-            g.setColor(new Color(accent.getRed(), accent.getGreen(), accent.getBlue(), Math.min(255, alpha + 60)));
-            g.drawRoundRect(labelX, labelY, labelWidth, labelHeight, 7, 7);
-            g.setColor(new Color(255, 255, 255, Math.min(255, alpha + 80)));
-            g.drawString(label, labelX + 7, labelY + (labelHeight - fm.getHeight()) / 2 + fm.getAscent());
+            int textX = EVENT_BADGE_PADDING_X + EVENT_BADGE_ICON_SIZE + EVENT_BADGE_ICON_GAP;
+            int textY = (EVENT_BADGE_HEIGHT - fm.getHeight()) / 2 + fm.getAscent();
+            g.drawString(text, textX, textY);
             g.dispose();
             return image;
         }

@@ -128,10 +128,6 @@ public class OrderWallChangeEvent {
         if (Math.abs(size) < 1_000) {
             return Integer.toString(size);
         }
-        double thousands = size / 1_000.0;
-        if (Math.abs(thousands - Math.rint(thousands)) < 0.05) {
-            return Integer.toString((int) Math.rint(thousands)) + "K";
-        }
-        return String.format("%.1fK", thousands);
+        return Long.toString(Math.round(size / 1_000.0)) + "K";
     }
 }

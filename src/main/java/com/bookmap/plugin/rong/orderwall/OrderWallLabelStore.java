@@ -75,6 +75,31 @@ public class OrderWallLabelStore {
         return instrumentLabels != null && instrumentLabels.displayedLabelIds.contains(labelId);
     }
 
+    public void markBestMatchDisplayed(String instrumentAlias, boolean bid, int priceTick, long eventTimeNs) {
+        InstrumentLabels instrumentLabels = labelsByInstrument.get(instrumentAlias);
+        if (instrumentLabels == null) {
+            return;
+        }
+
+        String priceKey = OrderWallLabel.buildKey(bid, priceTick);
+        OrderWallLabel bestLabel = null;
+        long bestDistance = Long.MAX_VALUE;
+        for (OrderWallLabel label : instrumentLabels.labelsById.values()) {
+            if (!priceKey.equals(label.getPriceKey())) {
+                continue;
+            }
+            long anchor = label.isActive() ? label.getStartTimeNs() : label.getEndTimeNs();
+            long distance = eventTimeNs > 0 ? Math.abs(eventTimeNs - anchor) : 0;
+            if (bestLabel == null || distance < bestDistance) {
+                bestLabel = label;
+                bestDistance = distance;
+            }
+        }
+        if (bestLabel != null) {
+            instrumentLabels.displayedLabelIds.add(bestLabel.getId());
+        }
+    }
+
     public List<OrderWallLabel> getLabels(String instrumentAlias) {
         InstrumentLabels instrumentLabels = labelsByInstrument.get(instrumentAlias);
         if (instrumentLabels == null || instrumentLabels.labelsById.isEmpty()) {
