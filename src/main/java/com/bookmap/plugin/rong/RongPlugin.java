@@ -179,10 +179,10 @@ public class RongPlugin implements CustomModuleAdapter,
 
         // Draw predefined key price levels for this instrument
         if (keyLevelManager != null) {
-            keyLevelManager.onInstrumentInitialized(alias, info.pips);
+            keyLevelManager.onInstrumentInitialized(cleanAlias, info.pips);
         }
         if (exitOrderManager != null) {
-            exitOrderManager.onInstrumentInitialized(alias, info.pips);
+            exitOrderManager.onInstrumentInitialized(cleanAlias, info.pips);
         }
 
         // Fetch cam pivots + premarket high/low from EdgeDesk API (runs on background thread)

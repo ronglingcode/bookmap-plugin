@@ -17,7 +17,10 @@ public class SymbolUtils {
      * @return clean ticker symbol (e.g. "SMCI")
      */
     public static String cleanSymbol(String instrumentAlias) {
-        String clean = instrumentAlias;
+        if (instrumentAlias == null) {
+            return "";
+        }
+        String clean = instrumentAlias.trim();
         int atIdx = clean.indexOf('@');
         if (atIdx >= 0) {
             clean = clean.substring(0, atIdx);
@@ -26,6 +29,6 @@ public class SymbolUtils {
         if (colonIdx >= 0) {
             clean = clean.substring(0, colonIdx);
         }
-        return clean;
+        return clean.trim();
     }
 }

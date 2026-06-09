@@ -12,6 +12,7 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
 import com.bookmap.plugin.rong.PluginLog;
+import com.bookmap.plugin.rong.SymbolUtils;
 
 import velox.api.layer1.layers.strategies.interfaces.ScreenSpaceCanvas;
 import velox.api.layer1.layers.strategies.interfaces.ScreenSpaceCanvas.CanvasIcon;
@@ -35,6 +36,7 @@ public class PriceLinePainter implements ScreenSpacePainterFactory {
     private static final int LINE_IMAGE_HEIGHT = 20; // enough for line + label text
     private static final int LINE_THICKNESS = 2;
     private static final Font LABEL_FONT = new Font("SansSerif", Font.BOLD, 11);
+    private static final String PAINTER_NAME_PREFIX = "priceLines_";
 
     private final PriceLineStore store;
 
@@ -47,11 +49,12 @@ public class PriceLinePainter implements ScreenSpacePainterFactory {
     }
 
     public void registerInstrument(String instrumentAlias) {
-        lastRegisteredInstrument = instrumentAlias;
+        lastRegisteredInstrument = SymbolUtils.cleanSymbol(instrumentAlias);
     }
 
     public void unregisterInstrument(String instrumentAlias) {
-        painterToInstrument.entrySet().removeIf(e -> e.getValue().equals(instrumentAlias));
+        String cleanInstrumentAlias = SymbolUtils.cleanSymbol(instrumentAlias);
+        painterToInstrument.entrySet().removeIf(e -> e.getValue().equals(cleanInstrumentAlias));
     }
 
     @Override
@@ -59,14 +62,31 @@ public class PriceLinePainter implements ScreenSpacePainterFactory {
                                                         ScreenSpaceCanvasFactory canvasFactory) {
         ScreenSpaceCanvas canvas = canvasFactory.createCanvas(ScreenSpaceCanvasType.HEATMAP);
 
-        if (lastRegisteredInstrument != null) {
-            painterToInstrument.put(alias, lastRegisteredInstrument);
+        String instrumentAlias = resolveInstrumentAlias(alias);
+        if (instrumentAlias != null) {
+            painterToInstrument.put(alias, instrumentAlias);
         }
-        String instrumentAlias = painterToInstrument.getOrDefault(alias, lastRegisteredInstrument);
 
         PluginLog.info("[PriceLinePainter] Created painter: " + alias + " → " + instrumentAlias);
 
         return new PainterInstance(alias, instrumentAlias, canvas);
+    }
+
+    private String resolveInstrumentAlias(String painterAlias) {
+        String existingInstrument = painterToInstrument.get(painterAlias);
+        if (existingInstrument != null) {
+            return existingInstrument;
+        }
+        if (painterAlias != null) {
+            int prefixIndex = painterAlias.lastIndexOf(PAINTER_NAME_PREFIX);
+            if (prefixIndex >= 0) {
+                String instrumentAlias = painterAlias.substring(prefixIndex + PAINTER_NAME_PREFIX.length());
+                if (!instrumentAlias.isEmpty()) {
+                    return SymbolUtils.cleanSymbol(instrumentAlias);
+                }
+            }
+        }
+        return lastRegisteredInstrument;
     }
 
     /**

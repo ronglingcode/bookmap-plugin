@@ -26,8 +26,9 @@ public class KeyLevelManager implements SignalWebSocketServer.KeyLevelConfigList
      * Called from the plugin's {@code initialize()} after InstrumentInfo is available.
      */
     public void onInstrumentInitialized(String instrumentAlias, double pips) {
-        instrumentPips.put(instrumentAlias, pips);
-        redrawInstrument(instrumentAlias);
+        String cleanInstrumentAlias = SymbolUtils.cleanSymbol(instrumentAlias);
+        instrumentPips.put(cleanInstrumentAlias, pips);
+        redrawInstrument(cleanInstrumentAlias);
     }
 
     /**
@@ -35,8 +36,9 @@ public class KeyLevelManager implements SignalWebSocketServer.KeyLevelConfigList
      * Removes all KEY_LEVEL lines for that instrument from the chart.
      */
     public void onInstrumentStopped(String instrumentAlias) {
-        instrumentPips.remove(instrumentAlias);
-        store.removeByType(instrumentAlias, PriceLine.LineType.KEY_LEVEL);
+        String cleanInstrumentAlias = SymbolUtils.cleanSymbol(instrumentAlias);
+        instrumentPips.remove(cleanInstrumentAlias);
+        store.removeByType(cleanInstrumentAlias, PriceLine.LineType.KEY_LEVEL);
     }
 
     @Override

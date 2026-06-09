@@ -29,13 +29,15 @@ public class ExitOrderManager implements SignalWebSocketServer.ExitOrderPairsCon
     }
 
     public void onInstrumentInitialized(String instrumentAlias, double pips) {
-        instrumentPips.put(instrumentAlias, pips);
-        redrawInstrument(instrumentAlias);
+        String cleanInstrumentAlias = SymbolUtils.cleanSymbol(instrumentAlias);
+        instrumentPips.put(cleanInstrumentAlias, pips);
+        redrawInstrument(cleanInstrumentAlias);
     }
 
     public void onInstrumentStopped(String instrumentAlias) {
-        instrumentPips.remove(instrumentAlias);
-        store.removeByType(instrumentAlias, PriceLine.LineType.EXIT_ORDER);
+        String cleanInstrumentAlias = SymbolUtils.cleanSymbol(instrumentAlias);
+        instrumentPips.remove(cleanInstrumentAlias);
+        store.removeByType(cleanInstrumentAlias, PriceLine.LineType.EXIT_ORDER);
     }
 
     @Override
