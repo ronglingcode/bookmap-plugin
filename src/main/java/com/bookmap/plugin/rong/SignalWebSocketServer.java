@@ -173,6 +173,10 @@ public class SignalWebSocketServer extends WebSocketServer {
                 handleActionLog(json);
                 return;
             }
+            if ("account_state".equals(type)) {
+                handleAccountState(json);
+                return;
+            }
         }
         if (trimmed.contains("\"subscribe\"") && trimmed.contains("\"orderbook\"")) {
             orderbookSubscribers.add(conn);
@@ -349,6 +353,105 @@ public class SignalWebSocketServer extends WebSocketServer {
         }
     }
 
+    private void handleAccountState(JsonObject json) {
+        String symbol = SymbolUtils.cleanSymbol(getString(json, "symbol"));
+        if (symbol.isEmpty()) {
+            PluginLog.error("[AccountState] Ignoring update with missing symbol");
+            return;
+        }
+
+        AccountPositionDefinition position = parseAccountPosition(symbol, json.get("position"));
+        JsonElement ordersElement = json.get("openOrders");
+        if (ordersElement == null) {
+            ordersElement = json.get("orders");
+        }
+        List<AccountOrderDefinition> openOrders = parseAccountOrders(symbol, ordersElement);
+
+        ActionLogWindow.updateAccountState(new AccountStateDefinition(
+                symbol,
+                position,
+                openOrders,
+                getLong(json, "timestamp")));
+    }
+
+    private AccountPositionDefinition parseAccountPosition(String symbol, JsonElement element) {
+        if (element == null || element.isJsonNull() || !element.isJsonObject()) {
+            return null;
+        }
+        JsonObject positionJson = element.getAsJsonObject();
+        double netQuantity = getDouble(positionJson, "netQuantity");
+        if (!Double.isFinite(netQuantity)) {
+            netQuantity = getDouble(positionJson, "quantity");
+        }
+        double averagePrice = getDouble(positionJson, "averagePrice");
+        return new AccountPositionDefinition(
+                symbol,
+                Double.isFinite(netQuantity) ? netQuantity : 0,
+                Double.isFinite(averagePrice) ? averagePrice : 0,
+                getDouble(positionJson, "riskPercent"));
+    }
+
+    private List<AccountOrderDefinition> parseAccountOrders(String symbol, JsonElement element) {
+        if (element == null || element.isJsonNull() || !element.isJsonArray()) {
+            return Collections.emptyList();
+        }
+        List<AccountOrderDefinition> orders = new ArrayList<>();
+        for (JsonElement item : element.getAsJsonArray()) {
+            AccountOrderDefinition order = parseAccountOrder(symbol, item);
+            if (order != null) {
+                orders.add(order);
+            }
+        }
+        return orders;
+    }
+
+    private AccountOrderDefinition parseAccountOrder(String symbol, JsonElement element) {
+        if (element == null || element.isJsonNull() || !element.isJsonObject()) {
+            return null;
+        }
+        try {
+            JsonObject orderJson = element.getAsJsonObject();
+            String role = getString(orderJson, "role");
+            if (role.isEmpty()) {
+                role = getString(orderJson, "kind");
+            }
+            double quantity = getDouble(orderJson, "quantity");
+            if (!Double.isFinite(quantity)) {
+                quantity = getDouble(orderJson, "qty");
+            }
+            int pairIndex = getInt(orderJson, "pairIndex");
+            if (pairIndex <= 0) {
+                pairIndex = getInt(orderJson, "index");
+            }
+
+            return new AccountOrderDefinition(
+                    symbol,
+                    firstNonEmpty(getString(orderJson, "orderID"), getString(orderJson, "orderId")),
+                    role,
+                    getString(orderJson, "orderType"),
+                    getDouble(orderJson, "price"),
+                    Double.isFinite(quantity) ? quantity : 0,
+                    parseOrderIsBuy(orderJson),
+                    getString(orderJson, "source"),
+                    firstNonEmpty(getString(orderJson, "parentOrderID"), getString(orderJson, "parentOrderId")),
+                    pairIndex);
+        } catch (RuntimeException e) {
+            PluginLog.error("[AccountState] Ignoring malformed order for " + symbol + ": " + e.getMessage());
+            return null;
+        }
+    }
+
+    private boolean parseOrderIsBuy(JsonObject orderJson) {
+        String side = getString(orderJson, "side").trim();
+        if ("BUY".equalsIgnoreCase(side) || "LONG".equalsIgnoreCase(side)) {
+            return true;
+        }
+        if ("SELL".equalsIgnoreCase(side) || "SHORT".equalsIgnoreCase(side)) {
+            return false;
+        }
+        return getBoolean(orderJson, "isBuy");
+    }
+
     private ExitOrderPairDefinition parseExitOrderPair(String symbol, JsonElement element, int fallbackIndex) {
         if (element == null || !element.isJsonObject()) {
             return null;
@@ -501,6 +604,22 @@ public class SignalWebSocketServer extends WebSocketServer {
         } catch (RuntimeException e) {
             return false;
         }
+    }
+
+    private long getLong(JsonObject json, String field) {
+        JsonElement element = json.get(field);
+        if (element == null || element.isJsonNull()) {
+            return 0L;
+        }
+        try {
+            return element.getAsLong();
+        } catch (RuntimeException e) {
+            return 0L;
+        }
+    }
+
+    private String firstNonEmpty(String first, String second) {
+        return first == null || first.isEmpty() ? second : first;
     }
 
     private synchronized void ensureOrderbookBroadcast() {

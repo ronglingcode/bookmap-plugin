@@ -1,6 +1,7 @@
 package com.bookmap.plugin.rong.tradebuttons;
 
 import java.awt.BorderLayout;
+import java.awt.Color;
 import java.awt.GridLayout;
 import java.util.Collections;
 import java.util.List;
@@ -23,6 +24,10 @@ import com.google.gson.JsonObject;
  * Floating always-on-top trade button panel for a single symbol.
  */
 public class TradeButtonWindow {
+
+    private static final Color LONG_TRADEBOOK_BUTTON_COLOR = new Color(38, 139, 88);
+    private static final Color SHORT_TRADEBOOK_BUTTON_COLOR = new Color(180, 62, 62);
+    private static final Color TRADEBOOK_BUTTON_TEXT_COLOR = Color.WHITE;
 
     private final String symbol;
     private final SignalWebSocketServer server;
@@ -131,11 +136,37 @@ public class TradeButtonWindow {
     private JButton createButton(TradebookButtonGroup tradebook, String entryMethod, boolean useMarketOrder) {
         String orderType = useMarketOrder ? "Mkt" : "Breakout";
         JButton button = new JButton(entryMethod);
+        applyTradebookButtonStyle(button, tradebook.getSide());
         if (!tradebook.getTradebookName().isEmpty()) {
             button.setToolTipText(orderType + " order - " + tradebook.getTradebookName());
         }
         button.addActionListener(e -> sendTradeButtonMessage(tradebook, entryMethod, useMarketOrder));
         return button;
+    }
+
+    private void applyTradebookButtonStyle(JButton button, String side) {
+        Color color = getTradebookButtonColor(side);
+        if (color == null) {
+            return;
+        }
+        button.setBackground(color);
+        button.setForeground(TRADEBOOK_BUTTON_TEXT_COLOR);
+        button.setOpaque(true);
+        button.setBorderPainted(false);
+    }
+
+    private Color getTradebookButtonColor(String side) {
+        if (side == null) {
+            return null;
+        }
+        String normalizedSide = side.trim();
+        if ("long".equalsIgnoreCase(normalizedSide) || "buy".equalsIgnoreCase(normalizedSide)) {
+            return LONG_TRADEBOOK_BUTTON_COLOR;
+        }
+        if ("short".equalsIgnoreCase(normalizedSide) || "sell".equalsIgnoreCase(normalizedSide)) {
+            return SHORT_TRADEBOOK_BUTTON_COLOR;
+        }
+        return null;
     }
 
     private void sendTradeButtonMessage(TradebookButtonGroup tradebook, String entryMethod, boolean useMarketOrder) {
