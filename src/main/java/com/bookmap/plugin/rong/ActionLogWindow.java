@@ -10,9 +10,11 @@ import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.Deque;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import javax.swing.BorderFactory;
 import javax.swing.JFrame;
@@ -191,6 +193,7 @@ public class ActionLogWindow {
 
         int positionCount = 0;
         int orderCount = 0;
+        Set<String> orderPairKeys = new HashSet<>();
         for (AccountStateDefinition state : states) {
             if (state.hasOpenPosition()) {
                 AccountPositionDefinition position = state.getPosition();
@@ -204,6 +207,10 @@ public class ActionLogWindow {
             }
 
             for (AccountOrderDefinition order : state.getOpenOrders()) {
+                String orderPairKey = getOrderPairKey(state.getSymbol(), order);
+                if (!orderPairKey.isEmpty()) {
+                    orderPairKeys.add(orderPairKey);
+                }
                 orderTableModel.addRow(new Object[] {
                         state.getSymbol(),
                         formatRole(order),
@@ -217,17 +224,36 @@ public class ActionLogWindow {
             }
         }
 
-        accountStatusLabel.setText("Account: " + activeSummary(positionCount, orderCount)
+        int orderPairCount = orderPairKeys.size();
+        accountStatusLabel.setText("Account: " + activeSummary(positionCount, orderCount, orderPairCount)
                 + " | updated " + LocalTime.now().format(TIME_FMT));
         positionStatusLabel.setText("Positions (" + positionCount + ")");
-        orderStatusLabel.setText("Open Orders (" + orderCount + ")");
+        orderStatusLabel.setText("Open Orders (" + orderCount + ", " + orderPairCount + " pair(s))");
     }
 
-    private static String activeSummary(int positionCount, int orderCount) {
+    private static String activeSummary(int positionCount, int orderCount, int orderPairCount) {
         if (positionCount == 0 && orderCount == 0) {
             return "no open positions/orders";
         }
-        return positionCount + " position(s), " + orderCount + " order(s)";
+        return positionCount + " position(s), " + orderCount + " order(s), " + orderPairCount + " pair(s)";
+    }
+
+    private static String getOrderPairKey(String symbol, AccountOrderDefinition order) {
+        if (!isExitOrderLeg(order)) {
+            return "";
+        }
+        if (order.getPairIndex() > 0) {
+            return symbol + "#" + order.getPairIndex();
+        }
+        if (!order.getParentOrderId().isEmpty()) {
+            return symbol + "#" + order.getParentOrderId();
+        }
+        return "";
+    }
+
+    private static boolean isExitOrderLeg(AccountOrderDefinition order) {
+        String role = order.getRole();
+        return "STOP".equalsIgnoreCase(role) || "LIMIT".equalsIgnoreCase(role);
     }
 
     private static String formatRole(AccountOrderDefinition order) {
