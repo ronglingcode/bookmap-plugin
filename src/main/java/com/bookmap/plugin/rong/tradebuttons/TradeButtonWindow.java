@@ -100,7 +100,6 @@ public class TradeButtonWindow {
 
     private JButton createHotkeyButton(String label, String id, String keyCode) {
         JButton button = new JButton(label);
-        button.setToolTipText(label + " - " + keyCode);
         button.addActionListener(e -> sendHotkeyButtonMessage(id, label, keyCode));
         return button;
     }
@@ -137,9 +136,6 @@ public class TradeButtonWindow {
         String orderType = useMarketOrder ? "Mkt" : "Breakout";
         JButton button = new JButton(entryMethod);
         applyTradebookButtonStyle(button, tradebook.getSide());
-        if (!tradebook.getTradebookName().isEmpty()) {
-            button.setToolTipText(orderType + " order - " + tradebook.getTradebookName());
-        }
         button.addActionListener(e -> sendTradeButtonMessage(tradebook, entryMethod, useMarketOrder));
         return button;
     }
