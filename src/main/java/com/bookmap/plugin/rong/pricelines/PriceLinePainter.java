@@ -175,8 +175,9 @@ public class PriceLinePainter implements ScreenSpacePainterFactory {
             // Draw the horizontal line
             g.setColor(color);
             if (line.getType() == PriceLine.LineType.KEY_LEVEL
-                    || line.getType() == PriceLine.LineType.EXIT_ORDER) {
-                // Solid line for key levels and broker-managed exits
+                    || line.getType() == PriceLine.LineType.EXIT_ORDER
+                    || line.getType() == PriceLine.LineType.ENTRY_ORDER) {
+                // Solid line for key levels and broker-managed orders
                 g.setStroke(new BasicStroke(LINE_THICKNESS));
             } else {
                 // Dashed for auto-drawn indicators

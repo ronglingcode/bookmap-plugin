@@ -28,6 +28,9 @@ public class TradeButtonWindow {
     private static final Color LONG_TRADEBOOK_BUTTON_COLOR = new Color(38, 139, 88);
     private static final Color SHORT_TRADEBOOK_BUTTON_COLOR = new Color(180, 62, 62);
     private static final Color TRADEBOOK_BUTTON_TEXT_COLOR = Color.WHITE;
+    private static final int WALL_OUT_PAIR_INDEX = 1;
+    private static final int WALL_OUT_MINIMUM_SIZE = 5_000;
+    private static final double WALL_OUT_PRICE_OFFSET = 0.02;
 
     private final String symbol;
     private final SignalWebSocketServer server;
@@ -90,17 +93,24 @@ public class TradeButtonWindow {
     }
 
     private JPanel createHotkeyPanel() {
-        JPanel hotkeyPanel = new JPanel(new GridLayout(1, 3, 6, 6));
+        JPanel hotkeyPanel = new JPanel(new GridLayout(1, 4, 6, 6));
         hotkeyPanel.setBorder(BorderFactory.createEmptyBorder(0, 0, 8, 0));
         hotkeyPanel.add(createHotkeyButton("Cancel", "cancel", "KeyC"));
         hotkeyPanel.add(createHotkeyButton("Flatten", "flatten", "KeyF"));
         hotkeyPanel.add(createHotkeyButton("Market Out 1", "market_out_1_partial", "KeyM"));
+        hotkeyPanel.add(createWallOutButton());
         return hotkeyPanel;
     }
 
     private JButton createHotkeyButton(String label, String id, String keyCode) {
         JButton button = new JButton(label);
         button.addActionListener(e -> sendHotkeyButtonMessage(id, label, keyCode));
+        return button;
+    }
+
+    private JButton createWallOutButton() {
+        JButton button = new JButton("Wall Out 1");
+        button.addActionListener(e -> sendWallOutButtonMessage());
         return button;
     }
 
@@ -199,6 +209,60 @@ public class TradeButtonWindow {
             PluginLog.action(symbol, "Button send " + buttonName);
         }
         PluginLog.info("[TradeButton] " + buttonName + " clicked for " + symbol + " as " + keyCode);
+    }
+
+    private void sendWallOutButtonMessage() {
+        SignalWebSocketServer.ExitWallAdjustment adjustment = server.resolveExitWallAdjustment(
+                symbol,
+                WALL_OUT_PAIR_INDEX,
+                WALL_OUT_MINIMUM_SIZE,
+                WALL_OUT_PRICE_OFFSET);
+        if (!adjustment.isAvailable()) {
+            PluginLog.action(symbol, "Wall Out 1 blocked: " + adjustment.getReason());
+            PluginLog.info("[TradeButton] Wall Out 1 blocked for " + symbol + ": " + adjustment.getReason());
+            return;
+        }
+
+        JsonObject json = new JsonObject();
+        json.addProperty("type", "custom_button_click");
+        json.addProperty("symbol", symbol);
+        json.addProperty("button_id", "hotkey:wall_out_1");
+        json.addProperty("button_name", "Wall Out 1");
+        json.addProperty("action", "adjust_exit_limit_to_bookmap_wall");
+        json.addProperty("pair_index", adjustment.getPairIndex());
+        json.addProperty("order_role", "LIMIT");
+        json.addProperty("limit_order_id", adjustment.getLimitOrderId());
+        json.addProperty("parent_order_id", adjustment.getParentOrderId());
+        json.addProperty("limit_order_quantity", adjustment.getLimitOrderQuantity());
+        json.addProperty("current_limit_price", adjustment.getCurrentLimitPrice());
+        json.addProperty("position_side", adjustment.isLongPosition() ? "long" : "short");
+        json.addProperty("exit_side", adjustment.isLongPosition() ? "sell" : "buy");
+        json.addProperty("wall_side", adjustment.isBidWall() ? "bid" : "ask");
+        json.addProperty("wall_price_tick", adjustment.getWallPriceTick());
+        json.addProperty("wall_price", adjustment.getWallPrice());
+        json.addProperty("wall_size", adjustment.getWallSize());
+        json.addProperty("minimum_wall_size", WALL_OUT_MINIMUM_SIZE);
+        json.addProperty("offset", adjustment.getOffset());
+        json.addProperty("target_price", adjustment.getTargetPrice());
+        json.addProperty("price", adjustment.getTargetPrice());
+        json.addProperty("source", adjustment.getSource());
+        json.addProperty("timestamp", System.currentTimeMillis());
+        server.broadcast(json.toString());
+
+        PluginLog.action(symbol, "Button send Wall Out 1 @ " + formatPrice(adjustment.getTargetPrice())
+                + " before " + (adjustment.isBidWall() ? "bid" : "ask") + " wall "
+                + formatPrice(adjustment.getWallPrice()));
+        PluginLog.info("[TradeButton] Wall Out 1 clicked for " + symbol
+                + ": target=" + formatPrice(adjustment.getTargetPrice())
+                + ", wall=" + formatPrice(adjustment.getWallPrice())
+                + ", size=" + adjustment.getWallSize());
+    }
+
+    private String formatPrice(double price) {
+        if (!Double.isFinite(price) || price <= 0) {
+            return "";
+        }
+        return String.format("%.2f", price);
     }
 
     public void dispose() {

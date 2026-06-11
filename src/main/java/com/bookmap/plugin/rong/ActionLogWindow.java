@@ -105,7 +105,7 @@ public class ActionLogWindow {
 
         accountStatusLabel = new JLabel("Account: waiting for ViteApp");
         positionStatusLabel = new JLabel("Positions (0)");
-        orderStatusLabel = new JLabel("Open Orders (0)");
+        orderStatusLabel = new JLabel("0 exit pair(s)");
         positionTableModel = createTableModel(POSITION_COLUMNS);
         orderTableModel = createTableModel(ORDER_COLUMNS);
         JTable positionTable = createTable(positionTableModel);
@@ -187,7 +187,7 @@ public class ActionLogWindow {
         if (states.isEmpty()) {
             accountStatusLabel.setText("Account: waiting for ViteApp");
             positionStatusLabel.setText("Positions (0)");
-            orderStatusLabel.setText("Open Orders (0)");
+            orderStatusLabel.setText("0 exit pair(s)");
             return;
         }
 
@@ -225,17 +225,17 @@ public class ActionLogWindow {
         }
 
         int orderPairCount = orderPairKeys.size();
-        accountStatusLabel.setText("Account: " + activeSummary(positionCount, orderCount, orderPairCount)
+        accountStatusLabel.setText("Account: " + activeSummary(positionCount, orderPairCount)
                 + " | updated " + LocalTime.now().format(TIME_FMT));
         positionStatusLabel.setText("Positions (" + positionCount + ")");
-        orderStatusLabel.setText("Open Orders (" + orderCount + ", " + orderPairCount + " pair(s))");
+        orderStatusLabel.setText(orderPairCount + " exit pair(s)");
     }
 
-    private static String activeSummary(int positionCount, int orderCount, int orderPairCount) {
-        if (positionCount == 0 && orderCount == 0) {
+    private static String activeSummary(int positionCount, int orderPairCount) {
+        if (positionCount == 0 && orderPairCount == 0) {
             return "no open positions/orders";
         }
-        return positionCount + " position(s), " + orderCount + " order(s), " + orderPairCount + " pair(s)";
+        return positionCount + " position(s), " + orderPairCount + " exit pair(s)";
     }
 
     private static String getOrderPairKey(String symbol, AccountOrderDefinition order) {

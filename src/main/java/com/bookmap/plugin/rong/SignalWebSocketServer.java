@@ -46,6 +46,11 @@ public class SignalWebSocketServer extends WebSocketServer {
         void onExitOrderPairsChanged(String symbol, List<ExitOrderPairDefinition> pairs);
     }
 
+    @FunctionalInterface
+    public interface AccountStateListener {
+        void onAccountStateChanged(AccountStateDefinition state);
+    }
+
     private final Object schedulerLock = new Object();
     private ScheduledExecutorService scheduler;
     private final Path breakoutLogFile;
@@ -57,10 +62,13 @@ public class SignalWebSocketServer extends WebSocketServer {
     private final Map<String, List<TradebookButtonGroup>> symbolToTradebooks = new ConcurrentHashMap<>();
     private final Map<String, List<KeyLevelDefinition>> symbolToKeyLevels = new ConcurrentHashMap<>();
     private final Map<String, List<ExitOrderPairDefinition>> symbolToExitOrderPairs = new ConcurrentHashMap<>();
+    private final Map<String, AccountStateDefinition> symbolToAccountState = new ConcurrentHashMap<>();
     private final Map<String, Set<TradeButtonConfigListener>> symbolToTradeButtonListeners = new ConcurrentHashMap<>();
     private final Set<KeyLevelConfigListener> keyLevelConfigListeners =
             Collections.newSetFromMap(new ConcurrentHashMap<>());
     private final Set<ExitOrderPairsConfigListener> exitOrderPairsConfigListeners =
+            Collections.newSetFromMap(new ConcurrentHashMap<>());
+    private final Set<AccountStateListener> accountStateListeners =
             Collections.newSetFromMap(new ConcurrentHashMap<>());
 
     // Broadcast config
@@ -138,6 +146,74 @@ public class SignalWebSocketServer extends WebSocketServer {
 
     public void unregisterExitOrderPairsConfigListener(ExitOrderPairsConfigListener listener) {
         exitOrderPairsConfigListeners.remove(listener);
+    }
+
+    public void registerAccountStateListener(AccountStateListener listener) {
+        accountStateListeners.add(listener);
+        for (AccountStateDefinition state : symbolToAccountState.values()) {
+            listener.onAccountStateChanged(state);
+        }
+    }
+
+    public void unregisterAccountStateListener(AccountStateListener listener) {
+        accountStateListeners.remove(listener);
+    }
+
+    public ExitWallAdjustment resolveExitWallAdjustment(
+            String symbol,
+            int pairIndex,
+            int minimumWallSize,
+            double targetOffset) {
+        String cleanSymbol = SymbolUtils.cleanSymbol(symbol);
+        if (cleanSymbol.isEmpty()) {
+            return ExitWallAdjustment.unavailable("missing symbol");
+        }
+
+        AccountStateDefinition state = symbolToAccountState.get(cleanSymbol);
+        if (state == null || !state.hasOpenPosition()) {
+            return ExitWallAdjustment.unavailable("no open position for " + cleanSymbol);
+        }
+
+        AccountPositionDefinition position = state.getPosition();
+        boolean longPosition = position.getNetQuantity() > 0;
+        boolean expectedLimitBuySide = !longPosition;
+        LimitOrderRef limitOrder = findPairLimitOrder(cleanSymbol, state, pairIndex, expectedLimitBuySide);
+        if (limitOrder == null) {
+            return ExitWallAdjustment.unavailable("no LIMIT order found for pair " + pairIndex);
+        }
+
+        OrderBookState orderBook = symbolToOrderBook.get(cleanSymbol);
+        Double pips = symbolToPips.get(cleanSymbol);
+        if (orderBook == null || pips == null || pips <= 0 || !Double.isFinite(pips)) {
+            return ExitWallAdjustment.unavailable("order book is not ready for " + cleanSymbol);
+        }
+
+        boolean bidWall = !longPosition;
+        OrderBookState.DepthLevel wall = orderBook.findFirstLevelLargerThan(bidWall, minimumWallSize);
+        if (wall == null) {
+            return ExitWallAdjustment.unavailable(
+                    "no " + (bidWall ? "bid" : "offer") + " wall > " + minimumWallSize);
+        }
+
+        int offsetTicks = Math.max(1, (int) Math.ceil((targetOffset / pips) - 1e-9));
+        int targetTick = longPosition
+                ? wall.getPriceTick() - offsetTicks
+                : wall.getPriceTick() + offsetTicks;
+        if (targetTick <= 0) {
+            return ExitWallAdjustment.unavailable("computed target price is not valid");
+        }
+
+        return ExitWallAdjustment.available(
+                cleanSymbol,
+                pairIndex,
+                longPosition,
+                bidWall,
+                wall.getPriceTick(),
+                wall.getSize(),
+                wall.getPriceTick() * pips,
+                targetTick * pips,
+                targetOffset,
+                limitOrder);
     }
 
     @Override
@@ -367,11 +443,14 @@ public class SignalWebSocketServer extends WebSocketServer {
         }
         List<AccountOrderDefinition> openOrders = parseAccountOrders(symbol, ordersElement);
 
-        ActionLogWindow.updateAccountState(new AccountStateDefinition(
+        AccountStateDefinition state = new AccountStateDefinition(
                 symbol,
                 position,
                 openOrders,
-                getLong(json, "timestamp")));
+                getLong(json, "timestamp"));
+        symbolToAccountState.put(symbol, state);
+        ActionLogWindow.updateAccountState(state);
+        notifyAccountStateListeners(state);
     }
 
     private AccountPositionDefinition parseAccountPosition(String symbol, JsonElement element) {
@@ -452,6 +531,63 @@ public class SignalWebSocketServer extends WebSocketServer {
         return getBoolean(orderJson, "isBuy");
     }
 
+    private LimitOrderRef findPairLimitOrder(
+            String symbol,
+            AccountStateDefinition state,
+            int pairIndex,
+            boolean expectedBuySide) {
+        LimitOrderRef fallback = null;
+        for (AccountOrderDefinition order : state.getOpenOrders()) {
+            if (order == null || order.getPairIndex() != pairIndex || !isLimitOrder(order)) {
+                continue;
+            }
+            LimitOrderRef ref = new LimitOrderRef(
+                    order.getOrderId(),
+                    order.getParentOrderId(),
+                    order.getQuantity(),
+                    order.getPrice(),
+                    order.isBuy(),
+                    order.getSource());
+            if (order.isBuy() == expectedBuySide) {
+                return ref;
+            }
+            if (fallback == null) {
+                fallback = ref;
+            }
+        }
+        if (fallback != null) {
+            return fallback;
+        }
+
+        List<ExitOrderPairDefinition> pairs =
+                symbolToExitOrderPairs.getOrDefault(symbol, Collections.emptyList());
+        for (ExitOrderPairDefinition pair : pairs) {
+            if (pair == null || pair.getIndex() != pairIndex || pair.getLimit() == null) {
+                continue;
+            }
+            ExitOrderLegDefinition limit = pair.getLimit();
+            LimitOrderRef ref = new LimitOrderRef(
+                    limit.getOrderId(),
+                    pair.getParentOrderId(),
+                    limit.getQuantity(),
+                    limit.getPrice(),
+                    limit.isBuy(),
+                    pair.getSource());
+            if (limit.isBuy() == expectedBuySide) {
+                return ref;
+            }
+            if (fallback == null) {
+                fallback = ref;
+            }
+        }
+        return fallback;
+    }
+
+    private boolean isLimitOrder(AccountOrderDefinition order) {
+        return "LIMIT".equalsIgnoreCase(order.getRole())
+                || "LIMIT".equalsIgnoreCase(order.getOrderType());
+    }
+
     private ExitOrderPairDefinition parseExitOrderPair(String symbol, JsonElement element, int fallbackIndex) {
         if (element == null || !element.isJsonObject()) {
             return null;
@@ -518,6 +654,17 @@ public class SignalWebSocketServer extends WebSocketServer {
                 listener.onExitOrderPairsChanged(symbol, pairs);
             } catch (RuntimeException e) {
                 PluginLog.error("[ExitOrder] Failed to update listener for " + symbol + ": " + e.getMessage());
+            }
+        }
+    }
+
+    private void notifyAccountStateListeners(AccountStateDefinition state) {
+        for (AccountStateListener listener : accountStateListeners) {
+            try {
+                listener.onAccountStateChanged(state);
+            } catch (RuntimeException e) {
+                PluginLog.error("[AccountState] Failed to update listener for "
+                        + state.getSymbol() + ": " + e.getMessage());
             }
         }
     }
@@ -620,6 +767,196 @@ public class SignalWebSocketServer extends WebSocketServer {
 
     private String firstNonEmpty(String first, String second) {
         return first == null || first.isEmpty() ? second : first;
+    }
+
+    private static class LimitOrderRef {
+        private final String orderId;
+        private final String parentOrderId;
+        private final double quantity;
+        private final double currentPrice;
+        private final boolean buy;
+        private final String source;
+
+        private LimitOrderRef(
+                String orderId,
+                String parentOrderId,
+                double quantity,
+                double currentPrice,
+                boolean buy,
+                String source) {
+            this.orderId = normalize(orderId);
+            this.parentOrderId = normalize(parentOrderId);
+            this.quantity = quantity;
+            this.currentPrice = currentPrice;
+            this.buy = buy;
+            this.source = normalize(source);
+        }
+    }
+
+    public static class ExitWallAdjustment {
+        private final boolean available;
+        private final String reason;
+        private final String symbol;
+        private final int pairIndex;
+        private final boolean longPosition;
+        private final boolean bidWall;
+        private final int wallPriceTick;
+        private final int wallSize;
+        private final double wallPrice;
+        private final double targetPrice;
+        private final double offset;
+        private final String limitOrderId;
+        private final String parentOrderId;
+        private final double limitOrderQuantity;
+        private final double currentLimitPrice;
+        private final boolean limitOrderBuy;
+        private final String source;
+
+        private ExitWallAdjustment(
+                boolean available,
+                String reason,
+                String symbol,
+                int pairIndex,
+                boolean longPosition,
+                boolean bidWall,
+                int wallPriceTick,
+                int wallSize,
+                double wallPrice,
+                double targetPrice,
+                double offset,
+                String limitOrderId,
+                String parentOrderId,
+                double limitOrderQuantity,
+                double currentLimitPrice,
+                boolean limitOrderBuy,
+                String source) {
+            this.available = available;
+            this.reason = normalize(reason);
+            this.symbol = normalize(symbol);
+            this.pairIndex = pairIndex;
+            this.longPosition = longPosition;
+            this.bidWall = bidWall;
+            this.wallPriceTick = wallPriceTick;
+            this.wallSize = wallSize;
+            this.wallPrice = wallPrice;
+            this.targetPrice = targetPrice;
+            this.offset = offset;
+            this.limitOrderId = normalize(limitOrderId);
+            this.parentOrderId = normalize(parentOrderId);
+            this.limitOrderQuantity = limitOrderQuantity;
+            this.currentLimitPrice = currentLimitPrice;
+            this.limitOrderBuy = limitOrderBuy;
+            this.source = normalize(source);
+        }
+
+        private static ExitWallAdjustment unavailable(String reason) {
+            return new ExitWallAdjustment(
+                    false, reason, "", 0, false, false, 0, 0, 0,
+                    0, 0, "", "", 0, 0, false, "");
+        }
+
+        private static ExitWallAdjustment available(
+                String symbol,
+                int pairIndex,
+                boolean longPosition,
+                boolean bidWall,
+                int wallPriceTick,
+                int wallSize,
+                double wallPrice,
+                double targetPrice,
+                double offset,
+                LimitOrderRef limitOrder) {
+            return new ExitWallAdjustment(
+                    true,
+                    "",
+                    symbol,
+                    pairIndex,
+                    longPosition,
+                    bidWall,
+                    wallPriceTick,
+                    wallSize,
+                    wallPrice,
+                    targetPrice,
+                    offset,
+                    limitOrder.orderId,
+                    limitOrder.parentOrderId,
+                    limitOrder.quantity,
+                    limitOrder.currentPrice,
+                    limitOrder.buy,
+                    limitOrder.source);
+        }
+
+        public boolean isAvailable() {
+            return available;
+        }
+
+        public String getReason() {
+            return reason;
+        }
+
+        public String getSymbol() {
+            return symbol;
+        }
+
+        public int getPairIndex() {
+            return pairIndex;
+        }
+
+        public boolean isLongPosition() {
+            return longPosition;
+        }
+
+        public boolean isBidWall() {
+            return bidWall;
+        }
+
+        public int getWallPriceTick() {
+            return wallPriceTick;
+        }
+
+        public int getWallSize() {
+            return wallSize;
+        }
+
+        public double getWallPrice() {
+            return wallPrice;
+        }
+
+        public double getTargetPrice() {
+            return targetPrice;
+        }
+
+        public double getOffset() {
+            return offset;
+        }
+
+        public String getLimitOrderId() {
+            return limitOrderId;
+        }
+
+        public String getParentOrderId() {
+            return parentOrderId;
+        }
+
+        public double getLimitOrderQuantity() {
+            return limitOrderQuantity;
+        }
+
+        public double getCurrentLimitPrice() {
+            return currentLimitPrice;
+        }
+
+        public boolean isLimitOrderBuy() {
+            return limitOrderBuy;
+        }
+
+        public String getSource() {
+            return source;
+        }
+    }
+
+    private static String normalize(String value) {
+        return value == null ? "" : value;
     }
 
     private synchronized void ensureOrderbookBroadcast() {

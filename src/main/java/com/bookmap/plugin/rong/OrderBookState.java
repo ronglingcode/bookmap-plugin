@@ -30,7 +30,7 @@ public class OrderBookState {
      * Update a price level with an absolute size.
      * Called from onDepth(). size == 0 means the level is empty.
      */
-    public void update(boolean isBid, int price, int size) {
+    public synchronized void update(boolean isBid, int price, int size) {
         TreeMap<Integer, Integer> book = isBid ? bids : asks;
         Integer previousSize = book.get(price);
 
@@ -74,6 +74,17 @@ public class OrderBookState {
     public int getSizeAt(boolean isBid, int price) {
         TreeMap<Integer, Integer> book = isBid ? bids : asks;
         return book.getOrDefault(price, 0);
+    }
+
+    /** First level on the requested side whose size is strictly larger than minSize. */
+    public synchronized DepthLevel findFirstLevelLargerThan(boolean isBid, int minSize) {
+        TreeMap<Integer, Integer> book = isBid ? bids : asks;
+        for (Map.Entry<Integer, Integer> entry : book.entrySet()) {
+            if (entry.getValue() > minSize) {
+                return new DepthLevel(entry.getKey(), entry.getValue());
+            }
+        }
+        return null;
     }
 
     /**
@@ -200,5 +211,23 @@ public class OrderBookState {
 
     private void decrementSizeCount(int size) {
         sizeCounts.computeIfPresent(size, (ignored, count) -> count > 1 ? count - 1 : null);
+    }
+
+    public static class DepthLevel {
+        private final int priceTick;
+        private final int size;
+
+        public DepthLevel(int priceTick, int size) {
+            this.priceTick = priceTick;
+            this.size = size;
+        }
+
+        public int getPriceTick() {
+            return priceTick;
+        }
+
+        public int getSize() {
+            return size;
+        }
     }
 }

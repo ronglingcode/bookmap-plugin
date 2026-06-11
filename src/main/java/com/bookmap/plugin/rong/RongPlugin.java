@@ -81,6 +81,7 @@ public class RongPlugin implements CustomModuleAdapter,
     private static KeyLevelManager keyLevelManager;
     private static CamPivotTracker camPivotTracker;
     private static ExitOrderManager exitOrderManager;
+    private static PendingEntryOrderManager pendingEntryOrderManager;
 
     private String rawAlias;
     private String alias;
@@ -133,6 +134,8 @@ public class RongPlugin implements CustomModuleAdapter,
                 sharedServer.registerKeyLevelConfigListener(keyLevelManager);
                 exitOrderManager = new ExitOrderManager(priceLineStore);
                 sharedServer.registerExitOrderPairsConfigListener(exitOrderManager);
+                pendingEntryOrderManager = new PendingEntryOrderManager(priceLineStore);
+                sharedServer.registerAccountStateListener(pendingEntryOrderManager);
                 camPivotTracker = new CamPivotTracker(priceLineStore, indicatorConfig);
             }
             instanceCount++;
@@ -183,6 +186,9 @@ public class RongPlugin implements CustomModuleAdapter,
         }
         if (exitOrderManager != null) {
             exitOrderManager.onInstrumentInitialized(cleanAlias, info.pips);
+        }
+        if (pendingEntryOrderManager != null) {
+            pendingEntryOrderManager.onInstrumentInitialized(cleanAlias, info.pips);
         }
 
         // Fetch cam pivots + premarket high/low from EdgeDesk API (runs on background thread)
@@ -257,6 +263,9 @@ public class RongPlugin implements CustomModuleAdapter,
         if (exitOrderManager != null) {
             exitOrderManager.onInstrumentStopped(alias);
         }
+        if (pendingEntryOrderManager != null) {
+            pendingEntryOrderManager.onInstrumentStopped(alias);
+        }
         if (priceLineStore != null) {
             priceLineStore.clearAll(alias);
         }
@@ -291,6 +300,11 @@ public class RongPlugin implements CustomModuleAdapter,
                     exitOrderManager.shutdown();
                     exitOrderManager = null;
                 }
+                if (pendingEntryOrderManager != null) {
+                    sharedServer.unregisterAccountStateListener(pendingEntryOrderManager);
+                    pendingEntryOrderManager.shutdown();
+                    pendingEntryOrderManager = null;
+                }
                 if (wallLabelPainter != null) {
                     wallLabelPainter.shutdown();
                 }
@@ -309,6 +323,7 @@ public class RongPlugin implements CustomModuleAdapter,
                 wallChangePainter = null;
                 indicatorConfig = null;
                 replayExportConfig = null;
+                pendingEntryOrderManager = null;
                 instanceCount = 0;
                 PluginLog.info("[Rong] Shared WebSocket server shut down");
             }
