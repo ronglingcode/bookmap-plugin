@@ -1,6 +1,7 @@
 package com.bookmap.plugin.rong;
 
 import java.awt.BorderLayout;
+import java.awt.Component;
 import java.awt.Dimension;
 import java.awt.Font;
 import java.awt.GridLayout;
@@ -17,6 +18,7 @@ import java.util.Map;
 import java.util.Set;
 
 import javax.swing.BorderFactory;
+import javax.swing.BoxLayout;
 import javax.swing.JFrame;
 import javax.swing.JLabel;
 import javax.swing.JPanel;
@@ -27,18 +29,23 @@ import javax.swing.SwingUtilities;
 import javax.swing.table.DefaultTableModel;
 
 /**
- * Small action-only log window. It intentionally stays separate from PluginLog's
- * verbose file logging so the UI only shows trading actions worth glancing at.
+ * Shared floating Rong control window. It combines trade buttons, account state,
+ * and action logs in one always-on-top frame.
  */
 public class ActionLogWindow {
 
     private static final int MAX_LINES = 20;
+    private static final int WINDOW_WIDTH = 760;
+    private static final int WINDOW_HEIGHT = 760;
+    private static final int CONTENT_WIDTH = 720;
     private static final DateTimeFormatter TIME_FMT = DateTimeFormatter.ofPattern("HH:mm:ss");
     private static final Deque<String> lines = new ArrayDeque<>();
     private static final Map<String, AccountStateDefinition> accountStates = new LinkedHashMap<>();
+    private static final Map<String, JPanel> tradeButtonPanels = new LinkedHashMap<>();
     private static final String[] POSITION_COLUMNS = {"Symbol", "Side", "Risk %", "Avg"};
     private static final String[] ORDER_COLUMNS = {"Symbol", "Role", "Side", "Qty", "Type", "Price", "Ref"};
     private static JFrame frame;
+    private static JPanel tradeButtonsContainer;
     private static JLabel accountStatusLabel;
     private static JLabel positionStatusLabel;
     private static JLabel orderStatusLabel;
@@ -75,13 +82,50 @@ public class ActionLogWindow {
         });
     }
 
+    public static void registerTradeButtonPanel(String symbol, JPanel panel) {
+        String cleanSymbol = SymbolUtils.cleanSymbol(symbol);
+        if (cleanSymbol.isEmpty() || panel == null) {
+            return;
+        }
+        SwingUtilities.invokeLater(() -> {
+            ensureWindow();
+            tradeButtonPanels.put(cleanSymbol, panel);
+            renderTradeButtons();
+        });
+    }
+
+    public static void unregisterTradeButtonPanel(String symbol, JPanel panel) {
+        String cleanSymbol = SymbolUtils.cleanSymbol(symbol);
+        if (cleanSymbol.isEmpty()) {
+            return;
+        }
+        SwingUtilities.invokeLater(() -> {
+            JPanel existing = tradeButtonPanels.get(cleanSymbol);
+            if (existing == panel || panel == null) {
+                tradeButtonPanels.remove(cleanSymbol);
+                renderTradeButtons();
+            }
+        });
+    }
+
+    public static void refreshLayout() {
+        SwingUtilities.invokeLater(() -> {
+            if (frame != null) {
+                frame.revalidate();
+                frame.repaint();
+            }
+        });
+    }
+
     public static void dispose() {
         SwingUtilities.invokeLater(() -> {
             lines.clear();
             accountStates.clear();
+            tradeButtonPanels.clear();
             if (frame != null) {
                 frame.dispose();
                 frame = null;
+                tradeButtonsContainer = null;
                 accountStatusLabel = null;
                 positionStatusLabel = null;
                 orderStatusLabel = null;
@@ -96,7 +140,7 @@ public class ActionLogWindow {
         if (frame != null) {
             return;
         }
-        frame = new JFrame("Rong Logs");
+        frame = new JFrame("Rong");
         frame.setAlwaysOnTop(true);
         frame.setDefaultCloseOperation(JFrame.DO_NOTHING_ON_CLOSE);
         textArea = new JTextArea(20, 54);
@@ -124,13 +168,32 @@ public class ActionLogWindow {
         logPanel.setBorder(BorderFactory.createTitledBorder("Actions"));
         logPanel.add(new JScrollPane(textArea), BorderLayout.CENTER);
 
+        JPanel topPanel = new JPanel(new BorderLayout(0, 6));
+        topPanel.add(createTradeButtonsSection(), BorderLayout.NORTH);
+        topPanel.add(accountPanel, BorderLayout.CENTER);
+
         frame.getContentPane().setLayout(new BorderLayout());
-        frame.getContentPane().add(accountPanel, BorderLayout.NORTH);
+        frame.getContentPane().add(topPanel, BorderLayout.NORTH);
         frame.getContentPane().add(logPanel, BorderLayout.CENTER);
-        frame.setPreferredSize(new Dimension(760, 620));
+        frame.setPreferredSize(new Dimension(WINDOW_WIDTH, WINDOW_HEIGHT));
+        frame.setMinimumSize(new Dimension(WINDOW_WIDTH, 620));
         frame.pack();
         frame.setVisible(true);
+        renderTradeButtons();
         renderAccountState();
+    }
+
+    private static JPanel createTradeButtonsSection() {
+        JPanel section = new JPanel(new BorderLayout());
+        section.setBorder(BorderFactory.createTitledBorder("Trade Buttons"));
+
+        tradeButtonsContainer = new JPanel();
+        tradeButtonsContainer.setLayout(new BoxLayout(tradeButtonsContainer, BoxLayout.Y_AXIS));
+
+        JScrollPane scrollPane = new JScrollPane(tradeButtonsContainer);
+        scrollPane.setPreferredSize(new Dimension(CONTENT_WIDTH, 220));
+        section.add(scrollPane, BorderLayout.CENTER);
+        return section;
     }
 
     private static String formatLine(String symbol, String source, String message) {
@@ -168,9 +231,38 @@ public class ActionLogWindow {
         statusLabel.setText(title + " (0)");
         section.add(statusLabel, BorderLayout.NORTH);
         JScrollPane scrollPane = new JScrollPane(table);
-        scrollPane.setPreferredSize(new Dimension(720, height));
+        scrollPane.setPreferredSize(new Dimension(CONTENT_WIDTH, height));
         section.add(scrollPane, BorderLayout.CENTER);
         return section;
+    }
+
+    private static void renderTradeButtons() {
+        if (tradeButtonsContainer == null) {
+            return;
+        }
+        tradeButtonsContainer.removeAll();
+
+        List<String> symbols = new ArrayList<>(tradeButtonPanels.keySet());
+        symbols.sort(Comparator.naturalOrder());
+        if (symbols.isEmpty()) {
+            JLabel placeholder = new JLabel("Waiting for instruments");
+            placeholder.setAlignmentX(Component.LEFT_ALIGNMENT);
+            tradeButtonsContainer.add(placeholder);
+        } else {
+            for (String symbol : symbols) {
+                JPanel panel = tradeButtonPanels.get(symbol);
+                if (panel == null) {
+                    continue;
+                }
+                panel.setAlignmentX(Component.LEFT_ALIGNMENT);
+                panel.setMaximumSize(new Dimension(Integer.MAX_VALUE, panel.getPreferredSize().height));
+                tradeButtonsContainer.add(panel);
+            }
+        }
+
+        tradeButtonsContainer.revalidate();
+        tradeButtonsContainer.repaint();
+        refreshLayout();
     }
 
     private static void renderAccountState() {

@@ -2,6 +2,8 @@ package com.bookmap.plugin.rong.tradebuttons;
 
 import java.awt.BorderLayout;
 import java.awt.Color;
+import java.awt.Component;
+import java.awt.Dimension;
 import java.awt.GridLayout;
 import java.util.Collections;
 import java.util.List;
@@ -9,19 +11,19 @@ import java.util.List;
 import javax.swing.BorderFactory;
 import javax.swing.BoxLayout;
 import javax.swing.JButton;
-import javax.swing.JFrame;
 import javax.swing.JLabel;
 import javax.swing.JPanel;
 import javax.swing.SwingConstants;
 import javax.swing.SwingUtilities;
 import javax.swing.border.EmptyBorder;
 
+import com.bookmap.plugin.rong.ActionLogWindow;
 import com.bookmap.plugin.rong.PluginLog;
 import com.bookmap.plugin.rong.SignalWebSocketServer;
 import com.google.gson.JsonObject;
 
 /**
- * Floating always-on-top trade button panel for a single symbol.
+ * Symbol-specific trade button panel embedded in the shared Rong window.
  */
 public class TradeButtonWindow {
 
@@ -35,61 +37,70 @@ public class TradeButtonWindow {
     private final String symbol;
     private final SignalWebSocketServer server;
     private final SignalWebSocketServer.TradeButtonConfigListener buttonConfigListener;
-    private JFrame frame;
     private JPanel buttonPanel;
+    private volatile boolean disposed;
 
     public TradeButtonWindow(String symbol, SignalWebSocketServer server) {
         this.symbol = symbol;
         this.server = server;
         this.buttonConfigListener = this::setButtons;
-        SwingUtilities.invokeLater(this::buildWindow);
+        SwingUtilities.invokeLater(this::buildPanel);
     }
 
-    private void buildWindow() {
-        frame = new JFrame("Trade: " + symbol);
-        frame.setAlwaysOnTop(true);
-        frame.setDefaultCloseOperation(JFrame.DO_NOTHING_ON_CLOSE);
-        frame.setResizable(false);
-
+    private void buildPanel() {
+        if (disposed) {
+            return;
+        }
         buttonPanel = new JPanel();
-        buttonPanel.setBorder(new EmptyBorder(8, 8, 8, 8));
-        frame.setContentPane(buttonPanel);
+        buttonPanel.setBorder(BorderFactory.createCompoundBorder(
+                BorderFactory.createTitledBorder("Trade: " + symbol),
+                new EmptyBorder(6, 6, 6, 6)));
         renderButtons(Collections.emptyList());
-        frame.pack();
-        frame.setVisible(true);
+        ActionLogWindow.registerTradeButtonPanel(symbol, buttonPanel);
 
         server.registerTradeButtonConfigListener(symbol, buttonConfigListener);
     }
 
     private void setButtons(List<TradebookButtonGroup> tradebooks) {
-        SwingUtilities.invokeLater(() -> renderButtons(tradebooks));
+        SwingUtilities.invokeLater(() -> {
+            if (!disposed) {
+                renderButtons(tradebooks);
+            }
+        });
     }
 
     private void renderButtons(List<TradebookButtonGroup> tradebooks) {
-        if (buttonPanel == null) {
+        if (disposed || buttonPanel == null) {
             return;
         }
         buttonPanel.removeAll();
         buttonPanel.setLayout(new BoxLayout(buttonPanel, BoxLayout.Y_AXIS));
-        buttonPanel.add(createHotkeyPanel());
+        addFullWidth(createHotkeyPanel());
 
         boolean hasTradebookButtons = false;
         if (tradebooks != null && !tradebooks.isEmpty()) {
             for (TradebookButtonGroup tradebook : tradebooks) {
                 if (!tradebook.getEntryMethods().isEmpty()) {
-                    buttonPanel.add(createTradebookPanel(tradebook));
+                    addFullWidth(createTradebookPanel(tradebook));
                     hasTradebookButtons = true;
                 }
             }
         }
         if (!hasTradebookButtons) {
-            buttonPanel.add(new JLabel("Waiting for buttons", SwingConstants.CENTER));
+            JLabel waitingLabel = new JLabel("Waiting for buttons", SwingConstants.CENTER);
+            waitingLabel.setAlignmentX(Component.LEFT_ALIGNMENT);
+            buttonPanel.add(waitingLabel);
         }
+        buttonPanel.setMaximumSize(new Dimension(Integer.MAX_VALUE, buttonPanel.getPreferredSize().height));
         buttonPanel.revalidate();
         buttonPanel.repaint();
-        if (frame != null) {
-            frame.pack();
-        }
+        ActionLogWindow.refreshLayout();
+    }
+
+    private void addFullWidth(JPanel panel) {
+        panel.setAlignmentX(Component.LEFT_ALIGNMENT);
+        panel.setMaximumSize(new Dimension(Integer.MAX_VALUE, panel.getPreferredSize().height));
+        buttonPanel.add(panel);
     }
 
     private JPanel createHotkeyPanel() {
@@ -267,12 +278,11 @@ public class TradeButtonWindow {
     }
 
     public void dispose() {
+        disposed = true;
         server.unregisterTradeButtonConfigListener(symbol, buttonConfigListener);
         SwingUtilities.invokeLater(() -> {
-            if (frame != null) {
-                frame.dispose();
-                frame = null;
-            }
+            ActionLogWindow.unregisterTradeButtonPanel(symbol, buttonPanel);
+            buttonPanel = null;
         });
     }
 }
