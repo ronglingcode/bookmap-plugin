@@ -93,12 +93,13 @@ public class TradeButtonWindow {
     }
 
     private JPanel createHotkeyPanel() {
-        JPanel hotkeyPanel = new JPanel(new GridLayout(1, 4, 6, 6));
+        JPanel hotkeyPanel = new JPanel(new GridLayout(1, 5, 6, 6));
         hotkeyPanel.setBorder(BorderFactory.createEmptyBorder(0, 0, 8, 0));
         hotkeyPanel.add(createHotkeyButton("Cancel", "cancel", "KeyC"));
         hotkeyPanel.add(createHotkeyButton("Flatten", "flatten", "KeyF"));
         hotkeyPanel.add(createHotkeyButton("Market Out 1", "market_out_1_partial", "KeyM"));
         hotkeyPanel.add(createWallOutButton());
+        hotkeyPanel.add(createHotkeyButton("Swap", "swap", "KeyW"));
         return hotkeyPanel;
     }
 
