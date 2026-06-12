@@ -4,11 +4,22 @@ import java.awt.BorderLayout;
 import java.awt.Color;
 import java.awt.Component;
 import java.awt.Dimension;
+import java.awt.Font;
 import java.awt.GridLayout;
+import java.awt.AWTEvent;
+import java.awt.Toolkit;
+import java.awt.event.AWTEventListener;
+import java.awt.event.ActionEvent;
+import java.awt.event.InputEvent;
+import java.awt.event.KeyEvent;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
+import java.awt.event.WindowAdapter;
+import java.awt.event.WindowEvent;
 import java.util.Collections;
 import java.util.List;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 
 import javax.swing.BorderFactory;
 import javax.swing.BoxLayout;
@@ -33,17 +44,29 @@ public class TradeButtonWindow {
     private static final Color SHORT_TRADEBOOK_BUTTON_COLOR = new Color(180, 62, 62);
     private static final Color TRADEBOOK_BUTTON_TEXT_COLOR = Color.WHITE;
     private static final Color HOTKEY_BUTTON_HOVER_COLOR = new Color(222, 235, 255);
+    private static final Color MODE_BREAKOUT_BACKGROUND = new Color(38, 139, 88);
+    private static final Color MODE_MARKET_BACKGROUND = new Color(190, 121, 28);
+    private static final Color MODE_TEXT_COLOR = Color.WHITE;
     private static final int WINDOW_WIDTH = 760;
     private static final int CONTENT_WIDTH = 720;
     private static final int WALL_OUT_PAIR_INDEX = 1;
     private static final int WALL_OUT_MINIMUM_SIZE = 5_000;
     private static final double WALL_OUT_PRICE_OFFSET = 0.02;
+    private static final String SHIFT_DOWN_CLIENT_PROPERTY = "rong.shiftDownForClick";
+    private static final Object SHIFT_LISTENER_LOCK = new Object();
+    private static final Set<TradeButtonWindow> OPEN_WINDOWS =
+            Collections.newSetFromMap(new ConcurrentHashMap<>());
+    private static final Set<String> PRESSED_SHIFT_KEYS =
+            Collections.newSetFromMap(new ConcurrentHashMap<>());
+    private static volatile AWTEventListener shiftStateListener;
+    private static volatile boolean shiftPressed;
 
     private final String symbol;
     private final SignalWebSocketServer server;
     private final SignalWebSocketServer.TradeButtonConfigListener buttonConfigListener;
     private JFrame frame;
     private JPanel buttonPanel;
+    private JLabel shiftModeLabel;
     private volatile boolean disposed;
 
     public TradeButtonWindow(String symbol, SignalWebSocketServer server) {
@@ -61,10 +84,22 @@ public class TradeButtonWindow {
         frame.setAlwaysOnTop(true);
         frame.setDefaultCloseOperation(JFrame.DO_NOTHING_ON_CLOSE);
         frame.setResizable(false);
+        frame.addWindowFocusListener(new WindowAdapter() {
+            @Override
+            public void windowGainedFocus(WindowEvent e) {
+                updateModeLabel(shiftPressed);
+            }
+
+            @Override
+            public void windowLostFocus(WindowEvent e) {
+                clearShiftState();
+            }
+        });
 
         buttonPanel = new JPanel();
         buttonPanel.setBorder(new EmptyBorder(8, 8, 8, 8));
         frame.setContentPane(buttonPanel);
+        registerShiftTracker(this);
         renderButtons(Collections.emptyList());
         frame.setVisible(true);
 
@@ -86,6 +121,7 @@ public class TradeButtonWindow {
         buttonPanel.removeAll();
         buttonPanel.setPreferredSize(null);
         buttonPanel.setLayout(new BoxLayout(buttonPanel, BoxLayout.Y_AXIS));
+        addFullWidth(createModePanel());
         addFullWidth(createHotkeyPanel());
 
         boolean hasTradebookButtons = false;
@@ -146,6 +182,21 @@ public class TradeButtonWindow {
         return button;
     }
 
+    private JPanel createModePanel() {
+        JPanel modePanel = new JPanel(new BorderLayout());
+        modePanel.setBorder(BorderFactory.createEmptyBorder(0, 0, 8, 0));
+        shiftModeLabel = new JLabel("", SwingConstants.CENTER);
+        shiftModeLabel.setOpaque(true);
+        shiftModeLabel.setForeground(MODE_TEXT_COLOR);
+        shiftModeLabel.setFont(shiftModeLabel.getFont().deriveFont(Font.BOLD));
+        shiftModeLabel.setBorder(BorderFactory.createEmptyBorder(5, 8, 5, 8));
+        updateModeLabel(shiftPressed);
+        modePanel.add(shiftModeLabel, BorderLayout.CENTER);
+        attachShiftMouseRefresh(modePanel);
+        attachShiftMouseRefresh(shiftModeLabel);
+        return modePanel;
+    }
+
     private JPanel createTradebookPanel(TradebookButtonGroup tradebook) {
         JPanel tradebookPanel = new JPanel(new BorderLayout(0, 6));
         tradebookPanel.setBorder(BorderFactory.createCompoundBorder(
@@ -157,28 +208,53 @@ public class TradeButtonWindow {
         JLabel tradebookLabel = new JLabel(tradebook.getLabel());
         tradebookPanel.add(tradebookLabel, BorderLayout.NORTH);
 
-        JPanel orderTypeHeaders = new JPanel(new GridLayout(1, 2, 6, 6));
-        orderTypeHeaders.add(new JLabel("Breakout", SwingConstants.CENTER));
-        orderTypeHeaders.add(new JLabel("Market", SwingConstants.CENTER));
-
-        JPanel entryMethodPanel = new JPanel(new GridLayout(tradebook.getEntryMethods().size(), 2, 6, 6));
+        JPanel entryMethodPanel = new JPanel(new GridLayout(tradebook.getEntryMethods().size(), 1, 6, 6));
         for (String entryMethod : tradebook.getEntryMethods()) {
-            entryMethodPanel.add(createButton(tradebook, entryMethod, false));
-            entryMethodPanel.add(createButton(tradebook, entryMethod, true));
+            entryMethodPanel.add(createEntryButton(tradebook, entryMethod));
         }
-
-        JPanel buttonsPanel = new JPanel(new BorderLayout(0, 4));
-        buttonsPanel.add(orderTypeHeaders, BorderLayout.NORTH);
-        buttonsPanel.add(entryMethodPanel, BorderLayout.CENTER);
-        tradebookPanel.add(buttonsPanel, BorderLayout.CENTER);
+        tradebookPanel.add(entryMethodPanel, BorderLayout.CENTER);
         return tradebookPanel;
     }
 
-    private JButton createButton(TradebookButtonGroup tradebook, String entryMethod, boolean useMarketOrder) {
-        String orderType = useMarketOrder ? "Mkt" : "Breakout";
+    private JButton createEntryButton(TradebookButtonGroup tradebook, String entryMethod) {
         JButton button = new JButton(entryMethod);
         applyTradebookButtonStyle(button, tradebook.getSide());
-        button.addActionListener(e -> sendTradeButtonMessage(tradebook, entryMethod, useMarketOrder));
+        button.setToolTipText("Click sends Breakout. Shift+click sends Market.");
+        button.putClientProperty(SHIFT_DOWN_CLIENT_PROPERTY, Boolean.FALSE);
+        button.addMouseListener(new MouseAdapter() {
+            @Override
+            public void mouseEntered(MouseEvent e) {
+                if (button.getModel().isPressed()) {
+                    boolean shiftDown = isShiftModified(e);
+                    button.putClientProperty(SHIFT_DOWN_CLIENT_PROPERTY, shiftDown);
+                    setShiftPressed(shiftDown);
+                }
+            }
+
+            @Override
+            public void mousePressed(MouseEvent e) {
+                boolean shiftDown = isShiftModified(e);
+                button.putClientProperty(SHIFT_DOWN_CLIENT_PROPERTY, shiftDown);
+                setShiftPressed(shiftDown);
+            }
+
+            @Override
+            public void mouseReleased(MouseEvent e) {
+                setShiftPressed(isShiftModified(e));
+            }
+
+            @Override
+            public void mouseExited(MouseEvent e) {
+                button.putClientProperty(SHIFT_DOWN_CLIENT_PROPERTY, Boolean.FALSE);
+                setShiftPressed(isShiftModified(e));
+            }
+        });
+        button.addActionListener(e -> {
+            boolean useMarketOrder = isMarketOrderAction(e, button);
+            button.putClientProperty(SHIFT_DOWN_CLIENT_PROPERTY, Boolean.FALSE);
+            setShiftPressed(useMarketOrder);
+            sendTradeButtonMessage(tradebook, entryMethod, useMarketOrder);
+        });
         return button;
     }
 
@@ -203,6 +279,7 @@ public class TradeButtonWindow {
         button.setOpaque(true);
         button.setContentAreaFilled(true);
         button.setRolloverEnabled(true);
+        attachShiftMouseRefresh(button);
         button.addMouseListener(new MouseAdapter() {
             @Override
             public void mouseEntered(MouseEvent e) {
@@ -214,6 +291,25 @@ public class TradeButtonWindow {
             @Override
             public void mouseExited(MouseEvent e) {
                 button.setBackground(baseColor);
+            }
+        });
+    }
+
+    private void attachShiftMouseRefresh(Component component) {
+        component.addMouseListener(new MouseAdapter() {
+            @Override
+            public void mouseEntered(MouseEvent e) {
+                setShiftPressed(isShiftModified(e));
+            }
+
+            @Override
+            public void mousePressed(MouseEvent e) {
+                setShiftPressed(isShiftModified(e));
+            }
+
+            @Override
+            public void mouseReleased(MouseEvent e) {
+                setShiftPressed(isShiftModified(e));
             }
         });
     }
@@ -241,6 +337,105 @@ public class TradeButtonWindow {
             return SHORT_TRADEBOOK_BUTTON_COLOR;
         }
         return null;
+    }
+
+    static boolean isShiftModified(ActionEvent event) {
+        if (event == null) {
+            return false;
+        }
+        int modifiers = event.getModifiers();
+        return (modifiers & ActionEvent.SHIFT_MASK) != 0
+                || (modifiers & InputEvent.SHIFT_DOWN_MASK) != 0;
+    }
+
+    private static boolean isShiftModified(MouseEvent event) {
+        return event != null && event.isShiftDown();
+    }
+
+    private static boolean isMarketOrderAction(ActionEvent event, JButton button) {
+        return isShiftModified(event)
+                || Boolean.TRUE.equals(button.getClientProperty(SHIFT_DOWN_CLIENT_PROPERTY));
+    }
+
+    private void updateModeLabel(boolean marketMode) {
+        if (shiftModeLabel == null) {
+            return;
+        }
+        shiftModeLabel.setText(marketMode
+                ? "Mode: MARKET - Shift pressed"
+                : "Mode: BREAKOUT - Shift not pressed");
+        shiftModeLabel.setBackground(marketMode ? MODE_MARKET_BACKGROUND : MODE_BREAKOUT_BACKGROUND);
+    }
+
+    private static void registerShiftTracker(TradeButtonWindow window) {
+        OPEN_WINDOWS.add(window);
+        ensureShiftStateListener();
+    }
+
+    private static void unregisterShiftTracker(TradeButtonWindow window) {
+        OPEN_WINDOWS.remove(window);
+        if (!OPEN_WINDOWS.isEmpty()) {
+            return;
+        }
+        synchronized (SHIFT_LISTENER_LOCK) {
+            if (!OPEN_WINDOWS.isEmpty()) {
+                return;
+            }
+            if (shiftStateListener != null) {
+                Toolkit.getDefaultToolkit().removeAWTEventListener(shiftStateListener);
+                shiftStateListener = null;
+            }
+            PRESSED_SHIFT_KEYS.clear();
+            shiftPressed = false;
+        }
+    }
+
+    private static void ensureShiftStateListener() {
+        if (shiftStateListener != null) {
+            return;
+        }
+        synchronized (SHIFT_LISTENER_LOCK) {
+            if (shiftStateListener != null) {
+                return;
+            }
+            shiftStateListener = event -> {
+                if (!(event instanceof KeyEvent)) {
+                    return;
+                }
+                KeyEvent keyEvent = (KeyEvent) event;
+                if (keyEvent.getKeyCode() != KeyEvent.VK_SHIFT) {
+                    return;
+                }
+                if (keyEvent.getID() == KeyEvent.KEY_PRESSED) {
+                    PRESSED_SHIFT_KEYS.add(shiftKeyId(keyEvent));
+                    setShiftPressed(true);
+                } else if (keyEvent.getID() == KeyEvent.KEY_RELEASED) {
+                    PRESSED_SHIFT_KEYS.remove(shiftKeyId(keyEvent));
+                    setShiftPressed(!PRESSED_SHIFT_KEYS.isEmpty());
+                }
+            };
+            Toolkit.getDefaultToolkit().addAWTEventListener(shiftStateListener, AWTEvent.KEY_EVENT_MASK);
+        }
+    }
+
+    private static String shiftKeyId(KeyEvent event) {
+        return event.getKeyCode() + ":" + event.getKeyLocation();
+    }
+
+    private static void clearShiftState() {
+        PRESSED_SHIFT_KEYS.clear();
+        setShiftPressed(false);
+    }
+
+    private static void setShiftPressed(boolean pressed) {
+        shiftPressed = pressed;
+        SwingUtilities.invokeLater(() -> {
+            for (TradeButtonWindow window : OPEN_WINDOWS) {
+                if (!window.disposed) {
+                    window.updateModeLabel(pressed);
+                }
+            }
+        });
     }
 
     private void sendTradeButtonMessage(TradebookButtonGroup tradebook, String entryMethod, boolean useMarketOrder) {
@@ -335,6 +530,7 @@ public class TradeButtonWindow {
 
     public void dispose() {
         disposed = true;
+        unregisterShiftTracker(this);
         server.unregisterTradeButtonConfigListener(symbol, buttonConfigListener);
         SwingUtilities.invokeLater(() -> {
             if (frame != null) {
@@ -342,6 +538,7 @@ public class TradeButtonWindow {
                 frame = null;
             }
             buttonPanel = null;
+            shiftModeLabel = null;
         });
     }
 }
