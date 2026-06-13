@@ -12,17 +12,21 @@ public class AccountStateDefinition {
     private final String symbol;
     private final AccountPositionDefinition position;
     private final List<AccountOrderDefinition> openOrders;
+    private final List<AccountExecutionDefinition> executions;
     private final long timestamp;
 
     public AccountStateDefinition(
             String symbol,
             AccountPositionDefinition position,
             List<AccountOrderDefinition> openOrders,
+            List<AccountExecutionDefinition> executions,
             long timestamp) {
         this.symbol = normalize(symbol);
         this.position = position;
         List<AccountOrderDefinition> orders = openOrders == null ? Collections.emptyList() : openOrders;
         this.openOrders = Collections.unmodifiableList(new ArrayList<>(orders));
+        List<AccountExecutionDefinition> fills = executions == null ? Collections.emptyList() : executions;
+        this.executions = Collections.unmodifiableList(new ArrayList<>(fills));
         this.timestamp = timestamp;
     }
 
@@ -36,6 +40,10 @@ public class AccountStateDefinition {
 
     public List<AccountOrderDefinition> getOpenOrders() {
         return openOrders;
+    }
+
+    public List<AccountExecutionDefinition> getExecutions() {
+        return executions;
     }
 
     public long getTimestamp() {

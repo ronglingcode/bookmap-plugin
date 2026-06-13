@@ -6,6 +6,9 @@ import java.time.format.DateTimeFormatter;
 import java.util.List;
 
 import com.bookmap.plugin.rong.exporter.BookmapReplayExportSession;
+import com.bookmap.plugin.rong.executions.FilledExecutionManager;
+import com.bookmap.plugin.rong.executions.FilledExecutionPainter;
+import com.bookmap.plugin.rong.executions.FilledExecutionStore;
 import com.bookmap.plugin.rong.orderwall.OrderWallChangeEvent;
 import com.bookmap.plugin.rong.orderwall.OrderWallChangePainter;
 import com.bookmap.plugin.rong.orderwall.OrderWallChangeSound;
@@ -82,6 +85,9 @@ public class RongPlugin implements CustomModuleAdapter,
     private static CamPivotTracker camPivotTracker;
     private static ExitOrderManager exitOrderManager;
     private static PendingEntryOrderManager pendingEntryOrderManager;
+    private static FilledExecutionStore filledExecutionStore;
+    private static FilledExecutionPainter filledExecutionPainter;
+    private static FilledExecutionManager filledExecutionManager;
 
     private String rawAlias;
     private String alias;
@@ -136,6 +142,10 @@ public class RongPlugin implements CustomModuleAdapter,
                 sharedServer.registerExitOrderPairsConfigListener(exitOrderManager);
                 pendingEntryOrderManager = new PendingEntryOrderManager(priceLineStore);
                 sharedServer.registerAccountStateListener(pendingEntryOrderManager);
+                filledExecutionStore = new FilledExecutionStore();
+                filledExecutionPainter = new FilledExecutionPainter(filledExecutionStore);
+                filledExecutionManager = new FilledExecutionManager(filledExecutionStore);
+                sharedServer.registerAccountStateListener(filledExecutionManager);
                 camPivotTracker = new CamPivotTracker(priceLineStore, indicatorConfig);
             }
             instanceCount++;
@@ -155,6 +165,7 @@ public class RongPlugin implements CustomModuleAdapter,
         priceLinePainter.registerInstrument(cleanAlias);
         wallLabelPainter.registerInstrument(cleanAlias);
         wallChangePainter.registerInstrument(cleanAlias);
+        filledExecutionPainter.registerInstrument(cleanAlias);
 
         // Register ScreenSpacePainter to receive chart coordinate mappings
         api.sendUserMessage(Layer1ApiUserMessageModifyScreenSpacePainter.builder(
@@ -179,6 +190,11 @@ public class RongPlugin implements CustomModuleAdapter,
                 .setScreenSpacePainterFactory(wallChangePainter)
                 .setIsAdd(true)
                 .build());
+        api.sendUserMessage(Layer1ApiUserMessageModifyScreenSpacePainter.builder(
+                RongPlugin.class, FilledExecutionPainter.PAINTER_NAME_PREFIX + cleanAlias)
+                .setScreenSpacePainterFactory(filledExecutionPainter)
+                .setIsAdd(true)
+                .build());
 
         // Draw predefined key price levels for this instrument
         if (keyLevelManager != null) {
@@ -189,6 +205,9 @@ public class RongPlugin implements CustomModuleAdapter,
         }
         if (pendingEntryOrderManager != null) {
             pendingEntryOrderManager.onInstrumentInitialized(cleanAlias, info.pips);
+        }
+        if (filledExecutionManager != null) {
+            filledExecutionManager.onInstrumentInitialized(cleanAlias, info.pips);
         }
 
         // Fetch cam pivots + premarket high/low from EdgeDesk API (runs on background thread)
@@ -229,6 +248,9 @@ public class RongPlugin implements CustomModuleAdapter,
         if (wallChangePainter != null) {
             wallChangePainter.unregisterInstrument(alias);
         }
+        if (filledExecutionPainter != null) {
+            filledExecutionPainter.unregisterInstrument(alias);
+        }
         // Unregister ScreenSpacePainters
         api.sendUserMessage(Layer1ApiUserMessageModifyScreenSpacePainter.builder(
                 RongPlugin.class, "clickHandler_" + alias)
@@ -250,6 +272,11 @@ public class RongPlugin implements CustomModuleAdapter,
                 .setScreenSpacePainterFactory(wallChangePainter)
                 .setIsAdd(false)
                 .build());
+        api.sendUserMessage(Layer1ApiUserMessageModifyScreenSpacePainter.builder(
+                RongPlugin.class, FilledExecutionPainter.PAINTER_NAME_PREFIX + alias)
+                .setScreenSpacePainterFactory(filledExecutionPainter)
+                .setIsAdd(false)
+                .build());
 
         if (premarketTracker != null) {
             premarketTracker.unregister(alias);
@@ -266,6 +293,9 @@ public class RongPlugin implements CustomModuleAdapter,
         if (pendingEntryOrderManager != null) {
             pendingEntryOrderManager.onInstrumentStopped(alias);
         }
+        if (filledExecutionManager != null) {
+            filledExecutionManager.onInstrumentStopped(alias);
+        }
         if (priceLineStore != null) {
             priceLineStore.clearAll(alias);
         }
@@ -274,6 +304,9 @@ public class RongPlugin implements CustomModuleAdapter,
         }
         if (wallChangeStore != null) {
             wallChangeStore.clearAll(alias);
+        }
+        if (filledExecutionStore != null) {
+            filledExecutionStore.clearAll(alias);
         }
         if (sharedServer != null) {
             sharedServer.unregisterSymbol(alias);
@@ -305,11 +338,19 @@ public class RongPlugin implements CustomModuleAdapter,
                     pendingEntryOrderManager.shutdown();
                     pendingEntryOrderManager = null;
                 }
+                if (filledExecutionManager != null) {
+                    sharedServer.unregisterAccountStateListener(filledExecutionManager);
+                    filledExecutionManager.shutdown();
+                    filledExecutionManager = null;
+                }
                 if (wallLabelPainter != null) {
                     wallLabelPainter.shutdown();
                 }
                 if (wallChangePainter != null) {
                     wallChangePainter.shutdown();
+                }
+                if (filledExecutionPainter != null) {
+                    filledExecutionPainter.shutdown();
                 }
                 ActionLogWindow.dispose();
                 sharedServer.shutdown();
@@ -321,6 +362,8 @@ public class RongPlugin implements CustomModuleAdapter,
                 wallLabelPainter = null;
                 wallChangeStore = null;
                 wallChangePainter = null;
+                filledExecutionStore = null;
+                filledExecutionPainter = null;
                 indicatorConfig = null;
                 replayExportConfig = null;
                 pendingEntryOrderManager = null;

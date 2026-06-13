@@ -442,11 +442,13 @@ public class SignalWebSocketServer extends WebSocketServer {
             ordersElement = json.get("orders");
         }
         List<AccountOrderDefinition> openOrders = parseAccountOrders(symbol, ordersElement);
+        List<AccountExecutionDefinition> executions = parseAccountExecutions(symbol, json.get("executions"));
 
         AccountStateDefinition state = new AccountStateDefinition(
                 symbol,
                 position,
                 openOrders,
+                executions,
                 getLong(json, "timestamp"));
         symbolToAccountState.put(symbol, state);
         ActionLogWindow.updateAccountState(state);
@@ -482,6 +484,48 @@ public class SignalWebSocketServer extends WebSocketServer {
             }
         }
         return orders;
+    }
+
+    private List<AccountExecutionDefinition> parseAccountExecutions(String symbol, JsonElement element) {
+        if (element == null || element.isJsonNull() || !element.isJsonArray()) {
+            return Collections.emptyList();
+        }
+        List<AccountExecutionDefinition> executions = new ArrayList<>();
+        for (JsonElement item : element.getAsJsonArray()) {
+            AccountExecutionDefinition execution = parseAccountExecution(symbol, item);
+            if (execution != null) {
+                executions.add(execution);
+            }
+        }
+        return executions;
+    }
+
+    private AccountExecutionDefinition parseAccountExecution(String symbol, JsonElement element) {
+        if (element == null || element.isJsonNull() || !element.isJsonObject()) {
+            return null;
+        }
+        try {
+            JsonObject executionJson = element.getAsJsonObject();
+            double price = getDouble(executionJson, "price");
+            double quantity = getDouble(executionJson, "quantity");
+            long timeMs = getLong(executionJson, "timeMs");
+            if (price <= 0 || !Double.isFinite(price)
+                    || quantity <= 0 || !Double.isFinite(quantity)
+                    || timeMs <= 0) {
+                return null;
+            }
+
+            return new AccountExecutionDefinition(
+                    symbol,
+                    price,
+                    quantity,
+                    parseOrderIsBuy(executionJson),
+                    getBoolean(executionJson, "positionEffectIsOpen"),
+                    timeMs);
+        } catch (RuntimeException e) {
+            PluginLog.error("[AccountState] Ignoring malformed execution for " + symbol + ": " + e.getMessage());
+            return null;
+        }
     }
 
     private AccountOrderDefinition parseAccountOrder(String symbol, JsonElement element) {
