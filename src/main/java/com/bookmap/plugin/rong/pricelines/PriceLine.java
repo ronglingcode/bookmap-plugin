@@ -11,6 +11,8 @@ public class PriceLine {
     public enum LineType {
         PREMARKET_HIGH("PM High", new Color(255, 165, 0)),
         PREMARKET_LOW("PM Low", new Color(180, 100, 255)),
+        PREVIOUS_DAY_HIGH("Y High", new Color(255, 70, 70)),
+        PREVIOUS_DAY_LOW("Y Low", new Color(255, 70, 70)),
         KEY_LEVEL("Key Level", new Color(255, 215, 0)),
         EXIT_ORDER("Exit", new Color(120, 120, 120)),
         ENTRY_ORDER("Entry", new Color(70, 170, 255)),

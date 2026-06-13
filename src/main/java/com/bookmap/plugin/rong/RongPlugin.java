@@ -80,9 +80,8 @@ public class RongPlugin implements CustomModuleAdapter,
     private static OrderWallChangePainter wallChangePainter;
     private static IndicatorConfig indicatorConfig;
     private static ReplayExportConfig replayExportConfig;
-    private static PremarketTracker premarketTracker;
     private static KeyLevelManager keyLevelManager;
-    private static CamPivotTracker camPivotTracker;
+    private static MarketLevelManager marketLevelManager;
     private static ExitOrderManager exitOrderManager;
     private static PendingEntryOrderManager pendingEntryOrderManager;
     private static FilledExecutionStore filledExecutionStore;
@@ -135,9 +134,10 @@ public class RongPlugin implements CustomModuleAdapter,
                 wallChangeStore = new OrderWallChangeStore();
                 wallLabelPainter = new OrderWallLabelPainter(wallLabelStore, indicatorConfig, wallChangeStore);
                 wallChangePainter = new OrderWallChangePainter(wallChangeStore, indicatorConfig);
-                premarketTracker = new PremarketTracker(priceLineStore, indicatorConfig);
                 keyLevelManager = new KeyLevelManager(priceLineStore);
                 sharedServer.registerKeyLevelConfigListener(keyLevelManager);
+                marketLevelManager = new MarketLevelManager(priceLineStore, indicatorConfig);
+                sharedServer.registerMarketLevelConfigListener(marketLevelManager);
                 exitOrderManager = new ExitOrderManager(priceLineStore);
                 sharedServer.registerExitOrderPairsConfigListener(exitOrderManager);
                 pendingEntryOrderManager = new PendingEntryOrderManager(priceLineStore);
@@ -146,7 +146,6 @@ public class RongPlugin implements CustomModuleAdapter,
                 filledExecutionPainter = new FilledExecutionPainter(filledExecutionStore);
                 filledExecutionManager = new FilledExecutionManager(filledExecutionStore);
                 sharedServer.registerAccountStateListener(filledExecutionManager);
-                camPivotTracker = new CamPivotTracker(priceLineStore, indicatorConfig);
             }
             instanceCount++;
         }
@@ -200,6 +199,9 @@ public class RongPlugin implements CustomModuleAdapter,
         if (keyLevelManager != null) {
             keyLevelManager.onInstrumentInitialized(cleanAlias, info.pips);
         }
+        if (marketLevelManager != null) {
+            marketLevelManager.onInstrumentInitialized(cleanAlias, info.pips);
+        }
         if (exitOrderManager != null) {
             exitOrderManager.onInstrumentInitialized(cleanAlias, info.pips);
         }
@@ -209,9 +211,6 @@ public class RongPlugin implements CustomModuleAdapter,
         if (filledExecutionManager != null) {
             filledExecutionManager.onInstrumentInitialized(cleanAlias, info.pips);
         }
-
-        // Fetch cam pivots + premarket high/low from EdgeDesk API (runs on background thread)
-        IndicatorDataFetcher.fetch(cleanAlias, info.pips, camPivotTracker, premarketTracker);
 
         tradeButtonWindow = new TradeButtonWindow(cleanAlias, sharedServer);
 
@@ -278,14 +277,11 @@ public class RongPlugin implements CustomModuleAdapter,
                 .setIsAdd(false)
                 .build());
 
-        if (premarketTracker != null) {
-            premarketTracker.unregister(alias);
-        }
-        if (camPivotTracker != null) {
-            camPivotTracker.unregister(alias);
-        }
         if (keyLevelManager != null) {
             keyLevelManager.onInstrumentStopped(alias);
+        }
+        if (marketLevelManager != null) {
+            marketLevelManager.onInstrumentStopped(alias);
         }
         if (exitOrderManager != null) {
             exitOrderManager.onInstrumentStopped(alias);
@@ -315,18 +311,15 @@ public class RongPlugin implements CustomModuleAdapter,
             instanceCount--;
             if (instanceCount <= 0 && sharedServer != null) {
                 ChartClickHandler.removeAwtListener();
-                if (premarketTracker != null) {
-                    premarketTracker.shutdown();
-                    premarketTracker = null;
-                }
-                if (camPivotTracker != null) {
-                    camPivotTracker.shutdown();
-                    camPivotTracker = null;
-                }
                 if (keyLevelManager != null) {
                     sharedServer.unregisterKeyLevelConfigListener(keyLevelManager);
                     keyLevelManager.shutdown();
                     keyLevelManager = null;
+                }
+                if (marketLevelManager != null) {
+                    sharedServer.unregisterMarketLevelConfigListener(marketLevelManager);
+                    marketLevelManager.shutdown();
+                    marketLevelManager = null;
                 }
                 if (exitOrderManager != null) {
                     sharedServer.unregisterExitOrderPairsConfigListener(exitOrderManager);
@@ -418,9 +411,6 @@ public class RongPlugin implements CustomModuleAdapter,
         }
         refreshWallLabelsIfNeeded(true);
 
-        if (premarketTracker != null) {
-            premarketTracker.onTrade(alias, price, realPrice);
-        }
     }
 
     @Override
@@ -429,9 +419,6 @@ public class RongPlugin implements CustomModuleAdapter,
         BookmapReplayExportSession exportSession = replayExportSession;
         if (exportSession != null) {
             exportSession.onTimestamp(timestampNs);
-        }
-        if (premarketTracker != null) {
-            premarketTracker.setTimestamp(timestampNs);
         }
     }
 

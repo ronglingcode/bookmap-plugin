@@ -50,8 +50,7 @@ bookmap-plugin/
     ├── tradebuttons/           # Floating trade button panel and tradebook button config
     │   ├── TradeButtonWindow
     │   └── TradebookButtonGroup
-    ├── PremarketTracker        # Auto premarket high/low tracking
-    ├── CamPivotTracker         # Camarilla Pivot levels (R1-R6, S1-S6)
+    ├── MarketLevel*            # WebSocket cam pivots, previous day, and premarket lines
     ├── KeyLevel*               # WebSocket key level definitions and drawing bridge
     ├── OrderBookState          # Full order book state
     ├── SignalWebSocketServer   # WebSocket server for external clients
@@ -168,11 +167,23 @@ All messages include a `symbol` field identifying which instrument the data belo
     { "price": 185.50, "label": "daily resistance" },
     { "price": 180.00 }
   ],
+  "camPivots": {
+    "R1": 184.12,
+    "R2": 185.24,
+    "R3": 186.36,
+    "R4": 189.72,
+    "S1": 181.88,
+    "S2": 180.76,
+    "S3": 179.64,
+    "S4": 176.28
+  },
+  "previousDay": { "high": 187.20, "low": 178.30 },
+  "premarket": { "high": 183.75, "low": 179.40 },
   "timestamp": 1710345600000
 }
 ```
 
-Sending an empty `levels` array clears existing key level lines for that symbol.
+Sending an empty `levels` array clears existing key level lines for that symbol. Missing or empty market-level fields clear their corresponding websocket-supplied market lines for that symbol.
 
 ### TypeScript example
 
@@ -264,11 +275,11 @@ Auto-drawn price levels still track through scroll and zoom. These include prema
 
 ## Indicators (Auto-Drawn Levels)
 
-The plugin can automatically draw price levels based on market data. Each indicator can be enabled or disabled in the **Indicators** settings panel.
+The plugin draws market levels supplied by the external WebSocket client. Each indicator can be enabled or disabled in the **Indicators** settings panel.
 
 ### Premarket High / Low
 
-Automatically draws and updates horizontal lines at the premarket session high and low prices.
+Draws horizontal lines at the premarket session high and low prices sent by the external client.
 
 
 | Line    | Color  | Description                          |
@@ -277,15 +288,14 @@ Automatically draws and updates horizontal lines at the premarket session high a
 | PM Low  | Purple | Lowest trade price during premarket  |
 
 
-- **Premarket hours**: 4:00 AM - 9:30 AM Eastern Time
-- Lines update in real-time as new highs/lows are made during premarket
+- **Data source**: The external client sends `premarket.high` and `premarket.low` in the `key_levels_config` WebSocket message
+- Lines update when the external client pushes refreshed premarket values
 - Lines persist after premarket ends as reference levels for regular trading hours
-- Resets automatically at the start of each new premarket session (4:00 AM ET)
 - Enabled by default; disable via the **Indicators** settings panel
 
 ### Camarilla Pivots (R1–R6, S1–S6)
 
-Automatically draws all 12 Camarilla Pivot levels calculated from the previous day's high, low, and close.
+Draws Camarilla Pivot levels supplied by the external client.
 
 
 | Lines | Color                        | Description       |
@@ -294,11 +304,13 @@ Automatically draws all 12 Camarilla Pivot levels calculated from the previous d
 | S1–S6 | Blue gradient (light → dark) | Support levels    |
 
 
-- **Formula**: Uses a 1.1x range multiplier on previous day's range, with linear extensions for R5/R6 and S5/S6
-- **Data source**: Previous day's daily candle is fetched from the EdgeDesk API (`/api/intraday-indicators`) on plugin initialization. This avoids the need for Bookmap to have previous-day price data in its session.
-- **Static levels**: Pivots are calculated once and don't change during the day
-- **Premarket seeding**: The same API call also returns premarket high/low data, which seeds the premarket tracker before any streaming data arrives
+- **Data source**: The external client sends `camPivots` in the `key_levels_config` WebSocket message
+- **Static levels**: Pivots normally stay fixed for the day, but the plugin redraws them whenever the client sends an updated config
 - Enabled by default; disable via the **Indicators** settings panel
+
+### Previous Day High / Low
+
+Draws the previous regular-session high and low supplied by the external client in the `previousDay` field of the `key_levels_config` WebSocket message.
 
 ### Key Price Levels
 
@@ -314,11 +326,7 @@ Key levels are instrument-specific — a $180 level sent for NVDA will only appe
 
 ### Replay & Multi-Day Data
 
-The premarket tracker uses Bookmap's **data/replay time** (not system clock), so it works correctly in both live and replay modes:
-
-- **Multi-day replay**: When replaying feed data that spans multiple days, indicators automatically reset at the start of each new day's session. Previous day's lines are cleared and new lines are drawn for the current day.
-- **Mid-session attach**: If the plugin is attached after trading has already started (e.g. you turn on your computer at 7 AM), it backfills from Bookmap's historical trade data to catch up on premarket high/low from 4:00 AM onward.
-- **Time source**: All time decisions use the most recent data/replay timestamp received from Bookmap's `TimeListener`, which keeps trackers in sync with whatever time the chart is showing.
+Market levels are client-owned. In live or replay mode, the plugin draws the latest `camPivots`, `previousDay`, and `premarket` values sent over WebSocket for each symbol.
 
 ## Configuration
 
@@ -350,8 +358,8 @@ On Windows, the full paths are:
 Plugin log files are named by session start time, e.g. `2026-03-21_10-30-45.txt`. Each line includes a timestamp and level:
 
 ```
-2026-03-21 10:30:45.123 [INFO] [PremarketTracker] Backfilled NVDA: PM High=120.50, PM Low=118.20
-2026-03-21 10:30:45.456 [ERROR] [IndicatorDataFetcher] HTTP 500 for AAPL
+2026-03-21 10:30:45.123 [INFO] [MarketLevelManager] Drew 16 websocket market level(s) for NVDA
+2026-03-21 10:30:45.456 [INFO] [KeyLevel] Updated 2 websocket key levels for AAPL and 12 cam pivot(s)
 ```
 
 Signal logs (`breakout.jsonl`) are appended in JSONL format (one JSON object per line). The `click-debug.log` records key+left-click events with millisecond timestamps.

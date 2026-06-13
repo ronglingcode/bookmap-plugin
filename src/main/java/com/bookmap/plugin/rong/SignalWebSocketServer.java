@@ -9,6 +9,7 @@ import java.nio.file.Paths;
 import java.nio.file.StandardOpenOption;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Set;
 import java.util.Collections;
@@ -42,6 +43,11 @@ public class SignalWebSocketServer extends WebSocketServer {
     }
 
     @FunctionalInterface
+    public interface MarketLevelConfigListener {
+        void onMarketLevelsChanged(String symbol, MarketLevelDefinition marketLevels);
+    }
+
+    @FunctionalInterface
     public interface ExitOrderPairsConfigListener {
         void onExitOrderPairsChanged(String symbol, List<ExitOrderPairDefinition> pairs);
     }
@@ -61,10 +67,13 @@ public class SignalWebSocketServer extends WebSocketServer {
     private final Map<String, Double> symbolToPips = new ConcurrentHashMap<>();
     private final Map<String, List<TradebookButtonGroup>> symbolToTradebooks = new ConcurrentHashMap<>();
     private final Map<String, List<KeyLevelDefinition>> symbolToKeyLevels = new ConcurrentHashMap<>();
+    private final Map<String, MarketLevelDefinition> symbolToMarketLevels = new ConcurrentHashMap<>();
     private final Map<String, List<ExitOrderPairDefinition>> symbolToExitOrderPairs = new ConcurrentHashMap<>();
     private final Map<String, AccountStateDefinition> symbolToAccountState = new ConcurrentHashMap<>();
     private final Map<String, Set<TradeButtonConfigListener>> symbolToTradeButtonListeners = new ConcurrentHashMap<>();
     private final Set<KeyLevelConfigListener> keyLevelConfigListeners =
+            Collections.newSetFromMap(new ConcurrentHashMap<>());
+    private final Set<MarketLevelConfigListener> marketLevelConfigListeners =
             Collections.newSetFromMap(new ConcurrentHashMap<>());
     private final Set<ExitOrderPairsConfigListener> exitOrderPairsConfigListeners =
             Collections.newSetFromMap(new ConcurrentHashMap<>());
@@ -135,6 +144,17 @@ public class SignalWebSocketServer extends WebSocketServer {
 
     public void unregisterKeyLevelConfigListener(KeyLevelConfigListener listener) {
         keyLevelConfigListeners.remove(listener);
+    }
+
+    public void registerMarketLevelConfigListener(MarketLevelConfigListener listener) {
+        marketLevelConfigListeners.add(listener);
+        for (Map.Entry<String, MarketLevelDefinition> entry : symbolToMarketLevels.entrySet()) {
+            listener.onMarketLevelsChanged(entry.getKey(), entry.getValue());
+        }
+    }
+
+    public void unregisterMarketLevelConfigListener(MarketLevelConfigListener listener) {
+        marketLevelConfigListeners.remove(listener);
     }
 
     public void registerExitOrderPairsConfigListener(ExitOrderPairsConfigListener listener) {
@@ -364,7 +384,13 @@ public class SignalWebSocketServer extends WebSocketServer {
         List<KeyLevelDefinition> immutableLevels = Collections.unmodifiableList(levels);
         symbolToKeyLevels.put(symbol, immutableLevels);
         notifyKeyLevelConfigListeners(symbol, immutableLevels);
-        PluginLog.info("[KeyLevel] Updated " + levels.size() + " websocket key levels for " + symbol);
+
+        MarketLevelDefinition marketLevels = parseMarketLevels(symbol, json);
+        symbolToMarketLevels.put(symbol, marketLevels);
+        notifyMarketLevelConfigListeners(symbol, marketLevels);
+
+        PluginLog.info("[KeyLevel] Updated " + levels.size() + " websocket key levels for " + symbol
+                + " and " + marketLevels.getCamPivots().size() + " cam pivot(s)");
     }
 
     private KeyLevelDefinition parseKeyLevel(String symbol, JsonElement element) {
@@ -390,6 +416,78 @@ public class SignalWebSocketServer extends WebSocketServer {
             PluginLog.error("[KeyLevel] Ignoring malformed level for " + symbol + ": " + e.getMessage());
             return null;
         }
+    }
+
+    private MarketLevelDefinition parseMarketLevels(String symbol, JsonObject json) {
+        JsonObject marketLevelsObject = getObjectField(json, "marketLevels");
+        JsonObject camPivotsObject = getFirstObjectField(json, marketLevelsObject, "camPivots");
+        JsonObject previousDayObject = getFirstObjectField(json, marketLevelsObject, "previousDay");
+        if (previousDayObject == null) {
+            previousDayObject = getFirstObjectField(json, marketLevelsObject, "yesterday");
+        }
+        JsonObject premarketObject = getFirstObjectField(json, marketLevelsObject, "premarket");
+
+        return new MarketLevelDefinition(
+                symbol,
+                parseCamPivots(camPivotsObject),
+                getPairPrice(json, previousDayObject, "high", "previousDayHigh", "yesterdayHigh"),
+                getPairPrice(json, previousDayObject, "low", "previousDayLow", "yesterdayLow"),
+                getPairPrice(json, premarketObject, "high", "premarketHigh", "pmHigh"),
+                getPairPrice(json, premarketObject, "low", "premarketLow", "pmLow"));
+    }
+
+    private Map<String, Double> parseCamPivots(JsonObject pivotsObject) {
+        Map<String, Double> pivots = new LinkedHashMap<>();
+        if (pivotsObject == null) {
+            return pivots;
+        }
+        String[] levels = {"R1", "R2", "R3", "R4", "R5", "R6",
+                           "S1", "S2", "S3", "S4", "S5", "S6"};
+        for (String level : levels) {
+            double price = getDouble(pivotsObject, level);
+            if (Double.isFinite(price) && price > 0) {
+                pivots.put(level, price);
+            }
+        }
+        return pivots;
+    }
+
+    private double getPairPrice(
+            JsonObject root,
+            JsonObject pairObject,
+            String pairField,
+            String primaryTopLevelField,
+            String secondaryTopLevelField) {
+        if (pairObject != null) {
+            double nestedValue = getDouble(pairObject, pairField);
+            if (Double.isFinite(nestedValue)) {
+                return nestedValue;
+            }
+        }
+        double primaryValue = getDouble(root, primaryTopLevelField);
+        if (Double.isFinite(primaryValue)) {
+            return primaryValue;
+        }
+        return getDouble(root, secondaryTopLevelField);
+    }
+
+    private JsonObject getFirstObjectField(JsonObject primary, JsonObject secondary, String field) {
+        JsonObject object = getObjectField(primary, field);
+        if (object != null) {
+            return object;
+        }
+        return secondary == null ? null : getObjectField(secondary, field);
+    }
+
+    private JsonObject getObjectField(JsonObject json, String field) {
+        if (json == null) {
+            return null;
+        }
+        JsonElement element = json.get(field);
+        if (element == null || element.isJsonNull() || !element.isJsonObject()) {
+            return null;
+        }
+        return element.getAsJsonObject();
     }
 
     private void handleExitOrderPairsConfig(JsonObject json) {
@@ -688,6 +786,16 @@ public class SignalWebSocketServer extends WebSocketServer {
                 listener.onKeyLevelsChanged(symbol, levels);
             } catch (RuntimeException e) {
                 PluginLog.error("[KeyLevel] Failed to update listener for " + symbol + ": " + e.getMessage());
+            }
+        }
+    }
+
+    private void notifyMarketLevelConfigListeners(String symbol, MarketLevelDefinition marketLevels) {
+        for (MarketLevelConfigListener listener : marketLevelConfigListeners) {
+            try {
+                listener.onMarketLevelsChanged(symbol, marketLevels);
+            } catch (RuntimeException e) {
+                PluginLog.error("[MarketLevel] Failed to update listener for " + symbol + ": " + e.getMessage());
             }
         }
     }
