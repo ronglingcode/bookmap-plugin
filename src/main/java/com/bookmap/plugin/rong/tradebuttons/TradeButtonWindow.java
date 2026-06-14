@@ -158,20 +158,25 @@ public class TradeButtonWindow {
     }
 
     private JPanel createHotkeyPanel() {
-        JPanel hotkeyPanel = new JPanel(new GridLayout(1, 5, 6, 6));
+        JPanel hotkeyPanel = new JPanel(new GridLayout(2, 3, 6, 6));
         hotkeyPanel.setBorder(BorderFactory.createEmptyBorder(0, 0, 8, 0));
         hotkeyPanel.add(createHotkeyButton("Cancel", "cancel", "KeyC"));
         hotkeyPanel.add(createHotkeyButton("Flatten", "flatten", "KeyF"));
         hotkeyPanel.add(createHotkeyButton("Market Out 1", "market_out_1_partial", "KeyM"));
+        hotkeyPanel.add(createHotkeyButton("Market Out Half", "market_out_half", "KeyG", true));
         hotkeyPanel.add(createWallOutButton());
         hotkeyPanel.add(createHotkeyButton("Swap", "swap", "KeyW"));
         return hotkeyPanel;
     }
 
     private JButton createHotkeyButton(String label, String id, String keyCode) {
+        return createHotkeyButton(label, id, keyCode, false);
+    }
+
+    private JButton createHotkeyButton(String label, String id, String keyCode, boolean shiftKey) {
         JButton button = new JButton(label);
         applyHotkeyButtonStyle(button);
-        button.addActionListener(e -> sendHotkeyButtonMessage(id, label, keyCode));
+        button.addActionListener(e -> sendHotkeyButtonMessage(id, label, keyCode, shiftKey));
         return button;
     }
 
@@ -362,8 +367,8 @@ public class TradeButtonWindow {
             return;
         }
         shiftModeLabel.setText(marketMode
-                ? "Mode: MARKET - Shift pressed"
-                : "Mode: BREAKOUT - Shift not pressed");
+                ? "[" + symbol + "] Mode: MARKET - Shift pressed"
+                : "[" + symbol + "] Mode: BREAKOUT - Shift not pressed");
         shiftModeLabel.setBackground(marketMode ? MODE_MARKET_BACKGROUND : MODE_BREAKOUT_BACKGROUND);
     }
 
@@ -458,7 +463,7 @@ public class TradeButtonWindow {
                 + " clicked for " + symbol);
     }
 
-    private void sendHotkeyButtonMessage(String buttonId, String buttonName, String keyCode) {
+    private void sendHotkeyButtonMessage(String buttonId, String buttonName, String keyCode, boolean shiftKey) {
         JsonObject json = new JsonObject();
         json.addProperty("type", "custom_button_click");
         json.addProperty("symbol", symbol);
@@ -466,12 +471,15 @@ public class TradeButtonWindow {
         json.addProperty("button_name", buttonName);
         json.addProperty("keyCode", keyCode);
         json.addProperty("key_code", keyCode);
+        json.addProperty("shiftKey", shiftKey);
+        json.addProperty("shift_key", shiftKey);
         json.addProperty("timestamp", System.currentTimeMillis());
         server.broadcast(json.toString());
         if (!"KeyF".equals(keyCode)) {
             PluginLog.action(symbol, "Button send " + buttonName);
         }
-        PluginLog.info("[TradeButton] " + buttonName + " clicked for " + symbol + " as " + keyCode);
+        PluginLog.info("[TradeButton] " + buttonName + " clicked for " + symbol + " as "
+                + (shiftKey ? "Shift+" : "") + keyCode);
     }
 
     private void sendWallOutButtonMessage() {

@@ -12,6 +12,7 @@ import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.TreeSet;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.Executors;
@@ -615,7 +616,7 @@ public class OrderWallLabelPainter implements ScreenSpacePainterFactory,
         }
     }
 
-    private static String formatSizePath(OrderWallLabel label) {
+    static String formatSizePath(OrderWallLabel label) {
         List<Integer> sizePath = label.getSizePath();
         if (sizePath.isEmpty()) {
             return Integer.toString(OrderWallLabel.toDisplaySize(label.getPeakSize()));
@@ -635,13 +636,34 @@ public class OrderWallLabelPainter implements ScreenSpacePainterFactory,
         if (sizePath.size() <= MAX_RENDERED_SIZE_PATH_POINTS) {
             return sizePath;
         }
-        List<Integer> compactPath = new ArrayList<>();
-        appendIfDifferent(compactPath, sizePath.get(0));
-        int start = sizePath.size() - (MAX_RENDERED_SIZE_PATH_POINTS - 1);
-        for (int i = start; i < sizePath.size(); i++) {
-            appendIfDifferent(compactPath, sizePath.get(i));
+
+        TreeSet<Integer> selectedIndexes = new TreeSet<>();
+        selectedIndexes.add(0);
+        selectedIndexes.add(indexOfPeak(sizePath));
+        for (int i = sizePath.size() - 1;
+             i >= 0 && selectedIndexes.size() < MAX_RENDERED_SIZE_PATH_POINTS;
+             i--) {
+            selectedIndexes.add(i);
+        }
+
+        List<Integer> compactPath = new ArrayList<>(selectedIndexes.size());
+        for (int index : selectedIndexes) {
+            appendIfDifferent(compactPath, sizePath.get(index));
         }
         return compactPath;
+    }
+
+    private static int indexOfPeak(List<Integer> sizePath) {
+        int peakIndex = 0;
+        int peakValue = sizePath.get(0);
+        for (int i = 1; i < sizePath.size(); i++) {
+            int value = sizePath.get(i);
+            if (value > peakValue) {
+                peakIndex = i;
+                peakValue = value;
+            }
+        }
+        return peakIndex;
     }
 
     private static void appendIfDifferent(List<Integer> values, int value) {

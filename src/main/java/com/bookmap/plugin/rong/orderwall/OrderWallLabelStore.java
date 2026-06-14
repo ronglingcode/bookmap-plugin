@@ -75,6 +75,14 @@ public class OrderWallLabelStore {
         return instrumentLabels != null && instrumentLabels.displayedLabelIds.contains(labelId);
     }
 
+    public OrderWallLabel getLabel(String instrumentAlias, String labelId) {
+        InstrumentLabels instrumentLabels = labelsByInstrument.get(instrumentAlias);
+        if (instrumentLabels == null) {
+            return null;
+        }
+        return instrumentLabels.labelsById.get(labelId);
+    }
+
     public void markBestMatchDisplayed(String instrumentAlias, boolean bid, int priceTick, long eventTimeNs) {
         InstrumentLabels instrumentLabels = labelsByInstrument.get(instrumentAlias);
         if (instrumentLabels == null) {

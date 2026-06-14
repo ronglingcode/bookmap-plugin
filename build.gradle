@@ -4,7 +4,7 @@ plugins {
 }
 
 group = 'com.bookmap.plugin'
-version = '1.6'
+version = '1.7'
 
 base {
     archivesName = 'rong'
@@ -25,6 +25,8 @@ dependencies {
     compileOnly 'com.bookmap.api:api-simplified:7.1.0.35'
     implementation 'org.java-websocket:Java-WebSocket:1.5.7'
     implementation 'com.google.code.gson:gson:2.11.0'
+    testImplementation 'com.bookmap.api:api-core:7.1.0.35'
+    testImplementation 'com.bookmap.api:api-simplified:7.1.0.35'
     testImplementation 'org.junit.jupiter:junit-jupiter:5.10.3'
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
 }

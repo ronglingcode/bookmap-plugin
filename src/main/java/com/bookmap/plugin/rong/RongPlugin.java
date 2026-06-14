@@ -151,7 +151,8 @@ public class RongPlugin implements CustomModuleAdapter,
         }
         replayExportConfig.addChangeListener(this);
         this.wallLabelTracker = new OrderWallLabelTracker(
-                cleanAlias, info.pips, wallLabelStore, WALL_LABEL_PERCENTILE, WALL_LABEL_RETAIN_TICKS);
+                cleanAlias, info.pips, wallLabelStore, WALL_LABEL_PERCENTILE, WALL_LABEL_RETAIN_TICKS,
+                this::handleWallLabelTrackerChange);
         this.wallChangeTracker = new OrderWallChangeTracker(
                 cleanAlias,
                 info.pips,
@@ -227,6 +228,10 @@ public class RongPlugin implements CustomModuleAdapter,
             replayExportConfig.removeChangeListener(this);
         }
         stopReplayExport();
+        if (wallLabelTracker != null) {
+            wallLabelTracker.shutdown();
+            wallLabelTracker = null;
+        }
         if (wallChangeTracker != null) {
             wallChangeTracker.shutdown();
             wallChangeTracker = null;
@@ -518,6 +523,11 @@ public class RongPlugin implements CustomModuleAdapter,
         wallLabelPainter.refreshInstrument(alias);
         wallLabelsDirty = false;
         lastWallLabelRefreshMs = now;
+    }
+
+    private void handleWallLabelTrackerChange() {
+        wallLabelsDirty = true;
+        refreshWallLabelsIfNeeded(true);
     }
 
     private long getEventTimeNs() {
