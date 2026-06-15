@@ -63,6 +63,76 @@ class OrderWallChangeTrackerTest {
     }
 
     @Test
+    void alertsWhenExistingLargeOrderDoublesAndSurvivesLifetime() throws Exception {
+        List<OrderWallChangeEvent> events = new CopyOnWriteArrayList<>();
+        CountDownLatch alertSeen = new CountDownLatch(1);
+        OrderWallChangeTracker tracker = newTracker(60, event -> {
+            events.add(event);
+            alertSeen.countDown();
+        });
+
+        try {
+            tracker.onDepth(true, 12_700, 11_000, 1L);
+            tracker.markReady();
+            tracker.onDepth(true, 12_700, 58_000, 2L);
+
+            assertTrue(alertSeen.await(500, TimeUnit.MILLISECONDS));
+            assertEquals(1, events.size());
+            OrderWallChangeEvent event = events.get(0);
+            assertEquals(OrderWallChangeEvent.Type.INCREASED, event.getType());
+            assertEquals(11_000, event.getPreviousSize());
+            assertEquals(58_000, event.getCurrentSize());
+            assertTrue(event.isBid());
+            assertEquals(12_700, event.getPriceTick());
+        } finally {
+            tracker.shutdown();
+        }
+    }
+
+    @Test
+    void skipsDoubledIncreaseWhenNewSizeDoesNotExceedLargeThreshold() throws Exception {
+        List<OrderWallChangeEvent> events = new CopyOnWriteArrayList<>();
+        CountDownLatch alertSeen = new CountDownLatch(1);
+        OrderWallChangeTracker tracker = newTracker(60, event -> {
+            events.add(event);
+            alertSeen.countDown();
+        });
+
+        try {
+            tracker.markReady();
+            tracker.onDepth(true, 11_020, 2_000, 1L);
+            tracker.onDepth(true, 11_020, 4_000, 2L);
+
+            assertFalse(alertSeen.await(200, TimeUnit.MILLISECONDS));
+            assertTrue(events.isEmpty());
+        } finally {
+            tracker.shutdown();
+        }
+    }
+
+    @Test
+    void suppressedFlashIncreaseDoesNotAlertAsDecreaseWhenItReturnsToOriginalSize() throws Exception {
+        List<OrderWallChangeEvent> events = new CopyOnWriteArrayList<>();
+        CountDownLatch alertSeen = new CountDownLatch(1);
+        OrderWallChangeTracker tracker = newTracker(100, event -> {
+            events.add(event);
+            alertSeen.countDown();
+        });
+
+        try {
+            tracker.onDepth(true, 12_700, 11_000, 1L);
+            tracker.markReady();
+            tracker.onDepth(true, 12_700, 58_000, 2L);
+            tracker.onDepth(true, 12_700, 11_000, 3L);
+
+            assertFalse(alertSeen.await(300, TimeUnit.MILLISECONDS));
+            assertTrue(events.isEmpty());
+        } finally {
+            tracker.shutdown();
+        }
+    }
+
+    @Test
     void existingLargeSnapshotAtReadyCanAlertOnPullWithoutWaitingLifetime() throws Exception {
         List<OrderWallChangeEvent> events = new CopyOnWriteArrayList<>();
         CountDownLatch alertSeen = new CountDownLatch(1);

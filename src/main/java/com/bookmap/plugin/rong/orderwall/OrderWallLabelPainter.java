@@ -410,6 +410,7 @@ public class OrderWallLabelPainter implements ScreenSpacePainterFactory,
                     continue;
                 }
                 long anchor = event.getType() == OrderWallChangeEvent.Type.ADDED
+                        || event.getType() == OrderWallChangeEvent.Type.INCREASED
                         ? label.getStartTimeNs()
                         : label.getEndTimeNs();
                 long distanceNs = Math.abs(eventTimeNs - anchor);
@@ -423,7 +424,8 @@ public class OrderWallLabelPainter implements ScreenSpacePainterFactory,
 
         private boolean isEventTypeCompatible(OrderWallLabel label, OrderWallChangeEvent event) {
             if (!label.isActive()) {
-                return event.getType() != OrderWallChangeEvent.Type.ADDED;
+                return event.getType() != OrderWallChangeEvent.Type.ADDED
+                        && event.getType() != OrderWallChangeEvent.Type.INCREASED;
             }
             return true;
         }
@@ -572,6 +574,7 @@ public class OrderWallLabelPainter implements ScreenSpacePainterFactory,
     private static Color changeAccent(OrderWallChangeEvent event) {
         switch (event.getType()) {
             case ADDED:
+            case INCREASED:
                 return ADDED_ACCENT;
             case REPLACED_SMALLER:
                 return CHANGED_ACCENT;
@@ -604,6 +607,11 @@ public class OrderWallLabelPainter implements ScreenSpacePainterFactory,
             case ADDED:
                 g.drawLine(centerX - 5, centerY, centerX + 5, centerY);
                 g.drawLine(centerX, centerY - 5, centerX, centerY + 5);
+                break;
+            case INCREASED:
+                g.drawLine(centerX, centerY + 5, centerX, centerY - 5);
+                g.drawLine(centerX, centerY - 5, centerX - 4, centerY - 1);
+                g.drawLine(centerX, centerY - 5, centerX + 4, centerY - 1);
                 break;
             case REPLACED_SMALLER:
                 g.drawLine(centerX - 5, centerY - 3, centerX, centerY + 4);

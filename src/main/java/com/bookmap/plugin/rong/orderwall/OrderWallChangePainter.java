@@ -248,7 +248,8 @@ public class OrderWallChangePainter implements ScreenSpacePainterFactory,
         private void addEventBadgeShapes(List<OrderWallChangeEvent> events, long nowMs) {
             int count = 0;
             for (OrderWallChangeEvent event : events) {
-                if (event.getType() != OrderWallChangeEvent.Type.ADDED) {
+                if (event.getType() != OrderWallChangeEvent.Type.ADDED
+                        && event.getType() != OrderWallChangeEvent.Type.INCREASED) {
                     continue;
                 }
                 CanvasIcon icon = createEventBadgeIcon(event, nowMs);
@@ -392,8 +393,7 @@ public class OrderWallChangePainter implements ScreenSpacePainterFactory,
                     EVENT_BADGE_ICON_SIZE, EVENT_BADGE_ICON_SIZE);
             g.setColor(new Color(255, 255, 255, 245));
             g.setStroke(new BasicStroke(2.2f, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
-            g.drawLine(iconX - 5, iconY, iconX + 5, iconY);
-            g.drawLine(iconX, iconY - 5, iconX, iconY + 5);
+            drawEventBadgeIcon(g, event.getType(), iconX, iconY);
 
             g.setFont(EVENT_BADGE_FONT);
             g.setColor(TEXT_COLOR);
@@ -442,12 +442,29 @@ public class OrderWallChangePainter implements ScreenSpacePainterFactory,
     private static Color colorFor(OrderWallChangeEvent event) {
         switch (event.getType()) {
             case ADDED:
+            case INCREASED:
                 return ADD_COLOR;
             case REPLACED_SMALLER:
                 return REPLACE_COLOR;
             case REDUCED:
             default:
                 return REDUCE_COLOR;
+        }
+    }
+
+    private static void drawEventBadgeIcon(Graphics2D g, OrderWallChangeEvent.Type type,
+                                           int centerX, int centerY) {
+        switch (type) {
+            case INCREASED:
+                g.drawLine(centerX, centerY + 5, centerX, centerY - 5);
+                g.drawLine(centerX, centerY - 5, centerX - 4, centerY - 1);
+                g.drawLine(centerX, centerY - 5, centerX + 4, centerY - 1);
+                break;
+            case ADDED:
+            default:
+                g.drawLine(centerX - 5, centerY, centerX + 5, centerY);
+                g.drawLine(centerX, centerY - 5, centerX, centerY + 5);
+                break;
         }
     }
 

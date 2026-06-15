@@ -26,6 +26,7 @@ public class OrderWallChangeTracker {
     private static final double TRADE_EXPLAINED_RATIO = 0.70;
     private static final long ALERT_COOLDOWN_MS = 2_500;
     private static final long MIN_LARGE_ORDER_LIFETIME_MS = 500;
+    private static final double SIZE_INCREASE_RATIO = 2.0;
 
     private final String instrumentAlias;
     private final double pips;
@@ -37,6 +38,7 @@ public class OrderWallChangeTracker {
     private final ScheduledExecutorService scheduler;
     private final Map<LevelKey, Integer> currentSizes = new HashMap<>();
     private final Map<LevelKey, PendingAdd> pendingAdds = new HashMap<>();
+    private final Map<LevelKey, PendingIncrease> pendingIncreases = new HashMap<>();
     private final Map<LevelKey, PendingDecrease> pendingDecreases = new HashMap<>();
     private final Map<LevelKey, Long> largeSinceMsByLevel = new HashMap<>();
     private final Map<LevelKey, Long> lastAlertMsByLevel = new HashMap<>();
@@ -83,6 +85,7 @@ public class OrderWallChangeTracker {
             promotePendingAddIfMature(key, previousSize, nowMs);
         }
         PendingAdd existingPendingAdd = pendingAdds.get(key);
+        PendingIncrease existingPendingIncrease = pendingIncreases.get(key);
         boolean wasLargeOrderEligible = isLargeOrderEligible(key, nowMs);
 
         if (size == 0) {
@@ -115,13 +118,32 @@ public class OrderWallChangeTracker {
             return;
         }
 
+        if (existingPendingIncrease != null) {
+            if (isSignificantIncrease(existingPendingIncrease.previousSize, size)) {
+                existingPendingIncrease.latestSize = size;
+                existingPendingIncrease.latestEventTimeNs = eventTimeNs;
+                return;
+            }
+            pendingIncreases.remove(key);
+            PluginLog.info("[WallChange] Suppressed flash increase for " + instrumentAlias + " "
+                    + (key.bid ? "BID" : "ASK") + " " + priceText(key.priceTick)
+                    + " lifetime=" + (nowMs - existingPendingIncrease.createdAtMs) + "ms");
+            previousSize = existingPendingIncrease.previousSize;
+        }
+
         if (previousSize < largeOrderThreshold && size >= largeOrderThreshold) {
             schedulePendingAdd(key, previousSize, size, eventTimeNs, nowMs);
             return;
         }
 
+        if (previousSize >= largeOrderThreshold && isSignificantIncrease(previousSize, size)) {
+            schedulePendingIncrease(key, previousSize, size, eventTimeNs, nowMs);
+            return;
+        }
+
         if (size < largeOrderThreshold) {
             largeSinceMsByLevel.remove(key);
+            pendingIncreases.remove(key);
         }
 
         if (previousSize >= largeOrderThreshold
@@ -159,6 +181,7 @@ public class OrderWallChangeTracker {
         ready = true;
         long nowMs = System.currentTimeMillis();
         pendingAdds.clear();
+        pendingIncreases.clear();
         pendingDecreases.clear();
         largeSinceMsByLevel.clear();
         for (Map.Entry<LevelKey, Integer> entry : currentSizes.entrySet()) {
@@ -173,6 +196,7 @@ public class OrderWallChangeTracker {
     public synchronized void shutdown() {
         shutdown = true;
         pendingAdds.clear();
+        pendingIncreases.clear();
         pendingDecreases.clear();
         largeSinceMsByLevel.clear();
         recentTrades.clear();
@@ -263,10 +287,47 @@ public class OrderWallChangeTracker {
         PluginLog.info("[WallChange] " + event.getLogMessage());
     }
 
+    private synchronized void evaluatePendingIncrease(LevelKey key) {
+        if (shutdown || !ready) {
+            return;
+        }
+        PendingIncrease pending = pendingIncreases.get(key);
+        if (pending == null) {
+            return;
+        }
+
+        long nowMs = System.currentTimeMillis();
+        int latestSize = currentSizes.getOrDefault(key, 0);
+        if (!isSignificantIncrease(pending.previousSize, latestSize)) {
+            pendingIncreases.remove(key);
+            PluginLog.info("[WallChange] Suppressed flash increase for " + instrumentAlias + " "
+                    + (key.bid ? "BID" : "ASK") + " " + priceText(key.priceTick)
+                    + " lifetime=" + (nowMs - pending.createdAtMs) + "ms");
+            return;
+        }
+
+        long remainingMs = minLargeOrderLifetimeMs - (nowMs - pending.createdAtMs);
+        if (remainingMs > 0) {
+            scheduler.schedule(() -> evaluatePendingIncrease(key), remainingMs, TimeUnit.MILLISECONDS);
+            return;
+        }
+
+        pending.latestSize = latestSize;
+        pendingIncreases.remove(key);
+        emitIncrease(key, pending.previousSize, pending.latestSize, pending.latestEventTimeNs, nowMs);
+    }
+
     private void schedulePendingAdd(LevelKey key, int previousSize, int size, long eventTimeNs, long nowMs) {
         PendingAdd pending = new PendingAdd(key, previousSize, size, eventTimeNs, nowMs);
         pendingAdds.put(key, pending);
         scheduler.schedule(() -> evaluatePendingAdd(key),
+                minLargeOrderLifetimeMs, TimeUnit.MILLISECONDS);
+    }
+
+    private void schedulePendingIncrease(LevelKey key, int previousSize, int size, long eventTimeNs, long nowMs) {
+        PendingIncrease pending = new PendingIncrease(key, previousSize, size, eventTimeNs, nowMs);
+        pendingIncreases.put(key, pending);
+        scheduler.schedule(() -> evaluatePendingIncrease(key),
                 minLargeOrderLifetimeMs, TimeUnit.MILLISECONDS);
     }
 
@@ -307,8 +368,34 @@ public class OrderWallChangeTracker {
         PluginLog.info("[WallChange] " + event.getLogMessage());
     }
 
+    private void emitIncrease(LevelKey key, int previousSize, int size, long eventTimeNs, long nowMs) {
+        if (isCoolingDown(key, nowMs)) {
+            return;
+        }
+        OrderWallChangeEvent event = new OrderWallChangeEvent(
+                instrumentAlias,
+                key.bid,
+                key.priceTick,
+                key.priceTick * pips,
+                previousSize,
+                size,
+                0,
+                OrderWallChangeEvent.Type.INCREASED,
+                eventTimeNs,
+                nowMs);
+        markAlerted(key, nowMs);
+        alertConsumer.accept(event);
+        PluginLog.info("[WallChange] " + event.getLogMessage());
+    }
+
     private boolean isSignificantDecrease(int previousSize, int currentSize) {
         return currentSize < largeOrderThreshold || currentSize <= previousSize * remainingRatio;
+    }
+
+    private boolean isSignificantIncrease(int previousSize, int currentSize) {
+        return previousSize > 0
+                && currentSize > largeOrderThreshold
+                && currentSize >= previousSize * SIZE_INCREASE_RATIO;
     }
 
     private boolean isLargeOrderEligible(LevelKey key, long nowMs) {
@@ -367,6 +454,23 @@ public class OrderWallChangeTracker {
 
         private PendingAdd(LevelKey key, int previousSize, int latestSize,
                            long latestEventTimeNs, long createdAtMs) {
+            this.key = key;
+            this.previousSize = previousSize;
+            this.latestSize = latestSize;
+            this.latestEventTimeNs = latestEventTimeNs;
+            this.createdAtMs = createdAtMs;
+        }
+    }
+
+    private static class PendingIncrease {
+        private final LevelKey key;
+        private final int previousSize;
+        private final long createdAtMs;
+        private int latestSize;
+        private long latestEventTimeNs;
+
+        private PendingIncrease(LevelKey key, int previousSize, int latestSize,
+                                long latestEventTimeNs, long createdAtMs) {
             this.key = key;
             this.previousSize = previousSize;
             this.latestSize = latestSize;

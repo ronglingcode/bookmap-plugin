@@ -60,7 +60,7 @@ public class RongPlugin implements CustomModuleAdapter,
     private static final double WALL_CONSUMED_RATIO = 0.10;
     private static final double ORDERBOOK_PERCENTILE = 90;
     private static final int ORDERBOOK_INTERVAL_MS = 1000;
-    private static final double WALL_LABEL_PERCENTILE = 95.0;
+    private static final int WALL_LABEL_MIN_SIZE = 5_000;
     private static final int WALL_LABEL_RETAIN_TICKS = 2_000;
     private static final int WALL_LABEL_REFRESH_MS = 200;
     private static final int WALL_CHANGE_THRESHOLD = 5_000;
@@ -151,7 +151,7 @@ public class RongPlugin implements CustomModuleAdapter,
         }
         replayExportConfig.addChangeListener(this);
         this.wallLabelTracker = new OrderWallLabelTracker(
-                cleanAlias, info.pips, wallLabelStore, WALL_LABEL_PERCENTILE, WALL_LABEL_RETAIN_TICKS,
+                cleanAlias, info.pips, wallLabelStore, WALL_LABEL_MIN_SIZE, WALL_LABEL_RETAIN_TICKS,
                 this::handleWallLabelTrackerChange);
         this.wallChangeTracker = new OrderWallChangeTracker(
                 cleanAlias,
@@ -391,7 +391,7 @@ public class RongPlugin implements CustomModuleAdapter,
         }
         orderBook.update(isBid, price, size);
         wallTracker.updateLevel(isBid, price, size);
-        if (wallLabelTracker != null && wallLabelTracker.onDepth(orderBook, isBid, price, size, getEventTimeNs())) {
+        if (wallLabelTracker != null && wallLabelTracker.onDepth(isBid, price, size, getEventTimeNs())) {
             wallLabelsDirty = true;
             refreshWallLabelsIfNeeded(false);
         }

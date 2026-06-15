@@ -12,6 +12,7 @@ public class OrderWallChangeEvent {
 
     public enum Type {
         ADDED,
+        INCREASED,
         REDUCED,
         REPLACED_SMALLER
     }
@@ -100,6 +101,8 @@ public class OrderWallChangeEvent {
         switch (type) {
             case ADDED:
                 return "ADDED";
+            case INCREASED:
+                return "INCREASED";
             case REPLACED_SMALLER:
                 return "CHANGED";
             case REDUCED:

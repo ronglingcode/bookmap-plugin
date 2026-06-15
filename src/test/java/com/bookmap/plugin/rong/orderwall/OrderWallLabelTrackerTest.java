@@ -2,6 +2,8 @@ package com.bookmap.plugin.rong.orderwall;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.Arrays;
@@ -10,27 +12,45 @@ import java.util.concurrent.TimeUnit;
 
 import org.junit.jupiter.api.Test;
 
-import com.bookmap.plugin.rong.OrderBookState;
-
 class OrderWallLabelTrackerTest {
 
     @Test
+    void tracksLevelsOnlyWhenTheyExceedConfiguredMinimumSize() {
+        OrderWallLabelStore store = new OrderWallLabelStore();
+        OrderWallLabelTracker tracker = new OrderWallLabelTracker(
+                "TEST", 0.01, store, 5_000, 2_000);
+
+        try {
+            onDepth(tracker, true, 12_700, 5_000, 1L);
+            assertNull(store.getActiveLabel("TEST", true, 12_700));
+
+            onDepth(tracker, true, 12_700, 5_001, 2L);
+            OrderWallLabel label = store.getActiveLabel("TEST", true, 12_700);
+
+            assertNotNull(label);
+            assertEquals(5_001, label.getCurrentSize());
+            assertEquals(5_001, label.getPeakSize());
+        } finally {
+            tracker.shutdown();
+        }
+    }
+
+    @Test
     void sizePathKeepsPeakWhenWallIsConsumedAfterBreakout() {
-        OrderBookState orderBook = new OrderBookState();
         OrderWallLabelStore store = new OrderWallLabelStore();
         OrderWallLabelTracker tracker = new OrderWallLabelTracker(
                 "TEST", 0.01, store, 0, 2_000);
 
         try {
-            onDepth(orderBook, tracker, false, 47_000, 79_000, 1L);
-            onDepth(orderBook, tracker, false, 47_000, 106_000, 2L);
-            onDepth(orderBook, tracker, false, 47_000, 107_000, 3L);
-            onDepth(orderBook, tracker, false, 47_000, 108_000, 4L);
+            onDepth(tracker, false, 47_000, 79_000, 1L);
+            onDepth(tracker, false, 47_000, 106_000, 2L);
+            onDepth(tracker, false, 47_000, 107_000, 3L);
+            onDepth(tracker, false, 47_000, 108_000, 4L);
 
-            onDepth(orderBook, tracker, false, 47_000, 79_000, 5L);
-            onDepth(orderBook, tracker, false, 47_000, 11_000, 6L);
-            onDepth(orderBook, tracker, false, 47_000, 5_000, 7L);
-            onDepth(orderBook, tracker, false, 47_000, 2_000, 8L);
+            onDepth(tracker, false, 47_000, 79_000, 5L);
+            onDepth(tracker, false, 47_000, 11_000, 6L);
+            onDepth(tracker, false, 47_000, 5_000, 7L);
+            onDepth(tracker, false, 47_000, 2_000, 8L);
 
             OrderWallLabel label = store.getActiveLabel("TEST", false, 47_000);
 
@@ -43,16 +63,15 @@ class OrderWallLabelTrackerTest {
 
     @Test
     void stableDecreaseIsRecordedAfterDebounce() throws Exception {
-        OrderBookState orderBook = new OrderBookState();
         OrderWallLabelStore store = new OrderWallLabelStore();
         CountDownLatch changeSeen = new CountDownLatch(1);
         OrderWallLabelTracker tracker = new OrderWallLabelTracker(
                 "TEST", 0.01, store, 0, 2_000, 30, changeSeen::countDown);
 
         try {
-            onDepth(orderBook, tracker, false, 47_000, 79_000, 1L);
-            onDepth(orderBook, tracker, false, 47_000, 108_000, 2L);
-            onDepth(orderBook, tracker, false, 47_000, 11_000, 3L);
+            onDepth(tracker, false, 47_000, 79_000, 1L);
+            onDepth(tracker, false, 47_000, 108_000, 2L);
+            onDepth(tracker, false, 47_000, 11_000, 3L);
 
             assertEquals(Arrays.asList(79, 108),
                     store.getActiveLabel("TEST", false, 47_000).getSizePath());
@@ -67,18 +86,17 @@ class OrderWallLabelTrackerTest {
 
     @Test
     void transientDecreaseIsIgnoredWhenSizeChangesBeforeDebounce() throws Exception {
-        OrderBookState orderBook = new OrderBookState();
         OrderWallLabelStore store = new OrderWallLabelStore();
         CountDownLatch changeSeen = new CountDownLatch(1);
         OrderWallLabelTracker tracker = new OrderWallLabelTracker(
                 "TEST", 0.01, store, 0, 2_000, 90, changeSeen::countDown);
 
         try {
-            onDepth(orderBook, tracker, false, 47_000, 79_000, 1L);
-            onDepth(orderBook, tracker, false, 47_000, 108_000, 2L);
-            onDepth(orderBook, tracker, false, 47_000, 11_000, 3L);
+            onDepth(tracker, false, 47_000, 79_000, 1L);
+            onDepth(tracker, false, 47_000, 108_000, 2L);
+            onDepth(tracker, false, 47_000, 11_000, 3L);
             Thread.sleep(20);
-            onDepth(orderBook, tracker, false, 47_000, 108_000, 4L);
+            onDepth(tracker, false, 47_000, 108_000, 4L);
 
             assertFalse(changeSeen.await(200, TimeUnit.MILLISECONDS));
             assertEquals(Arrays.asList(79, 108),
@@ -90,15 +108,14 @@ class OrderWallLabelTrackerTest {
 
     @Test
     void zeroDecreaseIsRecordedImmediately() {
-        OrderBookState orderBook = new OrderBookState();
         OrderWallLabelStore store = new OrderWallLabelStore();
         OrderWallLabelTracker tracker = new OrderWallLabelTracker(
                 "TEST", 0.01, store, 0, 2_000, 1_000, null);
 
         try {
-            onDepth(orderBook, tracker, false, 47_000, 79_000, 1L);
-            onDepth(orderBook, tracker, false, 47_000, 108_000, 2L);
-            onDepth(orderBook, tracker, false, 47_000, 0, 3L);
+            onDepth(tracker, false, 47_000, 79_000, 1L);
+            onDepth(tracker, false, 47_000, 108_000, 2L);
+            onDepth(tracker, false, 47_000, 0, 3L);
 
             OrderWallLabel label = store.getLabels("TEST").get(0);
 
@@ -110,16 +127,15 @@ class OrderWallLabelTrackerTest {
 
     @Test
     void laterHigherReloadStillExtendsGrowthPath() {
-        OrderBookState orderBook = new OrderBookState();
         OrderWallLabelStore store = new OrderWallLabelStore();
         OrderWallLabelTracker tracker = new OrderWallLabelTracker(
                 "TEST", 0.01, store, 0, 2_000);
 
         try {
-            onDepth(orderBook, tracker, false, 47_000, 79_000, 1L);
-            onDepth(orderBook, tracker, false, 47_000, 108_000, 2L);
-            onDepth(orderBook, tracker, false, 47_000, 11_000, 3L);
-            onDepth(orderBook, tracker, false, 47_000, 120_000, 4L);
+            onDepth(tracker, false, 47_000, 79_000, 1L);
+            onDepth(tracker, false, 47_000, 108_000, 2L);
+            onDepth(tracker, false, 47_000, 11_000, 3L);
+            onDepth(tracker, false, 47_000, 120_000, 4L);
 
             OrderWallLabel label = store.getActiveLabel("TEST", false, 47_000);
 
@@ -129,9 +145,8 @@ class OrderWallLabelTrackerTest {
         }
     }
 
-    private static void onDepth(OrderBookState orderBook, OrderWallLabelTracker tracker,
+    private static void onDepth(OrderWallLabelTracker tracker,
                                 boolean isBid, int priceTick, int size, long eventTimeNs) {
-        orderBook.update(isBid, priceTick, size);
-        tracker.onDepth(orderBook, isBid, priceTick, size, eventTimeNs);
+        tracker.onDepth(isBid, priceTick, size, eventTimeNs);
     }
 }

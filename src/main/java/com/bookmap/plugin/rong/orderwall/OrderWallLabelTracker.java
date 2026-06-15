@@ -9,8 +9,6 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 
-import com.bookmap.plugin.rong.OrderBookState;
-
 /**
  * Tracks large liquidity walls and retains meaningful size changes at each level.
  */
@@ -22,7 +20,7 @@ public class OrderWallLabelTracker {
     private final String instrumentAlias;
     private final double pips;
     private final OrderWallLabelStore store;
-    private final double percentile;
+    private final int minimumSize;
     private final long decreaseStabilityMs;
     private final Runnable labelChangeListener;
     private final ScheduledExecutorService scheduler;
@@ -31,23 +29,23 @@ public class OrderWallLabelTracker {
     private boolean shutdown;
 
     public OrderWallLabelTracker(String instrumentAlias, double pips, OrderWallLabelStore store,
-                                 double percentile, int retainDistanceTicks) {
-        this(instrumentAlias, pips, store, percentile, retainDistanceTicks, DECREASE_STABILITY_MS, null);
+                                 int minimumSize, int retainDistanceTicks) {
+        this(instrumentAlias, pips, store, minimumSize, retainDistanceTicks, DECREASE_STABILITY_MS, null);
     }
 
     public OrderWallLabelTracker(String instrumentAlias, double pips, OrderWallLabelStore store,
-                                 double percentile, int retainDistanceTicks, Runnable labelChangeListener) {
-        this(instrumentAlias, pips, store, percentile, retainDistanceTicks,
+                                 int minimumSize, int retainDistanceTicks, Runnable labelChangeListener) {
+        this(instrumentAlias, pips, store, minimumSize, retainDistanceTicks,
                 DECREASE_STABILITY_MS, labelChangeListener);
     }
 
     OrderWallLabelTracker(String instrumentAlias, double pips, OrderWallLabelStore store,
-                          double percentile, int retainDistanceTicks, long decreaseStabilityMs,
+                          int minimumSize, int retainDistanceTicks, long decreaseStabilityMs,
                           Runnable labelChangeListener) {
         this.instrumentAlias = instrumentAlias;
         this.pips = pips;
         this.store = store;
-        this.percentile = percentile;
+        this.minimumSize = minimumSize;
         this.decreaseStabilityMs = decreaseStabilityMs;
         this.labelChangeListener = labelChangeListener;
         this.scheduler = Executors.newSingleThreadScheduledExecutor(r -> {
@@ -58,11 +56,11 @@ public class OrderWallLabelTracker {
     }
 
     /**
-     * Labels are created once a level reaches the configured percentile threshold.
+     * Labels are created once a level exceeds the configured minimum size.
      * When a level falls back below that threshold, the segment is frozen as a
      * historical wall so the peak size remains visible over the bright section.
      */
-    public synchronized boolean onDepth(OrderBookState orderBook, boolean isBid, int priceTick, int size, long eventTimeNs) {
+    public synchronized boolean onDepth(boolean isBid, int priceTick, int size, long eventTimeNs) {
         if (shutdown) {
             return false;
         }
@@ -70,8 +68,7 @@ public class OrderWallLabelTracker {
         updateCurrentDisplaySize(key, size);
 
         OrderWallLabel existing = store.getActiveLabel(instrumentAlias, isBid, priceTick);
-        int requiredSize = orderBook.getPercentileThreshold(percentile);
-        boolean qualifiesNow = size > 0 && size >= requiredSize;
+        boolean qualifiesNow = size > minimumSize;
 
         if (!qualifiesNow && existing == null) {
             pendingDecreases.remove(key);
