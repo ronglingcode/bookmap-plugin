@@ -457,6 +457,7 @@ public class TradeButtonWindow {
         json.addProperty("tradebook_name", tradebook.getTradebookName());
         json.addProperty("entry_method", entryMethod);
         json.addProperty("timestamp", System.currentTimeMillis());
+        server.appendOrderbookSnapshot(symbol, json, WALL_OUT_MINIMUM_SIZE);
         server.broadcast(json.toString());
         PluginLog.action(symbol, "Button send " + orderType + " " + tradebook.getLabel() + " " + entryMethod);
         PluginLog.info("[TradeButton] " + orderType + " " + tradebook.getLabel() + ": " + entryMethod

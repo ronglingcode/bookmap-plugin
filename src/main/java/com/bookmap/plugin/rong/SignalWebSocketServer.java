@@ -11,6 +11,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.NavigableMap;
 import java.util.Set;
 import java.util.Collections;
 import java.util.concurrent.ConcurrentHashMap;
@@ -109,6 +110,62 @@ public class SignalWebSocketServer extends WebSocketServer {
         symbolToOrderBook.remove(symbol);
         symbolToPips.remove(symbol);
         PluginLog.info("[Rong] Unregistered symbol: " + symbol);
+    }
+
+    public boolean appendOrderbookSnapshot(String symbol, JsonObject target, int minimumWallSize) {
+        JsonObject snapshot = buildOrderbookSnapshot(symbol, minimumWallSize);
+        if (snapshot == null) {
+            return false;
+        }
+        target.add("orderbook", snapshot);
+        return true;
+    }
+
+    private JsonObject buildOrderbookSnapshot(String symbol, int minimumWallSize) {
+        String cleanSymbol = SymbolUtils.cleanSymbol(symbol);
+        if (cleanSymbol.isEmpty()) {
+            return null;
+        }
+
+        OrderBookState orderBook = symbolToOrderBook.get(cleanSymbol);
+        Double pips = symbolToPips.get(cleanSymbol);
+        if (orderBook == null || pips == null || pips <= 0 || !Double.isFinite(pips)) {
+            return null;
+        }
+
+        JsonObject snapshot = new JsonObject();
+        snapshot.addProperty("symbol", cleanSymbol);
+        snapshot.addProperty("timestamp", System.currentTimeMillis());
+        snapshot.addProperty("wallThreshold", minimumWallSize);
+
+        synchronized (orderBook) {
+            Integer bestBidTick = orderBook.getBestBid();
+            Integer bestAskTick = orderBook.getBestAsk();
+            if (bestBidTick != null) {
+                snapshot.addProperty("bestBid", bestBidTick * pips);
+            }
+            if (bestAskTick != null) {
+                snapshot.addProperty("bestAsk", bestAskTick * pips);
+            }
+            snapshot.add("largeBids", buildWallLevels(orderBook.getBids(), pips, minimumWallSize));
+            snapshot.add("largeAsks", buildWallLevels(orderBook.getAsks(), pips, minimumWallSize));
+        }
+        return snapshot;
+    }
+
+    private JsonArray buildWallLevels(NavigableMap<Integer, Integer> levels, double pips, int minimumWallSize) {
+        JsonArray result = new JsonArray();
+        for (Map.Entry<Integer, Integer> entry : levels.entrySet()) {
+            int size = entry.getValue();
+            if (size <= minimumWallSize) {
+                continue;
+            }
+            JsonArray level = new JsonArray();
+            level.add(entry.getKey() * pips);
+            level.add(size);
+            result.add(level);
+        }
+        return result;
     }
 
     public void registerTradeButtonConfigListener(String symbol, TradeButtonConfigListener listener) {
