@@ -68,5 +68,21 @@ public class IndicatorSettingsPanel extends StrategyPanel {
         wallChangeSoundCheckbox.addActionListener(e ->
                 config.setEnabled(IndicatorConfig.ORDER_WALL_CHANGE_SOUND, wallChangeSoundCheckbox.isSelected()));
         add(wallChangeSoundCheckbox, gbc);
+
+        gbc.gridy++;
+        JCheckBox filledExecutionMarkersCheckbox = new JCheckBox(
+                "Filled Execution Markers",
+                config.isEnabled(IndicatorConfig.FILLED_EXECUTION_MARKERS));
+        filledExecutionMarkersCheckbox.addActionListener(e ->
+                config.setEnabled(IndicatorConfig.FILLED_EXECUTION_MARKERS, filledExecutionMarkersCheckbox.isSelected()));
+        add(filledExecutionMarkersCheckbox, gbc);
+
+        gbc.gridy++;
+        JCheckBox fireKeyboardEventCheckbox = new JCheckBox(
+                "Fire Keyboard Hotkey Events (A/G/T/W, 0-9)",
+                config.isEnabled(IndicatorConfig.FIRE_KEYBOARD_EVENT));
+        fireKeyboardEventCheckbox.addActionListener(e ->
+                config.setEnabled(IndicatorConfig.FIRE_KEYBOARD_EVENT, fireKeyboardEventCheckbox.isSelected()));
+        add(fireKeyboardEventCheckbox, gbc);
     }
 }

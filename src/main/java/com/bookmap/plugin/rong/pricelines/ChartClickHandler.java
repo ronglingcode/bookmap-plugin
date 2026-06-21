@@ -4,6 +4,11 @@ import java.awt.AWTEvent;
 import java.awt.Component;
 import java.awt.Container;
 import java.awt.Frame;
+import java.awt.KeyboardFocusManager;
+import java.awt.MouseInfo;
+import java.awt.Point;
+import java.awt.PointerInfo;
+import java.awt.TextComponent;
 import java.awt.Toolkit;
 import java.awt.Window;
 import java.awt.event.AWTEventListener;
@@ -19,11 +24,16 @@ import java.util.Map;
 import java.util.Set;
 import java.util.Collections;
 import java.util.concurrent.ConcurrentHashMap;
+import javax.swing.JComboBox;
 import javax.swing.JLabel;
+import javax.swing.JTable;
 import javax.swing.SwingUtilities;
+import javax.swing.text.JTextComponent;
 
+import com.bookmap.plugin.rong.IndicatorConfig;
 import com.bookmap.plugin.rong.PluginLog;
 import com.bookmap.plugin.rong.SignalWebSocketServer;
+import com.google.gson.JsonObject;
 
 import velox.api.layer1.layers.strategies.interfaces.ScreenSpaceCanvasFactory;
 import velox.api.layer1.layers.strategies.interfaces.ScreenSpacePainter;
@@ -66,15 +76,24 @@ public class ChartClickHandler implements ScreenSpacePainterFactory {
     /** Currently held non-modifier keys (e.g. 'b', 's'). Tracked via KEY_PRESSED/KEY_RELEASED. */
     private static final Set<String> heldKeys = Collections.newSetFromMap(new ConcurrentHashMap<>());
 
+    /** Chart hotkeys forwarded to ViteApp with the currently hovered Bookmap price. */
+    private static final Set<String> CHART_HOTKEYS =
+            Set.of("a", "g", "t", "w", "1", "2", "3", "4", "5", "6", "7", "8", "9", "0");
+
+    /** Last resolved chart hover. Used so KEY_PRESSED can include the hovered chart price. */
+    private static volatile HoverContext lastHoverContext;
+
     /** Shared AWT listener — registered once. */
     private static volatile AWTEventListener awtListener;
     private static final Object listenerLock = new Object();
 
     private static volatile BufferedWriter clickLogWriter;
     private final SignalWebSocketServer wsServer;
+    private final IndicatorConfig config;
 
-    public ChartClickHandler(SignalWebSocketServer wsServer) {
+    public ChartClickHandler(SignalWebSocketServer wsServer, IndicatorConfig config) {
         this.wsServer = wsServer;
+        this.config = config;
         initClickLog();
         ensureAwtListener();
     }
@@ -126,6 +145,7 @@ public class ChartClickHandler implements ScreenSpacePainterFactory {
                 painterCoords.clear();
                 painterToInstrument.clear();
                 windowToInstrument.clear();
+                lastHoverContext = null;
                 PluginLog.info("[Rong] AWT listener removed");
             }
         }
@@ -140,12 +160,20 @@ public class ChartClickHandler implements ScreenSpacePainterFactory {
                 if (event.getID() == KeyEvent.KEY_PRESSED) {
                     KeyEvent ke = (KeyEvent) event;
                     String key = normalizeKey(ke);
-                    heldKeys.add(key);
+                    boolean firstPress = heldKeys.add(key);
+                    if (firstPress) {
+                        handleChartHotkey(ke, key);
+                    }
                     return;
                 }
                 if (event.getID() == KeyEvent.KEY_RELEASED) {
                     KeyEvent ke = (KeyEvent) event;
                     heldKeys.remove(normalizeKey(ke));
+                    return;
+                }
+
+                if (event.getID() == MouseEvent.MOUSE_MOVED || event.getID() == MouseEvent.MOUSE_DRAGGED) {
+                    updateHoverContext((MouseEvent) event);
                     return;
                 }
 
@@ -235,9 +263,201 @@ public class ChartClickHandler implements ScreenSpacePainterFactory {
                 }
             };
             Toolkit.getDefaultToolkit().addAWTEventListener(awtListener,
-                AWTEvent.MOUSE_EVENT_MASK | AWTEvent.KEY_EVENT_MASK);
-            PluginLog.info("[Rong] AWT mouse listener registered for key+left-click");
+                AWTEvent.MOUSE_EVENT_MASK | AWTEvent.MOUSE_MOTION_EVENT_MASK | AWTEvent.KEY_EVENT_MASK);
+            PluginLog.info("[Rong] AWT mouse listener registered for key+left-click and chart hotkeys");
         }
+    }
+
+    private void updateHoverContext(MouseEvent event) {
+        Component component = event.getComponent();
+        ResolvedChartPrice price = resolveChartPrice(component, event.getY());
+        lastHoverContext = price == null ? null : new HoverContext(price.instrument, price.price, component);
+    }
+
+    private void handleChartHotkey(KeyEvent event, String normalizedKey) {
+        if (!CHART_HOTKEYS.contains(normalizedKey)) {
+            return;
+        }
+        if (config == null || !config.isEnabled(IndicatorConfig.FIRE_KEYBOARD_EVENT)) {
+            return;
+        }
+        if (isTextEntryEvent(event)) {
+            PluginLog.info("[Rong] Chart hotkey blocked while text entry appears active: key="
+                    + normalizedKey + ", focus=" + describeComponent(
+                            KeyboardFocusManager.getCurrentKeyboardFocusManager().getFocusOwner())
+                    + ", source=" + describeComponent(event.getComponent()));
+            return;
+        }
+
+        HoverContext hover = resolveCurrentHoverContext();
+        if (hover == null) {
+            return;
+        }
+
+        String keyCode = toViteKeyCode(normalizedKey);
+        boolean shiftDown = event.isShiftDown() || heldKeys.contains("shift");
+        JsonObject json = new JsonObject();
+        json.addProperty("type", "custom_button_click");
+        json.addProperty("symbol", hover.instrument);
+        json.addProperty("button_id", "chart_hotkey:" + normalizedKey);
+        json.addProperty("button_name", "Chart Hotkey " + normalizedKey.toUpperCase());
+        json.addProperty("keyCode", keyCode);
+        json.addProperty("key_code", keyCode);
+        json.addProperty("shiftKey", shiftDown);
+        json.addProperty("shift_key", shiftDown);
+        json.addProperty("price", hover.price);
+        json.addProperty("source", "bookmap_chart_hotkey");
+        json.addProperty("timestamp", System.currentTimeMillis());
+        wsServer.broadcast(json.toString());
+
+        PluginLog.action(hover.instrument, "Hotkey send " + (shiftDown ? "Shift+" : "") + keyCode
+                + " @ " + formatPrice(hover.price));
+        PluginLog.info("[Rong] Chart hotkey " + (shiftDown ? "Shift+" : "") + keyCode
+                + " sent for " + hover.instrument + " @ " + formatPrice(hover.price));
+    }
+
+    private static HoverContext resolveCurrentHoverContext() {
+        HoverContext hover = lastHoverContext;
+        if (hover == null || hover.component == null || !hover.component.isShowing()) {
+            return null;
+        }
+
+        PointerInfo pointerInfo = MouseInfo.getPointerInfo();
+        if (pointerInfo == null) {
+            return null;
+        }
+
+        Point point = pointerInfo.getLocation();
+        SwingUtilities.convertPointFromScreen(point, hover.component);
+        if (!hover.component.contains(point)) {
+            return null;
+        }
+
+        ResolvedChartPrice current = resolveChartPrice(hover.component, point.y);
+        if (current == null) {
+            lastHoverContext = null;
+            return null;
+        }
+
+        HoverContext refreshed = new HoverContext(current.instrument, current.price, hover.component);
+        lastHoverContext = refreshed;
+        return refreshed;
+    }
+
+    private static ResolvedChartPrice resolveChartPrice(Component comp, int localY) {
+        int compHeight = (comp != null) ? comp.getHeight() : 0;
+        String clickedInstrument = identifyInstrumentFromComponent(comp);
+
+        for (Map.Entry<String, CoordinateState> entry : painterCoords.entrySet()) {
+            String painterAlias = entry.getKey();
+            CoordinateState cs = entry.getValue();
+            if (cs.pixelsHeight <= 0 || cs.priceHeight <= 0) continue;
+
+            String instrument = painterToInstrument.getOrDefault(painterAlias, lastRegisteredInstrument);
+            if (instrument == null) instrument = painterAlias;
+
+            if (clickedInstrument != null && !clickedInstrument.equals(instrument)) {
+                continue;
+            }
+
+            double pips = instrumentPips.getOrDefault(instrument, 1.0);
+            double fraction = cs.fraction(localY, compHeight);
+            double priceTick = cs.yToPriceTick(localY, compHeight);
+            double price = priceTick * pips;
+
+            if (fraction >= 0 && fraction <= 1 && !Double.isNaN(price) && price > 0) {
+                return new ResolvedChartPrice(instrument, price);
+            }
+        }
+
+        return null;
+    }
+
+    private static boolean isTextEntryEvent(KeyEvent event) {
+        if (event == null || event.isConsumed()) {
+            return true;
+        }
+
+        KeyboardFocusManager manager = KeyboardFocusManager.getCurrentKeyboardFocusManager();
+        if (isTextEntryComponent(manager.getFocusOwner())
+                || isTextEntryComponent(manager.getPermanentFocusOwner())
+                || isTextEntryComponent(event.getComponent())) {
+            return true;
+        }
+
+        Object source = event.getSource();
+        if (source instanceof Component && isTextEntryComponent((Component) source)) {
+            return true;
+        }
+
+        return hasTextEntryMarker(manager.getFocusedWindow()) || hasTextEntryMarker(manager.getActiveWindow());
+    }
+
+    private static boolean isTextEntryComponent(Component component) {
+        Component current = component;
+        while (current != null) {
+            if (current instanceof JTextComponent && ((JTextComponent) current).isEditable()) {
+                return true;
+            }
+            if (current instanceof TextComponent && ((TextComponent) current).isEditable()) {
+                return true;
+            }
+            if (current instanceof JComboBox && ((JComboBox<?>) current).isEditable()) {
+                return true;
+            }
+            if (current instanceof JTable && ((JTable) current).isEditing()) {
+                return true;
+            }
+            if (hasTextEntryMarker(current)) {
+                return true;
+            }
+            current = current.getParent();
+        }
+        return false;
+    }
+
+    private static boolean hasTextEntryMarker(Component component) {
+        if (component == null) {
+            return false;
+        }
+        String text = describeComponent(component).toLowerCase();
+        return text.contains("annotation")
+                || text.contains("annotat")
+                || text.contains("texteditor")
+                || text.contains("text editor")
+                || text.contains("textinput")
+                || text.contains("text input")
+                || text.contains("textfield")
+                || text.contains("textarea")
+                || text.contains("edittext")
+                || text.contains("editabletext")
+                || text.contains("inputfield")
+                || text.contains("noteeditor");
+    }
+
+    private static String describeComponent(Component component) {
+        if (component == null) {
+            return "";
+        }
+        StringBuilder builder = new StringBuilder(component.getClass().getName());
+        String name = component.getName();
+        if (name != null && !name.isEmpty()) {
+            builder.append(" name=").append(name);
+        }
+        if (component instanceof Frame) {
+            String title = ((Frame) component).getTitle();
+            if (title != null && !title.isEmpty()) {
+                builder.append(" title=").append(title);
+            }
+        }
+        return builder.toString();
+    }
+
+    private static String formatPrice(double price) {
+        if (!Double.isFinite(price) || price <= 0) {
+            return "";
+        }
+        return String.format("%.2f", price);
     }
 
     @Override
@@ -312,6 +532,14 @@ public class ChartClickHandler implements ScreenSpacePainterFactory {
             return Integer.toString(keyCode - KeyEvent.VK_NUMPAD0);
         }
         return KeyEvent.getKeyText(keyCode).toLowerCase();
+    }
+
+    private static String toViteKeyCode(String normalizedKey) {
+        if (normalizedKey != null && normalizedKey.length() == 1
+                && normalizedKey.charAt(0) >= '0' && normalizedKey.charAt(0) <= '9') {
+            return "Digit" + normalizedKey;
+        }
+        return "Key" + normalizedKey.toUpperCase();
     }
 
     private static boolean isActionKey(String keyCode) {
@@ -440,6 +668,28 @@ public class ChartClickHandler implements ScreenSpacePainterFactory {
             }
         }
         return null;
+    }
+
+    private static class ResolvedChartPrice {
+        final String instrument;
+        final double price;
+
+        ResolvedChartPrice(String instrument, double price) {
+            this.instrument = instrument;
+            this.price = price;
+        }
+    }
+
+    private static class HoverContext {
+        final String instrument;
+        final double price;
+        final Component component;
+
+        HoverContext(String instrument, double price, Component component) {
+            this.instrument = instrument;
+            this.price = price;
+            this.component = component;
+        }
     }
 
     /** Stores the chart coordinate mapping for one painter instance. */

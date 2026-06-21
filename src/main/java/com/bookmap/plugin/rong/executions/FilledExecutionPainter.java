@@ -16,6 +16,7 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
 
+import com.bookmap.plugin.rong.IndicatorConfig;
 import com.bookmap.plugin.rong.PluginLog;
 import com.bookmap.plugin.rong.SymbolUtils;
 
@@ -35,7 +36,8 @@ import velox.api.layer1.layers.strategies.interfaces.ScreenSpacePainterFactory;
 /**
  * Draws filled broker executions at their fill time and fill price.
  */
-public class FilledExecutionPainter implements ScreenSpacePainterFactory, FilledExecutionStore.ChangeListener {
+public class FilledExecutionPainter implements ScreenSpacePainterFactory,
+        FilledExecutionStore.ChangeListener, IndicatorConfig.ChangeListener {
 
     public static final String PAINTER_NAME_PREFIX = "filledExecutions_";
 
@@ -50,13 +52,16 @@ public class FilledExecutionPainter implements ScreenSpacePainterFactory, Filled
     private static final Color BACKGROUND = new Color(10, 14, 18, 220);
 
     private final FilledExecutionStore store;
+    private final IndicatorConfig config;
     private final Map<String, String> painterToInstrument = new ConcurrentHashMap<>();
     private final Map<String, CopyOnWriteArrayList<PainterInstance>> paintersByInstrument = new ConcurrentHashMap<>();
     private volatile String lastRegisteredInstrument;
 
-    public FilledExecutionPainter(FilledExecutionStore store) {
+    public FilledExecutionPainter(FilledExecutionStore store, IndicatorConfig config) {
         this.store = store;
+        this.config = config;
         this.store.addListener(this);
+        this.config.addChangeListener(this);
     }
 
     public void registerInstrument(String instrumentAlias) {
@@ -81,13 +86,30 @@ public class FilledExecutionPainter implements ScreenSpacePainterFactory, Filled
         }
     }
 
+    private void refreshAllInstruments() {
+        for (CopyOnWriteArrayList<PainterInstance> painters : paintersByInstrument.values()) {
+            for (PainterInstance painter : painters) {
+                painter.rebuildMarkers();
+            }
+        }
+    }
+
     @Override
     public void onFilledExecutionsChanged(String instrumentAlias) {
         refreshInstrument(instrumentAlias);
     }
 
+    @Override
+    public void onIndicatorConfigChanged(String indicatorKey, boolean enabled) {
+        if (!IndicatorConfig.FILLED_EXECUTION_MARKERS.equals(indicatorKey)) {
+            return;
+        }
+        refreshAllInstruments();
+    }
+
     public void shutdown() {
         store.removeListener(this);
+        config.removeChangeListener(this);
     }
 
     @Override
@@ -164,6 +186,9 @@ public class FilledExecutionPainter implements ScreenSpacePainterFactory, Filled
                     return;
                 }
                 removeActiveShapesLocked();
+                if (!config.isEnabled(IndicatorConfig.FILLED_EXECUTION_MARKERS)) {
+                    return;
+                }
 
                 List<FilledExecutionMarker> markers = selectMarkersToDraw();
                 for (FilledExecutionMarker marker : markers) {

@@ -122,13 +122,15 @@ public class RongPlugin implements CustomModuleAdapter,
                 ActionLogWindow.showWindow();
                 PluginLog.info("[Rong] Shared WebSocket server started on port " + WS_PORT);
             }
+            if (indicatorConfig == null) {
+                indicatorConfig = new IndicatorConfig();
+            }
             if (chartClickHandler == null) {
-                chartClickHandler = new ChartClickHandler(sharedServer);
+                chartClickHandler = new ChartClickHandler(sharedServer, indicatorConfig);
             }
             if (priceLineStore == null) {
                 priceLineStore = new PriceLineStore();
                 priceLinePainter = new PriceLinePainter(priceLineStore);
-                indicatorConfig = new IndicatorConfig();
                 replayExportConfig = new ReplayExportConfig();
                 wallLabelStore = new OrderWallLabelStore();
                 wallChangeStore = new OrderWallChangeStore();
@@ -143,7 +145,7 @@ public class RongPlugin implements CustomModuleAdapter,
                 pendingEntryOrderManager = new PendingEntryOrderManager(priceLineStore);
                 sharedServer.registerAccountStateListener(pendingEntryOrderManager);
                 filledExecutionStore = new FilledExecutionStore();
-                filledExecutionPainter = new FilledExecutionPainter(filledExecutionStore);
+                filledExecutionPainter = new FilledExecutionPainter(filledExecutionStore, indicatorConfig);
                 filledExecutionManager = new FilledExecutionManager(filledExecutionStore);
                 sharedServer.registerAccountStateListener(filledExecutionManager);
             }
@@ -421,6 +423,10 @@ public class RongPlugin implements CustomModuleAdapter,
     @Override
     public void onTimestamp(long timestampNs) {
         this.lastTimestampNs = timestampNs;
+        if (wallLabelTracker != null && wallLabelTracker.onTimestamp(timestampNs)) {
+            wallLabelsDirty = true;
+            refreshWallLabelsIfNeeded(true);
+        }
         BookmapReplayExportSession exportSession = replayExportSession;
         if (exportSession != null) {
             exportSession.onTimestamp(timestampNs);

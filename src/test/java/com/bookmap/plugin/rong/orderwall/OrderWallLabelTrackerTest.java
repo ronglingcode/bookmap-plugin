@@ -17,8 +17,7 @@ class OrderWallLabelTrackerTest {
     @Test
     void tracksLevelsOnlyWhenTheyExceedConfiguredMinimumSize() {
         OrderWallLabelStore store = new OrderWallLabelStore();
-        OrderWallLabelTracker tracker = new OrderWallLabelTracker(
-                "TEST", 0.01, store, 5_000, 2_000);
+        OrderWallLabelTracker tracker = newImmediateTracker(store, 5_000);
 
         try {
             onDepth(tracker, true, 12_700, 5_000, 1L);
@@ -36,10 +35,51 @@ class OrderWallLabelTrackerTest {
     }
 
     @Test
+    void skipsLargeOrderThatDisappearsBeforeLabelLifetime() {
+        OrderWallLabelStore store = new OrderWallLabelStore();
+        OrderWallLabelTracker tracker = newTracker(store, 5_000, 1_000, 1_000, null);
+
+        try {
+            onDepth(tracker, false, 11_730, 5_500, ns(10_000));
+            assertNull(store.getActiveLabel("TEST", false, 11_730));
+
+            onDepth(tracker, false, 11_730, 0, ns(10_800));
+
+            assertFalse(tracker.onTimestamp(ns(11_500)));
+            assertTrue(store.getLabels("TEST").isEmpty());
+        } finally {
+            tracker.shutdown();
+        }
+    }
+
+    @Test
+    void labelsOnlyAfterLevelSurvivesOneSecond() {
+        OrderWallLabelStore store = new OrderWallLabelStore();
+        OrderWallLabelTracker tracker = newTracker(store, 5_000, 1_000, 1_000, null);
+
+        try {
+            onDepth(tracker, false, 11_730, 5_500, ns(10_000));
+
+            assertFalse(tracker.onTimestamp(ns(10_999)));
+            assertNull(store.getActiveLabel("TEST", false, 11_730));
+
+            assertTrue(tracker.onTimestamp(ns(11_000)));
+            OrderWallLabel label = store.getActiveLabel("TEST", false, 11_730);
+
+            assertNotNull(label);
+            assertEquals(5_500, label.getCurrentSize());
+            assertEquals(5_500, label.getPeakSize());
+            assertEquals(ns(10_000), label.getStartTimeNs());
+            assertEquals(ns(11_000), label.getEndTimeNs());
+        } finally {
+            tracker.shutdown();
+        }
+    }
+
+    @Test
     void sizePathKeepsPeakWhenWallIsConsumedAfterBreakout() {
         OrderWallLabelStore store = new OrderWallLabelStore();
-        OrderWallLabelTracker tracker = new OrderWallLabelTracker(
-                "TEST", 0.01, store, 0, 2_000);
+        OrderWallLabelTracker tracker = newImmediateTracker(store, 0);
 
         try {
             onDepth(tracker, false, 47_000, 79_000, 1L);
@@ -65,8 +105,7 @@ class OrderWallLabelTrackerTest {
     void stableDecreaseIsRecordedAfterDebounce() throws Exception {
         OrderWallLabelStore store = new OrderWallLabelStore();
         CountDownLatch changeSeen = new CountDownLatch(1);
-        OrderWallLabelTracker tracker = new OrderWallLabelTracker(
-                "TEST", 0.01, store, 0, 2_000, 30, changeSeen::countDown);
+        OrderWallLabelTracker tracker = newImmediateTracker(store, 0, 30, changeSeen::countDown);
 
         try {
             onDepth(tracker, false, 47_000, 79_000, 1L);
@@ -88,8 +127,7 @@ class OrderWallLabelTrackerTest {
     void transientDecreaseIsIgnoredWhenSizeChangesBeforeDebounce() throws Exception {
         OrderWallLabelStore store = new OrderWallLabelStore();
         CountDownLatch changeSeen = new CountDownLatch(1);
-        OrderWallLabelTracker tracker = new OrderWallLabelTracker(
-                "TEST", 0.01, store, 0, 2_000, 90, changeSeen::countDown);
+        OrderWallLabelTracker tracker = newImmediateTracker(store, 0, 90, changeSeen::countDown);
 
         try {
             onDepth(tracker, false, 47_000, 79_000, 1L);
@@ -109,8 +147,7 @@ class OrderWallLabelTrackerTest {
     @Test
     void zeroDecreaseIsRecordedImmediately() {
         OrderWallLabelStore store = new OrderWallLabelStore();
-        OrderWallLabelTracker tracker = new OrderWallLabelTracker(
-                "TEST", 0.01, store, 0, 2_000, 1_000, null);
+        OrderWallLabelTracker tracker = newImmediateTracker(store, 0, 1_000, null);
 
         try {
             onDepth(tracker, false, 47_000, 79_000, 1L);
@@ -128,8 +165,7 @@ class OrderWallLabelTrackerTest {
     @Test
     void laterHigherReloadStillExtendsGrowthPath() {
         OrderWallLabelStore store = new OrderWallLabelStore();
-        OrderWallLabelTracker tracker = new OrderWallLabelTracker(
-                "TEST", 0.01, store, 0, 2_000);
+        OrderWallLabelTracker tracker = newImmediateTracker(store, 0);
 
         try {
             onDepth(tracker, false, 47_000, 79_000, 1L);
@@ -148,5 +184,33 @@ class OrderWallLabelTrackerTest {
     private static void onDepth(OrderWallLabelTracker tracker,
                                 boolean isBid, int priceTick, int size, long eventTimeNs) {
         tracker.onDepth(isBid, priceTick, size, eventTimeNs);
+    }
+
+    private static OrderWallLabelTracker newImmediateTracker(OrderWallLabelStore store, int minimumSize) {
+        return newImmediateTracker(store, minimumSize, 1_000, null);
+    }
+
+    private static OrderWallLabelTracker newImmediateTracker(OrderWallLabelStore store, int minimumSize,
+                                                            long decreaseStabilityMs,
+                                                            Runnable labelChangeListener) {
+        return newTracker(store, minimumSize, decreaseStabilityMs, 0, labelChangeListener);
+    }
+
+    private static OrderWallLabelTracker newTracker(OrderWallLabelStore store, int minimumSize,
+                                                    long decreaseStabilityMs, long labelMinLifetimeMs,
+                                                    Runnable labelChangeListener) {
+        return new OrderWallLabelTracker(
+                "TEST",
+                0.01,
+                store,
+                minimumSize,
+                2_000,
+                decreaseStabilityMs,
+                labelMinLifetimeMs,
+                labelChangeListener);
+    }
+
+    private static long ns(long millis) {
+        return millis * 1_000_000L;
     }
 }

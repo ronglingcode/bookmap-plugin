@@ -252,25 +252,32 @@ public class OrderWallLabelPainter implements ScreenSpacePainterFactory,
         private List<LabelPlacement> selectLabelsToDraw() {
             List<OrderWallLabel> activeLabels = new ArrayList<>();
             List<OrderWallLabel> clearedLabels = new ArrayList<>();
+            Map<OrderWallLabel, OrderWallChangeEvent> recentChanges = new HashMap<>();
             long nowMs = System.currentTimeMillis();
 
             for (OrderWallLabel label : store.getLabels(instrumentAlias)) {
                 if (!isVisible(label) || !isDisplayable(label)) {
                     continue;
                 }
+                OrderWallChangeEvent recentChange = findRecentChange(label, nowMs);
+                recentChanges.put(label, recentChange);
                 if (label.isActive()) {
                     activeLabels.add(label);
                 } else if (store.hasBeenDisplayed(instrumentAlias, label.getId())
-                        || findRecentChange(label, nowMs) != null) {
+                        || recentChange != null) {
                     clearedLabels.add(label);
                 }
             }
 
             Comparator<OrderWallLabel> priority = Comparator
-                    .comparing((OrderWallLabel label) -> findRecentChange(label, nowMs) != null,
+                    .comparing((OrderWallLabel label) -> recentChanges.get(label) != null,
                             Comparator.reverseOrder())
                     .thenComparing(Comparator.comparingInt(OrderWallLabel::getPeakSize).reversed())
-                    .thenComparing(Comparator.comparingLong(OrderWallLabel::getEndTimeNs).reversed());
+                    .thenComparing(Comparator.comparingLong(OrderWallLabel::getEndTimeNs).reversed())
+                    .thenComparingInt(OrderWallLabel::getPriceTick)
+                    .thenComparing(OrderWallLabel::isBid)
+                    .thenComparingLong(OrderWallLabel::getStartTimeNs)
+                    .thenComparing(label -> safeString(label.getId()));
 
             activeLabels.sort(priority);
             clearedLabels.sort(priority);
@@ -280,14 +287,25 @@ public class OrderWallLabelPainter implements ScreenSpacePainterFactory,
                 selected.add(label);
             }
             selected.addAll(clearedLabels);
+
+            long timeLeftSnapshot = timeLeft;
+            long timeWidthSnapshot = timeWidth;
+            Map<OrderWallLabel, Long> anchorTimes = new HashMap<>();
+            for (OrderWallLabel label : selected) {
+                anchorTimes.put(label, anchorTimeNs(label, timeLeftSnapshot, timeWidthSnapshot));
+            }
             selected.sort(Comparator
-                    .comparingLong((OrderWallLabel label) -> anchorTimeNs(label)).reversed()
-                    .thenComparing(Comparator.comparingInt(OrderWallLabel::getPeakSize).reversed()));
+                    .comparingLong((OrderWallLabel label) -> anchorTimes.getOrDefault(label, 0L)).reversed()
+                    .thenComparing(Comparator.comparingInt(OrderWallLabel::getPeakSize).reversed())
+                    .thenComparingInt(OrderWallLabel::getPriceTick)
+                    .thenComparing(OrderWallLabel::isBid)
+                    .thenComparingLong(OrderWallLabel::getStartTimeNs)
+                    .thenComparing(label -> safeString(label.getId())));
 
             List<LabelPlacement> placements = new ArrayList<>();
             for (OrderWallLabel label : selected) {
                 placements.add(new LabelPlacement(label, null, 0));
-                OrderWallChangeEvent change = findRecentChange(label, nowMs);
+                OrderWallChangeEvent change = recentChanges.get(label);
                 if (change != null) {
                     placements.add(new LabelPlacement(label, change, 0));
                 }
@@ -362,6 +380,18 @@ public class OrderWallLabelPainter implements ScreenSpacePainterFactory,
             return midpoint(visibleStart, visibleEnd);
         }
 
+        private long anchorTimeNs(OrderWallLabel label, long timeLeftSnapshot, long timeWidthSnapshot) {
+            if (timeWidthSnapshot <= 0) {
+                return midpoint(label.getStartTimeNs(), label.getEndTimeNs());
+            }
+            long visibleStart = Math.max(label.getStartTimeNs(), timeLeftSnapshot);
+            long visibleEnd = Math.min(label.getEndTimeNs(), timeLeftSnapshot + timeWidthSnapshot);
+            if (visibleEnd < visibleStart) {
+                return visibleStart;
+            }
+            return midpoint(visibleStart, visibleEnd);
+        }
+
         private long anchorTimeNs(OrderWallLabel label, OrderWallChangeEvent recentChange) {
             if (recentChange == null) {
                 return anchorTimeNs(label);
@@ -385,6 +415,10 @@ public class OrderWallLabelPainter implements ScreenSpacePainterFactory,
 
         private long midpoint(long start, long end) {
             return start + (end - start) / 2;
+        }
+
+        private String safeString(String value) {
+            return value == null ? "" : value;
         }
 
         private OrderWallChangeEvent findRecentChange(OrderWallLabel label, long nowMs) {

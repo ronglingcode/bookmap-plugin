@@ -5,6 +5,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.UUID;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
@@ -16,15 +17,19 @@ public class OrderWallLabelTracker {
 
     private static final int GROWTH_PHASE_SPLIT_MULTIPLIER = 2;
     private static final long DECREASE_STABILITY_MS = 1_000L;
+    private static final long LABEL_MIN_LIFETIME_MS = 1_000L;
+    private static final long NS_PER_MS = 1_000_000L;
 
     private final String instrumentAlias;
     private final double pips;
     private final OrderWallLabelStore store;
     private final int minimumSize;
     private final long decreaseStabilityMs;
+    private final long labelMinLifetimeMs;
     private final Runnable labelChangeListener;
     private final ScheduledExecutorService scheduler;
     private final Map<LevelKey, Integer> currentDisplaySizes = new HashMap<>();
+    private final Map<LevelKey, PendingLabel> pendingLabels = new HashMap<>();
     private final Map<LevelKey, PendingDecrease> pendingDecreases = new HashMap<>();
     private boolean shutdown;
 
@@ -42,11 +47,19 @@ public class OrderWallLabelTracker {
     OrderWallLabelTracker(String instrumentAlias, double pips, OrderWallLabelStore store,
                           int minimumSize, int retainDistanceTicks, long decreaseStabilityMs,
                           Runnable labelChangeListener) {
+        this(instrumentAlias, pips, store, minimumSize, retainDistanceTicks,
+                decreaseStabilityMs, LABEL_MIN_LIFETIME_MS, labelChangeListener);
+    }
+
+    OrderWallLabelTracker(String instrumentAlias, double pips, OrderWallLabelStore store,
+                          int minimumSize, int retainDistanceTicks, long decreaseStabilityMs,
+                          long labelMinLifetimeMs, Runnable labelChangeListener) {
         this.instrumentAlias = instrumentAlias;
         this.pips = pips;
         this.store = store;
         this.minimumSize = minimumSize;
         this.decreaseStabilityMs = decreaseStabilityMs;
+        this.labelMinLifetimeMs = labelMinLifetimeMs;
         this.labelChangeListener = labelChangeListener;
         this.scheduler = Executors.newSingleThreadScheduledExecutor(r -> {
             Thread t = new Thread(r, "wall-label-decrease-" + instrumentAlias);
@@ -56,9 +69,10 @@ public class OrderWallLabelTracker {
     }
 
     /**
-     * Labels are created once a level exceeds the configured minimum size.
-     * When a level falls back below that threshold, the segment is frozen as a
-     * historical wall so the peak size remains visible over the bright section.
+     * Labels start as pending once a level exceeds the configured minimum size.
+     * They become drawable only after surviving the configured minimum lifetime.
+     * When a mature level falls back below the threshold, the segment is frozen
+     * as a historical wall so the peak size remains visible over the bright section.
      */
     public synchronized boolean onDepth(boolean isBid, int priceTick, int size, long eventTimeNs) {
         if (shutdown) {
@@ -69,28 +83,22 @@ public class OrderWallLabelTracker {
 
         OrderWallLabel existing = store.getActiveLabel(instrumentAlias, isBid, priceTick);
         boolean qualifiesNow = size > minimumSize;
-
-        if (!qualifiesNow && existing == null) {
-            pendingDecreases.remove(key);
-            return false;
-        }
-
         long timestampNs = eventTimeNs > 0 ? eventTimeNs : System.currentTimeMillis() * 1_000_000L;
 
         if (existing == null) {
-            store.putLabel(new OrderWallLabel(
-                    instrumentAlias,
-                    isBid,
-                    priceTick,
-                    priceTick * pips,
-                    size,
-                    size,
-                    timestampNs,
-                    timestampNs,
-                    System.currentTimeMillis()));
             pendingDecreases.remove(key);
-            return true;
+            if (!qualifiesNow) {
+                pendingLabels.remove(key);
+                return false;
+            }
+            if (updatePendingLabel(key, isBid, priceTick, size, timestampNs)) {
+                pendingLabels.remove(key);
+                return true;
+            }
+            return false;
         }
+
+        pendingLabels.remove(key);
 
         if (!existing.isActive() && !qualifiesNow) {
             return false;
@@ -144,6 +152,71 @@ public class OrderWallLabelTracker {
                 sizePath);
         store.putLabel(updated);
         return true;
+    }
+
+    public synchronized boolean onTimestamp(long timestampNs) {
+        if (shutdown || timestampNs <= 0 || pendingLabels.isEmpty()) {
+            return false;
+        }
+
+        boolean changed = false;
+        List<Map.Entry<LevelKey, PendingLabel>> candidates =
+                new ArrayList<>(pendingLabels.entrySet());
+        for (Map.Entry<LevelKey, PendingLabel> entry : candidates) {
+            LevelKey key = entry.getKey();
+            PendingLabel pending = entry.getValue();
+            if (pendingLabels.get(key) != pending || !isPendingLabelMature(pending, timestampNs)) {
+                continue;
+            }
+            pending.latestEventTimeNs = timestampNs;
+            if (promotePendingLabel(key, pending)) {
+                changed = true;
+            }
+        }
+        return changed;
+    }
+
+    private boolean updatePendingLabel(LevelKey key, boolean isBid, int priceTick, int size, long timestampNs) {
+        PendingLabel pending = pendingLabels.get(key);
+        if (pending == null) {
+            pending = new PendingLabel(isBid, priceTick, size, timestampNs);
+            pendingLabels.put(key, pending);
+        } else {
+            pending.currentSize = size;
+            pending.peakSize = Math.max(pending.peakSize, size);
+            pending.latestEventTimeNs = timestampNs;
+            pending.sizePath = appendImmediateSizePath(pending.sizePath, size);
+        }
+
+        if (!isPendingLabelMature(pending, timestampNs)) {
+            return false;
+        }
+        return promotePendingLabel(key, pending);
+    }
+
+    private boolean isPendingLabelMature(PendingLabel pending, long timestampNs) {
+        return labelMinLifetimeMs <= 0
+                || timestampNs - pending.startTimeNs >= labelMinLifetimeMs * NS_PER_MS;
+    }
+
+    private boolean promotePendingLabel(LevelKey key, PendingLabel pending) {
+        if (pendingLabels.remove(key, pending)) {
+            store.putLabel(new OrderWallLabel(
+                    UUID.randomUUID().toString(),
+                    instrumentAlias,
+                    pending.bid,
+                    pending.priceTick,
+                    pending.priceTick * pips,
+                    pending.currentSize,
+                    pending.peakSize,
+                    pending.startTimeNs,
+                    pending.latestEventTimeNs,
+                    System.currentTimeMillis(),
+                    false,
+                    pending.sizePath));
+            return true;
+        }
+        return false;
     }
 
     private boolean shouldStartNewGrowthPhase(OrderWallLabel existing, int rawSize) {
@@ -296,9 +369,39 @@ public class OrderWallLabelTracker {
 
     public synchronized void shutdown() {
         shutdown = true;
+        pendingLabels.clear();
         pendingDecreases.clear();
         currentDisplaySizes.clear();
         scheduler.shutdownNow();
+    }
+
+    private static class PendingLabel {
+        private final boolean bid;
+        private final int priceTick;
+        private final long startTimeNs;
+        private int currentSize;
+        private int peakSize;
+        private long latestEventTimeNs;
+        private List<Integer> sizePath;
+
+        private PendingLabel(boolean bid, int priceTick, int size, long timestampNs) {
+            this.bid = bid;
+            this.priceTick = priceTick;
+            this.startTimeNs = timestampNs;
+            this.currentSize = size;
+            this.peakSize = size;
+            this.latestEventTimeNs = timestampNs;
+            this.sizePath = appendInitialSizePath(size);
+        }
+
+        private static List<Integer> appendInitialSizePath(int size) {
+            List<Integer> path = new ArrayList<>();
+            int displaySize = OrderWallLabel.toDisplaySize(size);
+            if (displaySize > 0) {
+                path.add(displaySize);
+            }
+            return path;
+        }
     }
 
     private static class PendingDecrease {

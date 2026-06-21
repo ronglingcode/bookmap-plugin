@@ -33,6 +33,8 @@ import javax.swing.table.DefaultTableModel;
 public class ActionLogWindow {
 
     private static final int MAX_LINES = 20;
+    private static final int WINDOW_WIDTH = 570;
+    private static final int CONTENT_WIDTH = 540;
     private static final DateTimeFormatter TIME_FMT = DateTimeFormatter.ofPattern("HH:mm:ss");
     private static final Deque<String> lines = new ArrayDeque<>();
     private static final Map<String, AccountStateDefinition> accountStates = new LinkedHashMap<>();
@@ -99,7 +101,7 @@ public class ActionLogWindow {
         frame = new JFrame("Rong Logs");
         frame.setAlwaysOnTop(true);
         frame.setDefaultCloseOperation(JFrame.DO_NOTHING_ON_CLOSE);
-        textArea = new JTextArea(20, 54);
+        textArea = new JTextArea(20, 41);
         textArea.setEditable(false);
         textArea.setFont(new Font(Font.MONOSPACED, Font.PLAIN, 12));
 
@@ -127,7 +129,7 @@ public class ActionLogWindow {
         frame.getContentPane().setLayout(new BorderLayout());
         frame.getContentPane().add(accountPanel, BorderLayout.NORTH);
         frame.getContentPane().add(logPanel, BorderLayout.CENTER);
-        frame.setPreferredSize(new Dimension(760, 620));
+        frame.setPreferredSize(new Dimension(WINDOW_WIDTH, 620));
         frame.pack();
         frame.setVisible(true);
         renderAccountState();
@@ -168,7 +170,7 @@ public class ActionLogWindow {
         statusLabel.setText(title + " (0)");
         section.add(statusLabel, BorderLayout.NORTH);
         JScrollPane scrollPane = new JScrollPane(table);
-        scrollPane.setPreferredSize(new Dimension(720, height));
+        scrollPane.setPreferredSize(new Dimension(CONTENT_WIDTH, height));
         section.add(scrollPane, BorderLayout.CENTER);
         return section;
     }

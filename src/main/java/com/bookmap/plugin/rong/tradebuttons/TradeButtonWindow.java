@@ -47,8 +47,8 @@ public class TradeButtonWindow {
     private static final Color MODE_BREAKOUT_BACKGROUND = new Color(38, 139, 88);
     private static final Color MODE_MARKET_BACKGROUND = new Color(190, 121, 28);
     private static final Color MODE_TEXT_COLOR = Color.WHITE;
-    private static final int WINDOW_WIDTH = 760;
-    private static final int CONTENT_WIDTH = 720;
+    private static final int WINDOW_WIDTH = 570;
+    private static final int CONTENT_WIDTH = 540;
     private static final int WALL_OUT_PAIR_INDEX = 1;
     private static final int WALL_OUT_MINIMUM_SIZE = 5_000;
     private static final double WALL_OUT_PRICE_OFFSET = 0.02;
