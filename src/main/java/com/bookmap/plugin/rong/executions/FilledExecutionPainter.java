@@ -9,7 +9,6 @@ import java.awt.RenderingHints;
 import java.awt.image.BufferedImage;
 import java.util.ArrayList;
 import java.util.Comparator;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -141,7 +140,7 @@ public class FilledExecutionPainter implements ScreenSpacePainterFactory,
         private final String painterAlias;
         private final String instrumentAlias;
         private final ScreenSpaceCanvas canvas;
-        private final Map<String, CanvasIcon> activeShapes = new HashMap<>();
+        private final List<CanvasIcon> activeShapes = new ArrayList<>();
         private final Object shapeLock = new Object();
 
         private volatile long priceBottom;
@@ -195,7 +194,7 @@ public class FilledExecutionPainter implements ScreenSpacePainterFactory,
                     CanvasIcon icon = createMarkerIcon(marker);
                     if (icon != null) {
                         canvas.addShape(icon);
-                        activeShapes.put(marker.getId(), icon);
+                        activeShapes.add(icon);
                     }
                 }
             }
@@ -312,7 +311,7 @@ public class FilledExecutionPainter implements ScreenSpacePainterFactory,
         }
 
         private void removeActiveShapesLocked() {
-            List<CanvasIcon> icons = new ArrayList<>(activeShapes.values());
+            List<CanvasIcon> icons = new ArrayList<>(activeShapes);
             activeShapes.clear();
             for (CanvasIcon icon : icons) {
                 try {
