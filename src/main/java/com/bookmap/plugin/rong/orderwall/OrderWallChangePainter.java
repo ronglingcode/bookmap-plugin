@@ -41,26 +41,20 @@ public class OrderWallChangePainter implements ScreenSpacePainterFactory,
 
     public static final String PAINTER_NAME_PREFIX = "wallChangeAlerts_";
 
-    private static final long BANNER_TTL_MS = 8_000;
+    private static final long FLASH_TTL_MS = 8_000;
     private static final long MARKER_TTL_MS = 30_000;
-    private static final int MAX_BANNERS = 3;
     private static final int MAX_MARKERS = 8;
-    private static final int BANNER_HEIGHT = 32;
-    private static final int BANNER_GAP = 6;
     private static final int MARKER_HEIGHT = 34;
     private static final int EVENT_BADGE_HEIGHT = 28;
     private static final int EVENT_BADGE_PADDING_X = 8;
     private static final int EVENT_BADGE_ICON_SIZE = 20;
     private static final int EVENT_BADGE_ICON_GAP = 6;
-    private static final Font BANNER_FONT = new Font("SansSerif", Font.BOLD, 13);
-    private static final Font MARKER_FONT = new Font("SansSerif", Font.BOLD, 12);
     private static final Font EVENT_BADGE_FONT = new Font("SansSerif", Font.BOLD, 14);
 
     private static final Color ADD_COLOR = new Color(60, 220, 148);
     private static final Color REDUCE_COLOR = new Color(255, 91, 78);
     private static final Color REPLACE_COLOR = new Color(255, 196, 73);
     private static final Color TEXT_COLOR = new Color(255, 255, 255);
-    private static final Color DARK_BACKGROUND = new Color(12, 16, 20);
 
     private final OrderWallChangeStore store;
     private final IndicatorConfig config;
@@ -166,7 +160,6 @@ public class OrderWallChangePainter implements ScreenSpacePainterFactory,
         private final Object shapeLock = new Object();
 
         private volatile int fullPixelsWidth;
-        private volatile int activePixelsWidth;
         private boolean disposed;
 
         PainterInstance(String painterAlias, String instrumentAlias, ScreenSpaceCanvas canvas) {
@@ -178,12 +171,6 @@ public class OrderWallChangePainter implements ScreenSpacePainterFactory,
         @Override
         public void onHeatmapFullPixelsWidth(int width) {
             this.fullPixelsWidth = width;
-            rebuildAlerts();
-        }
-
-        @Override
-        public void onHeatmapActivePixelsWidth(int width) {
-            this.activePixelsWidth = width;
             rebuildAlerts();
         }
 
@@ -204,29 +191,8 @@ public class OrderWallChangePainter implements ScreenSpacePainterFactory,
                     return;
                 }
 
-                addBannerShapes(events, nowMs);
                 addMarkerShapes(events, nowMs);
                 addEventBadgeShapes(events, nowMs);
-            }
-        }
-
-        private void addBannerShapes(List<OrderWallChangeEvent> events, long nowMs) {
-            int y = 12;
-            int count = 0;
-            for (OrderWallChangeEvent event : events) {
-                if (nowMs - event.getCreatedAtMs() > BANNER_TTL_MS) {
-                    continue;
-                }
-                CanvasIcon icon = createBannerIcon(event, y, nowMs);
-                if (icon != null) {
-                    canvas.addShape(icon);
-                    activeShapes.put(event.getId() + ":banner:" + count, icon);
-                    y += BANNER_HEIGHT + BANNER_GAP;
-                    count++;
-                }
-                if (count >= MAX_BANNERS) {
-                    return;
-                }
             }
         }
 
@@ -264,21 +230,6 @@ public class OrderWallChangePainter implements ScreenSpacePainterFactory,
             }
         }
 
-        private CanvasIcon createBannerIcon(OrderWallChangeEvent event, int y, long nowMs) {
-            BufferedImage image = renderBannerImage(event, nowMs);
-            PreparedImage prepared = new PreparedImage(image);
-            int x = 12;
-            CompositeHorizontalCoordinate x1 = new CompositeHorizontalCoordinate(
-                    CompositeCoordinateBase.PIXEL_ZERO, x, 0);
-            CompositeHorizontalCoordinate x2 = new CompositeHorizontalCoordinate(
-                    CompositeCoordinateBase.PIXEL_ZERO, x + image.getWidth(), 0);
-            CompositeVerticalCoordinate y1 = new CompositeVerticalCoordinate(
-                    CompositeCoordinateBase.PIXEL_ZERO, y, 0);
-            CompositeVerticalCoordinate y2 = new CompositeVerticalCoordinate(
-                    CompositeCoordinateBase.PIXEL_ZERO, y + image.getHeight(), 0);
-            return new CanvasIcon(prepared, x1, y1, x2, y2);
-        }
-
         private CanvasIcon createMarkerIcon(OrderWallChangeEvent event, long nowMs) {
             int width = Math.max(fullPixelsWidth, 1_200);
             BufferedImage image = renderMarkerImage(event, width, nowMs);
@@ -313,34 +264,6 @@ public class OrderWallChangePainter implements ScreenSpacePainterFactory,
             CompositeVerticalCoordinate y2 = new CompositeVerticalCoordinate(
                     CompositeCoordinateBase.DATA_ZERO, EVENT_BADGE_HEIGHT / 2 + 4 + image.getHeight(), event.getPriceTick());
             return new CanvasIcon(prepared, x1, y1, x2, y2);
-        }
-
-        private BufferedImage renderBannerImage(OrderWallChangeEvent event, long nowMs) {
-            int maxWidth = activePixelsWidth > 0 ? Math.max(220, activePixelsWidth - 24) : 520;
-            maxWidth = Math.min(maxWidth, 560);
-            int width = maxWidth;
-            BufferedImage image = new BufferedImage(width, BANNER_HEIGHT, BufferedImage.TYPE_INT_ARGB);
-            Graphics2D g = image.createGraphics();
-            g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-
-            Color accent = colorFor(event);
-            int accentAlpha = flashAlpha(event, nowMs, 225, 150);
-            g.setColor(new Color(DARK_BACKGROUND.getRed(), DARK_BACKGROUND.getGreen(),
-                    DARK_BACKGROUND.getBlue(), 210));
-            g.fillRoundRect(0, 0, width - 1, BANNER_HEIGHT - 1, 7, 7);
-            g.setColor(new Color(accent.getRed(), accent.getGreen(), accent.getBlue(), accentAlpha));
-            g.setStroke(new BasicStroke(2.4f));
-            g.drawRoundRect(1, 1, width - 3, BANNER_HEIGHT - 3, 7, 7);
-            g.fillRoundRect(0, 0, 7, BANNER_HEIGHT, 7, 7);
-
-            g.setFont(BANNER_FONT);
-            FontMetrics fm = g.getFontMetrics();
-            String text = clipText(g, event.getLogMessage(), width - 24);
-            g.setColor(TEXT_COLOR);
-            int textY = (BANNER_HEIGHT - fm.getHeight()) / 2 + fm.getAscent();
-            g.drawString(text, 14, textY);
-            g.dispose();
-            return image;
         }
 
         private BufferedImage renderMarkerImage(OrderWallChangeEvent event, int width, long nowMs) {
@@ -470,13 +393,13 @@ public class OrderWallChangePainter implements ScreenSpacePainterFactory,
 
     private static int flashAlpha(OrderWallChangeEvent event, long nowMs, int high, int low) {
         long age = Math.max(0, nowMs - event.getCreatedAtMs());
-        if (age > BANNER_TTL_MS) {
+        if (age > FLASH_TTL_MS) {
             return low;
         }
         double pulse = (Math.sin(nowMs / 90.0) + 1.0) / 2.0;
         int alpha = low + (int) ((high - low) * pulse);
-        if (age > BANNER_TTL_MS - 2_000) {
-            double fade = (BANNER_TTL_MS - age) / 2_000.0;
+        if (age > FLASH_TTL_MS - 2_000) {
+            double fade = (FLASH_TTL_MS - age) / 2_000.0;
             alpha = Math.max(40, (int) (alpha * fade));
         }
         return Math.max(0, Math.min(255, alpha));
@@ -492,20 +415,6 @@ public class OrderWallChangePainter implements ScreenSpacePainterFactory,
         }
         double fade = 1.0 - ((double) (age - 6_000) / (MARKER_TTL_MS - 6_000));
         return Math.max(35, (int) (120 * fade));
-    }
-
-    private static String clipText(Graphics2D g, String text, int maxWidth) {
-        FontMetrics fm = g.getFontMetrics();
-        if (fm.stringWidth(text) <= maxWidth) {
-            return text;
-        }
-        String suffix = "...";
-        int suffixWidth = fm.stringWidth(suffix);
-        int end = text.length();
-        while (end > 0 && fm.stringWidth(text.substring(0, end)) + suffixWidth > maxWidth) {
-            end--;
-        }
-        return end <= 0 ? suffix : text.substring(0, end) + suffix;
     }
 
     static String extractInstrumentFromPainterName(String painterAlias, String fullName) {

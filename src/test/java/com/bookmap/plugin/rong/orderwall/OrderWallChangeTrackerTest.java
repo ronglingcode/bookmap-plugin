@@ -157,12 +157,104 @@ class OrderWallChangeTrackerTest {
         }
     }
 
+    @Test
+    void suppressesNearZeroReductionWhenSamePriceTradesShowWallWasFilled() throws Exception {
+        List<OrderWallChangeEvent> events = new CopyOnWriteArrayList<>();
+        CountDownLatch alertSeen = new CountDownLatch(1);
+        OrderWallChangeTracker tracker = newTracker(1_000, event -> {
+            events.add(event);
+            alertSeen.countDown();
+        });
+
+        try {
+            tracker.onDepth(false, 9_730, 6_000, 1L);
+            tracker.markReady();
+
+            // Even if the aggressor side does not match the ask-side wall, same-price
+            // trades mean price touched this level and the depth drop is likely a fill.
+            tracker.onTrade(9_730, 700, false);
+            tracker.onDepth(false, 9_730, 102, 2L);
+
+            assertFalse(alertSeen.await(500, TimeUnit.MILLISECONDS));
+            assertTrue(events.isEmpty());
+        } finally {
+            tracker.shutdown();
+        }
+    }
+
+    @Test
+    void adaptivePercentileSuppressesFiveThousandCrossWhenBookIsCrowded() throws Exception {
+        List<OrderWallChangeEvent> events = new CopyOnWriteArrayList<>();
+        CountDownLatch alertSeen = new CountDownLatch(1);
+        OrderWallChangeTracker tracker = newAdaptiveTracker(60, event -> {
+            events.add(event);
+            alertSeen.countDown();
+        });
+
+        try {
+            tracker.onDepth(false, 19_400, 200_000, 1L);
+            tracker.onDepth(false, 19_410, 200_000, 2L);
+            tracker.onDepth(false, 19_420, 200_000, 3L);
+            tracker.markReady();
+
+            tracker.onDepth(false, 19_430, 6_000, 4L);
+
+            assertFalse(alertSeen.await(300, TimeUnit.MILLISECONDS));
+            assertTrue(events.isEmpty());
+        } finally {
+            tracker.shutdown();
+        }
+    }
+
+    @Test
+    void adaptivePercentileAlertsWhenOrderCrossesEffectiveThreshold() throws Exception {
+        List<OrderWallChangeEvent> events = new CopyOnWriteArrayList<>();
+        CountDownLatch alertSeen = new CountDownLatch(1);
+        OrderWallChangeTracker tracker = newAdaptiveTracker(60, event -> {
+            events.add(event);
+            alertSeen.countDown();
+        });
+
+        try {
+            tracker.onDepth(false, 19_400, 200_000, 1L);
+            tracker.onDepth(false, 19_410, 200_000, 2L);
+            tracker.onDepth(false, 19_420, 200_000, 3L);
+            tracker.markReady();
+
+            tracker.onDepth(false, 19_430, 200_000, 4L);
+
+            assertTrue(alertSeen.await(500, TimeUnit.MILLISECONDS));
+            assertEquals(1, events.size());
+            OrderWallChangeEvent event = events.get(0);
+            assertEquals(OrderWallChangeEvent.Type.ADDED, event.getType());
+            assertEquals(0, event.getPreviousSize());
+            assertEquals(200_000, event.getCurrentSize());
+            assertEquals(19_430, event.getPriceTick());
+        } finally {
+            tracker.shutdown();
+        }
+    }
+
     private static OrderWallChangeTracker newTracker(long minLargeOrderLifetimeMs,
                                                      java.util.function.Consumer<OrderWallChangeEvent> consumer) {
         return new OrderWallChangeTracker(
                 "TEST",
                 0.01,
                 LARGE_THRESHOLD,
+                0.50,
+                20,
+                minLargeOrderLifetimeMs,
+                consumer);
+    }
+
+    private static OrderWallChangeTracker newAdaptiveTracker(
+            long minLargeOrderLifetimeMs,
+            java.util.function.Consumer<OrderWallChangeEvent> consumer) {
+        return new OrderWallChangeTracker(
+                "TEST",
+                0.01,
+                LARGE_THRESHOLD,
+                90,
                 0.50,
                 20,
                 minLargeOrderLifetimeMs,

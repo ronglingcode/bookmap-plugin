@@ -18,6 +18,7 @@ import java.awt.event.WindowAdapter;
 import java.awt.event.WindowEvent;
 import java.util.Collections;
 import java.util.List;
+import java.util.Locale;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -29,6 +30,7 @@ import javax.swing.JLabel;
 import javax.swing.JPanel;
 import javax.swing.SwingConstants;
 import javax.swing.SwingUtilities;
+import javax.swing.Timer;
 import javax.swing.border.EmptyBorder;
 
 import com.bookmap.plugin.rong.PluginLog;
@@ -47,11 +49,15 @@ public class TradeButtonWindow {
     private static final Color MODE_BREAKOUT_BACKGROUND = new Color(38, 139, 88);
     private static final Color MODE_MARKET_BACKGROUND = new Color(190, 121, 28);
     private static final Color MODE_TEXT_COLOR = Color.WHITE;
+    private static final Color THRESHOLD_BACKGROUND = new Color(232, 238, 246);
+    private static final Color THRESHOLD_TEXT_COLOR = new Color(24, 35, 46);
     private static final int WINDOW_WIDTH = 570;
     private static final int CONTENT_WIDTH = 540;
     private static final int WALL_OUT_PAIR_INDEX = 1;
     private static final int WALL_OUT_MINIMUM_SIZE = 5_000;
+    private static final int WALL_OUT_PROTECTED_ABSOLUTE_LEVELS = 2;
     private static final double WALL_OUT_PRICE_OFFSET = 0.02;
+    private static final int WALL_THRESHOLD_REFRESH_MS = 1_000;
     private static final String SHIFT_DOWN_CLIENT_PROPERTY = "rong.shiftDownForClick";
     private static final Object SHIFT_LISTENER_LOCK = new Object();
     private static final Set<TradeButtonWindow> OPEN_WINDOWS =
@@ -67,6 +73,8 @@ public class TradeButtonWindow {
     private JFrame frame;
     private JPanel buttonPanel;
     private JLabel shiftModeLabel;
+    private JLabel wallThresholdLabel;
+    private Timer wallThresholdTimer;
     private volatile boolean disposed;
 
     public TradeButtonWindow(String symbol, SignalWebSocketServer server) {
@@ -101,6 +109,7 @@ public class TradeButtonWindow {
         frame.setContentPane(buttonPanel);
         registerShiftTracker(this);
         renderButtons(Collections.emptyList());
+        startWallThresholdTimer();
         frame.setVisible(true);
 
         server.registerTradeButtonConfigListener(symbol, buttonConfigListener);
@@ -188,7 +197,7 @@ public class TradeButtonWindow {
     }
 
     private JPanel createModePanel() {
-        JPanel modePanel = new JPanel(new BorderLayout());
+        JPanel modePanel = new JPanel(new GridLayout(0, 1, 0, 4));
         modePanel.setBorder(BorderFactory.createEmptyBorder(0, 0, 8, 0));
         shiftModeLabel = new JLabel("", SwingConstants.CENTER);
         shiftModeLabel.setOpaque(true);
@@ -196,9 +205,20 @@ public class TradeButtonWindow {
         shiftModeLabel.setFont(shiftModeLabel.getFont().deriveFont(Font.BOLD));
         shiftModeLabel.setBorder(BorderFactory.createEmptyBorder(5, 8, 5, 8));
         updateModeLabel(shiftPressed);
-        modePanel.add(shiftModeLabel, BorderLayout.CENTER);
+
+        wallThresholdLabel = new JLabel("", SwingConstants.CENTER);
+        wallThresholdLabel.setOpaque(true);
+        wallThresholdLabel.setForeground(THRESHOLD_TEXT_COLOR);
+        wallThresholdLabel.setBackground(THRESHOLD_BACKGROUND);
+        wallThresholdLabel.setFont(wallThresholdLabel.getFont().deriveFont(Font.BOLD, 12f));
+        wallThresholdLabel.setBorder(BorderFactory.createEmptyBorder(4, 8, 4, 8));
+        updateWallThresholdLabel();
+
+        modePanel.add(shiftModeLabel);
+        modePanel.add(wallThresholdLabel);
         attachShiftMouseRefresh(modePanel);
         attachShiftMouseRefresh(shiftModeLabel);
+        attachShiftMouseRefresh(wallThresholdLabel);
         return modePanel;
     }
 
@@ -372,6 +392,36 @@ public class TradeButtonWindow {
         shiftModeLabel.setBackground(marketMode ? MODE_MARKET_BACKGROUND : MODE_BREAKOUT_BACKGROUND);
     }
 
+    private void startWallThresholdTimer() {
+        if (wallThresholdTimer != null) {
+            return;
+        }
+        wallThresholdTimer = new Timer(WALL_THRESHOLD_REFRESH_MS, e -> updateWallThresholdLabel());
+        wallThresholdTimer.setRepeats(true);
+        wallThresholdTimer.start();
+        updateWallThresholdLabel();
+    }
+
+    private void updateWallThresholdLabel() {
+        if (wallThresholdLabel == null) {
+            return;
+        }
+        SignalWebSocketServer.OrderbookWallThreshold threshold =
+                server.getOrderbookWallThreshold(symbol, WALL_OUT_MINIMUM_SIZE);
+        if (!threshold.isAvailable()) {
+            wallThresholdLabel.setText("Wall threshold: waiting for book");
+            return;
+        }
+
+        String percentileSize = threshold.getPercentileMinSize() > 0
+                ? formatShareSize(threshold.getPercentileMinSize())
+                : "n/a";
+        wallThresholdLabel.setText("Wall threshold: " + formatShareSize(threshold.getEffectiveMinSize())
+                + " (P" + formatPercentile(threshold.getPercentile())
+                + "=" + percentileSize
+                + ", floor=" + formatShareSize(threshold.getAbsoluteMinSize()) + ")");
+    }
+
     private static void registerShiftTracker(TradeButtonWindow window) {
         OPEN_WINDOWS.add(window);
         ensureShiftStateListener();
@@ -457,7 +507,8 @@ public class TradeButtonWindow {
         json.addProperty("tradebook_name", tradebook.getTradebookName());
         json.addProperty("entry_method", entryMethod);
         json.addProperty("timestamp", System.currentTimeMillis());
-        server.appendOrderbookSnapshot(symbol, json, WALL_OUT_MINIMUM_SIZE);
+        server.appendOrderbookSnapshot(
+                symbol, json, WALL_OUT_MINIMUM_SIZE, WALL_OUT_PROTECTED_ABSOLUTE_LEVELS);
         server.broadcast(json.toString());
         PluginLog.action(symbol, "Button send " + orderType + " " + tradebook.getLabel() + " " + entryMethod);
         PluginLog.info("[TradeButton] " + orderType + " " + tradebook.getLabel() + ": " + entryMethod
@@ -537,8 +588,36 @@ public class TradeButtonWindow {
         return String.format("%.2f", price);
     }
 
+    private static String formatShareSize(int size) {
+        if (size >= 1_000_000) {
+            return formatCompactSize(size, 1_000_000, "M");
+        }
+        if (size >= 1_000) {
+            return formatCompactSize(size, 1_000, "K");
+        }
+        return Integer.toString(size);
+    }
+
+    private static String formatCompactSize(int size, int unit, String suffix) {
+        if (size % unit == 0) {
+            return (size / unit) + suffix;
+        }
+        return String.format(Locale.US, "%.1f%s", size / (double) unit, suffix);
+    }
+
+    private static String formatPercentile(double percentile) {
+        if (Math.abs(percentile - Math.rint(percentile)) < 0.00001) {
+            return String.format(Locale.US, "%.0f", percentile);
+        }
+        return String.format(Locale.US, "%.1f", percentile);
+    }
+
     public void dispose() {
         disposed = true;
+        if (wallThresholdTimer != null) {
+            wallThresholdTimer.stop();
+            wallThresholdTimer = null;
+        }
         unregisterShiftTracker(this);
         server.unregisterTradeButtonConfigListener(symbol, buttonConfigListener);
         SwingUtilities.invokeLater(() -> {
@@ -548,6 +627,7 @@ public class TradeButtonWindow {
             }
             buttonPanel = null;
             shiftModeLabel = null;
+            wallThresholdLabel = null;
         });
     }
 }

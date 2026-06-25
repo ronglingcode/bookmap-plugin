@@ -277,6 +277,8 @@ Auto-drawn price levels still track through scroll and zoom. These include prema
 
 The plugin draws market levels supplied by the external WebSocket client. Each indicator can be enabled or disabled in the **Indicators** settings panel.
 
+Order wall size-change sounds are enabled by default. The visual size-change alert overlays are disabled by default to keep the heatmap uncluttered, but they can still be enabled from the **Indicators** settings panel.
+
 ### Premarket High / Low
 
 Draws horizontal lines at the premarket session high and low prices sent by the external client.
@@ -338,8 +340,13 @@ The following parameters are hardcoded constants in each plugin's main class:
 | `WS_PORT`               | 8765    | WebSocket server port                                       |
 | `WALL_THRESHOLD`        | 500,000 | Minimum shares at a price level to qualify as a wall        |
 | `WALL_CONSUMED_RATIO`   | 0.10    | Wall is "consumed" when size drops to this ratio of peak    |
-| `ORDERBOOK_PERCENTILE`  | 90      | Only send order book levels above this percentile threshold |
+| `ORDERBOOK_PERCENTILE`  | 90      | Adaptive crowd filter for orderbook snapshots and size-change alerts |
 | `ORDERBOOK_INTERVAL_MS` | 1000    | Order book snapshot broadcast interval                      |
+| `WALL_CHANGE_THRESHOLD` | 5,000   | Absolute floor for size-change alerts; alerts use `max(WALL_CHANGE_THRESHOLD, ORDERBOOK_PERCENTILE threshold)` |
+| `WALL_OUT_MINIMUM_SIZE` | 5,000   | Absolute floor for wall-out/orderbook snapshot candidates; 5,000-share levels are included |
+| `WALL_OUT_PROTECTED_ABSOLUTE_LEVELS` | 2 | Per-side count of near-touch absolute-floor levels preserved even when the percentile threshold is higher |
+
+The floating trade button window shows the live effective wall threshold as `max(5K, P90)` for the active symbol.
 
 
 ## Logging

@@ -28,11 +28,11 @@ public class IndicatorConfig {
     private final java.util.List<ChangeListener> listeners = new java.util.concurrent.CopyOnWriteArrayList<>();
 
     public IndicatorConfig() {
-        // Defaults: all indicators enabled
+        // Defaults keep reference levels and sounds on while leaving noisy visual alerts off.
         enabled.put(PREMARKET_HIGH_LOW, true);
         enabled.put(CAM_PIVOTS, true);
         enabled.put(ORDER_WALL_SIZE_LABELS, true);
-        enabled.put(ORDER_WALL_CHANGE_ALERTS, true);
+        enabled.put(ORDER_WALL_CHANGE_ALERTS, false);
         enabled.put(ORDER_WALL_CHANGE_SOUND, true);
         enabled.put(FIRE_KEYBOARD_EVENT, false);
         enabled.put(FILLED_EXECUTION_MARKERS, true);

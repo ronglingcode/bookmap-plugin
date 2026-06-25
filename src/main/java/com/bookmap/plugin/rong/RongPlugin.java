@@ -159,6 +159,7 @@ public class RongPlugin implements CustomModuleAdapter,
                 cleanAlias,
                 info.pips,
                 WALL_CHANGE_THRESHOLD,
+                ORDERBOOK_PERCENTILE,
                 WALL_CHANGE_REMAINING_RATIO,
                 WALL_CHANGE_DECISION_DELAY_MS,
                 this::handleWallChangeEvent);

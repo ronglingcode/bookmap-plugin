@@ -6,6 +6,7 @@ import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.Objects;
+import java.util.TreeMap;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
@@ -21,9 +22,10 @@ import velox.api.layer1.data.TradeInfo;
  */
 public class OrderWallChangeTracker {
 
-    private static final long TRADE_LOOKBACK_MS = 400;
+    private static final long TRADE_LOOKBACK_MS = 2_000;
     private static final long TRADE_RETENTION_MS = 5_000;
     private static final double TRADE_EXPLAINED_RATIO = 0.70;
+    private static final double SAME_PRICE_TRADE_EXPLAINED_RATIO = 0.10;
     private static final long ALERT_COOLDOWN_MS = 2_500;
     private static final long MIN_LARGE_ORDER_LIFETIME_MS = 500;
     private static final double SIZE_INCREASE_RATIO = 2.0;
@@ -31,6 +33,7 @@ public class OrderWallChangeTracker {
     private final String instrumentAlias;
     private final double pips;
     private final int largeOrderThreshold;
+    private final double largeOrderPercentile;
     private final double remainingRatio;
     private final long decreaseDecisionDelayMs;
     private final long minLargeOrderLifetimeMs;
@@ -42,7 +45,9 @@ public class OrderWallChangeTracker {
     private final Map<LevelKey, PendingDecrease> pendingDecreases = new HashMap<>();
     private final Map<LevelKey, Long> largeSinceMsByLevel = new HashMap<>();
     private final Map<LevelKey, Long> lastAlertMsByLevel = new HashMap<>();
+    private final TreeMap<Integer, Integer> sizeCounts = new TreeMap<>();
     private final Deque<TradeRecord> recentTrades = new ArrayDeque<>();
+    private int totalLevels;
 
     private boolean ready;
     private boolean shutdown;
@@ -50,7 +55,16 @@ public class OrderWallChangeTracker {
     public OrderWallChangeTracker(String instrumentAlias, double pips, int largeOrderThreshold,
                                   double remainingRatio, long decreaseDecisionDelayMs,
                                   Consumer<OrderWallChangeEvent> alertConsumer) {
-        this(instrumentAlias, pips, largeOrderThreshold, remainingRatio, decreaseDecisionDelayMs,
+        this(instrumentAlias, pips, largeOrderThreshold, 0, remainingRatio, decreaseDecisionDelayMs,
+                MIN_LARGE_ORDER_LIFETIME_MS, alertConsumer);
+    }
+
+    public OrderWallChangeTracker(String instrumentAlias, double pips, int largeOrderThreshold,
+                                  double largeOrderPercentile, double remainingRatio,
+                                  long decreaseDecisionDelayMs,
+                                  Consumer<OrderWallChangeEvent> alertConsumer) {
+        this(instrumentAlias, pips, largeOrderThreshold, largeOrderPercentile,
+                remainingRatio, decreaseDecisionDelayMs,
                 MIN_LARGE_ORDER_LIFETIME_MS, alertConsumer);
     }
 
@@ -58,9 +72,18 @@ public class OrderWallChangeTracker {
                            double remainingRatio, long decreaseDecisionDelayMs,
                            long minLargeOrderLifetimeMs,
                            Consumer<OrderWallChangeEvent> alertConsumer) {
+        this(instrumentAlias, pips, largeOrderThreshold, 0, remainingRatio,
+                decreaseDecisionDelayMs, minLargeOrderLifetimeMs, alertConsumer);
+    }
+
+    OrderWallChangeTracker(String instrumentAlias, double pips, int largeOrderThreshold,
+                           double largeOrderPercentile, double remainingRatio,
+                           long decreaseDecisionDelayMs, long minLargeOrderLifetimeMs,
+                           Consumer<OrderWallChangeEvent> alertConsumer) {
         this.instrumentAlias = instrumentAlias;
         this.pips = pips;
         this.largeOrderThreshold = largeOrderThreshold;
+        this.largeOrderPercentile = largeOrderPercentile;
         this.remainingRatio = remainingRatio;
         this.decreaseDecisionDelayMs = decreaseDecisionDelayMs;
         this.minLargeOrderLifetimeMs = minLargeOrderLifetimeMs;
@@ -81,18 +104,16 @@ public class OrderWallChangeTracker {
 
         LevelKey key = new LevelKey(isBid, priceTick);
         int previousSize = currentSizes.getOrDefault(key, 0);
+        int previousThreshold = getEffectiveLargeOrderThreshold();
         if (ready) {
-            promotePendingAddIfMature(key, previousSize, nowMs);
+            promotePendingAddIfMature(key, previousSize, previousThreshold, nowMs);
         }
         PendingAdd existingPendingAdd = pendingAdds.get(key);
         PendingIncrease existingPendingIncrease = pendingIncreases.get(key);
-        boolean wasLargeOrderEligible = isLargeOrderEligible(key, nowMs);
+        boolean wasLargeOrderEligible = isLargeOrderEligible(key, previousThreshold, nowMs);
 
-        if (size == 0) {
-            currentSizes.remove(key);
-        } else {
-            currentSizes.put(key, size);
-        }
+        updateCurrentSize(key, size);
+        int currentThreshold = getEffectiveLargeOrderThreshold();
 
         PendingDecrease existingPending = pendingDecreases.get(key);
         if (existingPending != null) {
@@ -105,7 +126,7 @@ public class OrderWallChangeTracker {
         }
 
         if (existingPendingAdd != null) {
-            if (size >= largeOrderThreshold) {
+            if (size >= currentThreshold) {
                 existingPendingAdd.latestSize = size;
                 existingPendingAdd.latestEventTimeNs = eventTimeNs;
             } else {
@@ -119,7 +140,7 @@ public class OrderWallChangeTracker {
         }
 
         if (existingPendingIncrease != null) {
-            if (isSignificantIncrease(existingPendingIncrease.previousSize, size)) {
+            if (isSignificantIncrease(existingPendingIncrease.previousSize, size, currentThreshold)) {
                 existingPendingIncrease.latestSize = size;
                 existingPendingIncrease.latestEventTimeNs = eventTimeNs;
                 return;
@@ -131,24 +152,24 @@ public class OrderWallChangeTracker {
             previousSize = existingPendingIncrease.previousSize;
         }
 
-        if (previousSize < largeOrderThreshold && size >= largeOrderThreshold) {
+        if (previousSize < previousThreshold && size >= currentThreshold) {
             schedulePendingAdd(key, previousSize, size, eventTimeNs, nowMs);
             return;
         }
 
-        if (previousSize >= largeOrderThreshold && isSignificantIncrease(previousSize, size)) {
+        if (previousSize >= previousThreshold && isSignificantIncrease(previousSize, size, currentThreshold)) {
             schedulePendingIncrease(key, previousSize, size, eventTimeNs, nowMs);
             return;
         }
 
-        if (size < largeOrderThreshold) {
+        if (size < currentThreshold) {
             largeSinceMsByLevel.remove(key);
             pendingIncreases.remove(key);
         }
 
-        if (previousSize >= largeOrderThreshold
+        if (previousSize >= previousThreshold
                 && size < previousSize
-                && isSignificantDecrease(previousSize, size)) {
+                && isSignificantDecrease(previousSize, size, currentThreshold)) {
             if (!wasLargeOrderEligible) {
                 return;
             }
@@ -169,8 +190,19 @@ public class OrderWallChangeTracker {
         if (shutdown || size <= 0 || tradeInfo == null) {
             return;
         }
+        recordTrade(priceTick, size, tradeInfo.isBidAggressor);
+    }
+
+    synchronized void onTrade(int priceTick, int size, boolean bidAggressor) {
+        if (shutdown || size <= 0) {
+            return;
+        }
+        recordTrade(priceTick, size, bidAggressor);
+    }
+
+    private void recordTrade(int priceTick, int size, boolean bidAggressor) {
         long nowMs = System.currentTimeMillis();
-        recentTrades.addLast(new TradeRecord(priceTick, size, tradeInfo.isBidAggressor, nowMs));
+        recentTrades.addLast(new TradeRecord(priceTick, size, bidAggressor, nowMs));
         cleanupRecentTrades(nowMs);
     }
 
@@ -184,8 +216,9 @@ public class OrderWallChangeTracker {
         pendingIncreases.clear();
         pendingDecreases.clear();
         largeSinceMsByLevel.clear();
+        int currentThreshold = getEffectiveLargeOrderThreshold();
         for (Map.Entry<LevelKey, Integer> entry : currentSizes.entrySet()) {
-            if (entry.getValue() >= largeOrderThreshold) {
+            if (entry.getValue() >= currentThreshold) {
                 largeSinceMsByLevel.put(entry.getKey(), nowMs - minLargeOrderLifetimeMs);
             }
         }
@@ -214,7 +247,8 @@ public class OrderWallChangeTracker {
 
         long nowMs = System.currentTimeMillis();
         int latestSize = currentSizes.getOrDefault(key, 0);
-        if (latestSize < largeOrderThreshold) {
+        int currentThreshold = getEffectiveLargeOrderThreshold();
+        if (latestSize < currentThreshold) {
             pendingAdds.remove(key);
             largeSinceMsByLevel.remove(key);
             PluginLog.info("[WallChange] Suppressed flash add for " + instrumentAlias + " "
@@ -246,8 +280,9 @@ public class OrderWallChangeTracker {
         cleanupRecentTrades(nowMs);
         int latestSize = currentSizes.getOrDefault(key, 0);
         pending.latestSize = latestSize;
+        int currentThreshold = getEffectiveLargeOrderThreshold();
 
-        if (!isSignificantDecrease(pending.originalSize, latestSize)) {
+        if (!isSignificantDecrease(pending.originalSize, latestSize, currentThreshold)) {
             return;
         }
 
@@ -256,7 +291,8 @@ public class OrderWallChangeTracker {
             return;
         }
 
-        int tradedSize = sumMatchingTradeSize(key, pending.createdAtMs - TRADE_LOOKBACK_MS, nowMs);
+        long tradeWindowStartMs = pending.createdAtMs - TRADE_LOOKBACK_MS;
+        int tradedSize = sumMatchingTradeSize(key, tradeWindowStartMs, nowMs);
         if (tradedSize >= dropSize * TRADE_EXPLAINED_RATIO) {
             PluginLog.info("[WallChange] Suppressed traded decrease for " + instrumentAlias + " "
                     + (key.bid ? "BID" : "ASK") + " " + priceText(key.priceTick)
@@ -264,11 +300,20 @@ public class OrderWallChangeTracker {
             return;
         }
 
+        int samePriceTradeSize = sumSamePriceTradeSize(key.priceTick, tradeWindowStartMs, nowMs);
+        if (latestSize < currentThreshold
+                && samePriceTradeSize >= dropSize * SAME_PRICE_TRADE_EXPLAINED_RATIO) {
+            PluginLog.info("[WallChange] Suppressed price-touched decrease for " + instrumentAlias + " "
+                    + (key.bid ? "BID" : "ASK") + " " + priceText(key.priceTick)
+                    + " drop=" + dropSize + " samePriceTraded=" + samePriceTradeSize);
+            return;
+        }
+
         if (isCoolingDown(key, nowMs)) {
             return;
         }
 
-        OrderWallChangeEvent.Type type = latestSize >= largeOrderThreshold
+        OrderWallChangeEvent.Type type = latestSize >= currentThreshold
                 ? OrderWallChangeEvent.Type.REPLACED_SMALLER
                 : OrderWallChangeEvent.Type.REDUCED;
         OrderWallChangeEvent event = new OrderWallChangeEvent(
@@ -298,7 +343,8 @@ public class OrderWallChangeTracker {
 
         long nowMs = System.currentTimeMillis();
         int latestSize = currentSizes.getOrDefault(key, 0);
-        if (!isSignificantIncrease(pending.previousSize, latestSize)) {
+        int currentThreshold = getEffectiveLargeOrderThreshold();
+        if (!isSignificantIncrease(pending.previousSize, latestSize, currentThreshold)) {
             pendingIncreases.remove(key);
             PluginLog.info("[WallChange] Suppressed flash increase for " + instrumentAlias + " "
                     + (key.bid ? "BID" : "ASK") + " " + priceText(key.priceTick)
@@ -331,10 +377,10 @@ public class OrderWallChangeTracker {
                 minLargeOrderLifetimeMs, TimeUnit.MILLISECONDS);
     }
 
-    private void promotePendingAddIfMature(LevelKey key, int latestSize, long nowMs) {
+    private void promotePendingAddIfMature(LevelKey key, int latestSize, int currentThreshold, long nowMs) {
         PendingAdd pending = pendingAdds.get(key);
         if (pending == null
-                || latestSize < largeOrderThreshold
+                || latestSize < currentThreshold
                 || nowMs - pending.createdAtMs < minLargeOrderLifetimeMs) {
             return;
         }
@@ -388,19 +434,65 @@ public class OrderWallChangeTracker {
         PluginLog.info("[WallChange] " + event.getLogMessage());
     }
 
-    private boolean isSignificantDecrease(int previousSize, int currentSize) {
-        return currentSize < largeOrderThreshold || currentSize <= previousSize * remainingRatio;
+    private boolean isSignificantDecrease(int previousSize, int currentSize, int currentThreshold) {
+        return currentSize < currentThreshold || currentSize <= previousSize * remainingRatio;
     }
 
-    private boolean isSignificantIncrease(int previousSize, int currentSize) {
+    private boolean isSignificantIncrease(int previousSize, int currentSize, int currentThreshold) {
         return previousSize > 0
-                && currentSize > largeOrderThreshold
+                && currentSize >= currentThreshold
                 && currentSize >= previousSize * SIZE_INCREASE_RATIO;
     }
 
-    private boolean isLargeOrderEligible(LevelKey key, long nowMs) {
+    private boolean isLargeOrderEligible(LevelKey key, int currentThreshold, long nowMs) {
         Long largeSinceMs = largeSinceMsByLevel.get(key);
-        return largeSinceMs != null && nowMs - largeSinceMs >= minLargeOrderLifetimeMs;
+        return largeSinceMs != null
+                && currentSizes.getOrDefault(key, 0) >= currentThreshold
+                && nowMs - largeSinceMs >= minLargeOrderLifetimeMs;
+    }
+
+    private int getEffectiveLargeOrderThreshold() {
+        if (largeOrderPercentile <= 0 || totalLevels == 0) {
+            return largeOrderThreshold;
+        }
+        return Math.max(largeOrderThreshold, getPercentileThreshold(largeOrderPercentile));
+    }
+
+    private int getPercentileThreshold(double percentile) {
+        int index = (int) Math.ceil(percentile / 100.0 * totalLevels) - 1;
+        index = Math.max(0, Math.min(index, totalLevels - 1));
+
+        int cumulative = 0;
+        for (Map.Entry<Integer, Integer> entry : sizeCounts.entrySet()) {
+            cumulative += entry.getValue();
+            if (cumulative > index) {
+                return entry.getKey();
+            }
+        }
+        return sizeCounts.isEmpty() ? 0 : sizeCounts.lastKey();
+    }
+
+    private void updateCurrentSize(LevelKey key, int size) {
+        Integer previousSize = currentSizes.get(key);
+        if (previousSize != null) {
+            decrementSizeCount(previousSize);
+            totalLevels--;
+        }
+        if (size == 0) {
+            currentSizes.remove(key);
+            return;
+        }
+        currentSizes.put(key, size);
+        incrementSizeCount(size);
+        totalLevels++;
+    }
+
+    private void incrementSizeCount(int size) {
+        sizeCounts.merge(size, 1, Integer::sum);
+    }
+
+    private void decrementSizeCount(int size) {
+        sizeCounts.computeIfPresent(size, (ignored, count) -> count > 1 ? count - 1 : null);
     }
 
     private int sumMatchingTradeSize(LevelKey key, long fromMs, long toMs) {
@@ -415,6 +507,19 @@ public class OrderWallChangeTracker {
             if (key.bid && !trade.bidAggressor) {
                 total += trade.size;
             } else if (!key.bid && trade.bidAggressor) {
+                total += trade.size;
+            }
+        }
+        return total;
+    }
+
+    private int sumSamePriceTradeSize(int priceTick, long fromMs, long toMs) {
+        int total = 0;
+        for (TradeRecord trade : recentTrades) {
+            if (trade.observedAtMs < fromMs || trade.observedAtMs > toMs) {
+                continue;
+            }
+            if (trade.priceTick == priceTick) {
                 total += trade.size;
             }
         }

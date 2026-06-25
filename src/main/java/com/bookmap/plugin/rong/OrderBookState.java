@@ -76,11 +76,11 @@ public class OrderBookState {
         return book.getOrDefault(price, 0);
     }
 
-    /** First level on the requested side whose size is strictly larger than minSize. */
-    public synchronized DepthLevel findFirstLevelLargerThan(boolean isBid, int minSize) {
+    /** First level on the requested side whose size is at least minSize. */
+    public synchronized DepthLevel findFirstLevelAtLeast(boolean isBid, int minSize) {
         TreeMap<Integer, Integer> book = isBid ? bids : asks;
         for (Map.Entry<Integer, Integer> entry : book.entrySet()) {
-            if (entry.getValue() > minSize) {
+            if (entry.getValue() >= minSize) {
                 return new DepthLevel(entry.getKey(), entry.getValue());
             }
         }

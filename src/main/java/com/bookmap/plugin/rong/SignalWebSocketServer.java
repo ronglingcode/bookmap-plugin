@@ -33,6 +33,8 @@ import com.google.gson.JsonParser;
 
 public class SignalWebSocketServer extends WebSocketServer {
 
+    private static final int DEFAULT_PROTECTED_ABSOLUTE_WALL_LEVELS = 2;
+
     @FunctionalInterface
     public interface TradeButtonConfigListener {
         void onTradeButtonsChanged(List<TradebookButtonGroup> tradebooks);
@@ -113,7 +115,16 @@ public class SignalWebSocketServer extends WebSocketServer {
     }
 
     public boolean appendOrderbookSnapshot(String symbol, JsonObject target, int minimumWallSize) {
-        JsonObject snapshot = buildOrderbookSnapshot(symbol, minimumWallSize);
+        return appendOrderbookSnapshot(
+                symbol, target, minimumWallSize, DEFAULT_PROTECTED_ABSOLUTE_WALL_LEVELS);
+    }
+
+    public boolean appendOrderbookSnapshot(
+            String symbol,
+            JsonObject target,
+            int minimumWallSize,
+            int protectedAbsoluteWallLevels) {
+        JsonObject snapshot = buildOrderbookSnapshot(symbol, minimumWallSize, protectedAbsoluteWallLevels);
         if (snapshot == null) {
             return false;
         }
@@ -121,7 +132,35 @@ public class SignalWebSocketServer extends WebSocketServer {
         return true;
     }
 
-    private JsonObject buildOrderbookSnapshot(String symbol, int minimumWallSize) {
+    public OrderbookWallThreshold getOrderbookWallThreshold(String symbol, int minimumWallSize) {
+        String cleanSymbol = SymbolUtils.cleanSymbol(symbol);
+        int absoluteMinSize = Math.max(0, minimumWallSize);
+        if (cleanSymbol.isEmpty()) {
+            return OrderbookWallThreshold.unavailable("", orderbookPercentile, absoluteMinSize);
+        }
+
+        OrderBookState orderBook = symbolToOrderBook.get(cleanSymbol);
+        Double pips = symbolToPips.get(cleanSymbol);
+        if (orderBook == null || pips == null || pips <= 0 || !Double.isFinite(pips)) {
+            return OrderbookWallThreshold.unavailable(cleanSymbol, orderbookPercentile, absoluteMinSize);
+        }
+
+        synchronized (orderBook) {
+            WallThreshold threshold = WallThreshold.from(orderBook, absoluteMinSize, orderbookPercentile);
+            return OrderbookWallThreshold.available(
+                    cleanSymbol,
+                    orderbookPercentile,
+                    threshold.absoluteMinSize,
+                    threshold.percentileMinSize,
+                    threshold.effectiveMinSize,
+                    System.currentTimeMillis());
+        }
+    }
+
+    private JsonObject buildOrderbookSnapshot(
+            String symbol,
+            int minimumWallSize,
+            int protectedAbsoluteWallLevels) {
         String cleanSymbol = SymbolUtils.cleanSymbol(symbol);
         if (cleanSymbol.isEmpty()) {
             return null;
@@ -137,8 +176,14 @@ public class SignalWebSocketServer extends WebSocketServer {
         snapshot.addProperty("symbol", cleanSymbol);
         snapshot.addProperty("timestamp", System.currentTimeMillis());
         snapshot.addProperty("wallThreshold", minimumWallSize);
+        snapshot.addProperty("absoluteWallThreshold", minimumWallSize);
+        snapshot.addProperty("percentile", orderbookPercentile);
+        snapshot.addProperty("protectedAbsoluteWallLevels", Math.max(0, protectedAbsoluteWallLevels));
 
         synchronized (orderBook) {
+            WallThreshold threshold = WallThreshold.from(orderBook, minimumWallSize, orderbookPercentile);
+            snapshot.addProperty("percentileWallThreshold", threshold.percentileMinSize);
+            snapshot.addProperty("effectiveWallThreshold", threshold.effectiveMinSize);
             Integer bestBidTick = orderBook.getBestBid();
             Integer bestAskTick = orderBook.getBestAsk();
             if (bestBidTick != null) {
@@ -147,18 +192,34 @@ public class SignalWebSocketServer extends WebSocketServer {
             if (bestAskTick != null) {
                 snapshot.addProperty("bestAsk", bestAskTick * pips);
             }
-            snapshot.add("largeBids", buildWallLevels(orderBook.getBids(), pips, minimumWallSize));
-            snapshot.add("largeAsks", buildWallLevels(orderBook.getAsks(), pips, minimumWallSize));
+            snapshot.add("largeBids",
+                    buildWallLevels(orderBook.getBids(), pips, threshold, protectedAbsoluteWallLevels));
+            snapshot.add("largeAsks",
+                    buildWallLevels(orderBook.getAsks(), pips, threshold, protectedAbsoluteWallLevels));
         }
         return snapshot;
     }
 
-    private JsonArray buildWallLevels(NavigableMap<Integer, Integer> levels, double pips, int minimumWallSize) {
+    private JsonArray buildWallLevels(
+            NavigableMap<Integer, Integer> levels,
+            double pips,
+            WallThreshold threshold,
+            int protectedAbsoluteWallLevels) {
         JsonArray result = new JsonArray();
+        int protectedLevelsIncluded = 0;
+        int protectedLevelLimit = Math.max(0, protectedAbsoluteWallLevels);
         for (Map.Entry<Integer, Integer> entry : levels.entrySet()) {
             int size = entry.getValue();
-            if (size <= minimumWallSize) {
+            boolean passesEffectiveThreshold = size >= threshold.effectiveMinSize;
+            // Keep the nearest absolute-floor levels so a crowded symbol does not hide 5K candidates entirely.
+            boolean protectedAbsoluteLevel = size >= threshold.absoluteMinSize
+                    && size < threshold.effectiveMinSize
+                    && protectedLevelsIncluded < protectedLevelLimit;
+            if (!passesEffectiveThreshold && !protectedAbsoluteLevel) {
                 continue;
+            }
+            if (protectedAbsoluteLevel) {
+                protectedLevelsIncluded++;
             }
             JsonArray level = new JsonArray();
             level.add(entry.getKey() * pips);
@@ -266,10 +327,10 @@ public class SignalWebSocketServer extends WebSocketServer {
         }
 
         boolean bidWall = !longPosition;
-        OrderBookState.DepthLevel wall = orderBook.findFirstLevelLargerThan(bidWall, minimumWallSize);
+        OrderBookState.DepthLevel wall = orderBook.findFirstLevelAtLeast(bidWall, minimumWallSize);
         if (wall == null) {
             return ExitWallAdjustment.unavailable(
-                    "no " + (bidWall ? "bid" : "offer") + " wall > " + minimumWallSize);
+                    "no " + (bidWall ? "bid" : "offer") + " wall >= " + minimumWallSize);
         }
 
         int offsetTicks = Math.max(1, (int) Math.ceil((targetOffset / pips) - 1e-9));
@@ -976,6 +1037,101 @@ public class SignalWebSocketServer extends WebSocketServer {
 
     private String firstNonEmpty(String first, String second) {
         return first == null || first.isEmpty() ? second : first;
+    }
+
+    public static class OrderbookWallThreshold {
+        private final boolean available;
+        private final String symbol;
+        private final double percentile;
+        private final int absoluteMinSize;
+        private final int percentileMinSize;
+        private final int effectiveMinSize;
+        private final long timestamp;
+
+        private OrderbookWallThreshold(
+                boolean available,
+                String symbol,
+                double percentile,
+                int absoluteMinSize,
+                int percentileMinSize,
+                int effectiveMinSize,
+                long timestamp) {
+            this.available = available;
+            this.symbol = normalize(symbol);
+            this.percentile = percentile;
+            this.absoluteMinSize = absoluteMinSize;
+            this.percentileMinSize = percentileMinSize;
+            this.effectiveMinSize = effectiveMinSize;
+            this.timestamp = timestamp;
+        }
+
+        private static OrderbookWallThreshold unavailable(
+                String symbol,
+                double percentile,
+                int absoluteMinSize) {
+            return new OrderbookWallThreshold(
+                    false, symbol, percentile, absoluteMinSize, 0, absoluteMinSize, 0);
+        }
+
+        private static OrderbookWallThreshold available(
+                String symbol,
+                double percentile,
+                int absoluteMinSize,
+                int percentileMinSize,
+                int effectiveMinSize,
+                long timestamp) {
+            return new OrderbookWallThreshold(
+                    true, symbol, percentile, absoluteMinSize, percentileMinSize, effectiveMinSize, timestamp);
+        }
+
+        public boolean isAvailable() {
+            return available;
+        }
+
+        public String getSymbol() {
+            return symbol;
+        }
+
+        public double getPercentile() {
+            return percentile;
+        }
+
+        public int getAbsoluteMinSize() {
+            return absoluteMinSize;
+        }
+
+        public int getPercentileMinSize() {
+            return percentileMinSize;
+        }
+
+        public int getEffectiveMinSize() {
+            return effectiveMinSize;
+        }
+
+        public long getTimestamp() {
+            return timestamp;
+        }
+    }
+
+    private static class WallThreshold {
+        private final int absoluteMinSize;
+        private final int percentileMinSize;
+        private final int effectiveMinSize;
+
+        private WallThreshold(int absoluteMinSize, int percentileMinSize, int effectiveMinSize) {
+            this.absoluteMinSize = absoluteMinSize;
+            this.percentileMinSize = percentileMinSize;
+            this.effectiveMinSize = effectiveMinSize;
+        }
+
+        private static WallThreshold from(OrderBookState orderBook, int absoluteMinSize, double percentile) {
+            int normalizedAbsoluteMinSize = Math.max(0, absoluteMinSize);
+            int percentileMinSize = percentile > 0
+                    ? orderBook.getPercentileThreshold(percentile)
+                    : 0;
+            int effectiveMinSize = Math.max(normalizedAbsoluteMinSize, percentileMinSize);
+            return new WallThreshold(normalizedAbsoluteMinSize, percentileMinSize, effectiveMinSize);
+        }
     }
 
     private static class LimitOrderRef {
