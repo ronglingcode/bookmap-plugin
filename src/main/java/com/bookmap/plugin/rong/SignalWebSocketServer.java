@@ -10,6 +10,7 @@ import java.nio.file.StandardOpenOption;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.LinkedHashMap;
+import java.util.Locale;
 import java.util.Map;
 import java.util.NavigableMap;
 import java.util.Set;
@@ -251,6 +252,23 @@ public class SignalWebSocketServer extends WebSocketServer {
         if (listeners.isEmpty()) {
             symbolToTradeButtonListeners.remove(cleanSymbol, listeners);
         }
+    }
+
+    public boolean hasEnabledWallBreakTradeButton(String symbol, boolean bidBreakdown) {
+        String cleanSymbol = SymbolUtils.cleanSymbol(symbol);
+        List<TradebookButtonGroup> tradebooks = symbolToTradebooks.get(cleanSymbol);
+        if (tradebooks == null || tradebooks.isEmpty()) {
+            return false;
+        }
+        for (TradebookButtonGroup tradebook : tradebooks) {
+            if (tradebook.getEntryMethods().isEmpty()) {
+                continue;
+            }
+            if (isMatchingWallBreakTradebook(tradebook, bidBreakdown)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     public void registerKeyLevelConfigListener(KeyLevelConfigListener listener) {
@@ -951,6 +969,40 @@ public class SignalWebSocketServer extends WebSocketServer {
                 PluginLog.error("[TradeButton] Failed to update button listener for " + symbol + ": " + e.getMessage());
             }
         }
+    }
+
+    private boolean isMatchingWallBreakTradebook(TradebookButtonGroup tradebook, boolean bidBreakdown) {
+        if (bidBreakdown && !isShortSide(tradebook.getSide())) {
+            return false;
+        }
+        if (!bidBreakdown && !isLongSide(tradebook.getSide())) {
+            return false;
+        }
+
+        String searchable = (
+                tradebook.getId() + " "
+                        + tradebook.getLabel() + " "
+                        + tradebook.getTradebookId() + " "
+                        + tradebook.getTradebookName())
+                .toLowerCase(Locale.US);
+        if (bidBreakdown) {
+            return searchable.contains("bidwallbreakdown")
+                    || searchable.contains("bid wall breakdown")
+                    || searchable.contains("bid_breakdown")
+                    || searchable.contains("bid breakdown");
+        }
+        return searchable.contains("offerwallbreakout")
+                || searchable.contains("offer wall breakout")
+                || searchable.contains("offer_breakout")
+                || searchable.contains("offer breakout");
+    }
+
+    private boolean isLongSide(String side) {
+        return "long".equalsIgnoreCase(side) || "buy".equalsIgnoreCase(side);
+    }
+
+    private boolean isShortSide(String side) {
+        return "short".equalsIgnoreCase(side) || "sell".equalsIgnoreCase(side);
     }
 
     private List<String> getStringArray(JsonObject json, String field) {

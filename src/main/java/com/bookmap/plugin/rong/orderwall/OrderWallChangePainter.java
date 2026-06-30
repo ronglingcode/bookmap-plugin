@@ -42,7 +42,6 @@ public class OrderWallChangePainter implements ScreenSpacePainterFactory,
     public static final String PAINTER_NAME_PREFIX = "wallChangeAlerts_";
 
     private static final long FLASH_TTL_MS = 8_000;
-    private static final long MARKER_TTL_MS = 30_000;
     private static final int MAX_MARKERS = 8;
     private static final int MARKER_HEIGHT = 34;
     private static final int EVENT_BADGE_HEIGHT = 28;
@@ -54,6 +53,8 @@ public class OrderWallChangePainter implements ScreenSpacePainterFactory,
     private static final Color ADD_COLOR = new Color(60, 220, 148);
     private static final Color REDUCE_COLOR = new Color(255, 91, 78);
     private static final Color REPLACE_COLOR = new Color(255, 196, 73);
+    private static final Color OFFER_BREAKOUT_COLOR = new Color(57, 230, 255);
+    private static final Color BID_BREAKDOWN_COLOR = new Color(255, 64, 214);
     private static final Color TEXT_COLOR = new Color(255, 255, 255);
 
     private final OrderWallChangeStore store;
@@ -143,7 +144,7 @@ public class OrderWallChangePainter implements ScreenSpacePainterFactory,
 
     private void refreshAnimatedAlerts() {
         long nowMs = System.currentTimeMillis();
-        if (!store.hasRecentEvents(MARKER_TTL_MS, nowMs)) {
+        if (!store.hasRecentEvents(OrderWallAlertDisplayTiming.maxTtlMs(), nowMs)) {
             return;
         }
         for (String instrumentAlias : paintersByInstrument.keySet()) {
@@ -185,8 +186,12 @@ public class OrderWallChangePainter implements ScreenSpacePainterFactory,
                 }
 
                 long nowMs = System.currentTimeMillis();
-                List<OrderWallChangeEvent> events =
-                        store.getRecentEvents(instrumentAlias, MARKER_TTL_MS, nowMs);
+                List<OrderWallChangeEvent> events = visibleEvents(
+                        store.getRecentEvents(
+                                instrumentAlias,
+                                OrderWallAlertDisplayTiming.maxTtlMs(),
+                                nowMs),
+                        nowMs);
                 if (events.isEmpty()) {
                     return;
                 }
@@ -214,7 +219,8 @@ public class OrderWallChangePainter implements ScreenSpacePainterFactory,
         private void addEventBadgeShapes(List<OrderWallChangeEvent> events, long nowMs) {
             int count = 0;
             for (OrderWallChangeEvent event : events) {
-                if (event.getType() != OrderWallChangeEvent.Type.ADDED
+                if (!event.isWallBreak()
+                        && event.getType() != OrderWallChangeEvent.Type.ADDED
                         && event.getType() != OrderWallChangeEvent.Type.INCREASED) {
                     continue;
                 }
@@ -275,18 +281,28 @@ public class OrderWallChangePainter implements ScreenSpacePainterFactory,
             int alpha = markerAlpha(event, nowMs);
             int y = MARKER_HEIGHT / 2;
 
-            g.setColor(new Color(accent.getRed(), accent.getGreen(), accent.getBlue(), alpha));
-            g.setStroke(new BasicStroke(3.0f, BasicStroke.CAP_BUTT, BasicStroke.JOIN_MITER,
-                    10.0f, new float[]{12.0f, 7.0f}, 0.0f));
-            g.drawLine(0, y, width, y);
+            if (event.isWallBreak()) {
+                g.setColor(new Color(accent.getRed(), accent.getGreen(), accent.getBlue(), Math.max(28, alpha / 4)));
+                g.setStroke(new BasicStroke(12.0f, BasicStroke.CAP_BUTT, BasicStroke.JOIN_MITER));
+                g.drawLine(0, y, width, y);
+                g.setColor(new Color(8, 10, 14, Math.min(190, alpha)));
+                g.setStroke(new BasicStroke(5.5f, BasicStroke.CAP_BUTT, BasicStroke.JOIN_MITER));
+                g.drawLine(0, y, width, y);
+                g.setColor(new Color(accent.getRed(), accent.getGreen(), accent.getBlue(), alpha));
+                g.setStroke(new BasicStroke(3.2f, BasicStroke.CAP_BUTT, BasicStroke.JOIN_MITER));
+                g.drawLine(0, y, width, y);
+            } else {
+                g.setColor(new Color(accent.getRed(), accent.getGreen(), accent.getBlue(), alpha));
+                g.setStroke(new BasicStroke(3.0f, BasicStroke.CAP_BUTT, BasicStroke.JOIN_MITER,
+                        10.0f, new float[]{12.0f, 7.0f}, 0.0f));
+                g.drawLine(0, y, width, y);
+            }
             g.dispose();
             return image;
         }
 
         private BufferedImage renderEventBadgeImage(OrderWallChangeEvent event, long nowMs) {
-            String text = OrderWallChangeEvent.formatSize(event.getPreviousSize())
-                    + " -> "
-                    + OrderWallChangeEvent.formatSize(event.getCurrentSize());
+            String text = eventBadgeText(event);
             BufferedImage probe = new BufferedImage(1, 1, BufferedImage.TYPE_INT_ARGB);
             Graphics2D probeGraphics = probe.createGraphics();
             probeGraphics.setFont(EVENT_BADGE_FONT);
@@ -369,15 +385,42 @@ public class OrderWallChangePainter implements ScreenSpacePainterFactory,
                 return ADD_COLOR;
             case REPLACED_SMALLER:
                 return REPLACE_COLOR;
+            case OFFER_BREAKOUT:
+                return OFFER_BREAKOUT_COLOR;
+            case BID_BREAKDOWN:
+                return BID_BREAKDOWN_COLOR;
             case REDUCED:
             default:
                 return REDUCE_COLOR;
         }
     }
 
+    private static String eventBadgeText(OrderWallChangeEvent event) {
+        if (event.isWallBreak()) {
+            String sideText = event.isBid() ? "BID" : "OFFER";
+            return sideText + " " + event.getTypeText()
+                    + " " + OrderWallChangeEvent.formatSize(event.getPreviousSize());
+        }
+        return OrderWallChangeEvent.formatSize(event.getPreviousSize())
+                + " -> "
+                + OrderWallChangeEvent.formatSize(event.getCurrentSize());
+    }
+
     private static void drawEventBadgeIcon(Graphics2D g, OrderWallChangeEvent.Type type,
                                            int centerX, int centerY) {
         switch (type) {
+            case OFFER_BREAKOUT:
+                g.drawLine(centerX - 5, centerY + 5, centerX + 5, centerY + 5);
+                g.drawLine(centerX, centerY + 5, centerX, centerY - 6);
+                g.drawLine(centerX, centerY - 6, centerX - 4, centerY - 2);
+                g.drawLine(centerX, centerY - 6, centerX + 4, centerY - 2);
+                break;
+            case BID_BREAKDOWN:
+                g.drawLine(centerX - 5, centerY - 5, centerX + 5, centerY - 5);
+                g.drawLine(centerX, centerY - 5, centerX, centerY + 6);
+                g.drawLine(centerX, centerY + 6, centerX - 4, centerY + 2);
+                g.drawLine(centerX, centerY + 6, centerX + 4, centerY + 2);
+                break;
             case INCREASED:
                 g.drawLine(centerX, centerY + 5, centerX, centerY - 5);
                 g.drawLine(centerX, centerY - 5, centerX - 4, centerY - 1);
@@ -406,15 +449,27 @@ public class OrderWallChangePainter implements ScreenSpacePainterFactory,
     }
 
     private static int markerAlpha(OrderWallChangeEvent event, long nowMs) {
-        long age = Math.max(0, nowMs - event.getCreatedAtMs());
-        if (age > MARKER_TTL_MS) {
+        long age = OrderWallAlertDisplayTiming.ageMs(event, nowMs);
+        long ttlMs = OrderWallAlertDisplayTiming.ttlMs(event);
+        if (age > ttlMs) {
             return 0;
         }
         if (age < 6_000) {
             return flashAlpha(event, nowMs, 235, 120);
         }
-        double fade = 1.0 - ((double) (age - 6_000) / (MARKER_TTL_MS - 6_000));
+        double fadeDurationMs = Math.max(1.0, ttlMs - 6_000);
+        double fade = 1.0 - ((double) (age - 6_000) / fadeDurationMs);
         return Math.max(35, (int) (120 * fade));
+    }
+
+    private static List<OrderWallChangeEvent> visibleEvents(List<OrderWallChangeEvent> events, long nowMs) {
+        List<OrderWallChangeEvent> visible = new ArrayList<>();
+        for (OrderWallChangeEvent event : events) {
+            if (OrderWallAlertDisplayTiming.isVisible(event, nowMs)) {
+                visible.add(event);
+            }
+        }
+        return visible;
     }
 
     static String extractInstrumentFromPainterName(String painterAlias, String fullName) {

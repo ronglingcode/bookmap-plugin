@@ -183,6 +183,106 @@ class OrderWallChangeTrackerTest {
     }
 
     @Test
+    void alertsBidBreakdownWhenEnabledBidWallIsFilledAndCleared() throws Exception {
+        List<OrderWallChangeEvent> events = new CopyOnWriteArrayList<>();
+        CountDownLatch alertSeen = new CountDownLatch(1);
+        OrderWallChangeTracker tracker = newWallBreakTracker(1_000, bidWall -> bidWall, event -> {
+            events.add(event);
+            alertSeen.countDown();
+        });
+
+        try {
+            tracker.onDepth(true, 11_020, 8_000, 1L);
+            tracker.markReady();
+            tracker.onTrade(11_020, 8_000, false);
+            tracker.onDepth(true, 11_020, 0, 2L);
+
+            assertTrue(alertSeen.await(500, TimeUnit.MILLISECONDS));
+            assertEquals(1, events.size());
+            OrderWallChangeEvent event = events.get(0);
+            assertEquals(OrderWallChangeEvent.Type.BID_BREAKDOWN, event.getType());
+            assertTrue(event.isBid());
+            assertEquals(8_000, event.getPreviousSize());
+            assertEquals(0, event.getCurrentSize());
+            assertEquals(8_000, event.getTradedSize());
+        } finally {
+            tracker.shutdown();
+        }
+    }
+
+    @Test
+    void alertsOfferBreakoutWhenEnabledOfferWallIsFilledAndCleared() throws Exception {
+        List<OrderWallChangeEvent> events = new CopyOnWriteArrayList<>();
+        CountDownLatch alertSeen = new CountDownLatch(1);
+        OrderWallChangeTracker tracker = newWallBreakTracker(1_000, bidWall -> !bidWall, event -> {
+            events.add(event);
+            alertSeen.countDown();
+        });
+
+        try {
+            tracker.onDepth(false, 11_050, 9_000, 1L);
+            tracker.markReady();
+            tracker.onTrade(11_050, 9_000, true);
+            tracker.onDepth(false, 11_050, 0, 2L);
+
+            assertTrue(alertSeen.await(500, TimeUnit.MILLISECONDS));
+            assertEquals(1, events.size());
+            OrderWallChangeEvent event = events.get(0);
+            assertEquals(OrderWallChangeEvent.Type.OFFER_BREAKOUT, event.getType());
+            assertFalse(event.isBid());
+            assertEquals(9_000, event.getPreviousSize());
+            assertEquals(0, event.getCurrentSize());
+            assertEquals(9_000, event.getTradedSize());
+        } finally {
+            tracker.shutdown();
+        }
+    }
+
+    @Test
+    void suppressesFilledWallBreakWhenMatchingTradeButtonIsDisabled() throws Exception {
+        List<OrderWallChangeEvent> events = new CopyOnWriteArrayList<>();
+        CountDownLatch alertSeen = new CountDownLatch(1);
+        OrderWallChangeTracker tracker = newWallBreakTracker(1_000, bidWall -> false, event -> {
+            events.add(event);
+            alertSeen.countDown();
+        });
+
+        try {
+            tracker.onDepth(true, 11_020, 8_000, 1L);
+            tracker.markReady();
+            tracker.onTrade(11_020, 8_000, false);
+            tracker.onDepth(true, 11_020, 0, 2L);
+
+            assertFalse(alertSeen.await(500, TimeUnit.MILLISECONDS));
+            assertTrue(events.isEmpty());
+        } finally {
+            tracker.shutdown();
+        }
+    }
+
+    @Test
+    void cancelledWallClearDoesNotAlertAsWallBreak() throws Exception {
+        List<OrderWallChangeEvent> events = new CopyOnWriteArrayList<>();
+        CountDownLatch alertSeen = new CountDownLatch(1);
+        OrderWallChangeTracker tracker = newWallBreakTracker(1_000, bidWall -> true, event -> {
+            events.add(event);
+            alertSeen.countDown();
+        });
+
+        try {
+            tracker.onDepth(true, 11_020, 8_000, 1L);
+            tracker.markReady();
+            tracker.onDepth(true, 11_020, 0, 2L);
+
+            assertTrue(alertSeen.await(500, TimeUnit.MILLISECONDS));
+            assertEquals(1, events.size());
+            assertEquals(OrderWallChangeEvent.Type.REDUCED, events.get(0).getType());
+        } finally {
+            tracker.shutdown();
+        }
+    }
+
+    @Test
     void adaptivePercentileSuppressesFiveThousandCrossWhenBookIsCrowded() throws Exception {
         List<OrderWallChangeEvent> events = new CopyOnWriteArrayList<>();
         CountDownLatch alertSeen = new CountDownLatch(1);
@@ -259,5 +359,20 @@ class OrderWallChangeTrackerTest {
                 20,
                 minLargeOrderLifetimeMs,
                 consumer);
+    }
+
+    private static OrderWallChangeTracker newWallBreakTracker(
+            long minLargeOrderLifetimeMs,
+            java.util.function.Predicate<Boolean> wallBreakAlertEnabled,
+            java.util.function.Consumer<OrderWallChangeEvent> consumer) {
+        return new OrderWallChangeTracker(
+                "TEST",
+                0.01,
+                LARGE_THRESHOLD,
+                0.50,
+                20,
+                minLargeOrderLifetimeMs,
+                consumer,
+                wallBreakAlertEnabled);
     }
 }

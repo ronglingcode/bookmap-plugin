@@ -14,7 +14,9 @@ public class OrderWallChangeEvent {
         ADDED,
         INCREASED,
         REDUCED,
-        REPLACED_SMALLER
+        REPLACED_SMALLER,
+        OFFER_BREAKOUT,
+        BID_BREAKDOWN
     }
 
     private final String id;
@@ -105,6 +107,10 @@ public class OrderWallChangeEvent {
                 return "INCREASED";
             case REPLACED_SMALLER:
                 return "CHANGED";
+            case OFFER_BREAKOUT:
+                return "BREAKOUT";
+            case BID_BREAKDOWN:
+                return "BREAKDOWN";
             case REDUCED:
             default:
                 return "PULLED";
@@ -112,16 +118,24 @@ public class OrderWallChangeEvent {
     }
 
     public String getShortMessage() {
+        if (isWallBreak()) {
+            return getSideText() + " " + getPriceText() + " " + getTypeText()
+                    + " filled " + formatSize(previousSize);
+        }
         return getSideText() + " " + getPriceText() + " " + getTypeText()
                 + " " + formatSize(previousSize) + " -> " + formatSize(currentSize);
     }
 
     public String getLogMessage() {
         String message = instrumentAlias + " " + getShortMessage();
-        if (tradedSize > 0 && type != Type.ADDED) {
+        if (tradedSize > 0 && type != Type.ADDED && !isWallBreak()) {
             message += " (traded " + formatSize(tradedSize) + ")";
         }
         return message;
+    }
+
+    public boolean isWallBreak() {
+        return type == Type.OFFER_BREAKOUT || type == Type.BID_BREAKDOWN;
     }
 
     public static String formatSize(int size) {

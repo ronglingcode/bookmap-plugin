@@ -51,7 +51,6 @@ public class OrderWallLabelPainter implements ScreenSpacePainterFactory,
     private static final int CHANGE_LABEL_PADDING_X = 8;
     private static final int CHANGE_ICON_SIZE = 20;
     private static final int CHANGE_ICON_GAP = 6;
-    private static final long CHANGE_LABEL_TTL_MS = 30_000;
     private static final long CHANGE_LABEL_FLASH_MS = 8_000;
     private static final long CHANGE_EVENT_MATCH_TOLERANCE_NS = 2_000_000_000L;
     private static final int STACKED_LABEL_GAP = 3;
@@ -68,6 +67,8 @@ public class OrderWallLabelPainter implements ScreenSpacePainterFactory,
     private static final Color ADDED_ACCENT = new Color(60, 220, 148);
     private static final Color REDUCED_ACCENT = new Color(255, 91, 78);
     private static final Color CHANGED_ACCENT = new Color(255, 196, 73);
+    private static final Color OFFER_BREAKOUT_ACCENT = new Color(57, 230, 255);
+    private static final Color BID_BREAKDOWN_ACCENT = new Color(255, 64, 214);
 
     private final OrderWallLabelStore store;
     private final IndicatorConfig config;
@@ -160,7 +161,7 @@ public class OrderWallLabelPainter implements ScreenSpacePainterFactory,
 
     private void refreshAnimatedChangeLabels() {
         long nowMs = System.currentTimeMillis();
-        if (!wallChangeStore.hasRecentEvents(CHANGE_LABEL_TTL_MS, nowMs)) {
+        if (!wallChangeStore.hasRecentEvents(OrderWallAlertDisplayTiming.maxTtlMs(), nowMs)) {
             return;
         }
         for (String instrumentAlias : paintersByInstrument.keySet()) {
@@ -427,7 +428,11 @@ public class OrderWallLabelPainter implements ScreenSpacePainterFactory,
             }
             OrderWallChangeEvent bestEvent = null;
             long bestDistanceNs = Long.MAX_VALUE;
-            for (OrderWallChangeEvent event : wallChangeStore.getRecentEvents(instrumentAlias, CHANGE_LABEL_TTL_MS, nowMs)) {
+            for (OrderWallChangeEvent event : wallChangeStore.getRecentEvents(
+                    instrumentAlias, OrderWallAlertDisplayTiming.maxTtlMs(), nowMs)) {
+                if (!OrderWallAlertDisplayTiming.isVisible(event, nowMs)) {
+                    continue;
+                }
                 if (event.isBid() != label.isBid() || event.getPriceTick() != label.getPriceTick()) {
                     continue;
                 }
@@ -600,6 +605,11 @@ public class OrderWallLabelPainter implements ScreenSpacePainterFactory,
     }
 
     private static String formatChangeText(OrderWallChangeEvent event) {
+        if (event.isWallBreak()) {
+            String sideText = event.isBid() ? "BID" : "OFFER";
+            return sideText + " " + event.getTypeText()
+                    + " " + OrderWallChangeEvent.formatSize(event.getPreviousSize());
+        }
         return OrderWallChangeEvent.formatSize(event.getPreviousSize())
                 + " -> "
                 + OrderWallChangeEvent.formatSize(event.getCurrentSize());
@@ -612,6 +622,10 @@ public class OrderWallLabelPainter implements ScreenSpacePainterFactory,
                 return ADDED_ACCENT;
             case REPLACED_SMALLER:
                 return CHANGED_ACCENT;
+            case OFFER_BREAKOUT:
+                return OFFER_BREAKOUT_ACCENT;
+            case BID_BREAKDOWN:
+                return BID_BREAKDOWN_ACCENT;
             case REDUCED:
             default:
                 return REDUCED_ACCENT;
@@ -619,13 +633,17 @@ public class OrderWallLabelPainter implements ScreenSpacePainterFactory,
     }
 
     private static int changePulseAlpha(OrderWallChangeEvent event, long nowMs) {
-        long age = Math.max(0, nowMs - event.getCreatedAtMs());
+        long age = OrderWallAlertDisplayTiming.ageMs(event, nowMs);
+        long ttlMs = OrderWallAlertDisplayTiming.ttlMs(event);
+        if (age > ttlMs) {
+            return 0;
+        }
         if (age < CHANGE_LABEL_FLASH_MS) {
             double pulse = (Math.sin(nowMs / 85.0) + 1.0) / 2.0;
             return 150 + (int) (105 * pulse);
         }
-        double remaining = 1.0 - ((double) (age - CHANGE_LABEL_FLASH_MS)
-                / (CHANGE_LABEL_TTL_MS - CHANGE_LABEL_FLASH_MS));
+        double fadeDurationMs = Math.max(1.0, ttlMs - CHANGE_LABEL_FLASH_MS);
+        double remaining = 1.0 - ((double) (age - CHANGE_LABEL_FLASH_MS) / fadeDurationMs);
         return Math.max(80, Math.min(180, (int) (80 + 100 * remaining)));
     }
 
@@ -638,6 +656,18 @@ public class OrderWallLabelPainter implements ScreenSpacePainterFactory,
         g.setStroke(new BasicStroke(2.2f, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
 
         switch (type) {
+            case OFFER_BREAKOUT:
+                g.drawLine(centerX - 5, centerY + 5, centerX + 5, centerY + 5);
+                g.drawLine(centerX, centerY + 5, centerX, centerY - 6);
+                g.drawLine(centerX, centerY - 6, centerX - 4, centerY - 2);
+                g.drawLine(centerX, centerY - 6, centerX + 4, centerY - 2);
+                break;
+            case BID_BREAKDOWN:
+                g.drawLine(centerX - 5, centerY - 5, centerX + 5, centerY - 5);
+                g.drawLine(centerX, centerY - 5, centerX, centerY + 6);
+                g.drawLine(centerX, centerY + 6, centerX - 4, centerY + 2);
+                g.drawLine(centerX, centerY + 6, centerX + 4, centerY + 2);
+                break;
             case ADDED:
                 g.drawLine(centerX - 5, centerY, centerX + 5, centerY);
                 g.drawLine(centerX, centerY - 5, centerX, centerY + 5);

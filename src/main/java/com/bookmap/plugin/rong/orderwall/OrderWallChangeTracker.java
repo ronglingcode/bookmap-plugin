@@ -11,6 +11,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
+import java.util.function.Predicate;
 
 import com.bookmap.plugin.rong.PluginLog;
 
@@ -29,6 +30,7 @@ public class OrderWallChangeTracker {
     private static final long ALERT_COOLDOWN_MS = 2_500;
     private static final long MIN_LARGE_ORDER_LIFETIME_MS = 500;
     private static final double SIZE_INCREASE_RATIO = 2.0;
+    private static final Predicate<Boolean> WALL_BREAK_ALERTS_DISABLED = ignored -> false;
 
     private final String instrumentAlias;
     private final double pips;
@@ -38,6 +40,7 @@ public class OrderWallChangeTracker {
     private final long decreaseDecisionDelayMs;
     private final long minLargeOrderLifetimeMs;
     private final Consumer<OrderWallChangeEvent> alertConsumer;
+    private final Predicate<Boolean> wallBreakAlertEnabled;
     private final ScheduledExecutorService scheduler;
     private final Map<LevelKey, Integer> currentSizes = new HashMap<>();
     private final Map<LevelKey, PendingAdd> pendingAdds = new HashMap<>();
@@ -45,6 +48,7 @@ public class OrderWallChangeTracker {
     private final Map<LevelKey, PendingDecrease> pendingDecreases = new HashMap<>();
     private final Map<LevelKey, Long> largeSinceMsByLevel = new HashMap<>();
     private final Map<LevelKey, Long> lastAlertMsByLevel = new HashMap<>();
+    private final Map<LevelKey, Long> lastWallBreakAlertMsByLevel = new HashMap<>();
     private final TreeMap<Integer, Integer> sizeCounts = new TreeMap<>();
     private final Deque<TradeRecord> recentTrades = new ArrayDeque<>();
     private int totalLevels;
@@ -56,7 +60,7 @@ public class OrderWallChangeTracker {
                                   double remainingRatio, long decreaseDecisionDelayMs,
                                   Consumer<OrderWallChangeEvent> alertConsumer) {
         this(instrumentAlias, pips, largeOrderThreshold, 0, remainingRatio, decreaseDecisionDelayMs,
-                MIN_LARGE_ORDER_LIFETIME_MS, alertConsumer);
+                MIN_LARGE_ORDER_LIFETIME_MS, alertConsumer, WALL_BREAK_ALERTS_DISABLED);
     }
 
     public OrderWallChangeTracker(String instrumentAlias, double pips, int largeOrderThreshold,
@@ -65,7 +69,17 @@ public class OrderWallChangeTracker {
                                   Consumer<OrderWallChangeEvent> alertConsumer) {
         this(instrumentAlias, pips, largeOrderThreshold, largeOrderPercentile,
                 remainingRatio, decreaseDecisionDelayMs,
-                MIN_LARGE_ORDER_LIFETIME_MS, alertConsumer);
+                MIN_LARGE_ORDER_LIFETIME_MS, alertConsumer, WALL_BREAK_ALERTS_DISABLED);
+    }
+
+    public OrderWallChangeTracker(String instrumentAlias, double pips, int largeOrderThreshold,
+                                  double largeOrderPercentile, double remainingRatio,
+                                  long decreaseDecisionDelayMs,
+                                  Consumer<OrderWallChangeEvent> alertConsumer,
+                                  Predicate<Boolean> wallBreakAlertEnabled) {
+        this(instrumentAlias, pips, largeOrderThreshold, largeOrderPercentile,
+                remainingRatio, decreaseDecisionDelayMs,
+                MIN_LARGE_ORDER_LIFETIME_MS, alertConsumer, wallBreakAlertEnabled);
     }
 
     OrderWallChangeTracker(String instrumentAlias, double pips, int largeOrderThreshold,
@@ -73,13 +87,31 @@ public class OrderWallChangeTracker {
                            long minLargeOrderLifetimeMs,
                            Consumer<OrderWallChangeEvent> alertConsumer) {
         this(instrumentAlias, pips, largeOrderThreshold, 0, remainingRatio,
-                decreaseDecisionDelayMs, minLargeOrderLifetimeMs, alertConsumer);
+                decreaseDecisionDelayMs, minLargeOrderLifetimeMs, alertConsumer, WALL_BREAK_ALERTS_DISABLED);
+    }
+
+    OrderWallChangeTracker(String instrumentAlias, double pips, int largeOrderThreshold,
+                           double remainingRatio, long decreaseDecisionDelayMs,
+                           long minLargeOrderLifetimeMs,
+                           Consumer<OrderWallChangeEvent> alertConsumer,
+                           Predicate<Boolean> wallBreakAlertEnabled) {
+        this(instrumentAlias, pips, largeOrderThreshold, 0, remainingRatio,
+                decreaseDecisionDelayMs, minLargeOrderLifetimeMs, alertConsumer, wallBreakAlertEnabled);
     }
 
     OrderWallChangeTracker(String instrumentAlias, double pips, int largeOrderThreshold,
                            double largeOrderPercentile, double remainingRatio,
                            long decreaseDecisionDelayMs, long minLargeOrderLifetimeMs,
                            Consumer<OrderWallChangeEvent> alertConsumer) {
+        this(instrumentAlias, pips, largeOrderThreshold, largeOrderPercentile, remainingRatio,
+                decreaseDecisionDelayMs, minLargeOrderLifetimeMs, alertConsumer, WALL_BREAK_ALERTS_DISABLED);
+    }
+
+    OrderWallChangeTracker(String instrumentAlias, double pips, int largeOrderThreshold,
+                           double largeOrderPercentile, double remainingRatio,
+                           long decreaseDecisionDelayMs, long minLargeOrderLifetimeMs,
+                           Consumer<OrderWallChangeEvent> alertConsumer,
+                           Predicate<Boolean> wallBreakAlertEnabled) {
         this.instrumentAlias = instrumentAlias;
         this.pips = pips;
         this.largeOrderThreshold = largeOrderThreshold;
@@ -88,6 +120,9 @@ public class OrderWallChangeTracker {
         this.decreaseDecisionDelayMs = decreaseDecisionDelayMs;
         this.minLargeOrderLifetimeMs = minLargeOrderLifetimeMs;
         this.alertConsumer = alertConsumer;
+        this.wallBreakAlertEnabled = wallBreakAlertEnabled == null
+                ? WALL_BREAK_ALERTS_DISABLED
+                : wallBreakAlertEnabled;
         this.scheduler = Executors.newSingleThreadScheduledExecutor(r -> {
             Thread t = new Thread(r, "wall-change-alert-" + instrumentAlias);
             t.setDaemon(true);
@@ -232,6 +267,7 @@ public class OrderWallChangeTracker {
         pendingIncreases.clear();
         pendingDecreases.clear();
         largeSinceMsByLevel.clear();
+        lastWallBreakAlertMsByLevel.clear();
         recentTrades.clear();
         scheduler.shutdownNow();
     }
@@ -294,6 +330,10 @@ public class OrderWallChangeTracker {
         long tradeWindowStartMs = pending.createdAtMs - TRADE_LOOKBACK_MS;
         int tradedSize = sumMatchingTradeSize(key, tradeWindowStartMs, nowMs);
         if (tradedSize >= dropSize * TRADE_EXPLAINED_RATIO) {
+            if (latestSize < currentThreshold && emitWallBreak(key, pending.originalSize,
+                    latestSize, tradedSize, pending.latestEventTimeNs, nowMs)) {
+                return;
+            }
             PluginLog.info("[WallChange] Suppressed traded decrease for " + instrumentAlias + " "
                     + (key.bid ? "BID" : "ASK") + " " + priceText(key.priceTick)
                     + " drop=" + dropSize + " traded=" + tradedSize);
@@ -434,6 +474,34 @@ public class OrderWallChangeTracker {
         PluginLog.info("[WallChange] " + event.getLogMessage());
     }
 
+    private boolean emitWallBreak(LevelKey key, int previousSize, int size, int tradedSize,
+                                  long eventTimeNs, long nowMs) {
+        if (!isWallBreakAlertEnabled(key)) {
+            return false;
+        }
+        if (isWallBreakCoolingDown(key, nowMs)) {
+            return true;
+        }
+        OrderWallChangeEvent event = new OrderWallChangeEvent(
+                instrumentAlias,
+                key.bid,
+                key.priceTick,
+                key.priceTick * pips,
+                previousSize,
+                size,
+                tradedSize,
+                key.bid
+                        ? OrderWallChangeEvent.Type.BID_BREAKDOWN
+                        : OrderWallChangeEvent.Type.OFFER_BREAKOUT,
+                eventTimeNs,
+                nowMs);
+        markWallBreakAlerted(key, nowMs);
+        alertConsumer.accept(event);
+        PluginLog.info("[WallBreak] " + event.getLogMessage()
+                + " traded=" + OrderWallChangeEvent.formatSize(tradedSize));
+        return true;
+    }
+
     private boolean isSignificantDecrease(int previousSize, int currentSize, int currentThreshold) {
         return currentSize < currentThreshold || currentSize <= previousSize * remainingRatio;
     }
@@ -544,6 +612,25 @@ public class OrderWallChangeTracker {
 
     private void markAlerted(LevelKey key, long nowMs) {
         lastAlertMsByLevel.put(key, nowMs);
+    }
+
+    private boolean isWallBreakAlertEnabled(LevelKey key) {
+        try {
+            return wallBreakAlertEnabled.test(key.bid);
+        } catch (RuntimeException e) {
+            PluginLog.error("[WallBreak] Failed to check alert enablement for "
+                    + instrumentAlias + ": " + e.getMessage());
+            return false;
+        }
+    }
+
+    private boolean isWallBreakCoolingDown(LevelKey key, long nowMs) {
+        Long lastAlertMs = lastWallBreakAlertMsByLevel.get(key);
+        return lastAlertMs != null && nowMs - lastAlertMs < ALERT_COOLDOWN_MS;
+    }
+
+    private void markWallBreakAlerted(LevelKey key, long nowMs) {
+        lastWallBreakAlertMsByLevel.put(key, nowMs);
     }
 
     private String priceText(int priceTick) {

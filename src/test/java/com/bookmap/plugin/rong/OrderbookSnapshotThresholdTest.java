@@ -1,6 +1,7 @@
 package com.bookmap.plugin.rong;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.Arrays;
@@ -48,9 +49,58 @@ class OrderbookSnapshotThresholdTest {
         assertEquals(200_000, threshold.getEffectiveMinSize());
     }
 
+    @Test
+    void wallBreakAlertAvailabilityFollowsBookmapTradeButtons() {
+        SignalWebSocketServer server = new SignalWebSocketServer(0, 90, 1000);
+
+        JsonObject config = new JsonObject();
+        config.addProperty("type", "trade_button_config");
+        config.addProperty("symbol", "WEN");
+        JsonArray tradebooks = new JsonArray();
+        tradebooks.add(tradebook("GapAndGoBookmapOfferWallBreakout", "long", "0.25R"));
+        tradebooks.add(tradebook("GapAndCrapBookmapBidWallBreakdown", "short", "0.25R"));
+        config.add("tradebooks", tradebooks);
+
+        server.onMessage(null, config.toString());
+
+        assertTrue(server.hasEnabledWallBreakTradeButton("WEN", false));
+        assertTrue(server.hasEnabledWallBreakTradeButton("WEN", true));
+    }
+
+    @Test
+    void wallBreakAlertAvailabilityRejectsWrongSideTradeButtons() {
+        SignalWebSocketServer server = new SignalWebSocketServer(0, 90, 1000);
+
+        JsonObject config = new JsonObject();
+        config.addProperty("type", "trade_button_config");
+        config.addProperty("symbol", "WEN");
+        JsonArray tradebooks = new JsonArray();
+        tradebooks.add(tradebook("GapAndGoBookmapOfferWallBreakout", "short", "0.25R"));
+        tradebooks.add(tradebook("GapAndCrapBookmapBidWallBreakdown", "long", "0.25R"));
+        config.add("tradebooks", tradebooks);
+
+        server.onMessage(null, config.toString());
+
+        assertFalse(server.hasEnabledWallBreakTradeButton("WEN", false));
+        assertFalse(server.hasEnabledWallBreakTradeButton("WEN", true));
+    }
+
     private static List<Integer> sizes(JsonArray levels) {
         return levels.asList().stream()
                 .map(level -> level.getAsJsonArray().get(1).getAsInt())
                 .collect(Collectors.toList());
+    }
+
+    private static JsonObject tradebook(String tradebookId, String side, String entryMethod) {
+        JsonObject tradebook = new JsonObject();
+        tradebook.addProperty("id", tradebookId);
+        tradebook.addProperty("label", tradebookId);
+        tradebook.addProperty("side", side);
+        tradebook.addProperty("tradebookId", tradebookId);
+        tradebook.addProperty("tradebookName", tradebookId);
+        JsonArray entryMethods = new JsonArray();
+        entryMethods.add(entryMethod);
+        tradebook.add("entryMethods", entryMethods);
+        return tradebook;
     }
 }

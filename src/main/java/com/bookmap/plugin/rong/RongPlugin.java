@@ -162,7 +162,8 @@ public class RongPlugin implements CustomModuleAdapter,
                 ORDERBOOK_PERCENTILE,
                 WALL_CHANGE_REMAINING_RATIO,
                 WALL_CHANGE_DECISION_DELAY_MS,
-                this::handleWallChangeEvent);
+                this::handleWallChangeEvent,
+                this::isWallBreakAlertEnabled);
         sharedServer.registerSymbol(cleanAlias, orderBook, info.pips);
         chartClickHandler.registerSymbol(cleanAlias, info.pips);
         priceLinePainter.registerInstrument(cleanAlias);
@@ -498,6 +499,11 @@ public class RongPlugin implements CustomModuleAdapter,
             wallChangeStore.addEvent(event);
         }
         playWallChangeSound(event);
+    }
+
+    private boolean isWallBreakAlertEnabled(boolean bidWall) {
+        SignalWebSocketServer server = sharedServer;
+        return server != null && server.hasEnabledWallBreakTradeButton(alias, bidWall);
     }
 
     private void playWallChangeSound(OrderWallChangeEvent event) {
