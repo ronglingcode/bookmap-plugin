@@ -245,7 +245,6 @@ public class TradeButtonWindow {
     private JButton createEntryButton(TradebookButtonGroup tradebook, String entryMethod) {
         JButton button = new JButton(entryMethod);
         applyTradebookButtonStyle(button, tradebook.getSide());
-        button.setToolTipText("Click sends Breakout. Shift+click sends Market.");
         button.putClientProperty(SHIFT_DOWN_CLIENT_PROPERTY, Boolean.FALSE);
         button.addMouseListener(new MouseAdapter() {
             @Override
