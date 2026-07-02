@@ -1,8 +1,11 @@
 package com.bookmap.plugin.rong.pricelines;
 
+import java.util.Collection;
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
 
@@ -67,6 +70,21 @@ public class PriceLineStore {
     public void removeByType(String instrumentAlias, PriceLine.LineType type) {
         List<PriceLine> lines = linesByInstrument.get(instrumentAlias);
         if (lines != null && lines.removeIf(l -> l.getType() == type)) {
+            notifyListeners(instrumentAlias);
+        }
+    }
+
+    /** Remove all lines matching any of the given types for the instrument. */
+    public void removeByTypes(String instrumentAlias, Collection<PriceLine.LineType> types) {
+        if (types == null || types.isEmpty()) {
+            return;
+        }
+        List<PriceLine> lines = linesByInstrument.get(instrumentAlias);
+        if (lines == null) {
+            return;
+        }
+        Set<PriceLine.LineType> typeSet = new HashSet<>(types);
+        if (lines.removeIf(l -> typeSet.contains(l.getType()))) {
             notifyListeners(instrumentAlias);
         }
     }

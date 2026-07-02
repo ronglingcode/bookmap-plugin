@@ -187,9 +187,7 @@ public class MarketLevelManager implements SignalWebSocketServer.MarketLevelConf
     }
 
     private void removeAllLines(String instrumentAlias) {
-        for (PriceLine.LineType lineType : getManagedLineTypes()) {
-            store.removeByType(instrumentAlias, lineType);
-        }
+        store.removeByTypes(instrumentAlias, getManagedLineTypes());
     }
 
     private List<PriceLine.LineType> getManagedLineTypes() {
