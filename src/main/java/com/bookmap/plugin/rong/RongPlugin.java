@@ -21,6 +21,8 @@ import com.bookmap.plugin.rong.orderwall.OrderWallTracker;
 import com.bookmap.plugin.rong.pricelines.ChartClickHandler;
 import com.bookmap.plugin.rong.pricelines.PriceLinePainter;
 import com.bookmap.plugin.rong.pricelines.PriceLineStore;
+import com.bookmap.plugin.rong.pricelines.PriceZonePainter;
+import com.bookmap.plugin.rong.pricelines.PriceZoneStore;
 import com.bookmap.plugin.rong.tradebuttons.TradeButtonWindow;
 
 import velox.api.layer1.simplified.CustomSettingsPanelProvider;
@@ -74,6 +76,8 @@ public class RongPlugin implements CustomModuleAdapter,
     private static ChartClickHandler chartClickHandler;
     private static PriceLineStore priceLineStore;
     private static PriceLinePainter priceLinePainter;
+    private static PriceZoneStore priceZoneStore;
+    private static PriceZonePainter priceZonePainter;
     private static OrderWallLabelStore wallLabelStore;
     private static OrderWallLabelPainter wallLabelPainter;
     private static OrderWallChangeStore wallChangeStore;
@@ -81,6 +85,7 @@ public class RongPlugin implements CustomModuleAdapter,
     private static IndicatorConfig indicatorConfig;
     private static ReplayExportConfig replayExportConfig;
     private static KeyLevelManager keyLevelManager;
+    private static KeyZoneManager keyZoneManager;
     private static MarketLevelManager marketLevelManager;
     private static ExitOrderManager exitOrderManager;
     private static PendingEntryOrderManager pendingEntryOrderManager;
@@ -131,6 +136,8 @@ public class RongPlugin implements CustomModuleAdapter,
             if (priceLineStore == null) {
                 priceLineStore = new PriceLineStore();
                 priceLinePainter = new PriceLinePainter(priceLineStore);
+                priceZoneStore = new PriceZoneStore();
+                priceZonePainter = new PriceZonePainter(priceZoneStore);
                 replayExportConfig = new ReplayExportConfig();
                 wallLabelStore = new OrderWallLabelStore();
                 wallChangeStore = new OrderWallChangeStore();
@@ -138,6 +145,8 @@ public class RongPlugin implements CustomModuleAdapter,
                 wallChangePainter = new OrderWallChangePainter(wallChangeStore, indicatorConfig);
                 keyLevelManager = new KeyLevelManager(priceLineStore);
                 sharedServer.registerKeyLevelConfigListener(keyLevelManager);
+                keyZoneManager = new KeyZoneManager(priceZoneStore);
+                sharedServer.registerKeyZoneConfigListener(keyZoneManager);
                 marketLevelManager = new MarketLevelManager(priceLineStore, indicatorConfig);
                 sharedServer.registerMarketLevelConfigListener(marketLevelManager);
                 exitOrderManager = new ExitOrderManager(priceLineStore);
@@ -166,6 +175,7 @@ public class RongPlugin implements CustomModuleAdapter,
                 this::isWallBreakAlertEnabled);
         sharedServer.registerSymbol(cleanAlias, orderBook, info.pips);
         chartClickHandler.registerSymbol(cleanAlias, info.pips);
+        priceZonePainter.registerInstrument(cleanAlias);
         priceLinePainter.registerInstrument(cleanAlias);
         wallLabelPainter.registerInstrument(cleanAlias);
         wallChangePainter.registerInstrument(cleanAlias);
@@ -175,6 +185,13 @@ public class RongPlugin implements CustomModuleAdapter,
         api.sendUserMessage(Layer1ApiUserMessageModifyScreenSpacePainter.builder(
                 RongPlugin.class, "clickHandler_" + cleanAlias)
                 .setScreenSpacePainterFactory(chartClickHandler)
+                .setIsAdd(true)
+                .build());
+
+        // Register ScreenSpacePainter for drawing price zones
+        api.sendUserMessage(Layer1ApiUserMessageModifyScreenSpacePainter.builder(
+                RongPlugin.class, PriceZonePainter.PAINTER_NAME_PREFIX + cleanAlias)
+                .setScreenSpacePainterFactory(priceZonePainter)
                 .setIsAdd(true)
                 .build());
 
@@ -203,6 +220,9 @@ public class RongPlugin implements CustomModuleAdapter,
         // Draw predefined key price levels for this instrument
         if (keyLevelManager != null) {
             keyLevelManager.onInstrumentInitialized(cleanAlias, info.pips);
+        }
+        if (keyZoneManager != null) {
+            keyZoneManager.onInstrumentInitialized(cleanAlias, info.pips);
         }
         if (marketLevelManager != null) {
             marketLevelManager.onInstrumentInitialized(cleanAlias, info.pips);
@@ -247,6 +267,9 @@ public class RongPlugin implements CustomModuleAdapter,
         if (chartClickHandler != null) {
             chartClickHandler.unregisterSymbol(alias);
         }
+        if (priceZonePainter != null) {
+            priceZonePainter.unregisterInstrument(alias);
+        }
         if (priceLinePainter != null) {
             priceLinePainter.unregisterInstrument(alias);
         }
@@ -263,6 +286,11 @@ public class RongPlugin implements CustomModuleAdapter,
         api.sendUserMessage(Layer1ApiUserMessageModifyScreenSpacePainter.builder(
                 RongPlugin.class, "clickHandler_" + alias)
                 .setScreenSpacePainterFactory(chartClickHandler)
+                .setIsAdd(false)
+                .build());
+        api.sendUserMessage(Layer1ApiUserMessageModifyScreenSpacePainter.builder(
+                RongPlugin.class, PriceZonePainter.PAINTER_NAME_PREFIX + alias)
+                .setScreenSpacePainterFactory(priceZonePainter)
                 .setIsAdd(false)
                 .build());
         api.sendUserMessage(Layer1ApiUserMessageModifyScreenSpacePainter.builder(
@@ -289,6 +317,9 @@ public class RongPlugin implements CustomModuleAdapter,
         if (keyLevelManager != null) {
             keyLevelManager.onInstrumentStopped(alias);
         }
+        if (keyZoneManager != null) {
+            keyZoneManager.onInstrumentStopped(alias);
+        }
         if (marketLevelManager != null) {
             marketLevelManager.onInstrumentStopped(alias);
         }
@@ -303,6 +334,9 @@ public class RongPlugin implements CustomModuleAdapter,
         }
         if (priceLineStore != null) {
             priceLineStore.clearAll(alias);
+        }
+        if (priceZoneStore != null) {
+            priceZoneStore.clearAll(alias);
         }
         if (wallLabelStore != null) {
             wallLabelStore.clearAll(alias);
@@ -324,6 +358,11 @@ public class RongPlugin implements CustomModuleAdapter,
                     sharedServer.unregisterKeyLevelConfigListener(keyLevelManager);
                     keyLevelManager.shutdown();
                     keyLevelManager = null;
+                }
+                if (keyZoneManager != null) {
+                    sharedServer.unregisterKeyZoneConfigListener(keyZoneManager);
+                    keyZoneManager.shutdown();
+                    keyZoneManager = null;
                 }
                 if (marketLevelManager != null) {
                     sharedServer.unregisterMarketLevelConfigListener(marketLevelManager);
@@ -360,6 +399,8 @@ public class RongPlugin implements CustomModuleAdapter,
                 chartClickHandler = null;
                 priceLineStore = null;
                 priceLinePainter = null;
+                priceZoneStore = null;
+                priceZonePainter = null;
                 wallLabelStore = null;
                 wallLabelPainter = null;
                 wallChangeStore = null;

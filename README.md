@@ -30,7 +30,7 @@ This repository produces two Bookmap addon plugins in the same build:
 - **Order wall breakout detection** — monitors large ask-side walls and broadcasts signals when consumed
 - **Key+left-click pass-through** — sends the pressed key and clicked chart price to the trading bot
 - **Auto-drawn indicators** — premarket high/low and Camarilla Pivot levels drawn automatically
-- **WebSocket key levels** — instrument-specific price levels pushed by an external app
+- **WebSocket key levels/zones** — instrument-specific price levels and zones pushed by an external app
 - **WebSocket API** — real-time breakout, order book, and price select messages
 - **Settings panels** — enable/disable indicators and optionally export replay data
 
@@ -44,7 +44,7 @@ bookmap-plugin/
     ├── RongPlugin              # @Layer1StrategyName("Rong")
     ├── pricelines/             # Line model, storage, painting, and click price mapping
     │   ├── ChartClickHandler   # Key+left-click detection & coordinate mapping
-    │   └── PriceLine*          # Line model, storage, and painting
+    │   └── PriceLine*/PriceZone* # Level/zone model, storage, and painting
     ├── orderwall/              # Large wall detection, labels, and painting
     │   └── OrderWall*
     ├── tradebuttons/           # Floating trade button panel and tradebook button config
@@ -134,7 +134,7 @@ ws.onmessage = (event) => {
 
 ## WebSocket API Reference
 
-The plugin exposes a WebSocket server on `ws://localhost:8765`. Clients receive breakout messages as events occur. Additionally, clients can subscribe to real-time order book snapshots and send key levels to draw.
+The plugin exposes a WebSocket server on `ws://localhost:8765`. Clients receive breakout messages as events occur. Additionally, clients can subscribe to real-time order book snapshots and send key levels/zones to draw.
 
 ### Message types (server → client)
 
@@ -157,7 +157,7 @@ All messages include a `symbol` field identifying which instrument the data belo
 {"type":"unsubscribe","channel":"orderbook"}
 ```
 
-### Send key levels (client → server)
+### Send key levels and zones (client → server)
 
 ```json
 {
@@ -166,6 +166,9 @@ All messages include a `symbol` field identifying which instrument the data belo
   "levels": [
     { "price": 185.50, "label": "daily resistance" },
     { "price": 180.00 }
+  ],
+  "zones": [
+    { "low": 179.40, "high": 183.75, "label": "daily zone", "color": "#9ca3af" }
   ],
   "camPivots": {
     "R1": 184.12,
@@ -183,7 +186,7 @@ All messages include a `symbol` field identifying which instrument the data belo
 }
 ```
 
-Sending an empty `levels` array clears existing key level lines for that symbol. Missing or empty market-level fields clear their corresponding websocket-supplied market lines for that symbol.
+Sending an empty `levels` array clears existing key level lines for that symbol. Sending an empty or missing `zones` array clears existing key zones for that symbol. Missing or empty market-level fields clear their corresponding websocket-supplied market lines for that symbol.
 
 ### TypeScript example
 
@@ -314,17 +317,18 @@ Draws Camarilla Pivot levels supplied by the external client.
 
 Draws the previous regular-session high and low supplied by the external client in the `previousDay` field of the `key_levels_config` WebSocket message.
 
-### Key Price Levels
+### Key Price Levels And Zones
 
-Draw key price levels on specific instruments' charts. Useful for marking significant support/resistance levels identified from daily or higher timeframe analysis.
+Draw key price levels and filled price zones on specific instruments' charts. Useful for marking significant support/resistance levels identified from daily or higher timeframe analysis.
 
 
 | Line      | Color | Description                                         |
 | --------- | ----- | --------------------------------------------------- |
 | Key Level | Gold  | User-defined price level with optional custom label |
+| Key Zone  | Gray by default | User-defined price zone with optional label and color |
 
 
-Key levels are instrument-specific — a $180 level sent for NVDA will only appear on NVDA's chart, not on any other instrument. Bookmap does not read key levels from a local config file and does not expose a key-level entry UI; the external client owns the source data and pushes the latest levels over WebSocket.
+Key levels and zones are instrument-specific — a $180 level or $179-$184 zone sent for NVDA will only appear on NVDA's chart, not on any other instrument. Bookmap does not read key levels from a local config file and does not expose a key-level entry UI; the external client owns the source data and pushes the latest levels/zones over WebSocket.
 
 ### Replay & Multi-Day Data
 

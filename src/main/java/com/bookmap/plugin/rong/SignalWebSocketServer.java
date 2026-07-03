@@ -47,6 +47,11 @@ public class SignalWebSocketServer extends WebSocketServer {
     }
 
     @FunctionalInterface
+    public interface KeyZoneConfigListener {
+        void onKeyZonesChanged(String symbol, List<KeyZoneDefinition> zones);
+    }
+
+    @FunctionalInterface
     public interface MarketLevelConfigListener {
         void onMarketLevelsChanged(String symbol, MarketLevelDefinition marketLevels);
     }
@@ -71,11 +76,14 @@ public class SignalWebSocketServer extends WebSocketServer {
     private final Map<String, Double> symbolToPips = new ConcurrentHashMap<>();
     private final Map<String, List<TradebookButtonGroup>> symbolToTradebooks = new ConcurrentHashMap<>();
     private final Map<String, List<KeyLevelDefinition>> symbolToKeyLevels = new ConcurrentHashMap<>();
+    private final Map<String, List<KeyZoneDefinition>> symbolToKeyZones = new ConcurrentHashMap<>();
     private final Map<String, MarketLevelDefinition> symbolToMarketLevels = new ConcurrentHashMap<>();
     private final Map<String, List<ExitOrderPairDefinition>> symbolToExitOrderPairs = new ConcurrentHashMap<>();
     private final Map<String, AccountStateDefinition> symbolToAccountState = new ConcurrentHashMap<>();
     private final Map<String, Set<TradeButtonConfigListener>> symbolToTradeButtonListeners = new ConcurrentHashMap<>();
     private final Set<KeyLevelConfigListener> keyLevelConfigListeners =
+            Collections.newSetFromMap(new ConcurrentHashMap<>());
+    private final Set<KeyZoneConfigListener> keyZoneConfigListeners =
             Collections.newSetFromMap(new ConcurrentHashMap<>());
     private final Set<MarketLevelConfigListener> marketLevelConfigListeners =
             Collections.newSetFromMap(new ConcurrentHashMap<>());
@@ -280,6 +288,17 @@ public class SignalWebSocketServer extends WebSocketServer {
 
     public void unregisterKeyLevelConfigListener(KeyLevelConfigListener listener) {
         keyLevelConfigListeners.remove(listener);
+    }
+
+    public void registerKeyZoneConfigListener(KeyZoneConfigListener listener) {
+        keyZoneConfigListeners.add(listener);
+        for (Map.Entry<String, List<KeyZoneDefinition>> entry : symbolToKeyZones.entrySet()) {
+            listener.onKeyZonesChanged(entry.getKey(), entry.getValue());
+        }
+    }
+
+    public void unregisterKeyZoneConfigListener(KeyZoneConfigListener listener) {
+        keyZoneConfigListeners.remove(listener);
     }
 
     public void registerMarketLevelConfigListener(MarketLevelConfigListener listener) {
@@ -521,11 +540,17 @@ public class SignalWebSocketServer extends WebSocketServer {
         symbolToKeyLevels.put(symbol, immutableLevels);
         notifyKeyLevelConfigListeners(symbol, immutableLevels);
 
+        List<KeyZoneDefinition> zones = parseKeyZones(symbol, json);
+        List<KeyZoneDefinition> immutableZones = Collections.unmodifiableList(zones);
+        symbolToKeyZones.put(symbol, immutableZones);
+        notifyKeyZoneConfigListeners(symbol, immutableZones);
+
         MarketLevelDefinition marketLevels = parseMarketLevels(symbol, json);
         symbolToMarketLevels.put(symbol, marketLevels);
         notifyMarketLevelConfigListeners(symbol, marketLevels);
 
         PluginLog.info("[KeyLevel] Updated " + levels.size() + " websocket key levels for " + symbol
+                + ", " + zones.size() + " key zone(s)"
                 + " and " + marketLevels.getCamPivots().size() + " cam pivot(s)");
     }
 
@@ -550,6 +575,49 @@ public class SignalWebSocketServer extends WebSocketServer {
             return new KeyLevelDefinition(symbol, price, label);
         } catch (RuntimeException e) {
             PluginLog.error("[KeyLevel] Ignoring malformed level for " + symbol + ": " + e.getMessage());
+            return null;
+        }
+    }
+
+    private List<KeyZoneDefinition> parseKeyZones(String symbol, JsonObject json) {
+        JsonElement zonesElement = json.get("zones");
+        if (zonesElement == null) {
+            zonesElement = json.get("keyZones");
+        }
+        if (zonesElement == null || !zonesElement.isJsonArray()) {
+            return new ArrayList<>();
+        }
+
+        List<KeyZoneDefinition> zones = new ArrayList<>();
+        JsonArray zonesArray = zonesElement.getAsJsonArray();
+        for (JsonElement element : zonesArray) {
+            KeyZoneDefinition zone = parseKeyZone(symbol, element);
+            if (zone != null) {
+                zones.add(zone);
+            }
+        }
+        return zones;
+    }
+
+    private KeyZoneDefinition parseKeyZone(String symbol, JsonElement element) {
+        if (element == null || !element.isJsonObject()) {
+            return null;
+        }
+        try {
+            JsonObject zoneJson = element.getAsJsonObject();
+            double low = getDouble(zoneJson, "low");
+            double high = getDouble(zoneJson, "high");
+            if (!Double.isFinite(low) || !Double.isFinite(high) || low <= 0 || high <= 0 || low == high) {
+                return null;
+            }
+            return new KeyZoneDefinition(
+                    symbol,
+                    low,
+                    high,
+                    getString(zoneJson, "label"),
+                    getString(zoneJson, "color"));
+        } catch (RuntimeException e) {
+            PluginLog.error("[KeyZone] Ignoring malformed zone for " + symbol + ": " + e.getMessage());
             return null;
         }
     }
@@ -922,6 +990,16 @@ public class SignalWebSocketServer extends WebSocketServer {
                 listener.onKeyLevelsChanged(symbol, levels);
             } catch (RuntimeException e) {
                 PluginLog.error("[KeyLevel] Failed to update listener for " + symbol + ": " + e.getMessage());
+            }
+        }
+    }
+
+    private void notifyKeyZoneConfigListeners(String symbol, List<KeyZoneDefinition> zones) {
+        for (KeyZoneConfigListener listener : keyZoneConfigListeners) {
+            try {
+                listener.onKeyZonesChanged(symbol, zones);
+            } catch (RuntimeException e) {
+                PluginLog.error("[KeyZone] Failed to update listener for " + symbol + ": " + e.getMessage());
             }
         }
     }
