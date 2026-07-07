@@ -336,7 +336,7 @@ Market levels are client-owned. In live or replay mode, the plugin draws the lat
 
 ## Configuration
 
-The following parameters are hardcoded constants in each plugin's main class:
+The following parameters are plugin defaults unless noted as configurable:
 
 
 | Parameter               | Default | Description                                                 |
@@ -346,11 +346,10 @@ The following parameters are hardcoded constants in each plugin's main class:
 | `WALL_CONSUMED_RATIO`   | 0.10    | Wall is "consumed" when size drops to this ratio of peak    |
 | `ORDERBOOK_PERCENTILE`  | 95      | Adaptive crowd filter for orderbook snapshots and size-change alerts |
 | `ORDERBOOK_INTERVAL_MS` | 1000    | Order book snapshot broadcast interval                      |
-| `WALL_CHANGE_THRESHOLD` | 5,000   | Absolute floor for size-change alerts; alerts use `max(WALL_CHANGE_THRESHOLD, ORDERBOOK_PERCENTILE threshold)` |
-| `WALL_OUT_MINIMUM_SIZE` | 5,000   | Absolute floor for wall-out/orderbook snapshot candidates; 5,000-share levels are included |
+| `WALL_THRESHOLD_FLOOR`  | 5,000   | Configurable absolute floor for size-change alerts and wall-out/orderbook snapshot candidates; alerts use `max(WALL_THRESHOLD_FLOOR, ORDERBOOK_PERCENTILE threshold)` |
 | `WALL_OUT_PROTECTED_ABSOLUTE_LEVELS` | 2 | Per-side count of near-touch absolute-floor levels preserved even when the percentile threshold is higher |
 
-The floating trade button window shows the live effective wall threshold as `max(5K, P95)` for the active symbol.
+Adjust `WALL_THRESHOLD_FLOOR` from the Rong add-on settings under `Wall threshold floor`. The floating trade button window shows the live effective wall threshold as `max(configured floor, P95)` for the active symbol.
 
 
 ## Logging

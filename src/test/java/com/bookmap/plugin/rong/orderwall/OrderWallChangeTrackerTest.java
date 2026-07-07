@@ -8,6 +8,7 @@ import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import org.junit.jupiter.api.Test;
 
@@ -330,6 +331,43 @@ class OrderWallChangeTrackerTest {
             assertEquals(0, event.getPreviousSize());
             assertEquals(200_000, event.getCurrentSize());
             assertEquals(19_430, event.getPriceTick());
+        } finally {
+            tracker.shutdown();
+        }
+    }
+
+    @Test
+    void thresholdSupplierUpdatesFutureDepthDecisions() throws Exception {
+        AtomicInteger thresholdFloor = new AtomicInteger(LARGE_THRESHOLD);
+        List<OrderWallChangeEvent> events = new CopyOnWriteArrayList<>();
+        CountDownLatch alertSeen = new CountDownLatch(1);
+        OrderWallChangeTracker tracker = new OrderWallChangeTracker(
+                "TEST",
+                0.01,
+                thresholdFloor::get,
+                0,
+                0.50,
+                20,
+                60,
+                event -> {
+                    events.add(event);
+                    alertSeen.countDown();
+                },
+                bidWall -> false);
+
+        try {
+            tracker.markReady();
+            thresholdFloor.set(10_000);
+
+            tracker.onDepth(true, 12_700, 7_000, 1L);
+            assertFalse(alertSeen.await(200, TimeUnit.MILLISECONDS));
+            assertTrue(events.isEmpty());
+
+            tracker.onDepth(true, 12_710, 11_000, 2L);
+            assertTrue(alertSeen.await(500, TimeUnit.MILLISECONDS));
+            assertEquals(1, events.size());
+            assertEquals(OrderWallChangeEvent.Type.ADDED, events.get(0).getType());
+            assertEquals(11_000, events.get(0).getCurrentSize());
         } finally {
             tracker.shutdown();
         }

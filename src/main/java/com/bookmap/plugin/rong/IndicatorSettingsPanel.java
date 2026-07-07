@@ -3,9 +3,14 @@ package com.bookmap.plugin.rong;
 import java.awt.GridBagConstraints;
 import java.awt.GridBagLayout;
 import java.awt.Insets;
+import java.awt.Dimension;
 
 import javax.swing.JCheckBox;
+import javax.swing.JFormattedTextField;
 import javax.swing.JLabel;
+import javax.swing.JPanel;
+import javax.swing.JSpinner;
+import javax.swing.SpinnerNumberModel;
 
 import velox.gui.StrategyPanel;
 
@@ -14,7 +19,7 @@ import velox.gui.StrategyPanel;
  */
 public class IndicatorSettingsPanel extends StrategyPanel {
 
-    public IndicatorSettingsPanel(IndicatorConfig config) {
+    public IndicatorSettingsPanel(IndicatorConfig config, WallThresholdConfig wallThresholdConfig) {
         super("Indicators");
         setLayout(new GridBagLayout());
 
@@ -68,6 +73,33 @@ public class IndicatorSettingsPanel extends StrategyPanel {
         wallChangeSoundCheckbox.addActionListener(e ->
                 config.setEnabled(IndicatorConfig.ORDER_WALL_CHANGE_SOUND, wallChangeSoundCheckbox.isSelected()));
         add(wallChangeSoundCheckbox, gbc);
+
+        gbc.gridy++;
+        JPanel wallThresholdPanel = new JPanel(new GridBagLayout());
+        GridBagConstraints thresholdGbc = new GridBagConstraints();
+        thresholdGbc.insets = new Insets(0, 0, 0, 8);
+        thresholdGbc.anchor = GridBagConstraints.WEST;
+        thresholdGbc.gridx = 0;
+        thresholdGbc.gridy = 0;
+        wallThresholdPanel.add(new JLabel("Wall threshold floor"), thresholdGbc);
+
+        thresholdGbc.gridx++;
+        SpinnerNumberModel thresholdModel = new SpinnerNumberModel(
+                wallThresholdConfig.getThresholdFloor(),
+                0,
+                WallThresholdConfig.MAX_THRESHOLD_FLOOR,
+                500);
+        JSpinner thresholdSpinner = new JSpinner(thresholdModel);
+        thresholdSpinner.setPreferredSize(new Dimension(96, thresholdSpinner.getPreferredSize().height));
+        if (thresholdSpinner.getEditor() instanceof JSpinner.DefaultEditor) {
+            JFormattedTextField textField =
+                    ((JSpinner.DefaultEditor) thresholdSpinner.getEditor()).getTextField();
+            textField.setColumns(7);
+        }
+        thresholdSpinner.addChangeListener(e ->
+                wallThresholdConfig.setThresholdFloor(((Number) thresholdSpinner.getValue()).intValue()));
+        wallThresholdPanel.add(thresholdSpinner, thresholdGbc);
+        add(wallThresholdPanel, gbc);
 
         gbc.gridy++;
         JCheckBox filledExecutionMarkersCheckbox = new JCheckBox(

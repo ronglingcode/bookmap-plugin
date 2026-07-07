@@ -21,6 +21,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.IntSupplier;
 
 import javax.swing.BorderFactory;
 import javax.swing.BoxLayout;
@@ -35,6 +36,7 @@ import javax.swing.border.EmptyBorder;
 
 import com.bookmap.plugin.rong.PluginLog;
 import com.bookmap.plugin.rong.SignalWebSocketServer;
+import com.bookmap.plugin.rong.WallThresholdConfig;
 import com.google.gson.JsonObject;
 
 /**
@@ -54,7 +56,6 @@ public class TradeButtonWindow {
     private static final int WINDOW_WIDTH = 570;
     private static final int CONTENT_WIDTH = 540;
     private static final int WALL_OUT_PAIR_INDEX = 1;
-    private static final int WALL_OUT_MINIMUM_SIZE = 5_000;
     private static final int WALL_OUT_PROTECTED_ABSOLUTE_LEVELS = 2;
     private static final double WALL_OUT_PRICE_OFFSET = 0.02;
     private static final int WALL_THRESHOLD_REFRESH_MS = 1_000;
@@ -69,6 +70,7 @@ public class TradeButtonWindow {
 
     private final String symbol;
     private final SignalWebSocketServer server;
+    private final IntSupplier wallThresholdFloorSupplier;
     private final SignalWebSocketServer.TradeButtonConfigListener buttonConfigListener;
     private JFrame frame;
     private JPanel buttonPanel;
@@ -77,9 +79,13 @@ public class TradeButtonWindow {
     private Timer wallThresholdTimer;
     private volatile boolean disposed;
 
-    public TradeButtonWindow(String symbol, SignalWebSocketServer server) {
+    public TradeButtonWindow(String symbol, SignalWebSocketServer server,
+                             IntSupplier wallThresholdFloorSupplier) {
         this.symbol = symbol;
         this.server = server;
+        this.wallThresholdFloorSupplier = wallThresholdFloorSupplier == null
+                ? () -> WallThresholdConfig.DEFAULT_THRESHOLD_FLOOR
+                : wallThresholdFloorSupplier;
         this.buttonConfigListener = this::setButtons;
         SwingUtilities.invokeLater(this::buildWindow);
     }
@@ -406,8 +412,9 @@ public class TradeButtonWindow {
         if (wallThresholdLabel == null) {
             return;
         }
+        int minimumWallSize = getWallThresholdFloor();
         SignalWebSocketServer.OrderbookWallThreshold threshold =
-                server.getOrderbookWallThreshold(symbol, WALL_OUT_MINIMUM_SIZE);
+                server.getOrderbookWallThreshold(symbol, minimumWallSize);
         if (!threshold.isAvailable()) {
             wallThresholdLabel.setText("Wall threshold: waiting for book");
             return;
@@ -507,8 +514,9 @@ public class TradeButtonWindow {
         json.addProperty("tradebook_name", tradebook.getTradebookName());
         json.addProperty("entry_method", entryMethod);
         json.addProperty("timestamp", System.currentTimeMillis());
+        int minimumWallSize = getWallThresholdFloor();
         server.appendOrderbookSnapshot(
-                symbol, json, WALL_OUT_MINIMUM_SIZE, WALL_OUT_PROTECTED_ABSOLUTE_LEVELS);
+                symbol, json, minimumWallSize, WALL_OUT_PROTECTED_ABSOLUTE_LEVELS);
         server.broadcast(json.toString());
         PluginLog.action(symbol, "Button send " + orderType + " " + tradebook.getLabel() + " " + entryMethod);
         PluginLog.info("[TradeButton] " + orderType + " " + tradebook.getLabel() + ": " + entryMethod
@@ -535,10 +543,11 @@ public class TradeButtonWindow {
     }
 
     private void sendWallOutButtonMessage() {
+        int minimumWallSize = getWallThresholdFloor();
         SignalWebSocketServer.ExitWallAdjustment adjustment = server.resolveExitWallAdjustment(
                 symbol,
                 WALL_OUT_PAIR_INDEX,
-                WALL_OUT_MINIMUM_SIZE,
+                minimumWallSize,
                 WALL_OUT_PRICE_OFFSET);
         if (!adjustment.isAvailable()) {
             PluginLog.action(symbol, "Wall Out 1 blocked: " + adjustment.getReason());
@@ -564,7 +573,7 @@ public class TradeButtonWindow {
         json.addProperty("wall_price_tick", adjustment.getWallPriceTick());
         json.addProperty("wall_price", adjustment.getWallPrice());
         json.addProperty("wall_size", adjustment.getWallSize());
-        json.addProperty("minimum_wall_size", WALL_OUT_MINIMUM_SIZE);
+        json.addProperty("minimum_wall_size", minimumWallSize);
         json.addProperty("offset", adjustment.getOffset());
         json.addProperty("target_price", adjustment.getTargetPrice());
         json.addProperty("price", adjustment.getTargetPrice());
@@ -579,6 +588,16 @@ public class TradeButtonWindow {
                 + ": target=" + formatPrice(adjustment.getTargetPrice())
                 + ", wall=" + formatPrice(adjustment.getWallPrice())
                 + ", size=" + adjustment.getWallSize());
+    }
+
+    private int getWallThresholdFloor() {
+        try {
+            return Math.max(0, wallThresholdFloorSupplier.getAsInt());
+        } catch (RuntimeException e) {
+            PluginLog.error("[TradeButton] Failed to read wall threshold floor for "
+                    + symbol + ": " + e.getMessage());
+            return WallThresholdConfig.DEFAULT_THRESHOLD_FLOOR;
+        }
     }
 
     private String formatPrice(double price) {

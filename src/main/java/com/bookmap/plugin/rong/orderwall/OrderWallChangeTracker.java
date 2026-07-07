@@ -11,6 +11,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
+import java.util.function.IntSupplier;
 import java.util.function.Predicate;
 
 import com.bookmap.plugin.rong.PluginLog;
@@ -34,7 +35,7 @@ public class OrderWallChangeTracker {
 
     private final String instrumentAlias;
     private final double pips;
-    private final int largeOrderThreshold;
+    private final IntSupplier largeOrderThresholdSupplier;
     private final double largeOrderPercentile;
     private final double remainingRatio;
     private final long decreaseDecisionDelayMs;
@@ -59,7 +60,7 @@ public class OrderWallChangeTracker {
     public OrderWallChangeTracker(String instrumentAlias, double pips, int largeOrderThreshold,
                                   double remainingRatio, long decreaseDecisionDelayMs,
                                   Consumer<OrderWallChangeEvent> alertConsumer) {
-        this(instrumentAlias, pips, largeOrderThreshold, 0, remainingRatio, decreaseDecisionDelayMs,
+        this(instrumentAlias, pips, fixedThreshold(largeOrderThreshold), 0, remainingRatio, decreaseDecisionDelayMs,
                 MIN_LARGE_ORDER_LIFETIME_MS, alertConsumer, WALL_BREAK_ALERTS_DISABLED);
     }
 
@@ -67,7 +68,7 @@ public class OrderWallChangeTracker {
                                   double largeOrderPercentile, double remainingRatio,
                                   long decreaseDecisionDelayMs,
                                   Consumer<OrderWallChangeEvent> alertConsumer) {
-        this(instrumentAlias, pips, largeOrderThreshold, largeOrderPercentile,
+        this(instrumentAlias, pips, fixedThreshold(largeOrderThreshold), largeOrderPercentile,
                 remainingRatio, decreaseDecisionDelayMs,
                 MIN_LARGE_ORDER_LIFETIME_MS, alertConsumer, WALL_BREAK_ALERTS_DISABLED);
     }
@@ -77,7 +78,18 @@ public class OrderWallChangeTracker {
                                   long decreaseDecisionDelayMs,
                                   Consumer<OrderWallChangeEvent> alertConsumer,
                                   Predicate<Boolean> wallBreakAlertEnabled) {
-        this(instrumentAlias, pips, largeOrderThreshold, largeOrderPercentile,
+        this(instrumentAlias, pips, fixedThreshold(largeOrderThreshold), largeOrderPercentile,
+                remainingRatio, decreaseDecisionDelayMs,
+                MIN_LARGE_ORDER_LIFETIME_MS, alertConsumer, wallBreakAlertEnabled);
+    }
+
+    public OrderWallChangeTracker(String instrumentAlias, double pips,
+                                  IntSupplier largeOrderThresholdSupplier,
+                                  double largeOrderPercentile, double remainingRatio,
+                                  long decreaseDecisionDelayMs,
+                                  Consumer<OrderWallChangeEvent> alertConsumer,
+                                  Predicate<Boolean> wallBreakAlertEnabled) {
+        this(instrumentAlias, pips, largeOrderThresholdSupplier, largeOrderPercentile,
                 remainingRatio, decreaseDecisionDelayMs,
                 MIN_LARGE_ORDER_LIFETIME_MS, alertConsumer, wallBreakAlertEnabled);
     }
@@ -86,7 +98,7 @@ public class OrderWallChangeTracker {
                            double remainingRatio, long decreaseDecisionDelayMs,
                            long minLargeOrderLifetimeMs,
                            Consumer<OrderWallChangeEvent> alertConsumer) {
-        this(instrumentAlias, pips, largeOrderThreshold, 0, remainingRatio,
+        this(instrumentAlias, pips, fixedThreshold(largeOrderThreshold), 0, remainingRatio,
                 decreaseDecisionDelayMs, minLargeOrderLifetimeMs, alertConsumer, WALL_BREAK_ALERTS_DISABLED);
     }
 
@@ -95,7 +107,7 @@ public class OrderWallChangeTracker {
                            long minLargeOrderLifetimeMs,
                            Consumer<OrderWallChangeEvent> alertConsumer,
                            Predicate<Boolean> wallBreakAlertEnabled) {
-        this(instrumentAlias, pips, largeOrderThreshold, 0, remainingRatio,
+        this(instrumentAlias, pips, fixedThreshold(largeOrderThreshold), 0, remainingRatio,
                 decreaseDecisionDelayMs, minLargeOrderLifetimeMs, alertConsumer, wallBreakAlertEnabled);
     }
 
@@ -103,18 +115,21 @@ public class OrderWallChangeTracker {
                            double largeOrderPercentile, double remainingRatio,
                            long decreaseDecisionDelayMs, long minLargeOrderLifetimeMs,
                            Consumer<OrderWallChangeEvent> alertConsumer) {
-        this(instrumentAlias, pips, largeOrderThreshold, largeOrderPercentile, remainingRatio,
+        this(instrumentAlias, pips, fixedThreshold(largeOrderThreshold), largeOrderPercentile, remainingRatio,
                 decreaseDecisionDelayMs, minLargeOrderLifetimeMs, alertConsumer, WALL_BREAK_ALERTS_DISABLED);
     }
 
-    OrderWallChangeTracker(String instrumentAlias, double pips, int largeOrderThreshold,
+    OrderWallChangeTracker(String instrumentAlias, double pips,
+                           IntSupplier largeOrderThresholdSupplier,
                            double largeOrderPercentile, double remainingRatio,
                            long decreaseDecisionDelayMs, long minLargeOrderLifetimeMs,
                            Consumer<OrderWallChangeEvent> alertConsumer,
                            Predicate<Boolean> wallBreakAlertEnabled) {
         this.instrumentAlias = instrumentAlias;
         this.pips = pips;
-        this.largeOrderThreshold = largeOrderThreshold;
+        this.largeOrderThresholdSupplier = largeOrderThresholdSupplier == null
+                ? fixedThreshold(0)
+                : largeOrderThresholdSupplier;
         this.largeOrderPercentile = largeOrderPercentile;
         this.remainingRatio = remainingRatio;
         this.decreaseDecisionDelayMs = decreaseDecisionDelayMs;
@@ -128,6 +143,11 @@ public class OrderWallChangeTracker {
             t.setDaemon(true);
             return t;
         });
+    }
+
+    private static IntSupplier fixedThreshold(int largeOrderThreshold) {
+        int normalizedThreshold = Math.max(0, largeOrderThreshold);
+        return () -> normalizedThreshold;
     }
 
     public synchronized void onDepth(boolean isBid, int priceTick, int size, long eventTimeNs) {
@@ -520,10 +540,21 @@ public class OrderWallChangeTracker {
     }
 
     private int getEffectiveLargeOrderThreshold() {
+        int largeOrderThreshold = getAbsoluteLargeOrderThreshold();
         if (largeOrderPercentile <= 0 || totalLevels == 0) {
             return largeOrderThreshold;
         }
         return Math.max(largeOrderThreshold, getPercentileThreshold(largeOrderPercentile));
+    }
+
+    private int getAbsoluteLargeOrderThreshold() {
+        try {
+            return Math.max(0, largeOrderThresholdSupplier.getAsInt());
+        } catch (RuntimeException e) {
+            PluginLog.error("[WallChange] Failed to read wall threshold floor for "
+                    + instrumentAlias + ": " + e.getMessage());
+            return 0;
+        }
     }
 
     private int getPercentileThreshold(double percentile) {

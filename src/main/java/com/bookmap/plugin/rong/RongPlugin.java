@@ -65,7 +65,6 @@ public class RongPlugin implements CustomModuleAdapter,
     private static final int WALL_LABEL_MIN_SIZE = 5_000;
     private static final int WALL_LABEL_RETAIN_TICKS = 2_000;
     private static final int WALL_LABEL_REFRESH_MS = 200;
-    private static final int WALL_CHANGE_THRESHOLD = 5_000;
     private static final double WALL_CHANGE_REMAINING_RATIO = 0.50;
     private static final long WALL_CHANGE_DECISION_DELAY_MS = 500;
     private static final byte[] WALL_CHANGE_SOUND = OrderWallChangeSound.createAlertSound();
@@ -83,6 +82,7 @@ public class RongPlugin implements CustomModuleAdapter,
     private static OrderWallChangeStore wallChangeStore;
     private static OrderWallChangePainter wallChangePainter;
     private static IndicatorConfig indicatorConfig;
+    private static WallThresholdConfig wallThresholdConfig;
     private static ReplayExportConfig replayExportConfig;
     private static KeyLevelManager keyLevelManager;
     private static KeyZoneManager keyZoneManager;
@@ -130,6 +130,12 @@ public class RongPlugin implements CustomModuleAdapter,
             if (indicatorConfig == null) {
                 indicatorConfig = new IndicatorConfig();
             }
+            if (wallThresholdConfig == null) {
+                wallThresholdConfig = new WallThresholdConfig();
+            }
+            if (replayExportConfig == null) {
+                replayExportConfig = new ReplayExportConfig();
+            }
             if (chartClickHandler == null) {
                 chartClickHandler = new ChartClickHandler(sharedServer, indicatorConfig);
             }
@@ -138,7 +144,6 @@ public class RongPlugin implements CustomModuleAdapter,
                 priceLinePainter = new PriceLinePainter(priceLineStore);
                 priceZoneStore = new PriceZoneStore();
                 priceZonePainter = new PriceZonePainter(priceZoneStore);
-                replayExportConfig = new ReplayExportConfig();
                 wallLabelStore = new OrderWallLabelStore();
                 wallChangeStore = new OrderWallChangeStore();
                 wallLabelPainter = new OrderWallLabelPainter(wallLabelStore, indicatorConfig, wallChangeStore);
@@ -167,7 +172,7 @@ public class RongPlugin implements CustomModuleAdapter,
         this.wallChangeTracker = new OrderWallChangeTracker(
                 cleanAlias,
                 info.pips,
-                WALL_CHANGE_THRESHOLD,
+                wallThresholdConfig::getThresholdFloor,
                 ORDERBOOK_PERCENTILE,
                 WALL_CHANGE_REMAINING_RATIO,
                 WALL_CHANGE_DECISION_DELAY_MS,
@@ -237,7 +242,8 @@ public class RongPlugin implements CustomModuleAdapter,
             filledExecutionManager.onInstrumentInitialized(cleanAlias, info.pips);
         }
 
-        tradeButtonWindow = new TradeButtonWindow(cleanAlias, sharedServer);
+        tradeButtonWindow = new TradeButtonWindow(
+                cleanAlias, sharedServer, wallThresholdConfig::getThresholdFloor);
 
         if (replayExportConfig.isEnabled()) {
             startReplayExport();
@@ -408,6 +414,7 @@ public class RongPlugin implements CustomModuleAdapter,
                 filledExecutionStore = null;
                 filledExecutionPainter = null;
                 indicatorConfig = null;
+                wallThresholdConfig = null;
                 replayExportConfig = null;
                 pendingEntryOrderManager = null;
                 instanceCount = 0;
@@ -419,8 +426,19 @@ public class RongPlugin implements CustomModuleAdapter,
 
     @Override
     public StrategyPanel[] getCustomSettingsPanels() {
+        synchronized (RongPlugin.class) {
+            if (indicatorConfig == null) {
+                indicatorConfig = new IndicatorConfig();
+            }
+            if (wallThresholdConfig == null) {
+                wallThresholdConfig = new WallThresholdConfig();
+            }
+            if (replayExportConfig == null) {
+                replayExportConfig = new ReplayExportConfig();
+            }
+        }
         return new StrategyPanel[] {
-            new IndicatorSettingsPanel(indicatorConfig),
+            new IndicatorSettingsPanel(indicatorConfig, wallThresholdConfig),
             new ReplayExportSettingsPanel(replayExportConfig)
         };
     }
