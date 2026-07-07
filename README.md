@@ -344,13 +344,13 @@ The following parameters are hardcoded constants in each plugin's main class:
 | `WS_PORT`               | 8765    | WebSocket server port                                       |
 | `WALL_THRESHOLD`        | 500,000 | Minimum shares at a price level to qualify as a wall        |
 | `WALL_CONSUMED_RATIO`   | 0.10    | Wall is "consumed" when size drops to this ratio of peak    |
-| `ORDERBOOK_PERCENTILE`  | 90      | Adaptive crowd filter for orderbook snapshots and size-change alerts |
+| `ORDERBOOK_PERCENTILE`  | 95      | Adaptive crowd filter for orderbook snapshots and size-change alerts |
 | `ORDERBOOK_INTERVAL_MS` | 1000    | Order book snapshot broadcast interval                      |
 | `WALL_CHANGE_THRESHOLD` | 5,000   | Absolute floor for size-change alerts; alerts use `max(WALL_CHANGE_THRESHOLD, ORDERBOOK_PERCENTILE threshold)` |
 | `WALL_OUT_MINIMUM_SIZE` | 5,000   | Absolute floor for wall-out/orderbook snapshot candidates; 5,000-share levels are included |
 | `WALL_OUT_PROTECTED_ABSOLUTE_LEVELS` | 2 | Per-side count of near-touch absolute-floor levels preserved even when the percentile threshold is higher |
 
-The floating trade button window shows the live effective wall threshold as `max(5K, P90)` for the active symbol.
+The floating trade button window shows the live effective wall threshold as `max(5K, P95)` for the active symbol.
 
 
 ## Logging
