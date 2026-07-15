@@ -80,6 +80,7 @@ public class SignalWebSocketServer extends WebSocketServer {
     private final Map<String, MarketLevelDefinition> symbolToMarketLevels = new ConcurrentHashMap<>();
     private final Map<String, List<ExitOrderPairDefinition>> symbolToExitOrderPairs = new ConcurrentHashMap<>();
     private final Map<String, AccountStateDefinition> symbolToAccountState = new ConcurrentHashMap<>();
+    private final Map<String, RegularSessionHighLowTracker> symbolToRegularSessionHighLow = new ConcurrentHashMap<>();
     private final Map<String, Set<TradeButtonConfigListener>> symbolToTradeButtonListeners = new ConcurrentHashMap<>();
     private final Set<KeyLevelConfigListener> keyLevelConfigListeners =
             Collections.newSetFromMap(new ConcurrentHashMap<>());
@@ -120,7 +121,35 @@ public class SignalWebSocketServer extends WebSocketServer {
     public void unregisterSymbol(String symbol) {
         symbolToOrderBook.remove(symbol);
         symbolToPips.remove(symbol);
+        symbolToRegularSessionHighLow.remove(symbol);
         PluginLog.info("[Rong] Unregistered symbol: " + symbol);
+    }
+
+    public void updateRegularSessionHighLow(String symbol, double price, long timestampNs) {
+        String cleanSymbol = SymbolUtils.cleanSymbol(symbol);
+        if (cleanSymbol.isEmpty()) {
+            return;
+        }
+        symbolToRegularSessionHighLow
+                .computeIfAbsent(cleanSymbol, ignored -> new RegularSessionHighLowTracker())
+                .onTrade(price, timestampNs);
+    }
+
+    public boolean appendRegularSessionHighLow(String symbol, JsonObject target) {
+        RegularSessionHighLowTracker.Snapshot snapshot = getRegularSessionHighLow(symbol);
+        if (snapshot == null) {
+            return false;
+        }
+        target.add("bookmapDayHighLow", snapshot.toJson());
+        return true;
+    }
+
+    public String describeRegularSessionHighLow(String symbol) {
+        RegularSessionHighLowTracker.Snapshot snapshot = getRegularSessionHighLow(symbol);
+        if (snapshot == null) {
+            return "HOD/LOD: waiting";
+        }
+        return String.format(Locale.US, "HOD/LOD: %.2f/%.2f", snapshot.getHigh(), snapshot.getLow());
     }
 
     public boolean appendOrderbookSnapshot(String symbol, JsonObject target, int minimumWallSize) {
@@ -139,6 +168,15 @@ public class SignalWebSocketServer extends WebSocketServer {
         }
         target.add("orderbook", snapshot);
         return true;
+    }
+
+    private RegularSessionHighLowTracker.Snapshot getRegularSessionHighLow(String symbol) {
+        String cleanSymbol = SymbolUtils.cleanSymbol(symbol);
+        if (cleanSymbol.isEmpty()) {
+            return null;
+        }
+        RegularSessionHighLowTracker tracker = symbolToRegularSessionHighLow.get(cleanSymbol);
+        return tracker == null ? null : tracker.snapshot();
     }
 
     public OrderbookWallThreshold getOrderbookWallThreshold(String symbol, int minimumWallSize) {

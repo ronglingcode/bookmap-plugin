@@ -472,6 +472,9 @@ public class RongPlugin implements CustomModuleAdapter,
         double realPrice = price * instrumentInfo.pips;
         int priceTick = (int) price;
 
+        if (sharedServer != null) {
+            sharedServer.updateRegularSessionHighLow(alias, realPrice, getEventTimeNs());
+        }
         checkBreakout(realPrice);
         wallTracker.cleanup(priceTick);
         if (wallLabelTracker != null && wallLabelTracker.cleanup(priceTick)) {

@@ -433,17 +433,22 @@ public class TradeButtonWindow {
         SignalWebSocketServer.OrderbookWallThreshold threshold =
                 server.getOrderbookWallThreshold(symbol, minimumWallSize);
         if (!threshold.isAvailable()) {
-            wallThresholdLabel.setText("Wall threshold: waiting for book");
+            wallThresholdLabel.setText("Wall: waiting | " + getRegularSessionHighLowText());
             return;
         }
 
         String percentileSize = threshold.getPercentileMinSize() > 0
                 ? formatShareSize(threshold.getPercentileMinSize())
                 : "n/a";
-        wallThresholdLabel.setText("Wall threshold: " + formatShareSize(threshold.getEffectiveMinSize())
+        wallThresholdLabel.setText("Wall: " + formatShareSize(threshold.getEffectiveMinSize())
                 + " (P" + formatPercentile(threshold.getPercentile())
                 + "=" + percentileSize
-                + ", floor=" + formatShareSize(threshold.getAbsoluteMinSize()) + ")");
+                + ", floor=" + formatShareSize(threshold.getAbsoluteMinSize()) + ")"
+                + " | " + getRegularSessionHighLowText());
+    }
+
+    private String getRegularSessionHighLowText() {
+        return server.describeRegularSessionHighLow(symbol);
     }
 
     private static void registerShiftTracker(TradeButtonWindow window) {
@@ -531,6 +536,7 @@ public class TradeButtonWindow {
         json.addProperty("tradebook_name", tradebook.getTradebookName());
         json.addProperty("entry_method", entryMethod);
         json.addProperty("timestamp", System.currentTimeMillis());
+        server.appendRegularSessionHighLow(symbol, json);
         int minimumWallSize = getWallThresholdFloor();
         server.appendOrderbookSnapshot(
                 symbol, json, minimumWallSize, WALL_OUT_PROTECTED_ABSOLUTE_LEVELS);
@@ -551,6 +557,7 @@ public class TradeButtonWindow {
         json.addProperty("shiftKey", shiftKey);
         json.addProperty("shift_key", shiftKey);
         json.addProperty("timestamp", System.currentTimeMillis());
+        server.appendRegularSessionHighLow(symbol, json);
         server.broadcast(json.toString());
         if (!"KeyF".equals(keyCode)) {
             PluginLog.action(symbol, "Button send " + buttonName);
@@ -596,6 +603,7 @@ public class TradeButtonWindow {
         json.addProperty("price", adjustment.getTargetPrice());
         json.addProperty("source", adjustment.getSource());
         json.addProperty("timestamp", System.currentTimeMillis());
+        server.appendRegularSessionHighLow(symbol, json);
         server.broadcast(json.toString());
 
         PluginLog.action(symbol, "Button send Wall Out 1 @ " + formatPrice(adjustment.getTargetPrice())
