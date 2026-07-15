@@ -39,6 +39,9 @@ public class PriceZonePainter implements ScreenSpacePainterFactory {
     private static final int FILL_ALPHA = 24;
     private static final int EDGE_ALPHA = 170;
     private static final int LABEL_BACKGROUND_ALPHA = 160;
+    private static final int LABEL_PADDING_X = 4;
+    private static final int LABEL_PADDING_Y = 1;
+    private static final int LABEL_RIGHT_MARGIN = 12;
     private static final Font LABEL_FONT = new Font("SansSerif", Font.BOLD, 11);
 
     private final PriceZoneStore store;
@@ -144,8 +147,16 @@ public class PriceZonePainter implements ScreenSpacePainterFactory {
             if (fillIcon != null) {
                 icons.add(fillIcon);
             }
-            icons.add(createEdgeIcon(zone, width, zone.getHighPriceInTicks(), true));
-            icons.add(createEdgeIcon(zone, width, zone.getLowPriceInTicks(), true));
+            icons.add(createEdgeIcon(zone, width, zone.getHighPriceInTicks()));
+            icons.add(createEdgeIcon(zone, width, zone.getLowPriceInTicks()));
+            CanvasIcon highLabelIcon = createLabelIcon(zone, zone.getHighPriceInTicks());
+            if (highLabelIcon != null) {
+                icons.add(highLabelIcon);
+            }
+            CanvasIcon lowLabelIcon = createLabelIcon(zone, zone.getLowPriceInTicks());
+            if (lowLabelIcon != null) {
+                icons.add(lowLabelIcon);
+            }
             return icons;
         }
 
@@ -168,8 +179,8 @@ public class PriceZonePainter implements ScreenSpacePainterFactory {
             return new CanvasIcon(prepared, x1, y1, x2, y2);
         }
 
-        private CanvasIcon createEdgeIcon(PriceZone zone, int width, double priceInTicks, boolean showLabel) {
-            BufferedImage image = renderEdgeImage(zone, width, showLabel);
+        private CanvasIcon createEdgeIcon(PriceZone zone, int width, double priceInTicks) {
+            BufferedImage image = renderEdgeImage(zone.getColor(), width);
             PreparedImage prepared = new PreparedImage(image);
 
             CompositeHorizontalCoordinate x1 = new CompositeHorizontalCoordinate(
@@ -184,6 +195,28 @@ public class PriceZonePainter implements ScreenSpacePainterFactory {
             return new CanvasIcon(prepared, x1, y1, x2, y2);
         }
 
+        private CanvasIcon createLabelIcon(PriceZone zone, double priceInTicks) {
+            if (zone.getLabel() == null || fullPixelsWidth <= 0) {
+                return null;
+            }
+            BufferedImage image = renderLabelImage(zone);
+            PreparedImage prepared = new PreparedImage(image);
+            int rightX = Math.max(image.getWidth(), fullPixelsWidth - LABEL_RIGHT_MARGIN);
+            int leftX = rightX - image.getWidth();
+            int topOffset = -image.getHeight() / 2;
+
+            CompositeHorizontalCoordinate x1 = new CompositeHorizontalCoordinate(
+                    CompositeCoordinateBase.PIXEL_ZERO, leftX, 0);
+            CompositeHorizontalCoordinate x2 = new CompositeHorizontalCoordinate(
+                    CompositeCoordinateBase.PIXEL_ZERO, rightX, 0);
+            CompositeVerticalCoordinate y1 = new CompositeVerticalCoordinate(
+                    CompositeCoordinateBase.DATA_ZERO, topOffset, priceInTicks);
+            CompositeVerticalCoordinate y2 = new CompositeVerticalCoordinate(
+                    CompositeCoordinateBase.DATA_ZERO, topOffset + image.getHeight(), priceInTicks);
+
+            return new CanvasIcon(prepared, x1, y1, x2, y2);
+        }
+
         private BufferedImage renderFillImage(Color color, int width) {
             BufferedImage image = new BufferedImage(width, 1, BufferedImage.TYPE_INT_ARGB);
             Graphics2D g = image.createGraphics();
@@ -193,39 +226,45 @@ public class PriceZonePainter implements ScreenSpacePainterFactory {
             return image;
         }
 
-        private BufferedImage renderEdgeImage(PriceZone zone, int width, boolean showLabel) {
+        private BufferedImage renderEdgeImage(Color color, int width) {
             BufferedImage image = new BufferedImage(width, EDGE_IMAGE_HEIGHT, BufferedImage.TYPE_INT_ARGB);
             Graphics2D g = image.createGraphics();
             g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
 
-            Color color = zone.getColor();
             int lineY = EDGE_IMAGE_HEIGHT / 2;
             g.setColor(withAlpha(color, EDGE_ALPHA));
             g.setStroke(new BasicStroke(2.0f));
             g.drawLine(0, lineY, width, lineY);
 
-            if (showLabel && zone.getLabel() != null) {
-                drawLabel(g, zone, color, lineY);
-            }
-
             g.dispose();
             return image;
         }
 
-        private void drawLabel(Graphics2D g, PriceZone zone, Color color, int lineY) {
+        private BufferedImage renderLabelImage(PriceZone zone) {
             String text = zone.getLabel();
+            Color color = zone.getColor();
+            BufferedImage probe = new BufferedImage(1, 1, BufferedImage.TYPE_INT_ARGB);
+            Graphics2D probeGraphics = probe.createGraphics();
+            probeGraphics.setFont(LABEL_FONT);
+            FontMetrics metrics = probeGraphics.getFontMetrics();
+            int textWidth = metrics.stringWidth(text);
+            int textHeight = metrics.getHeight();
+            probeGraphics.dispose();
+
+            int width = textWidth + LABEL_PADDING_X * 2;
+            int height = textHeight + LABEL_PADDING_Y * 2;
+            BufferedImage image = new BufferedImage(width, height, BufferedImage.TYPE_INT_ARGB);
+            Graphics2D g = image.createGraphics();
+            g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
             g.setFont(LABEL_FONT);
             FontMetrics fm = g.getFontMetrics();
-            int textWidth = fm.stringWidth(text);
-            int textHeight = fm.getHeight();
-            int padding = 4;
-            int labelX = 10;
-            int labelY = Math.max(0, lineY - textHeight / 2 - 1);
 
             g.setColor(withAlpha(color, LABEL_BACKGROUND_ALPHA));
-            g.fillRect(labelX - padding, labelY, textWidth + padding * 2, textHeight + 2);
+            g.fillRect(0, 0, width, height);
             g.setColor(Color.WHITE);
-            g.drawString(text, labelX, lineY + fm.getAscent() / 2 - 1);
+            g.drawString(text, LABEL_PADDING_X, LABEL_PADDING_Y + fm.getAscent());
+            g.dispose();
+            return image;
         }
 
         @Override

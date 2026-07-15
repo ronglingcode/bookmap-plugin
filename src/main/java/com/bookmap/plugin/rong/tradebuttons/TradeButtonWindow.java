@@ -5,7 +5,10 @@ import java.awt.Color;
 import java.awt.Component;
 import java.awt.Dimension;
 import java.awt.Font;
+import java.awt.GridBagConstraints;
+import java.awt.GridBagLayout;
 import java.awt.GridLayout;
+import java.awt.Insets;
 import java.awt.AWTEvent;
 import java.awt.Toolkit;
 import java.awt.event.AWTEventListener;
@@ -59,6 +62,8 @@ public class TradeButtonWindow {
     private static final int WALL_OUT_PROTECTED_ABSOLUTE_LEVELS = 2;
     private static final double WALL_OUT_PRICE_OFFSET = 0.02;
     private static final int WALL_THRESHOLD_REFRESH_MS = 1_000;
+    private static final double PRIMARY_ENTRY_BUTTON_WEIGHT = 1.35;
+    private static final double SECONDARY_ENTRY_BUTTON_WEIGHT = 1.0;
     private static final String SHIFT_DOWN_CLIENT_PROPERTY = "rong.shiftDownForClick";
     private static final Object SHIFT_LISTENER_LOCK = new Object();
     private static final Set<TradeButtonWindow> OPEN_WINDOWS =
@@ -240,12 +245,24 @@ public class TradeButtonWindow {
         JLabel tradebookLabel = new JLabel(tradebook.getLabel());
         tradebookPanel.add(tradebookLabel, BorderLayout.NORTH);
 
-        JPanel entryMethodPanel = new JPanel(new GridLayout(tradebook.getEntryMethods().size(), 1, 6, 6));
-        for (String entryMethod : tradebook.getEntryMethods()) {
-            entryMethodPanel.add(createEntryButton(tradebook, entryMethod));
-        }
+        JPanel entryMethodPanel = createEntryMethodPanel(tradebook);
         tradebookPanel.add(entryMethodPanel, BorderLayout.CENTER);
         return tradebookPanel;
+    }
+
+    private JPanel createEntryMethodPanel(TradebookButtonGroup tradebook) {
+        JPanel entryMethodPanel = new JPanel(new GridBagLayout());
+        List<String> entryMethods = tradebook.getEntryMethods();
+        for (int index = 0; index < entryMethods.size(); index++) {
+            GridBagConstraints gbc = new GridBagConstraints();
+            gbc.gridx = index;
+            gbc.gridy = 0;
+            gbc.fill = GridBagConstraints.HORIZONTAL;
+            gbc.weightx = index == 0 ? PRIMARY_ENTRY_BUTTON_WEIGHT : SECONDARY_ENTRY_BUTTON_WEIGHT;
+            gbc.insets = new Insets(0, 0, 0, index == entryMethods.size() - 1 ? 0 : 6);
+            entryMethodPanel.add(createEntryButton(tradebook, entryMethods.get(index)), gbc);
+        }
+        return entryMethodPanel;
     }
 
     private JButton createEntryButton(TradebookButtonGroup tradebook, String entryMethod) {
