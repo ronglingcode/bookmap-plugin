@@ -95,7 +95,9 @@ public class MarketLevelManager implements SignalWebSocketServer.MarketLevelConf
         }
 
         int linesDrawn = 0;
-        linesDrawn += drawCamPivots(instrumentAlias, pips, levels.getCamPivots());
+        if (levels.hasCamPivots()) {
+            linesDrawn += drawCamPivots(instrumentAlias, pips, levels.getCamPivots());
+        }
         linesDrawn += drawPreviousDayLevels(instrumentAlias, pips, levels);
         linesDrawn += drawPremarketLevels(instrumentAlias, pips, levels);
 

@@ -39,6 +39,10 @@ public class MarketLevelDefinition {
         return camPivots;
     }
 
+    public boolean hasCamPivots() {
+        return !camPivots.isEmpty();
+    }
+
     public double getPreviousDayHigh() {
         return previousDayHigh;
     }

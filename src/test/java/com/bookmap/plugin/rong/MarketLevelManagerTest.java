@@ -3,6 +3,7 @@ package com.bookmap.plugin.rong;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 
+import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -45,6 +46,36 @@ class MarketLevelManagerTest {
         assertEquals(1, refreshCount.get());
         assertFalse(store.getLines("MU").stream().anyMatch(line -> line.getType().name().startsWith("CAM_R")));
         assertFalse(store.getLines("MU").stream().anyMatch(line -> line.getType().name().startsWith("CAM_S")));
+    }
+
+    @Test
+    void missingCamPivotsClearsPreviouslyDrawnPivotLines() {
+        PriceLineStore store = new PriceLineStore();
+        IndicatorConfig config = new IndicatorConfig();
+        MarketLevelManager manager = new MarketLevelManager(store, config);
+
+        manager.onInstrumentInitialized("MU:NASDAQ:STOCKS@BMD", 0.01);
+        manager.onMarketLevelsChanged("MU", new MarketLevelDefinition(
+                "MU",
+                camPivots(),
+                Double.NaN,
+                Double.NaN,
+                Double.NaN,
+                Double.NaN));
+        assertEquals(12, store.getLines("MU").size());
+
+        manager.onMarketLevelsChanged("MU", new MarketLevelDefinition(
+                "MU",
+                Collections.emptyMap(),
+                1088.00,
+                1024.00,
+                1080.00,
+                1050.00));
+
+        List<PriceLine> drawnLines = store.getLines("MU");
+        assertEquals(4, drawnLines.size());
+        assertFalse(drawnLines.stream().anyMatch(line -> line.getType().name().startsWith("CAM_R")));
+        assertFalse(drawnLines.stream().anyMatch(line -> line.getType().name().startsWith("CAM_S")));
     }
 
     private Map<String, Double> camPivots() {
