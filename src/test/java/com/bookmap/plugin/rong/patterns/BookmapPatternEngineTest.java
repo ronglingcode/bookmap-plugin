@@ -86,6 +86,7 @@ class BookmapPatternEngineTest {
     @Test
     void detectsOfferStepDownAndBidStepUpFromUnclearedReferences() {
         Fixture offer = new Fixture();
+        offer.trade(10_050, 10, true, BASE + 10);
         offer.bbo(9_997, 9_998, BASE);
         offer.depth(false, 10_000, 100, BASE + 100);
         offer.time(BASE + 600);
@@ -94,12 +95,36 @@ class BookmapPatternEngineTest {
         assertNotNull(offer.last(PatternType.OFFER_STEP_DOWN));
 
         Fixture bid = new Fixture();
+        bid.trade(9_950, 10, false, BASE + 10);
         bid.bbo(10_002, 10_003, BASE);
         bid.depth(true, 10_000, 100, BASE + 100);
         bid.time(BASE + 600);
         bid.depth(true, 10_001, 100, BASE + 700);
         bid.time(BASE + 1_200);
         assertNotNull(bid.last(PatternType.BID_STEP_UP));
+    }
+
+    @Test
+    void stepPatternsRequireNewWallBeyondTheCorrectSessionExtreme() {
+        Fixture offerAtHod = new Fixture();
+        offerAtHod.trade(9_999, 10, true, BASE + 10);
+        offerAtHod.bbo(9_997, 9_998, BASE + 20);
+        offerAtHod.depth(false, 10_000, 100, BASE + 100);
+        offerAtHod.time(BASE + 600);
+        offerAtHod.depth(false, 9_999, 100, BASE + 700);
+        offerAtHod.time(BASE + 1_200);
+        assertFalse(offerAtHod.has(PatternType.OFFER_STEP_DOWN),
+                "stepped-down offer must be strictly below HOD");
+
+        Fixture bidAtLod = new Fixture();
+        bidAtLod.trade(10_001, 10, false, BASE + 10);
+        bidAtLod.bbo(10_002, 10_003, BASE + 20);
+        bidAtLod.depth(true, 10_000, 100, BASE + 100);
+        bidAtLod.time(BASE + 600);
+        bidAtLod.depth(true, 10_001, 100, BASE + 700);
+        bidAtLod.time(BASE + 1_200);
+        assertFalse(bidAtLod.has(PatternType.BID_STEP_UP),
+                "stepped-up bid must be strictly above LOD");
     }
 
     @Test
@@ -212,6 +237,19 @@ class BookmapPatternEngineTest {
         engine.onBbo(10_101, 10, 10_102, 10, (afterClose + 1_000) * 1_000_000L);
         engine.onTimestamp((afterClose + 4_000) * 1_000_000L);
         assertTrue(output.isEmpty(), "after-hours events must not alert");
+    }
+
+    @Test
+    void featureToggleResetDropsExistingPatternEpisodes() {
+        Fixture fixture = new Fixture();
+        fixture.bbo(9_999, 10_001, BASE);
+        fixture.qualifyAndClear(false, 10_000, BASE + 100);
+
+        fixture.engine.resetForFeatureToggle();
+        fixture.bbo(10_001, 10_002, BASE + 1_400);
+        fixture.time(BASE + 4_000);
+
+        assertFalse(fixture.has(PatternType.OFFER_WALL_BREAKOUT));
     }
 
     @Test

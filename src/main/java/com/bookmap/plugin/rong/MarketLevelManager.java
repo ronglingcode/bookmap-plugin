@@ -63,8 +63,7 @@ public class MarketLevelManager implements SignalWebSocketServer.MarketLevelConf
 
     @Override
     public void onIndicatorConfigChanged(String indicatorKey, boolean enabled) {
-        if (!IndicatorConfig.CAM_PIVOTS.equals(indicatorKey)
-                && !IndicatorConfig.PREMARKET_HIGH_LOW.equals(indicatorKey)) {
+        if (!IndicatorConfig.PREMARKET_HIGH_LOW.equals(indicatorKey)) {
             return;
         }
         for (String instrumentAlias : instrumentPips.keySet()) {
@@ -106,10 +105,6 @@ public class MarketLevelManager implements SignalWebSocketServer.MarketLevelConf
     }
 
     private int drawCamPivots(String instrumentAlias, double pips, Map<String, Double> camPivots) {
-        if (!config.isEnabled(IndicatorConfig.CAM_PIVOTS)) {
-            return 0;
-        }
-
         int count = 0;
         for (Map.Entry<String, PriceLine.LineType> entry : CAM_LEVEL_TYPES.entrySet()) {
             String levelName = entry.getKey();

@@ -15,6 +15,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 
 import com.bookmap.plugin.rong.IndicatorConfig;
@@ -55,6 +56,7 @@ public class PatternSignalPainter implements ScreenSpacePainterFactory,
     private final Map<String, CopyOnWriteArrayList<PainterInstance>> paintersByInstrument =
             new ConcurrentHashMap<>();
     private final ScheduledExecutorService scheduler;
+    private ScheduledFuture<?> refreshTask;
     private volatile String lastRegisteredInstrument;
 
     public PatternSignalPainter(PatternSignalStore store, IndicatorConfig config) {
@@ -67,7 +69,7 @@ public class PatternSignalPainter implements ScreenSpacePainterFactory,
             thread.setDaemon(true);
             return thread;
         });
-        scheduler.scheduleAtFixedRate(this::refreshVisibleSignals, 500, 500, TimeUnit.MILLISECONDS);
+        setRefreshEnabled(config.isEnabled(IndicatorConfig.BOOKMAP_PATTERN_SIGNALS));
     }
 
     public void registerInstrument(String instrumentAlias) {
@@ -90,6 +92,7 @@ public class PatternSignalPainter implements ScreenSpacePainterFactory,
         if (!IndicatorConfig.BOOKMAP_PATTERN_SIGNALS.equals(indicatorKey)) {
             return;
         }
+        setRefreshEnabled(enabled);
         for (String instrumentAlias : paintersByInstrument.keySet()) {
             refreshInstrument(instrumentAlias);
         }
@@ -98,10 +101,24 @@ public class PatternSignalPainter implements ScreenSpacePainterFactory,
     public void shutdown() {
         store.removeListener(this);
         config.removeChangeListener(this);
+        setRefreshEnabled(false);
         scheduler.shutdownNow();
     }
 
+    private synchronized void setRefreshEnabled(boolean enabled) {
+        if (enabled) {
+            if (refreshTask == null || refreshTask.isCancelled() || refreshTask.isDone()) {
+                refreshTask = scheduler.scheduleAtFixedRate(
+                        this::refreshVisibleSignals, 500, 500, TimeUnit.MILLISECONDS);
+            }
+        } else if (refreshTask != null) {
+            refreshTask.cancel(false);
+            refreshTask = null;
+        }
+    }
+
     private void refreshVisibleSignals() {
+        if (!config.isEnabled(IndicatorConfig.BOOKMAP_PATTERN_SIGNALS)) return;
         for (String instrumentAlias : paintersByInstrument.keySet()) {
             refreshInstrument(instrumentAlias);
         }

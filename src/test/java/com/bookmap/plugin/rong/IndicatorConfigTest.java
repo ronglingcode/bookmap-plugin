@@ -14,4 +14,15 @@ class IndicatorConfigTest {
         assertFalse(config.isEnabled(IndicatorConfig.ORDER_WALL_CHANGE_ALERTS));
         assertTrue(config.isEnabled(IndicatorConfig.ORDER_WALL_CHANGE_SOUND));
     }
+
+    @Test
+    void bookmapPatternAutomationIsDisabledByDefaultAndControllable() {
+        IndicatorConfig config = new IndicatorConfig();
+
+        assertFalse(config.isEnabled(IndicatorConfig.BOOKMAP_PATTERN_SIGNALS));
+        config.setEnabled(IndicatorConfig.BOOKMAP_PATTERN_SIGNALS, true);
+        assertTrue(config.isEnabled(IndicatorConfig.BOOKMAP_PATTERN_SIGNALS));
+        config.setEnabled(IndicatorConfig.BOOKMAP_PATTERN_SIGNALS, false);
+        assertFalse(config.isEnabled(IndicatorConfig.BOOKMAP_PATTERN_SIGNALS));
+    }
 }

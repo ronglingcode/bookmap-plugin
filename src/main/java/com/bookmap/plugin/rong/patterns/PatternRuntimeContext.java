@@ -6,5 +6,7 @@ interface PatternRuntimeContext {
     int bestBidTick();
     int bestAskTick();
     int lastTradeTick();
+    int sessionHighTick();
+    int sessionLowTick();
     void emit(PatternCandidate candidate);
 }

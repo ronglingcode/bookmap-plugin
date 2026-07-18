@@ -43,14 +43,6 @@ public class IndicatorSettingsPanel extends StrategyPanel {
         add(premarketCheckbox, gbc);
 
         gbc.gridy++;
-        JCheckBox camPivotsCheckbox = new JCheckBox(
-                "Camarilla Pivots (R1-R6, S1-S6)",
-                config.isEnabled(IndicatorConfig.CAM_PIVOTS));
-        camPivotsCheckbox.addActionListener(e ->
-                config.setEnabled(IndicatorConfig.CAM_PIVOTS, camPivotsCheckbox.isSelected()));
-        add(camPivotsCheckbox, gbc);
-
-        gbc.gridy++;
         JCheckBox wallLabelsCheckbox = new JCheckBox(
                 "Order Wall Size Labels",
                 config.isEnabled(IndicatorConfig.ORDER_WALL_SIZE_LABELS));
@@ -68,7 +60,7 @@ public class IndicatorSettingsPanel extends StrategyPanel {
 
         gbc.gridy++;
         JCheckBox patternSignalsCheckbox = new JCheckBox(
-                "Scored Bookmap Pattern Badges",
+                "Bookmap Pattern Automation (display-only)",
                 config.isEnabled(IndicatorConfig.BOOKMAP_PATTERN_SIGNALS));
         patternSignalsCheckbox.addActionListener(e ->
                 config.setEnabled(IndicatorConfig.BOOKMAP_PATTERN_SIGNALS, patternSignalsCheckbox.isSelected()));

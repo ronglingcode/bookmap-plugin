@@ -7,7 +7,6 @@ import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.atomic.AtomicInteger;
 
 import org.junit.jupiter.api.Test;
 
@@ -17,7 +16,7 @@ import com.bookmap.plugin.rong.pricelines.PriceLineStore;
 class MarketLevelManagerTest {
 
     @Test
-    void disablingCamPivotsClearsResistanceAndSupportLinesWithOneRefresh() {
+    void suppliedCamPivotsAreDrawnWithoutAFeatureFlag() {
         PriceLineStore store = new PriceLineStore();
         IndicatorConfig config = new IndicatorConfig();
         MarketLevelManager manager = new MarketLevelManager(store, config);
@@ -33,19 +32,10 @@ class MarketLevelManagerTest {
 
         List<PriceLine> drawnLines = store.getLines("MU");
         assertEquals(12, drawnLines.size());
-
-        AtomicInteger refreshCount = new AtomicInteger();
-        store.addListener(changedInstrument -> {
-            if ("MU".equals(changedInstrument)) {
-                refreshCount.incrementAndGet();
-            }
-        });
-
-        config.setEnabled(IndicatorConfig.CAM_PIVOTS, false);
-
-        assertEquals(1, refreshCount.get());
-        assertFalse(store.getLines("MU").stream().anyMatch(line -> line.getType().name().startsWith("CAM_R")));
-        assertFalse(store.getLines("MU").stream().anyMatch(line -> line.getType().name().startsWith("CAM_S")));
+        assertEquals(6, drawnLines.stream()
+                .filter(line -> line.getType().name().startsWith("CAM_R")).count());
+        assertEquals(6, drawnLines.stream()
+                .filter(line -> line.getType().name().startsWith("CAM_S")).count());
     }
 
     @Test

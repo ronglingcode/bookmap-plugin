@@ -25,7 +25,8 @@ final class StepPatternDefinition extends AbstractDirectionalPatternDefinition {
                 PatternDetailKey.WALL_QUALITY,
                 PatternDetailKey.NEARBY_OPPOSING_LIQUIDITY,
                 PatternDetailKey.CONFIGURED_LEVEL_ALIGNMENT,
-                PatternDetailKey.COMPARABLE_REFERENCE_WALL);
+                PatternDetailKey.COMPARABLE_REFERENCE_WALL,
+                PatternDetailKey.SESSION_EXTREMES);
     }
 
     @Override
@@ -68,7 +69,9 @@ final class StepPatternDefinition extends AbstractDirectionalPatternDefinition {
                 .max(Comparator.comparingInt(candidate -> candidate.peakSize))
                 .orElse(null);
         references.add(wall);
-        if (reference == null || !isDefended(context, wall.priceTick)) return;
+        if (reference == null
+                || !passesSessionExtremeGate(context, wall.priceTick)
+                || !isDefended(context, wall.priceTick)) return;
         StepEpisode episode = new StepEpisode(wall, reference);
         pendingUpdates.put(wall.phaseId, episode);
         emit(episode, context);
@@ -115,6 +118,13 @@ final class StepPatternDefinition extends AbstractDirectionalPatternDefinition {
 
     private boolean isImprovedPrice(int newPrice, int oldPrice) {
         return bidWall ? newPrice > oldPrice : newPrice < oldPrice;
+    }
+
+    private boolean passesSessionExtremeGate(PatternRuntimeContext context, int newWallPrice) {
+        if (bidWall) {
+            return context.sessionLowTick() > 0 && newWallPrice > context.sessionLowTick();
+        }
+        return context.sessionHighTick() > 0 && newWallPrice < context.sessionHighTick();
     }
 
     private void cleanup(long nowMs) {

@@ -52,6 +52,8 @@ class BookmapPatternScorerTest {
                     definition.requiredDetails().contains(PatternDetailKey.VWAP_ALIGNMENT),
                     definition.type().name());
         }
+        assertTrue(definitions[4].requiredDetails().contains(PatternDetailKey.SESSION_EXTREMES));
+        assertTrue(definitions[5].requiredDetails().contains(PatternDetailKey.SESSION_EXTREMES));
     }
 
     @Test

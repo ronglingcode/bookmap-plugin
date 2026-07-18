@@ -10,7 +10,6 @@ import java.util.concurrent.ConcurrentHashMap;
 public class IndicatorConfig {
 
     public static final String PREMARKET_HIGH_LOW = "premarket_high_low";
-    public static final String CAM_PIVOTS = "cam_pivots";
     public static final String ORDER_WALL_SIZE_LABELS = "order_wall_size_labels";
     public static final String ORDER_WALL_CHANGE_ALERTS = "order_wall_change_alerts";
     public static final String ORDER_WALL_CHANGE_SOUND = "order_wall_change_sound";
@@ -31,13 +30,12 @@ public class IndicatorConfig {
     public IndicatorConfig() {
         // Defaults keep reference levels and sounds on while leaving noisy visual alerts off.
         enabled.put(PREMARKET_HIGH_LOW, true);
-        enabled.put(CAM_PIVOTS, true);
         enabled.put(ORDER_WALL_SIZE_LABELS, true);
         enabled.put(ORDER_WALL_CHANGE_ALERTS, false);
         enabled.put(ORDER_WALL_CHANGE_SOUND, true);
         enabled.put(FIRE_KEYBOARD_EVENT, false);
         enabled.put(FILLED_EXECUTION_MARKERS, true);
-        enabled.put(BOOKMAP_PATTERN_SIGNALS, true);
+        enabled.put(BOOKMAP_PATTERN_SIGNALS, false);
     }
 
     public boolean isEnabled(String indicatorKey) {

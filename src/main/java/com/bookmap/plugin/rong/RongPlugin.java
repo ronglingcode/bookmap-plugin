@@ -57,7 +57,8 @@ import velox.gui.StrategyPanel;
 public class RongPlugin implements CustomModuleAdapter,
         DepthDataListener, TradeDataListener, TimeListener,
         SnapshotEndListener, BboListener, HistoricalModeListener,
-        CustomSettingsPanelProvider, ReplayExportConfig.ChangeListener {
+        CustomSettingsPanelProvider, ReplayExportConfig.ChangeListener,
+        IndicatorConfig.ChangeListener {
 
     private static final int WS_PORT = 8765;
     private static final DateTimeFormatter EXPORT_RUN_ID_FORMAT =
@@ -110,6 +111,8 @@ public class RongPlugin implements CustomModuleAdapter,
     private OrderWallLabelTracker wallLabelTracker;
     private OrderWallChangeTracker wallChangeTracker;
     private BookmapPatternEngine patternEngine;
+    private volatile boolean patternAutomationEnabled;
+    private volatile boolean patternSnapshotComplete;
     private boolean wallLabelsDirty;
     private long lastWallLabelRefreshMs;
     private long lastTimestampNs;
@@ -198,9 +201,14 @@ public class RongPlugin implements CustomModuleAdapter,
                 orderBook,
                 priceLineStore,
                 priceZoneStore,
-                patternType -> sharedServer != null
+                patternType -> indicatorConfig != null
+                        && indicatorConfig.isEnabled(IndicatorConfig.BOOKMAP_PATTERN_SIGNALS)
+                        && sharedServer != null
                         && sharedServer.hasEnabledPatternTradebook(cleanAlias, patternType),
                 this::handlePatternSignal);
+        this.patternAutomationEnabled = indicatorConfig.isEnabled(
+                IndicatorConfig.BOOKMAP_PATTERN_SIGNALS);
+        indicatorConfig.addChangeListener(this);
         sharedServer.registerSymbol(cleanAlias, orderBook, info.pips);
         chartClickHandler.registerSymbol(cleanAlias, info.pips);
         priceZonePainter.registerInstrument(cleanAlias);
@@ -283,6 +291,9 @@ public class RongPlugin implements CustomModuleAdapter,
 
     @Override
     public void stop() {
+        if (indicatorConfig != null) {
+            indicatorConfig.removeChangeListener(this);
+        }
         if (replayExportConfig != null) {
             replayExportConfig.removeChangeListener(this);
         }
@@ -299,6 +310,8 @@ public class RongPlugin implements CustomModuleAdapter,
             patternEngine.shutdown();
             patternEngine = null;
         }
+        patternAutomationEnabled = false;
+        patternSnapshotComplete = false;
         if (tradeButtonWindow != null) {
             tradeButtonWindow.dispose();
             tradeButtonWindow = null;
@@ -506,7 +519,7 @@ public class RongPlugin implements CustomModuleAdapter,
             wallChangeTracker.onDepth(isBid, price, size, getEventTimeNs());
         }
         orderBook.update(isBid, price, size);
-        if (patternEngine != null) {
+        if (shouldRunPatternAutomation()) {
             patternEngine.onDepth(isBid, price, size, getEventTimeNs());
         }
         wallTracker.updateLevel(isBid, price, size);
@@ -528,7 +541,7 @@ public class RongPlugin implements CustomModuleAdapter,
         double realPrice = price * instrumentInfo.pips;
         int priceTick = (int) Math.round(price);
 
-        if (patternEngine != null) {
+        if (shouldRunPatternAutomation()) {
             patternEngine.onTrade(price, size, tradeInfo, getEventTimeNs());
         }
 
@@ -547,7 +560,7 @@ public class RongPlugin implements CustomModuleAdapter,
     @Override
     public void onTimestamp(long timestampNs) {
         this.lastTimestampNs = timestampNs;
-        if (patternEngine != null) {
+        if (shouldRunPatternAutomation()) {
             patternEngine.onTimestamp(timestampNs);
         }
         if (wallLabelTracker != null && wallLabelTracker.onTimestamp(timestampNs)) {
@@ -562,7 +575,7 @@ public class RongPlugin implements CustomModuleAdapter,
 
     @Override
     public void onBbo(int bidPrice, int bidSize, int askPrice, int askSize) {
-        if (patternEngine != null) {
+        if (shouldRunPatternAutomation()) {
             patternEngine.onBbo(bidPrice, bidSize, askPrice, askSize, getEventTimeNs());
         }
         BookmapReplayExportSession exportSession = replayExportSession;
@@ -573,6 +586,7 @@ public class RongPlugin implements CustomModuleAdapter,
 
     @Override
     public void onSnapshotEnd() {
+        patternSnapshotComplete = true;
         BookmapReplayExportSession exportSession = replayExportSession;
         if (exportSession != null) {
             exportSession.onSnapshotEnd();
@@ -580,13 +594,14 @@ public class RongPlugin implements CustomModuleAdapter,
         if (wallChangeTracker != null) {
             wallChangeTracker.markReady();
         }
-        if (patternEngine != null) {
+        if (shouldRunPatternAutomation()) {
             patternEngine.markReady();
         }
     }
 
     @Override
     public void onRealtimeStart() {
+        patternSnapshotComplete = true;
         BookmapReplayExportSession exportSession = replayExportSession;
         if (exportSession != null) {
             exportSession.onRealtimeStart();
@@ -594,7 +609,7 @@ public class RongPlugin implements CustomModuleAdapter,
         if (wallChangeTracker != null) {
             wallChangeTracker.markReady();
         }
-        if (patternEngine != null) {
+        if (shouldRunPatternAutomation()) {
             patternEngine.markReady();
         }
     }
@@ -605,6 +620,22 @@ public class RongPlugin implements CustomModuleAdapter,
             startReplayExport();
         } else {
             stopReplayExport();
+        }
+    }
+
+    @Override
+    public void onIndicatorConfigChanged(String indicatorKey, boolean enabled) {
+        if (!IndicatorConfig.BOOKMAP_PATTERN_SIGNALS.equals(indicatorKey)) return;
+        patternAutomationEnabled = enabled;
+        BookmapPatternEngine engine = patternEngine;
+        if (engine != null) {
+            engine.resetForFeatureToggle();
+            if (enabled && patternSnapshotComplete) {
+                engine.markReady();
+            }
+        }
+        if (!enabled && patternSignalStore != null && alias != null) {
+            patternSignalStore.clearAll(alias);
         }
     }
 
@@ -638,6 +669,10 @@ public class RongPlugin implements CustomModuleAdapter,
     private boolean isWallBreakAlertEnabled(boolean bidWall) {
         SignalWebSocketServer server = sharedServer;
         return server != null && server.hasEnabledWallBreakTradeButton(alias, bidWall);
+    }
+
+    private boolean shouldRunPatternAutomation() {
+        return patternAutomationEnabled && patternEngine != null;
     }
 
     private void handlePatternSignal(BookmapPatternSignal signal) {

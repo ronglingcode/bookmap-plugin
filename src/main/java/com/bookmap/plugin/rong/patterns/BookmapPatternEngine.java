@@ -127,6 +127,23 @@ public final class BookmapPatternEngine implements PatternRuntimeContext, Patter
         recentClears.clear();
     }
 
+    /** Clears all event-derived state when automation is toggled without processing disabled events. */
+    public synchronized void resetForFeatureToggle() {
+        resetPatternLifecycle();
+        recentTrades.clear();
+        recentClears.clear();
+        sessionDate = null;
+        regularSession = false;
+        lifecycleSeededForSession = false;
+        bestBidTick = 0;
+        bestAskTick = 0;
+        lastTradeTick = 0;
+        sessionHighTick = 0;
+        sessionLowTick = 0;
+        regularVolume = 0;
+        regularPriceVolume = 0;
+    }
+
     /** Called after the shared OrderBookState has received this absolute-size update. */
     public synchronized void onDepth(boolean bid, int priceTick, int size, long eventTimeNs) {
         beginEvent(eventTimeNs);
@@ -415,6 +432,16 @@ public final class BookmapPatternEngine implements PatternRuntimeContext, Patter
     @Override
     public int lastTradeTick() {
         return lastTradeTick;
+    }
+
+    @Override
+    public int sessionHighTick() {
+        return sessionHighTick;
+    }
+
+    @Override
+    public int sessionLowTick() {
+        return sessionLowTick;
     }
 
     @Override
