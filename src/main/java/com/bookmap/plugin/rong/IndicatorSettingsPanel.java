@@ -67,6 +67,14 @@ public class IndicatorSettingsPanel extends StrategyPanel {
         add(wallChangeAlertsCheckbox, gbc);
 
         gbc.gridy++;
+        JCheckBox patternSignalsCheckbox = new JCheckBox(
+                "Scored Bookmap Pattern Badges",
+                config.isEnabled(IndicatorConfig.BOOKMAP_PATTERN_SIGNALS));
+        patternSignalsCheckbox.addActionListener(e ->
+                config.setEnabled(IndicatorConfig.BOOKMAP_PATTERN_SIGNALS, patternSignalsCheckbox.isSelected()));
+        add(patternSignalsCheckbox, gbc);
+
+        gbc.gridy++;
         JCheckBox wallChangeSoundCheckbox = new JCheckBox(
                 "Order Wall Change Sound",
                 config.isEnabled(IndicatorConfig.ORDER_WALL_CHANGE_SOUND));

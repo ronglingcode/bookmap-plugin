@@ -18,6 +18,11 @@ import com.bookmap.plugin.rong.orderwall.OrderWallLabelPainter;
 import com.bookmap.plugin.rong.orderwall.OrderWallLabelStore;
 import com.bookmap.plugin.rong.orderwall.OrderWallLabelTracker;
 import com.bookmap.plugin.rong.orderwall.OrderWallTracker;
+import com.bookmap.plugin.rong.patterns.BookmapPatternEngine;
+import com.bookmap.plugin.rong.patterns.BookmapPatternSignal;
+import com.bookmap.plugin.rong.patterns.PatternSignalLogger;
+import com.bookmap.plugin.rong.patterns.PatternSignalPainter;
+import com.bookmap.plugin.rong.patterns.PatternSignalStore;
 import com.bookmap.plugin.rong.pricelines.ChartClickHandler;
 import com.bookmap.plugin.rong.pricelines.PriceLinePainter;
 import com.bookmap.plugin.rong.pricelines.PriceLineStore;
@@ -92,6 +97,9 @@ public class RongPlugin implements CustomModuleAdapter,
     private static FilledExecutionStore filledExecutionStore;
     private static FilledExecutionPainter filledExecutionPainter;
     private static FilledExecutionManager filledExecutionManager;
+    private static PatternSignalStore patternSignalStore;
+    private static PatternSignalPainter patternSignalPainter;
+    private static PatternSignalLogger patternSignalLogger;
 
     private String rawAlias;
     private String alias;
@@ -101,6 +109,7 @@ public class RongPlugin implements CustomModuleAdapter,
     private OrderBookState orderBook;
     private OrderWallLabelTracker wallLabelTracker;
     private OrderWallChangeTracker wallChangeTracker;
+    private BookmapPatternEngine patternEngine;
     private boolean wallLabelsDirty;
     private long lastWallLabelRefreshMs;
     private long lastTimestampNs;
@@ -148,6 +157,9 @@ public class RongPlugin implements CustomModuleAdapter,
                 wallChangeStore = new OrderWallChangeStore();
                 wallLabelPainter = new OrderWallLabelPainter(wallLabelStore, indicatorConfig, wallChangeStore);
                 wallChangePainter = new OrderWallChangePainter(wallChangeStore, indicatorConfig);
+                patternSignalStore = new PatternSignalStore();
+                patternSignalPainter = new PatternSignalPainter(patternSignalStore, indicatorConfig);
+                patternSignalLogger = new PatternSignalLogger();
                 keyLevelManager = new KeyLevelManager(priceLineStore);
                 sharedServer.registerKeyLevelConfigListener(keyLevelManager);
                 keyZoneManager = new KeyZoneManager(priceZoneStore);
@@ -178,12 +190,24 @@ public class RongPlugin implements CustomModuleAdapter,
                 WALL_CHANGE_DECISION_DELAY_MS,
                 this::handleWallChangeEvent,
                 this::isWallBreakAlertEnabled);
+        this.patternEngine = new BookmapPatternEngine(
+                cleanAlias,
+                info.pips,
+                wallThresholdConfig::getThresholdFloor,
+                ORDERBOOK_PERCENTILE,
+                orderBook,
+                priceLineStore,
+                priceZoneStore,
+                patternType -> sharedServer != null
+                        && sharedServer.hasEnabledPatternTradebook(cleanAlias, patternType),
+                this::handlePatternSignal);
         sharedServer.registerSymbol(cleanAlias, orderBook, info.pips);
         chartClickHandler.registerSymbol(cleanAlias, info.pips);
         priceZonePainter.registerInstrument(cleanAlias);
         priceLinePainter.registerInstrument(cleanAlias);
         wallLabelPainter.registerInstrument(cleanAlias);
         wallChangePainter.registerInstrument(cleanAlias);
+        patternSignalPainter.registerInstrument(cleanAlias);
         filledExecutionPainter.registerInstrument(cleanAlias);
 
         // Register ScreenSpacePainter to receive chart coordinate mappings
@@ -214,6 +238,11 @@ public class RongPlugin implements CustomModuleAdapter,
         api.sendUserMessage(Layer1ApiUserMessageModifyScreenSpacePainter.builder(
                 RongPlugin.class, OrderWallChangePainter.PAINTER_NAME_PREFIX + cleanAlias)
                 .setScreenSpacePainterFactory(wallChangePainter)
+                .setIsAdd(true)
+                .build());
+        api.sendUserMessage(Layer1ApiUserMessageModifyScreenSpacePainter.builder(
+                RongPlugin.class, PatternSignalPainter.PAINTER_NAME_PREFIX + cleanAlias)
+                .setScreenSpacePainterFactory(patternSignalPainter)
                 .setIsAdd(true)
                 .build());
         api.sendUserMessage(Layer1ApiUserMessageModifyScreenSpacePainter.builder(
@@ -266,6 +295,10 @@ public class RongPlugin implements CustomModuleAdapter,
             wallChangeTracker.shutdown();
             wallChangeTracker = null;
         }
+        if (patternEngine != null) {
+            patternEngine.shutdown();
+            patternEngine = null;
+        }
         if (tradeButtonWindow != null) {
             tradeButtonWindow.dispose();
             tradeButtonWindow = null;
@@ -284,6 +317,9 @@ public class RongPlugin implements CustomModuleAdapter,
         }
         if (wallChangePainter != null) {
             wallChangePainter.unregisterInstrument(alias);
+        }
+        if (patternSignalPainter != null) {
+            patternSignalPainter.unregisterInstrument(alias);
         }
         if (filledExecutionPainter != null) {
             filledExecutionPainter.unregisterInstrument(alias);
@@ -312,6 +348,11 @@ public class RongPlugin implements CustomModuleAdapter,
         api.sendUserMessage(Layer1ApiUserMessageModifyScreenSpacePainter.builder(
                 RongPlugin.class, OrderWallChangePainter.PAINTER_NAME_PREFIX + alias)
                 .setScreenSpacePainterFactory(wallChangePainter)
+                .setIsAdd(false)
+                .build());
+        api.sendUserMessage(Layer1ApiUserMessageModifyScreenSpacePainter.builder(
+                RongPlugin.class, PatternSignalPainter.PAINTER_NAME_PREFIX + alias)
+                .setScreenSpacePainterFactory(patternSignalPainter)
                 .setIsAdd(false)
                 .build());
         api.sendUserMessage(Layer1ApiUserMessageModifyScreenSpacePainter.builder(
@@ -349,6 +390,9 @@ public class RongPlugin implements CustomModuleAdapter,
         }
         if (wallChangeStore != null) {
             wallChangeStore.clearAll(alias);
+        }
+        if (patternSignalStore != null) {
+            patternSignalStore.clearAll(alias);
         }
         if (filledExecutionStore != null) {
             filledExecutionStore.clearAll(alias);
@@ -396,6 +440,12 @@ public class RongPlugin implements CustomModuleAdapter,
                 if (wallChangePainter != null) {
                     wallChangePainter.shutdown();
                 }
+                if (patternSignalPainter != null) {
+                    patternSignalPainter.shutdown();
+                }
+                if (patternSignalLogger != null) {
+                    patternSignalLogger.close();
+                }
                 if (filledExecutionPainter != null) {
                     filledExecutionPainter.shutdown();
                 }
@@ -411,6 +461,9 @@ public class RongPlugin implements CustomModuleAdapter,
                 wallLabelPainter = null;
                 wallChangeStore = null;
                 wallChangePainter = null;
+                patternSignalStore = null;
+                patternSignalPainter = null;
+                patternSignalLogger = null;
                 filledExecutionStore = null;
                 filledExecutionPainter = null;
                 indicatorConfig = null;
@@ -453,6 +506,9 @@ public class RongPlugin implements CustomModuleAdapter,
             wallChangeTracker.onDepth(isBid, price, size, getEventTimeNs());
         }
         orderBook.update(isBid, price, size);
+        if (patternEngine != null) {
+            patternEngine.onDepth(isBid, price, size, getEventTimeNs());
+        }
         wallTracker.updateLevel(isBid, price, size);
         if (wallLabelTracker != null && wallLabelTracker.onDepth(isBid, price, size, getEventTimeNs())) {
             wallLabelsDirty = true;
@@ -470,7 +526,11 @@ public class RongPlugin implements CustomModuleAdapter,
             wallChangeTracker.onTrade((int) Math.round(price), size, tradeInfo);
         }
         double realPrice = price * instrumentInfo.pips;
-        int priceTick = (int) price;
+        int priceTick = (int) Math.round(price);
+
+        if (patternEngine != null) {
+            patternEngine.onTrade(price, size, tradeInfo, getEventTimeNs());
+        }
 
         if (sharedServer != null) {
             sharedServer.updateRegularSessionHighLow(alias, realPrice, getEventTimeNs());
@@ -487,6 +547,9 @@ public class RongPlugin implements CustomModuleAdapter,
     @Override
     public void onTimestamp(long timestampNs) {
         this.lastTimestampNs = timestampNs;
+        if (patternEngine != null) {
+            patternEngine.onTimestamp(timestampNs);
+        }
         if (wallLabelTracker != null && wallLabelTracker.onTimestamp(timestampNs)) {
             wallLabelsDirty = true;
             refreshWallLabelsIfNeeded(true);
@@ -499,6 +562,9 @@ public class RongPlugin implements CustomModuleAdapter,
 
     @Override
     public void onBbo(int bidPrice, int bidSize, int askPrice, int askSize) {
+        if (patternEngine != null) {
+            patternEngine.onBbo(bidPrice, bidSize, askPrice, askSize, getEventTimeNs());
+        }
         BookmapReplayExportSession exportSession = replayExportSession;
         if (exportSession != null) {
             exportSession.onBbo(bidPrice, bidSize, askPrice, askSize);
@@ -514,6 +580,9 @@ public class RongPlugin implements CustomModuleAdapter,
         if (wallChangeTracker != null) {
             wallChangeTracker.markReady();
         }
+        if (patternEngine != null) {
+            patternEngine.markReady();
+        }
     }
 
     @Override
@@ -524,6 +593,9 @@ public class RongPlugin implements CustomModuleAdapter,
         }
         if (wallChangeTracker != null) {
             wallChangeTracker.markReady();
+        }
+        if (patternEngine != null) {
+            patternEngine.markReady();
         }
     }
 
@@ -566,6 +638,14 @@ public class RongPlugin implements CustomModuleAdapter,
     private boolean isWallBreakAlertEnabled(boolean bidWall) {
         SignalWebSocketServer server = sharedServer;
         return server != null && server.hasEnabledWallBreakTradeButton(alias, bidWall);
+    }
+
+    private void handlePatternSignal(BookmapPatternSignal signal) {
+        PatternSignalStore store = patternSignalStore;
+        if (store != null) store.addOrUpdate(signal);
+        PatternSignalLogger logger = patternSignalLogger;
+        if (logger != null) logger.append(signal);
+        PluginLog.info("[PatternSignal] " + signal.toJson());
     }
 
     private void playWallChangeSound(OrderWallChangeEvent event) {

@@ -133,6 +133,14 @@ public class OrderBookState {
         return Collections.unmodifiableNavigableMap(asks);
     }
 
+    /** Thread-safe copy of every level on one side of the book. */
+    public synchronized NavigableMap<Integer, Integer> getLevelsSnapshot(boolean isBid) {
+        TreeMap<Integer, Integer> source = isBid ? bids : asks;
+        TreeMap<Integer, Integer> copy = new TreeMap<>(source.comparator());
+        copy.putAll(source);
+        return Collections.unmodifiableNavigableMap(copy);
+    }
+
     /**
      * Calculate the size threshold at the given percentile across all levels.
      * @param percentile 0-100 (e.g., 90 means only top 10% of sizes pass)

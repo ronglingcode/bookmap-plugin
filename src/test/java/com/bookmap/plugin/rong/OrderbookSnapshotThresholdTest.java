@@ -10,6 +10,7 @@ import java.util.stream.Collectors;
 
 import org.junit.jupiter.api.Test;
 
+import com.bookmap.plugin.rong.patterns.PatternType;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
 
@@ -83,6 +84,29 @@ class OrderbookSnapshotThresholdTest {
 
         assertFalse(server.hasEnabledWallBreakTradeButton("WEN", false));
         assertFalse(server.hasEnabledWallBreakTradeButton("WEN", true));
+    }
+
+    @Test
+    void patternEligibilityUsesActiveMatchingBreakAndReversalTradebooks() {
+        SignalWebSocketServer server = new SignalWebSocketServer(0, 90, 1000);
+        JsonObject config = new JsonObject();
+        config.addProperty("type", "trade_button_config");
+        config.addProperty("symbol", "WEN");
+        JsonArray tradebooks = new JsonArray();
+        tradebooks.add(tradebook("GapAndGoBookmapOfferWallBreakout", "long", "0.25R"));
+        tradebooks.add(tradebook("GapGiveAndGoBookmapReversal", "long", "0.25R"));
+        tradebooks.add(tradebook("GapAndCrapOfferStepDownReappear", "short", "0.25R"));
+        config.add("tradebooks", tradebooks);
+        server.onMessage(null, config.toString());
+
+        assertTrue(server.hasEnabledPatternTradebook("WEN", PatternType.OFFER_WALL_BREAKOUT));
+        assertTrue(server.hasEnabledPatternTradebook("WEN", PatternType.BID_REAPPEAR));
+        assertTrue(server.hasEnabledPatternTradebook("WEN", PatternType.BID_STEP_UP));
+        assertTrue(server.hasEnabledPatternTradebook("WEN", PatternType.BID_V_SHAPE_RECOVERY));
+        assertTrue(server.hasEnabledPatternTradebook("WEN", PatternType.OFFER_REAPPEAR));
+        assertTrue(server.hasEnabledPatternTradebook("WEN", PatternType.OFFER_STEP_DOWN));
+        assertTrue(server.hasEnabledPatternTradebook("WEN", PatternType.OFFER_V_SHAPE_REJECTION));
+        assertFalse(server.hasEnabledPatternTradebook("WEN", PatternType.BID_WALL_BREAKDOWN));
     }
 
     private static List<Integer> sizes(JsonArray levels) {

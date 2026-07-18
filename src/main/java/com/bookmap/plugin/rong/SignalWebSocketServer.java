@@ -26,6 +26,8 @@ import org.java_websocket.WebSocket;
 import org.java_websocket.handshake.ClientHandshake;
 import org.java_websocket.server.WebSocketServer;
 
+import com.bookmap.plugin.rong.patterns.Direction;
+import com.bookmap.plugin.rong.patterns.PatternType;
 import com.bookmap.plugin.rong.tradebuttons.TradebookButtonGroup;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
@@ -311,6 +313,27 @@ public class SignalWebSocketServer extends WebSocketServer {
                 continue;
             }
             if (isMatchingWallBreakTradebook(tradebook, bidBreakdown)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * Read-only tradebook eligibility for display-only Bookmap pattern badges.
+     * An enabled group must have an entry method, match direction, and describe the
+     * applicable Bookmap break or reversal tradebook family.
+     */
+    public boolean hasEnabledPatternTradebook(String symbol, PatternType patternType) {
+        String cleanSymbol = SymbolUtils.cleanSymbol(symbol);
+        List<TradebookButtonGroup> tradebooks = symbolToTradebooks.get(cleanSymbol);
+        if (tradebooks == null || tradebooks.isEmpty()) return false;
+        for (TradebookButtonGroup tradebook : tradebooks) {
+            if (tradebook.getEntryMethods().isEmpty() || !matchesDirection(tradebook, patternType)) continue;
+            if (patternType.getFamily() == PatternType.Family.BREAK) {
+                if (isMatchingWallBreakTradebook(
+                        tradebook, patternType == PatternType.BID_WALL_BREAKDOWN)) return true;
+            } else if (isMatchingWallReversalTradebook(tradebook, patternType)) {
                 return true;
             }
         }
@@ -1111,6 +1134,44 @@ public class SignalWebSocketServer extends WebSocketServer {
                 || searchable.contains("offer wall breakout")
                 || searchable.contains("offer_breakout")
                 || searchable.contains("offer breakout");
+    }
+
+    private boolean matchesDirection(TradebookButtonGroup tradebook, PatternType patternType) {
+        return patternType.getDirection() == Direction.LONG
+                ? isLongSide(tradebook.getSide())
+                : isShortSide(tradebook.getSide());
+    }
+
+    private boolean isMatchingWallReversalTradebook(
+            TradebookButtonGroup tradebook, PatternType patternType) {
+        String searchable = searchableTradebookText(tradebook);
+        if (searchable.contains("bookmapreversal")
+                || searchable.contains("bookmap reversal")) {
+            return true;
+        }
+        if (patternType.isBidWallPattern()) {
+            return searchable.contains("range bound bid reversal")
+                    || searchable.contains("rangeboundbidreversal")
+                    || searchable.contains("bidreappear")
+                    || searchable.contains("bid reappear")
+                    || searchable.contains("bidstepup")
+                    || searchable.contains("bid step up")
+                    || searchable.contains("breakdown bid")
+                    || searchable.contains("breakdownbidswinglow");
+        }
+        return searchable.contains("range bound offer reversal")
+                || searchable.contains("rangeboundofferreversal")
+                || searchable.contains("offerstepdownreappear")
+                || searchable.contains("offer step down")
+                || searchable.contains("offer reappear")
+                || searchable.contains("offerreappear");
+    }
+
+    private String searchableTradebookText(TradebookButtonGroup tradebook) {
+        return (tradebook.getId() + " "
+                + tradebook.getLabel() + " "
+                + tradebook.getTradebookId() + " "
+                + tradebook.getTradebookName()).toLowerCase(Locale.US);
     }
 
     private boolean isLongSide(String side) {

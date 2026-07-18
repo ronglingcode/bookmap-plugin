@@ -16,6 +16,7 @@ public class IndicatorConfig {
     public static final String ORDER_WALL_CHANGE_SOUND = "order_wall_change_sound";
     public static final String FIRE_KEYBOARD_EVENT = "fire_keyboard_event";
     public static final String FILLED_EXECUTION_MARKERS = "filled_execution_markers";
+    public static final String BOOKMAP_PATTERN_SIGNALS = "bookmap_pattern_signals";
 
     private final Map<String, Boolean> enabled = new ConcurrentHashMap<>();
 
@@ -36,6 +37,7 @@ public class IndicatorConfig {
         enabled.put(ORDER_WALL_CHANGE_SOUND, true);
         enabled.put(FIRE_KEYBOARD_EVENT, false);
         enabled.put(FILLED_EXECUTION_MARKERS, true);
+        enabled.put(BOOKMAP_PATTERN_SIGNALS, true);
     }
 
     public boolean isEnabled(String indicatorKey) {

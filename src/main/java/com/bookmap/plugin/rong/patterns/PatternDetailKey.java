@@ -1,0 +1,13 @@
+package com.bookmap.plugin.rong.patterns;
+
+public enum PatternDetailKey {
+    WALL_QUALITY,
+    NEARBY_OPPOSING_LIQUIDITY,
+    CONFIGURED_LEVEL_ALIGNMENT,
+    VWAP_ALIGNMENT,
+    HOLD_OR_PULLBACK,
+    COMPARABLE_REFERENCE_WALL,
+    SWEEP_STACK,
+    SESSION_EXTREMES,
+    REVERSAL_TIMING
+}
