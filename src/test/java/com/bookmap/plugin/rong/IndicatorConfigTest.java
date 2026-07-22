@@ -12,7 +12,18 @@ class IndicatorConfigTest {
         IndicatorConfig config = new IndicatorConfig();
 
         assertFalse(config.isEnabled(IndicatorConfig.ORDER_WALL_CHANGE_ALERTS));
+        assertFalse(config.isEnabled(IndicatorConfig.ORDER_WALL_BREAKOUT_SIGNALS));
         assertTrue(config.isEnabled(IndicatorConfig.ORDER_WALL_CHANGE_SOUND));
+    }
+
+    @Test
+    void wallBreakoutSignalsAreIndependentlyControllable() {
+        IndicatorConfig config = new IndicatorConfig();
+
+        config.setEnabled(IndicatorConfig.ORDER_WALL_CHANGE_ALERTS, true);
+        assertFalse(config.isEnabled(IndicatorConfig.ORDER_WALL_BREAKOUT_SIGNALS));
+        config.setEnabled(IndicatorConfig.ORDER_WALL_BREAKOUT_SIGNALS, true);
+        assertTrue(config.isEnabled(IndicatorConfig.ORDER_WALL_BREAKOUT_SIGNALS));
     }
 
     @Test

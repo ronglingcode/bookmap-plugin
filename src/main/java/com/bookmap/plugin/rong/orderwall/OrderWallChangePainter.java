@@ -105,7 +105,8 @@ public class OrderWallChangePainter implements ScreenSpacePainterFactory,
 
     @Override
     public void onIndicatorConfigChanged(String indicatorKey, boolean enabled) {
-        if (!IndicatorConfig.ORDER_WALL_CHANGE_ALERTS.equals(indicatorKey)) {
+        if (!IndicatorConfig.ORDER_WALL_CHANGE_ALERTS.equals(indicatorKey)
+                && !IndicatorConfig.ORDER_WALL_BREAKOUT_SIGNALS.equals(indicatorKey)) {
             return;
         }
         for (String instrumentAlias : paintersByInstrument.keySet()) {
@@ -181,7 +182,11 @@ public class OrderWallChangePainter implements ScreenSpacePainterFactory,
                     return;
                 }
                 removeActiveShapesLocked();
-                if (!config.isEnabled(IndicatorConfig.ORDER_WALL_CHANGE_ALERTS)) {
+                boolean wallChangeAlertsEnabled =
+                        config.isEnabled(IndicatorConfig.ORDER_WALL_CHANGE_ALERTS);
+                boolean wallBreakoutSignalsEnabled =
+                        config.isEnabled(IndicatorConfig.ORDER_WALL_BREAKOUT_SIGNALS);
+                if (!wallChangeAlertsEnabled && !wallBreakoutSignalsEnabled) {
                     return;
                 }
 
@@ -191,7 +196,9 @@ public class OrderWallChangePainter implements ScreenSpacePainterFactory,
                                 instrumentAlias,
                                 OrderWallAlertDisplayTiming.maxTtlMs(),
                                 nowMs),
-                        nowMs);
+                        nowMs,
+                        wallChangeAlertsEnabled,
+                        wallBreakoutSignalsEnabled);
                 if (events.isEmpty()) {
                     return;
                 }
@@ -462,10 +469,17 @@ public class OrderWallChangePainter implements ScreenSpacePainterFactory,
         return Math.max(35, (int) (120 * fade));
     }
 
-    private static List<OrderWallChangeEvent> visibleEvents(List<OrderWallChangeEvent> events, long nowMs) {
+    static List<OrderWallChangeEvent> visibleEvents(
+            List<OrderWallChangeEvent> events,
+            long nowMs,
+            boolean wallChangeAlertsEnabled,
+            boolean wallBreakoutSignalsEnabled) {
         List<OrderWallChangeEvent> visible = new ArrayList<>();
         for (OrderWallChangeEvent event : events) {
-            if (OrderWallAlertDisplayTiming.isVisible(event, nowMs)) {
+            if (OrderWallAlertDisplayTiming.isVisible(event, nowMs)
+                    && (event.isWallBreak()
+                            ? wallBreakoutSignalsEnabled
+                            : wallChangeAlertsEnabled)) {
                 visible.add(event);
             }
         }

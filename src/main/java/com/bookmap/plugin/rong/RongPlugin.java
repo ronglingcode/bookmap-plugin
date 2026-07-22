@@ -667,6 +667,10 @@ public class RongPlugin implements CustomModuleAdapter,
     }
 
     private boolean isWallBreakAlertEnabled(boolean bidWall) {
+        if (indicatorConfig == null
+                || !indicatorConfig.isEnabled(IndicatorConfig.ORDER_WALL_BREAKOUT_SIGNALS)) {
+            return false;
+        }
         SignalWebSocketServer server = sharedServer;
         return server != null && server.hasEnabledWallBreakTradeButton(alias, bidWall);
     }

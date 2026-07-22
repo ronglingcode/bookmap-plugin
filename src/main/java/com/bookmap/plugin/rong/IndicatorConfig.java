@@ -12,6 +12,7 @@ public class IndicatorConfig {
     public static final String PREMARKET_HIGH_LOW = "premarket_high_low";
     public static final String ORDER_WALL_SIZE_LABELS = "order_wall_size_labels";
     public static final String ORDER_WALL_CHANGE_ALERTS = "order_wall_change_alerts";
+    public static final String ORDER_WALL_BREAKOUT_SIGNALS = "order_wall_breakout_signals";
     public static final String ORDER_WALL_CHANGE_SOUND = "order_wall_change_sound";
     public static final String FIRE_KEYBOARD_EVENT = "fire_keyboard_event";
     public static final String FILLED_EXECUTION_MARKERS = "filled_execution_markers";
@@ -32,6 +33,7 @@ public class IndicatorConfig {
         enabled.put(PREMARKET_HIGH_LOW, true);
         enabled.put(ORDER_WALL_SIZE_LABELS, true);
         enabled.put(ORDER_WALL_CHANGE_ALERTS, false);
+        enabled.put(ORDER_WALL_BREAKOUT_SIGNALS, false);
         enabled.put(ORDER_WALL_CHANGE_SOUND, true);
         enabled.put(FIRE_KEYBOARD_EVENT, false);
         enabled.put(FILLED_EXECUTION_MARKERS, true);
