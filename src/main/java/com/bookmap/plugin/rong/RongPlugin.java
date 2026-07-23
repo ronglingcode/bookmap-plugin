@@ -66,7 +66,7 @@ public class RongPlugin implements CustomModuleAdapter,
     private static final String EXPORT_RUN_ID = LocalDateTime.now().format(EXPORT_RUN_ID_FORMAT);
     private static final int WALL_THRESHOLD = 500_000;
     private static final double WALL_CONSUMED_RATIO = 0.10;
-    private static final double ORDERBOOK_PERCENTILE = 95;
+    private static final double ORDERBOOK_PERCENTILE = 97;
     private static final int ORDERBOOK_INTERVAL_MS = 1000;
     private static final int WALL_LABEL_MIN_SIZE = 5_000;
     private static final int WALL_LABEL_RETAIN_TICKS = 2_000;
