@@ -113,7 +113,7 @@ public class IndicatorSettingsPanel extends StrategyPanel {
 
         gbc.gridy++;
         JCheckBox filledExecutionMarkersCheckbox = new JCheckBox(
-                "Filled Execution Markers",
+                "Persistent Filled Execution Labels (otherwise 30 seconds)",
                 config.isEnabled(IndicatorConfig.FILLED_EXECUTION_MARKERS));
         filledExecutionMarkersCheckbox.addActionListener(e ->
                 config.setEnabled(IndicatorConfig.FILLED_EXECUTION_MARKERS, filledExecutionMarkersCheckbox.isSelected()));

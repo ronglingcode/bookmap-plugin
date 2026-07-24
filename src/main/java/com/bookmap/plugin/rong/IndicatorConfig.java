@@ -15,6 +15,10 @@ public class IndicatorConfig {
     public static final String ORDER_WALL_BREAKOUT_SIGNALS = "order_wall_breakout_signals";
     public static final String ORDER_WALL_CHANGE_SOUND = "order_wall_change_sound";
     public static final String FIRE_KEYBOARD_EVENT = "fire_keyboard_event";
+    /**
+     * Controls filled-execution label retention: enabled is persistent, disabled is a 30-second display.
+     * The stored key is retained for compatibility with the previous enable/disable setting.
+     */
     public static final String FILLED_EXECUTION_MARKERS = "filled_execution_markers";
     public static final String BOOKMAP_PATTERN_SIGNALS = "bookmap_pattern_signals";
 

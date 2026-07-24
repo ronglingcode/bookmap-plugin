@@ -14,6 +14,10 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ScheduledFuture;
+import java.util.concurrent.TimeUnit;
 
 import com.bookmap.plugin.rong.IndicatorConfig;
 import com.bookmap.plugin.rong.PluginLog;
@@ -44,6 +48,7 @@ public class FilledExecutionPainter implements ScreenSpacePainterFactory,
     private static final int MARKER_MIN_WIDTH = 58;
     private static final int MARKER_PADDING_X = 7;
     private static final int MAX_VISIBLE_MARKERS = 300;
+    private static final long TRANSIENT_REFRESH_INTERVAL_MS = 500L;
     private static final Font MARKER_FONT = new Font("SansSerif", Font.BOLD, 11);
     private static final Color BUY_COLOR = new Color(46, 125, 50);
     private static final Color SELL_COLOR = new Color(139, 0, 0);
@@ -54,6 +59,8 @@ public class FilledExecutionPainter implements ScreenSpacePainterFactory,
     private final IndicatorConfig config;
     private final Map<String, String> painterToInstrument = new ConcurrentHashMap<>();
     private final Map<String, CopyOnWriteArrayList<PainterInstance>> paintersByInstrument = new ConcurrentHashMap<>();
+    private final ScheduledExecutorService scheduler;
+    private ScheduledFuture<?> transientRefreshTask;
     private volatile String lastRegisteredInstrument;
 
     public FilledExecutionPainter(FilledExecutionStore store, IndicatorConfig config) {
@@ -61,6 +68,12 @@ public class FilledExecutionPainter implements ScreenSpacePainterFactory,
         this.config = config;
         this.store.addListener(this);
         this.config.addChangeListener(this);
+        scheduler = Executors.newSingleThreadScheduledExecutor(runnable -> {
+            Thread thread = new Thread(runnable, "filled-execution-painter");
+            thread.setDaemon(true);
+            return thread;
+        });
+        setTransientRefreshEnabled(!areLabelsPersistent());
     }
 
     public void registerInstrument(String instrumentAlias) {
@@ -103,12 +116,42 @@ public class FilledExecutionPainter implements ScreenSpacePainterFactory,
         if (!IndicatorConfig.FILLED_EXECUTION_MARKERS.equals(indicatorKey)) {
             return;
         }
+        setTransientRefreshEnabled(!enabled);
         refreshAllInstruments();
     }
 
     public void shutdown() {
         store.removeListener(this);
         config.removeChangeListener(this);
+        setTransientRefreshEnabled(false);
+        scheduler.shutdownNow();
+    }
+
+    private synchronized void setTransientRefreshEnabled(boolean enabled) {
+        if (enabled) {
+            if (transientRefreshTask == null
+                    || transientRefreshTask.isCancelled()
+                    || transientRefreshTask.isDone()) {
+                transientRefreshTask = scheduler.scheduleAtFixedRate(
+                        this::refreshTransientMarkers,
+                        TRANSIENT_REFRESH_INTERVAL_MS,
+                        TRANSIENT_REFRESH_INTERVAL_MS,
+                        TimeUnit.MILLISECONDS);
+            }
+        } else if (transientRefreshTask != null) {
+            transientRefreshTask.cancel(false);
+            transientRefreshTask = null;
+        }
+    }
+
+    private void refreshTransientMarkers() {
+        if (!areLabelsPersistent()) {
+            refreshAllInstruments();
+        }
+    }
+
+    private boolean areLabelsPersistent() {
+        return config.isEnabled(IndicatorConfig.FILLED_EXECUTION_MARKERS);
     }
 
     @Override
@@ -185,9 +228,6 @@ public class FilledExecutionPainter implements ScreenSpacePainterFactory,
                     return;
                 }
                 removeActiveShapesLocked();
-                if (!config.isEnabled(IndicatorConfig.FILLED_EXECUTION_MARKERS)) {
-                    return;
-                }
 
                 List<FilledExecutionMarker> markers = selectMarkersToDraw();
                 for (FilledExecutionMarker marker : markers) {
@@ -202,7 +242,11 @@ public class FilledExecutionPainter implements ScreenSpacePainterFactory,
 
         private List<FilledExecutionMarker> selectMarkersToDraw() {
             List<FilledExecutionMarker> visible = new ArrayList<>();
-            for (FilledExecutionMarker marker : store.getMarkers(instrumentAlias)) {
+            List<FilledExecutionMarker> markers = store.getMarkersForDisplay(
+                    instrumentAlias,
+                    areLabelsPersistent(),
+                    TimeUnit.MILLISECONDS.toNanos(System.currentTimeMillis()));
+            for (FilledExecutionMarker marker : markers) {
                 if (isVisible(marker)) {
                     visible.add(marker);
                 }

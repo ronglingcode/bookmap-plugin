@@ -36,4 +36,13 @@ class IndicatorConfigTest {
         config.setEnabled(IndicatorConfig.BOOKMAP_PATTERN_SIGNALS, false);
         assertFalse(config.isEnabled(IndicatorConfig.BOOKMAP_PATTERN_SIGNALS));
     }
+
+    @Test
+    void filledExecutionLabelsArePersistentByDefaultAndCanUseTimedMode() {
+        IndicatorConfig config = new IndicatorConfig();
+
+        assertTrue(config.isEnabled(IndicatorConfig.FILLED_EXECUTION_MARKERS));
+        config.setEnabled(IndicatorConfig.FILLED_EXECUTION_MARKERS, false);
+        assertFalse(config.isEnabled(IndicatorConfig.FILLED_EXECUTION_MARKERS));
+    }
 }

@@ -13,6 +13,8 @@ import java.util.concurrent.CopyOnWriteArrayList;
  */
 public class FilledExecutionStore {
 
+    public static final long TRANSIENT_DISPLAY_TTL_NS = 30_000_000_000L;
+
     @FunctionalInterface
     public interface ChangeListener {
         void onFilledExecutionsChanged(String instrumentAlias);
@@ -44,6 +46,25 @@ public class FilledExecutionStore {
             return Collections.emptyList();
         }
         return Collections.unmodifiableList(new ArrayList<>(markers));
+    }
+
+    /**
+     * Returns every marker in persistent mode, or only executions no more than 30 seconds old.
+     */
+    public List<FilledExecutionMarker> getMarkersForDisplay(
+            String instrumentAlias, boolean persistent, long nowNs) {
+        List<FilledExecutionMarker> markers = getMarkers(instrumentAlias);
+        if (persistent || markers.isEmpty()) {
+            return markers;
+        }
+
+        List<FilledExecutionMarker> recent = new ArrayList<>();
+        for (FilledExecutionMarker marker : markers) {
+            if (nowNs - marker.getTimeNs() <= TRANSIENT_DISPLAY_TTL_NS) {
+                recent.add(marker);
+            }
+        }
+        return Collections.unmodifiableList(recent);
     }
 
     public void clearAll(String instrumentAlias) {
