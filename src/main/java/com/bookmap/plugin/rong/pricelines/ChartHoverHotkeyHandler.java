@@ -31,6 +31,8 @@ import javax.swing.text.JTextComponent;
 import com.bookmap.plugin.rong.IndicatorConfig;
 import com.bookmap.plugin.rong.PluginLog;
 import com.bookmap.plugin.rong.SignalWebSocketServer;
+import com.bookmap.plugin.rong.WallThresholdConfig;
+import com.bookmap.plugin.rong.tradebuttons.TradebookButtonGroup;
 import com.google.gson.JsonObject;
 
 import velox.api.layer1.layers.strategies.interfaces.ScreenSpaceCanvasFactory;
@@ -54,6 +56,7 @@ public class ChartHoverHotkeyHandler implements ScreenSpacePainterFactory {
 
     /** Prefix used when registering this painter (see plugin initialize methods). */
     public static final String PAINTER_NAME_PREFIX = "hoverHotkey_";
+    private static final int ORDERBOOK_PROTECTED_ABSOLUTE_LEVELS = 2;
     private static final ZoneId NEW_YORK_TIME_ZONE = ZoneId.of("America/New_York");
     private static final LocalTime MARKET_CLOSE_TIME = LocalTime.of(16, 0);
 
@@ -79,7 +82,7 @@ public class ChartHoverHotkeyHandler implements ScreenSpacePainterFactory {
     /** Chart hotkeys forwarded to ViteApp with the currently hovered Bookmap price. */
     private static final Set<String> CHART_HOTKEYS =
             Set.of(
-                    "a", "g", "t", "w",
+                    "a", "b", "g", "s", "t", "w",
                     "1", "2", "3", "4", "5", "6", "7", "8", "9", "0",
                     "numpad1", "numpad2", "numpad3", "numpad4", "numpad5",
                     "numpad6", "numpad7", "numpad8", "numpad9", "numpad0");
@@ -93,10 +96,15 @@ public class ChartHoverHotkeyHandler implements ScreenSpacePainterFactory {
 
     private final SignalWebSocketServer wsServer;
     private final IndicatorConfig config;
+    private final WallThresholdConfig wallThresholdConfig;
 
-    public ChartHoverHotkeyHandler(SignalWebSocketServer wsServer, IndicatorConfig config) {
+    public ChartHoverHotkeyHandler(
+            SignalWebSocketServer wsServer,
+            IndicatorConfig config,
+            WallThresholdConfig wallThresholdConfig) {
         this.wsServer = wsServer;
         this.config = config;
+        this.wallThresholdConfig = wallThresholdConfig;
         ensureAwtListener();
     }
 
@@ -192,6 +200,15 @@ public class ChartHoverHotkeyHandler implements ScreenSpacePainterFactory {
 
         String keyCode = toViteKeyCode(normalizedKey);
         boolean shiftDown = event.isShiftDown() || heldKeys.contains("shift");
+        String actionLog = formatHoverHotkeyActionLog(
+                hover.instrument, keyCode, hover.price, shiftDown);
+        PluginLog.action(hover.instrument, "Bookmap", actionLog);
+        if (isAfterMarketClose(Instant.now())) {
+            PluginLog.info("[Rong] " + actionLog
+                    + " logged but not sent after the 4:00 PM New York market close");
+            return;
+        }
+
         JsonObject json = new JsonObject();
         json.addProperty("type", "custom_button_click");
         json.addProperty("symbol", hover.instrument);
@@ -205,17 +222,44 @@ public class ChartHoverHotkeyHandler implements ScreenSpacePainterFactory {
         json.addProperty("source", "bookmap_chart_hotkey");
         json.addProperty("timestamp", System.currentTimeMillis());
 
-        String actionLog = formatHoverHotkeyActionLog(
-                hover.instrument, keyCode, hover.price, shiftDown);
-        PluginLog.action(hover.instrument, "Bookmap", actionLog);
-        if (isAfterMarketClose(Instant.now())) {
-            PluginLog.info("[Rong] " + actionLog
-                    + " logged but not sent after the 4:00 PM New York market close");
-            return;
+        if (isWallReversalHotkey(normalizedKey)) {
+            boolean bidWallReversal = "b".equals(normalizedKey);
+            TradebookButtonGroup tradebook =
+                    wsServer.getPrimaryWallReversalTradebook(hover.instrument, bidWallReversal);
+            if (tradebook == null || tradebook.getEntryMethods().isEmpty()) {
+                PluginLog.info("[Rong] " + actionLog
+                        + " blocked because no matching Bookmap wall-reversal button is enabled");
+                return;
+            }
+
+            String entryMethod = tradebook.getEntryMethods().get(0);
+            json.addProperty(
+                    "pattern",
+                    bidWallReversal
+                            ? "bookmap_bid_wall_reversal"
+                            : "bookmap_offer_wall_reversal");
+            json.addProperty("use_market_order", false);
+            json.addProperty("order_type", "breakout");
+            json.addProperty("side", tradebook.getSide());
+            json.addProperty("tradebook_id", tradebook.getTradebookId());
+            json.addProperty("tradebook_name", tradebook.getTradebookName());
+            json.addProperty("entry_method", entryMethod);
+            wsServer.appendRegularSessionHighLow(hover.instrument, json);
+            wsServer.appendOrderbookSnapshot(
+                    hover.instrument,
+                    json,
+                    getWallThresholdFloor(),
+                    ORDERBOOK_PROTECTED_ABSOLUTE_LEVELS);
         }
 
         wsServer.broadcast(json.toString());
         PluginLog.info("[Rong] " + actionLog + " sent");
+    }
+
+    private int getWallThresholdFloor() {
+        return wallThresholdConfig == null
+                ? WallThresholdConfig.DEFAULT_THRESHOLD_FLOOR
+                : Math.max(0, wallThresholdConfig.getThresholdFloor());
     }
 
     private static HoverContext resolveCurrentHoverContext() {
@@ -449,6 +493,10 @@ public class ChartHoverHotkeyHandler implements ScreenSpacePainterFactory {
 
     static boolean isChartHotkey(String normalizedKey) {
         return CHART_HOTKEYS.contains(normalizedKey);
+    }
+
+    static boolean isWallReversalHotkey(String normalizedKey) {
+        return "b".equals(normalizedKey) || "s".equals(normalizedKey);
     }
 
     static String formatHoverHotkeyActionLog(

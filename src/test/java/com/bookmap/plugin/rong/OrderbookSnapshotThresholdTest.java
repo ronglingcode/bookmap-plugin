@@ -109,6 +109,27 @@ class OrderbookSnapshotThresholdTest {
         assertFalse(server.hasEnabledPatternTradebook("WEN", PatternType.BID_WALL_BREAKDOWN));
     }
 
+    @Test
+    void primaryWallReversalFollowsTradeButtonOrderAndSide() {
+        SignalWebSocketServer server = new SignalWebSocketServer(0, 90, 1000);
+        JsonObject config = new JsonObject();
+        config.addProperty("type", "trade_button_config");
+        config.addProperty("symbol", "WEN");
+        JsonArray tradebooks = new JsonArray();
+        tradebooks.add(tradebook("GapGiveAndGoBookmapReversal", "long", "0.25 R"));
+        tradebooks.add(tradebook("RangeBoundBidReversal", "long", "0.025 R"));
+        tradebooks.add(tradebook("GapAndCrapOfferStepDownReappear", "short", "0.25 R"));
+        config.add("tradebooks", tradebooks);
+        server.onMessage(null, config.toString());
+
+        assertEquals(
+                "GapGiveAndGoBookmapReversal",
+                server.getPrimaryWallReversalTradebook("WEN", true).getTradebookId());
+        assertEquals(
+                "GapAndCrapOfferStepDownReappear",
+                server.getPrimaryWallReversalTradebook("WEN", false).getTradebookId());
+    }
+
     private static List<Integer> sizes(JsonArray levels) {
         return levels.asList().stream()
                 .map(level -> level.getAsJsonArray().get(1).getAsInt())

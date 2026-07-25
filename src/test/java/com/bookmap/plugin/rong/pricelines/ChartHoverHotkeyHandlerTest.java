@@ -33,6 +33,17 @@ class ChartHoverHotkeyHandlerTest {
     }
 
     @Test
+    void buyAndSellKeysMapToWallReversalHotkeys() {
+        assertTrue(ChartHoverHotkeyHandler.isChartHotkey("b"));
+        assertTrue(ChartHoverHotkeyHandler.isWallReversalHotkey("b"));
+        assertEquals("KeyB", ChartHoverHotkeyHandler.toViteKeyCode("b"));
+
+        assertTrue(ChartHoverHotkeyHandler.isChartHotkey("s"));
+        assertTrue(ChartHoverHotkeyHandler.isWallReversalHotkey("s"));
+        assertEquals("KeyS", ChartHoverHotkeyHandler.toViteKeyCode("s"));
+    }
+
+    @Test
     void hoverHotkeyActionLogContainsEveryRequiredField() {
         assertEquals(
                 "hover_key AAPL Numpad3 @ 12.35 + shift",

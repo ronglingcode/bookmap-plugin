@@ -149,7 +149,8 @@ public class RongPlugin implements CustomModuleAdapter,
                 replayExportConfig = new ReplayExportConfig();
             }
             if (chartHoverHotkeyHandler == null) {
-                chartHoverHotkeyHandler = new ChartHoverHotkeyHandler(sharedServer, indicatorConfig);
+                chartHoverHotkeyHandler = new ChartHoverHotkeyHandler(
+                        sharedServer, indicatorConfig, wallThresholdConfig);
             }
             if (priceLineStore == null) {
                 priceLineStore = new PriceLineStore();

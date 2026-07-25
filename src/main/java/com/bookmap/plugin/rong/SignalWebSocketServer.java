@@ -340,6 +340,31 @@ public class SignalWebSocketServer extends WebSocketServer {
         return false;
     }
 
+    /**
+     * Returns the first enabled wall-reversal tradebook for the requested side.
+     * This is the same ordering pushed by ViteApp and rendered in the trade-button window.
+     */
+    public TradebookButtonGroup getPrimaryWallReversalTradebook(
+            String symbol, boolean bidWallReversal) {
+        String cleanSymbol = SymbolUtils.cleanSymbol(symbol);
+        List<TradebookButtonGroup> tradebooks = symbolToTradebooks.get(cleanSymbol);
+        if (tradebooks == null || tradebooks.isEmpty()) {
+            return null;
+        }
+        PatternType patternType =
+                bidWallReversal ? PatternType.BID_REAPPEAR : PatternType.OFFER_REAPPEAR;
+        for (TradebookButtonGroup tradebook : tradebooks) {
+            if (tradebook.getEntryMethods().isEmpty()
+                    || !matchesDirection(tradebook, patternType)) {
+                continue;
+            }
+            if (isMatchingWallReversalTradebook(tradebook, patternType)) {
+                return tradebook;
+            }
+        }
+        return null;
+    }
+
     public void registerKeyLevelConfigListener(KeyLevelConfigListener listener) {
         keyLevelConfigListeners.add(listener);
         for (Map.Entry<String, List<KeyLevelDefinition>> entry : symbolToKeyLevels.entrySet()) {

@@ -26,7 +26,7 @@ This repository produces two Bookmap addon plugins in the same build:
 
 ## Features
 
-- **Chart keyboard hotkeys** — when enabled, top-row digits adjust indexed exits and numpad digits market out indexed partials for the chart under the pointer
+- **Chart keyboard hotkeys** — when enabled, B/S place bid/offer wall-reversal stop entries at the hovered price, top-row digits adjust indexed exits, and numpad digits market out indexed partials
 - **Order wall breakout detection** — monitors large ask-side walls and broadcasts signals when consumed
 - **Auto-drawn indicators** — premarket high/low and Camarilla Pivot levels drawn automatically
 - **WebSocket key levels/zones** — instrument-specific price levels and zones pushed by an external app
