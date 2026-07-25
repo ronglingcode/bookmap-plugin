@@ -18,21 +18,19 @@ This repository produces two Bookmap addon plugins in the same build:
 3. When price trades above a consumed wall, broadcasts a breakout signal via WebSocket
 
 **Chart drawing:**
-4. Hold an action key and left-click on the chart to send the key and clicked price via WebSocket
-5. Premarket high/low lines are drawn and updated automatically during 4:00-9:30 AM ET
-6. Key price levels received over WebSocket are drawn on the matching instrument
-7. Large liquidity walls are labeled directly on the heatmap using compact growth paths like `5→7→10`
-8. Wall labels retain the increasing size path seen at each level and start a new phase label after 2x growth
-9. All lines and labels use Bookmap's data coordinates so they track through scroll and zoom
+4. Premarket high/low lines are drawn and updated automatically during 4:00-9:30 AM ET
+5. Key price levels received over WebSocket are drawn on the matching instrument
+6. Large liquidity walls are labeled directly on the heatmap using compact growth paths like `5→7→10`
+7. Wall labels retain the increasing size path seen at each level and start a new phase label after 2x growth
+8. All lines and labels use Bookmap's data coordinates so they track through scroll and zoom
 
 ## Features
 
 - **Chart keyboard hotkeys** — when enabled, top-row digits adjust indexed exits and numpad digits market out indexed partials for the chart under the pointer
 - **Order wall breakout detection** — monitors large ask-side walls and broadcasts signals when consumed
-- **Key+left-click pass-through** — sends the pressed key and clicked chart price to the trading bot
 - **Auto-drawn indicators** — premarket high/low and Camarilla Pivot levels drawn automatically
 - **WebSocket key levels/zones** — instrument-specific price levels and zones pushed by an external app
-- **WebSocket API** — real-time breakout, order book, and price select messages
+- **WebSocket API** — real-time breakout and order book messages
 - **Settings panels** — enable/disable indicators and optionally export replay data
 
 ## Project Structure
@@ -43,8 +41,8 @@ bookmap-plugin/
 ├── settings.gradle
 └── src/main/java/com/bookmap/plugin/rong/
     ├── RongPlugin              # @Layer1StrategyName("Rong")
-    ├── pricelines/             # Line model, storage, painting, and click price mapping
-    │   ├── ChartClickHandler   # Key+left-click detection & coordinate mapping
+    ├── pricelines/             # Line model, storage, painting, and hover price mapping
+    │   ├── ChartHoverHotkeyHandler # Hover-key detection & coordinate mapping
     │   └── PriceLine*/PriceZone* # Level/zone model, storage, and painting
     ├── orderwall/              # Large wall detection, labels, and painting
     │   └── OrderWall*
@@ -144,7 +142,6 @@ The plugin exposes a WebSocket server on `ws://localhost:8765`. Clients receive 
 | -------------- | -------------------------------------------- | ------------------------------------- |
 | `breakout`     | Wall breakout signal                         | On event                              |
 | `orderbook`    | Order book snapshot (filtered by percentile) | At subscription interval (default 1s) |
-| `priceSelect`  | Key+left-click price selection from chart    | On event                              |
 | `subscribed`   | Confirmation of orderbook subscription       | Once on subscribe                     |
 | `unsubscribed` | Confirmation of orderbook unsubscription     | Once on unsubscribe                   |
 
@@ -211,14 +208,6 @@ interface OrderBook {
   largeAsks: [number, number][]; // [price, size][]
 }
 
-interface PriceSelect {
-  type: "priceSelect";
-  symbol: string;
-  price: number;
-  keyCode: string;
-  timestamp: number;
-}
-
 interface Subscribed {
   type: "subscribed";
   channel: string;
@@ -226,12 +215,11 @@ interface Subscribed {
   percentile: number;
 }
 
-type BookmapMessage = Breakout | OrderBook | PriceSelect | Subscribed;
+type BookmapMessage = Breakout | OrderBook | Subscribed;
 
 function connectToBookmap(
   onBreakout: (signal: Breakout) => void,
-  onOrderBook?: (book: OrderBook) => void,
-  onPriceSelect?: (select: PriceSelect) => void
+  onOrderBook?: (book: OrderBook) => void
 ) {
   const ws = new WebSocket("ws://localhost:8765");
 
@@ -252,10 +240,6 @@ function connectToBookmap(
         onOrderBook?.(data);
         break;
 
-      case "priceSelect":
-        onPriceSelect?.(data);
-        break;
-
       case "subscribed":
         console.log(`Subscribed to ${data.channel} (every ${data.intervalMs}ms)`);
         break;
@@ -264,18 +248,12 @@ function connectToBookmap(
 
   ws.onclose = () => {
     console.log("Disconnected from Bookmap plugin");
-    setTimeout(() => connectToBookmap(onBreakout, onOrderBook, onPriceSelect), 3000);
+    setTimeout(() => connectToBookmap(onBreakout, onOrderBook), 3000);
   };
 
   return ws;
 }
 ```
-
-## Price Select Clicks
-
-Hold an action key and left-click on the chart to broadcast a `priceSelect` message via WebSocket. The plugin sends the pressed key and clicked price to the trading bot; it does not interpret those keys or draw manual stop loss, take profit, or entry lines locally.
-
-Auto-drawn price levels still track through scroll and zoom. These include premarket high/low, Camarilla Pivot levels, key levels received over WebSocket, and broker-managed exits.
 
 ## Indicators (Auto-Drawn Levels)
 
@@ -360,7 +338,7 @@ All logs are written under `~/Bookmap/` (`C:\Users\{username}\Bookmap\` on Windo
 | Log | Directory | Files |
 | --- | --------- | ----- |
 | **Plugin logs** | `~/Bookmap/plugin_logs/` | `{datetime}.txt` — one per session |
-| **Signal logs** | `~/Bookmap/bookmap-signals/` | `breakout.jsonl`, `click-debug.log` |
+| **Signal logs** | `~/Bookmap/bookmap-signals/` | `breakout.jsonl` |
 
 On Windows, the full paths are:
 - `C:\Users\{username}\Bookmap\plugin_logs\`
@@ -373,7 +351,7 @@ Plugin log files are named by session start time, e.g. `2026-03-21_10-30-45.txt`
 2026-03-21 10:30:45.456 [INFO] [KeyLevel] Updated 2 websocket key levels for AAPL and 12 cam pivot(s)
 ```
 
-Signal logs (`breakout.jsonl`) are appended in JSONL format (one JSON object per line). The `click-debug.log` records key+left-click events with millisecond timestamps.
+Signal logs (`breakout.jsonl`) are appended in JSONL format (one JSON object per line).
 
 ### Settings Panels
 

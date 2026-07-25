@@ -23,7 +23,7 @@ import com.bookmap.plugin.rong.patterns.BookmapPatternSignal;
 import com.bookmap.plugin.rong.patterns.PatternSignalLogger;
 import com.bookmap.plugin.rong.patterns.PatternSignalPainter;
 import com.bookmap.plugin.rong.patterns.PatternSignalStore;
-import com.bookmap.plugin.rong.pricelines.ChartClickHandler;
+import com.bookmap.plugin.rong.pricelines.ChartHoverHotkeyHandler;
 import com.bookmap.plugin.rong.pricelines.PriceLinePainter;
 import com.bookmap.plugin.rong.pricelines.PriceLineStore;
 import com.bookmap.plugin.rong.pricelines.PriceZonePainter;
@@ -78,7 +78,7 @@ public class RongPlugin implements CustomModuleAdapter,
     // Shared WebSocket server across all symbol instances
     private static SignalWebSocketServer sharedServer;
     private static int instanceCount = 0;
-    private static ChartClickHandler chartClickHandler;
+    private static ChartHoverHotkeyHandler chartHoverHotkeyHandler;
     private static PriceLineStore priceLineStore;
     private static PriceLinePainter priceLinePainter;
     private static PriceZoneStore priceZoneStore;
@@ -148,8 +148,8 @@ public class RongPlugin implements CustomModuleAdapter,
             if (replayExportConfig == null) {
                 replayExportConfig = new ReplayExportConfig();
             }
-            if (chartClickHandler == null) {
-                chartClickHandler = new ChartClickHandler(sharedServer, indicatorConfig);
+            if (chartHoverHotkeyHandler == null) {
+                chartHoverHotkeyHandler = new ChartHoverHotkeyHandler(sharedServer, indicatorConfig);
             }
             if (priceLineStore == null) {
                 priceLineStore = new PriceLineStore();
@@ -210,7 +210,7 @@ public class RongPlugin implements CustomModuleAdapter,
                 IndicatorConfig.BOOKMAP_PATTERN_SIGNALS);
         indicatorConfig.addChangeListener(this);
         sharedServer.registerSymbol(cleanAlias, orderBook, info.pips);
-        chartClickHandler.registerSymbol(cleanAlias, info.pips);
+        chartHoverHotkeyHandler.registerSymbol(cleanAlias, info.pips);
         priceZonePainter.registerInstrument(cleanAlias);
         priceLinePainter.registerInstrument(cleanAlias);
         wallLabelPainter.registerInstrument(cleanAlias);
@@ -220,8 +220,8 @@ public class RongPlugin implements CustomModuleAdapter,
 
         // Register ScreenSpacePainter to receive chart coordinate mappings
         api.sendUserMessage(Layer1ApiUserMessageModifyScreenSpacePainter.builder(
-                RongPlugin.class, "clickHandler_" + cleanAlias)
-                .setScreenSpacePainterFactory(chartClickHandler)
+                RongPlugin.class, ChartHoverHotkeyHandler.PAINTER_NAME_PREFIX + cleanAlias)
+                .setScreenSpacePainterFactory(chartHoverHotkeyHandler)
                 .setIsAdd(true)
                 .build());
 
@@ -316,8 +316,8 @@ public class RongPlugin implements CustomModuleAdapter,
             tradeButtonWindow.dispose();
             tradeButtonWindow = null;
         }
-        if (chartClickHandler != null) {
-            chartClickHandler.unregisterSymbol(alias);
+        if (chartHoverHotkeyHandler != null) {
+            chartHoverHotkeyHandler.unregisterSymbol(alias);
         }
         if (priceZonePainter != null) {
             priceZonePainter.unregisterInstrument(alias);
@@ -339,8 +339,8 @@ public class RongPlugin implements CustomModuleAdapter,
         }
         // Unregister ScreenSpacePainters
         api.sendUserMessage(Layer1ApiUserMessageModifyScreenSpacePainter.builder(
-                RongPlugin.class, "clickHandler_" + alias)
-                .setScreenSpacePainterFactory(chartClickHandler)
+                RongPlugin.class, ChartHoverHotkeyHandler.PAINTER_NAME_PREFIX + alias)
+                .setScreenSpacePainterFactory(chartHoverHotkeyHandler)
                 .setIsAdd(false)
                 .build());
         api.sendUserMessage(Layer1ApiUserMessageModifyScreenSpacePainter.builder(
@@ -416,7 +416,7 @@ public class RongPlugin implements CustomModuleAdapter,
         synchronized (RongPlugin.class) {
             instanceCount--;
             if (instanceCount <= 0 && sharedServer != null) {
-                ChartClickHandler.removeAwtListener();
+                ChartHoverHotkeyHandler.removeAwtListener();
                 if (keyLevelManager != null) {
                     sharedServer.unregisterKeyLevelConfigListener(keyLevelManager);
                     keyLevelManager.shutdown();
@@ -465,7 +465,7 @@ public class RongPlugin implements CustomModuleAdapter,
                 ActionLogWindow.dispose();
                 sharedServer.shutdown();
                 sharedServer = null;
-                chartClickHandler = null;
+                chartHoverHotkeyHandler = null;
                 priceLineStore = null;
                 priceLinePainter = null;
                 priceZoneStore = null;

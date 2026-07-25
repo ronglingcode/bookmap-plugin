@@ -14,16 +14,13 @@ import java.awt.Window;
 import java.awt.event.AWTEventListener;
 import java.awt.event.KeyEvent;
 import java.awt.event.MouseEvent;
-import java.io.BufferedWriter;
-import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
-import java.nio.file.StandardOpenOption;
-import java.util.Map;
-import java.util.Set;
+import java.time.Instant;
+import java.time.LocalTime;
+import java.time.ZoneId;
 import java.util.Collections;
 import java.util.Locale;
+import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import javax.swing.JComboBox;
 import javax.swing.JLabel;
@@ -42,21 +39,23 @@ import velox.api.layer1.layers.strategies.interfaces.ScreenSpacePainterAdapter;
 import velox.api.layer1.layers.strategies.interfaces.ScreenSpacePainterFactory;
 
 /**
- * Handles key+left-click on Bookmap chart to select a price level.
+ * Forwards supported keyboard actions with the currently hovered Bookmap chart price.
  *
  * Uses ScreenSpacePainterAdapter to receive chart coordinate mappings,
- * and a global AWT mouse listener to detect key+left-click events.
- * Converts the click Y coordinate to a price and broadcasts it via WebSocket.
+ * a global AWT mouse-motion listener to track the current chart price, and a
+ * keyboard listener to broadcast supported hotkeys via WebSocket.
  *
  * NOTE: The ScreenSpacePainterFactory creates one painter per chart.
- * The painter's alias parameter is the full painter name (e.g. "RongPlugin#clickHandler"),
+ * The painter's alias parameter is the full painter name (e.g. "RongPlugin#hoverHotkey"),
  * NOT the instrument symbol. We maintain a separate mapping of painterAlias → instrumentAlias
  * to resolve the correct symbol when broadcasting.
  */
-public class ChartClickHandler implements ScreenSpacePainterFactory {
+public class ChartHoverHotkeyHandler implements ScreenSpacePainterFactory {
 
     /** Prefix used when registering this painter (see plugin initialize methods). */
-    public static final String PAINTER_NAME_PREFIX = "clickHandler_";
+    public static final String PAINTER_NAME_PREFIX = "hoverHotkey_";
+    private static final ZoneId NEW_YORK_TIME_ZONE = ZoneId.of("America/New_York");
+    private static final LocalTime MARKET_CLOSE_TIME = LocalTime.of(16, 0);
 
     /** Coordinate state keyed by painter alias (from createScreenSpacePainter). */
     private static final Map<String, CoordinateState> painterCoords = new ConcurrentHashMap<>();
@@ -70,8 +69,8 @@ public class ChartClickHandler implements ScreenSpacePainterFactory {
     /** The most recently registered instrument alias — used as last-resort default. */
     private static volatile String lastRegisteredInstrument;
 
-    /** Cache: clicked top-level Window → resolved instrument alias.
-     *  Avoids re-walking the AWT tree on every click. */
+    /** Cache: hovered top-level Window → resolved instrument alias.
+     *  Avoids re-walking the AWT tree on every mouse move. */
     private static final Map<Window, String> windowToInstrument = new ConcurrentHashMap<>();
 
     /** Currently held non-modifier keys (e.g. 'b', 's'). Tracked via KEY_PRESSED/KEY_RELEASED. */
@@ -92,44 +91,21 @@ public class ChartClickHandler implements ScreenSpacePainterFactory {
     private static volatile AWTEventListener awtListener;
     private static final Object listenerLock = new Object();
 
-    private static volatile BufferedWriter clickLogWriter;
     private final SignalWebSocketServer wsServer;
     private final IndicatorConfig config;
 
-    public ChartClickHandler(SignalWebSocketServer wsServer, IndicatorConfig config) {
+    public ChartHoverHotkeyHandler(SignalWebSocketServer wsServer, IndicatorConfig config) {
         this.wsServer = wsServer;
         this.config = config;
-        initClickLog();
         ensureAwtListener();
-    }
-
-    private static void initClickLog() {
-        if (clickLogWriter != null) return;
-        try {
-            Path logFile = Paths.get(System.getProperty("user.home"), "Bookmap", "bookmap-signals", "click-debug.log");
-            Files.createDirectories(logFile.getParent());
-            clickLogWriter = Files.newBufferedWriter(logFile, StandardOpenOption.CREATE, StandardOpenOption.APPEND);
-        } catch (IOException e) {
-            PluginLog.error("[Rong] Failed to open click log: " + e.getMessage());
-        }
-    }
-
-    private static void logClick(String msg) {
-        PluginLog.info(msg);
-        if (clickLogWriter != null) {
-            try {
-                clickLogWriter.write(System.currentTimeMillis() + " " + msg);
-                clickLogWriter.newLine();
-                clickLogWriter.flush();
-            } catch (IOException ignored) {}
-        }
     }
 
     /** Register an instrument's pips before the painter is created. */
     public void registerSymbol(String instrumentAlias, double pips) {
         instrumentPips.put(instrumentAlias, pips);
         lastRegisteredInstrument = instrumentAlias;
-        PluginLog.info("[Rong] ChartClickHandler registered instrument: " + instrumentAlias + " pips=" + pips);
+        PluginLog.info("[Rong] ChartHoverHotkeyHandler registered instrument: "
+                + instrumentAlias + " pips=" + pips);
     }
 
     public void unregisterSymbol(String instrumentAlias) {
@@ -181,95 +157,10 @@ public class ChartClickHandler implements ScreenSpacePainterFactory {
                     updateHoverContext((MouseEvent) event);
                     return;
                 }
-
-                if (event.getID() != MouseEvent.MOUSE_CLICKED) return;
-                MouseEvent me = (MouseEvent) event;
-                if (me.getButton() != MouseEvent.BUTTON1) return;
-
-                // Require at least one key held during click (any key works)
-                if (heldKeys.isEmpty() && !me.isMetaDown() && !me.isControlDown()
-                        && !me.isShiftDown() && !me.isAltDown()) return;
-
-                // Build keyCode from all held keys
-                String keyCode = String.join("+", heldKeys);
-                if (keyCode.isEmpty()) {
-                    // Only modifier flags detected (no KEY_PRESSED events for modifiers on some platforms)
-                    if (me.isMetaDown() || me.isControlDown()) keyCode = "cmd";
-                    else if (me.isShiftDown()) keyCode = "shift";
-                    else if (me.isAltDown()) keyCode = "alt";
-                }
-
-                int localY = me.getY();
-                java.awt.Component comp = me.getComponent();
-                int compHeight = (comp != null) ? comp.getHeight() : 0;
-
-                // Identify which chart was actually clicked by inspecting the AWT hierarchy
-                // of the clicked component. This is the fix for "click on stock A sends price
-                // for stock B" — multiple painters may have valid fractions when chart layouts
-                // are similar, so we must use the actual clicked component as the source of truth.
-                String clickedInstrument = identifyInstrumentFromComponent(comp);
-
-                logClick("[Rong] Click: localY=" + localY
-                    + ", compHeight=" + compHeight
-                    + ", keyCode=" + keyCode
-                    + ", clickedInstrument=" + clickedInstrument);
-
-                // Find the painter whose chart contains the click (fraction in [0,1]).
-                // If we identified the chart from the AWT hierarchy, only consider painters
-                // that map to that instrument.
-                String bestInstrument = null;
-                double bestPrice = Double.NaN;
-
-                for (Map.Entry<String, CoordinateState> entry : painterCoords.entrySet()) {
-                    String painterAlias = entry.getKey();
-                    CoordinateState cs = entry.getValue();
-                    if (cs.pixelsHeight <= 0 || cs.priceHeight <= 0) continue;
-
-                    String instrument = painterToInstrument.getOrDefault(painterAlias, lastRegisteredInstrument);
-                    if (instrument == null) instrument = painterAlias;
-
-                    // If we know which instrument was clicked, skip painters for other instruments.
-                    if (clickedInstrument != null && !clickedInstrument.equals(instrument)) {
-                        continue;
-                    }
-
-                    double pips = instrumentPips.getOrDefault(instrument, 1.0);
-
-                    double fraction = cs.fraction(localY, compHeight);
-                    double priceTick = cs.yToPriceTick(localY, compHeight);
-                    double price = priceTick * pips;
-
-                    logClick("[Rong] Painter " + painterAlias + " → " + instrument
-                        + ": fraction=" + String.format("%.4f", fraction)
-                        + ", price=" + String.format("%.6f", price)
-                        + ", pixelsBottom=" + cs.pixelsBottom + ", pixelsHeight=" + cs.pixelsHeight
-                        + ", priceBottom=" + cs.priceBottom + ", priceHeight=" + cs.priceHeight);
-
-                    if (fraction >= 0 && fraction <= 1 && !Double.isNaN(price) && price > 0) {
-                        bestInstrument = instrument;
-                        bestPrice = price;
-                        break;
-                    }
-                }
-
-                if (bestInstrument != null) {
-                    String json = String.format(
-                        "{\"type\":\"priceSelect\",\"symbol\":\"%s\",\"price\":%.6f,\"keyCode\":\"%s\",\"timestamp\":%d}",
-                        bestInstrument, bestPrice, keyCode, System.currentTimeMillis());
-                    wsServer.broadcastSignal(json);
-                    logClick("[Rong] Price select: " + bestInstrument + " @ " + bestPrice
-                        + " keyCode=" + keyCode);
-                    if (isActionKey(keyCode)) {
-                        PluginLog.action(bestInstrument, "Click send " + keyCode + " @ "
-                                + String.format("%.2f", bestPrice));
-                    }
-                } else {
-                    logClick("[Rong] Click: no painter matched bounds");
-                }
             };
             Toolkit.getDefaultToolkit().addAWTEventListener(awtListener,
-                AWTEvent.MOUSE_EVENT_MASK | AWTEvent.MOUSE_MOTION_EVENT_MASK | AWTEvent.KEY_EVENT_MASK);
-            PluginLog.info("[Rong] AWT mouse listener registered for key+left-click and chart hotkeys");
+                AWTEvent.MOUSE_MOTION_EVENT_MASK | AWTEvent.KEY_EVENT_MASK);
+            PluginLog.info("[Rong] AWT listener registered for chart hover hotkeys");
         }
     }
 
@@ -313,11 +204,17 @@ public class ChartClickHandler implements ScreenSpacePainterFactory {
         json.addProperty("price", hover.price);
         json.addProperty("source", "bookmap_chart_hotkey");
         json.addProperty("timestamp", System.currentTimeMillis());
-        wsServer.broadcast(json.toString());
 
         String actionLog = formatHoverHotkeyActionLog(
                 hover.instrument, keyCode, hover.price, shiftDown);
         PluginLog.action(hover.instrument, "Bookmap", actionLog);
+        if (isAfterMarketClose(Instant.now())) {
+            PluginLog.info("[Rong] " + actionLog
+                    + " logged but not sent after the 4:00 PM New York market close");
+            return;
+        }
+
+        wsServer.broadcast(json.toString());
         PluginLog.info("[Rong] " + actionLog + " sent");
     }
 
@@ -351,7 +248,7 @@ public class ChartClickHandler implements ScreenSpacePainterFactory {
 
     private static ResolvedChartPrice resolveChartPrice(Component comp, int localY) {
         int compHeight = (comp != null) ? comp.getHeight() : 0;
-        String clickedInstrument = identifyInstrumentFromComponent(comp);
+        String componentInstrument = identifyInstrumentFromComponent(comp);
 
         for (Map.Entry<String, CoordinateState> entry : painterCoords.entrySet()) {
             String painterAlias = entry.getKey();
@@ -361,7 +258,7 @@ public class ChartClickHandler implements ScreenSpacePainterFactory {
             String instrument = painterToInstrument.getOrDefault(painterAlias, lastRegisteredInstrument);
             if (instrument == null) instrument = painterAlias;
 
-            if (clickedInstrument != null && !clickedInstrument.equals(instrument)) {
+            if (componentInstrument != null && !componentInstrument.equals(instrument)) {
                 continue;
             }
 
@@ -472,7 +369,7 @@ public class ChartClickHandler implements ScreenSpacePainterFactory {
         painterCoords.put(alias, coords);
 
         // Resolve the instrument by parsing the painter name we registered with
-        // (Layer1ApiUserMessageModifyScreenSpacePainter.builder(..., "clickHandler_<symbol>")).
+        // (Layer1ApiUserMessageModifyScreenSpacePainter.builder(..., "hoverHotkey_<symbol>")).
         // The Bookmap API exposes that name in either `alias` or `fullName` — search both.
         // Falls back to `lastRegisteredInstrument` only if parsing fails (best-effort legacy path).
         String instrument = extractInstrumentFromPainterName(alias, fullName);
@@ -562,19 +459,16 @@ public class ChartClickHandler implements ScreenSpacePainterFactory {
                 + (shiftDown ? " + shift" : "");
     }
 
-    private static boolean isActionKey(String keyCode) {
-        if (keyCode == null) {
-            return false;
-        }
-        String key = keyCode.toLowerCase();
-        return key.matches("(^|.*\\+)([0-9]|b|s|g|t)(\\+.*|$)");
+    static boolean isAfterMarketClose(Instant instant) {
+        LocalTime newYorkTime = instant.atZone(NEW_YORK_TIME_ZONE).toLocalTime();
+        return !newYorkTime.isBefore(MARKET_CLOSE_TIME);
     }
 
     /**
      * Extract an instrument alias from the painter alias / fullName params passed to
-     * createScreenSpacePainter. We register painters with name "clickHandler_" + symbol,
+     * createScreenSpacePainter. We register painters with name "hoverHotkey_" + symbol,
      * and Bookmap typically wraps that into something like
-     * "RongPlugin#clickHandler_AAPL". So we look for our prefix and take
+     * "RongPlugin#hoverHotkey_AAPL". So we look for our prefix and take
      * everything after it.
      */
     static String extractInstrumentFromPainterName(String painterAlias, String fullName) {
@@ -604,18 +498,18 @@ public class ChartClickHandler implements ScreenSpacePainterFactory {
     }
 
     /**
-     * Determine which registered instrument the click belongs to by inspecting the AWT
-     * hierarchy of the clicked component. Strategies (in order):
+     * Determine which registered instrument a component belongs to by inspecting the AWT
+     * hierarchy. Strategies (in order):
      *   1) Cached lookup by top-level Window
      *   2) Window title contains a known instrument alias
      *   3) Any ancestor's Component name contains a known instrument alias
      *   4) Recursive search of the window for a JLabel whose text contains a known alias
      * Returns null if nothing matches; callers should fall back to the legacy heuristic.
      */
-    static String identifyInstrumentFromComponent(Component clickedComp) {
-        if (clickedComp == null) return null;
+    static String identifyInstrumentFromComponent(Component component) {
+        if (component == null) return null;
 
-        Window window = SwingUtilities.getWindowAncestor(clickedComp);
+        Window window = SwingUtilities.getWindowAncestor(component);
         if (window != null) {
             String cached = windowToInstrument.get(window);
             if (cached != null && instrumentPips.containsKey(cached)) {
@@ -636,8 +530,8 @@ public class ChartClickHandler implements ScreenSpacePainterFactory {
             }
         }
 
-        // Strategy 3: walk up parent chain of clicked component, check each Component.getName()
-        Component c = clickedComp;
+        // Strategy 3: walk up the component's parent chain and check each Component.getName()
+        Component c = component;
         while (c != null) {
             String hit = findKnownAliasIn(c.getName(), known);
             if (hit != null) {
@@ -720,7 +614,7 @@ public class ChartClickHandler implements ScreenSpacePainterFactory {
         volatile int pixelsHeight;  // pixel height of heatmap area
 
         /**
-         * Compute where a click falls in the heatmap (0 = bottom, 1 = top).
+         * Compute where a mouse coordinate falls in the heatmap (0 = bottom, 1 = top).
          *
          * Bookmap's pixelsBottom is a bottom margin: the heatmap bottom in
          * component-local top-down coords is (compHeight - pixelsBottom).
