@@ -23,6 +23,7 @@ import java.nio.file.StandardOpenOption;
 import java.util.Map;
 import java.util.Set;
 import java.util.Collections;
+import java.util.Locale;
 import java.util.concurrent.ConcurrentHashMap;
 import javax.swing.JComboBox;
 import javax.swing.JLabel;
@@ -78,7 +79,11 @@ public class ChartClickHandler implements ScreenSpacePainterFactory {
 
     /** Chart hotkeys forwarded to ViteApp with the currently hovered Bookmap price. */
     private static final Set<String> CHART_HOTKEYS =
-            Set.of("a", "g", "t", "w", "1", "2", "3", "4", "5", "6", "7", "8", "9", "0");
+            Set.of(
+                    "a", "g", "t", "w",
+                    "1", "2", "3", "4", "5", "6", "7", "8", "9", "0",
+                    "numpad1", "numpad2", "numpad3", "numpad4", "numpad5",
+                    "numpad6", "numpad7", "numpad8", "numpad9", "numpad0");
 
     /** Last resolved chart hover. Used so KEY_PRESSED can include the hovered chart price. */
     private static volatile HoverContext lastHoverContext;
@@ -275,7 +280,7 @@ public class ChartClickHandler implements ScreenSpacePainterFactory {
     }
 
     private void handleChartHotkey(KeyEvent event, String normalizedKey) {
-        if (!CHART_HOTKEYS.contains(normalizedKey)) {
+        if (!isChartHotkey(normalizedKey)) {
             return;
         }
         if (config == null || !config.isEnabled(IndicatorConfig.FIRE_KEYBOARD_EVENT)) {
@@ -310,10 +315,10 @@ public class ChartClickHandler implements ScreenSpacePainterFactory {
         json.addProperty("timestamp", System.currentTimeMillis());
         wsServer.broadcast(json.toString());
 
-        PluginLog.action(hover.instrument, "Hotkey send " + (shiftDown ? "Shift+" : "") + keyCode
-                + " @ " + formatPrice(hover.price));
-        PluginLog.info("[Rong] Chart hotkey " + (shiftDown ? "Shift+" : "") + keyCode
-                + " sent for " + hover.instrument + " @ " + formatPrice(hover.price));
+        String actionLog = formatHoverHotkeyActionLog(
+                hover.instrument, keyCode, hover.price, shiftDown);
+        PluginLog.action(hover.instrument, "Bookmap", actionLog);
+        PluginLog.info("[Rong] " + actionLog + " sent");
     }
 
     private static HoverContext resolveCurrentHoverContext() {
@@ -523,23 +528,38 @@ public class ChartClickHandler implements ScreenSpacePainterFactory {
         };
     }
 
-    private static String normalizeKey(KeyEvent event) {
+    static String normalizeKey(KeyEvent event) {
         int keyCode = event.getKeyCode();
         if (keyCode >= KeyEvent.VK_0 && keyCode <= KeyEvent.VK_9) {
             return Integer.toString(keyCode - KeyEvent.VK_0);
         }
         if (keyCode >= KeyEvent.VK_NUMPAD0 && keyCode <= KeyEvent.VK_NUMPAD9) {
-            return Integer.toString(keyCode - KeyEvent.VK_NUMPAD0);
+            return "numpad" + (keyCode - KeyEvent.VK_NUMPAD0);
         }
         return KeyEvent.getKeyText(keyCode).toLowerCase();
     }
 
-    private static String toViteKeyCode(String normalizedKey) {
+    static String toViteKeyCode(String normalizedKey) {
+        if (normalizedKey != null && normalizedKey.matches("numpad[0-9]")) {
+            return "Numpad" + normalizedKey.charAt(normalizedKey.length() - 1);
+        }
         if (normalizedKey != null && normalizedKey.length() == 1
                 && normalizedKey.charAt(0) >= '0' && normalizedKey.charAt(0) <= '9') {
             return "Digit" + normalizedKey;
         }
         return "Key" + normalizedKey.toUpperCase();
+    }
+
+    static boolean isChartHotkey(String normalizedKey) {
+        return CHART_HOTKEYS.contains(normalizedKey);
+    }
+
+    static String formatHoverHotkeyActionLog(
+            String symbol, String keyCode, double price, boolean shiftDown) {
+        return "hover_key " + symbol
+                + " " + keyCode
+                + " @ " + String.format(Locale.US, "%.2f", price)
+                + (shiftDown ? " + shift" : "");
     }
 
     private static boolean isActionKey(String keyCode) {

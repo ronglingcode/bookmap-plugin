@@ -27,6 +27,7 @@ This repository produces two Bookmap addon plugins in the same build:
 
 ## Features
 
+- **Chart keyboard hotkeys** — when enabled, top-row digits adjust indexed exits and numpad digits market out indexed partials for the chart under the pointer
 - **Order wall breakout detection** — monitors large ask-side walls and broadcasts signals when consumed
 - **Key+left-click pass-through** — sends the pressed key and clicked chart price to the trading bot
 - **Auto-drawn indicators** — premarket high/low and Camarilla Pivot levels drawn automatically

@@ -121,7 +121,7 @@ public class IndicatorSettingsPanel extends StrategyPanel {
 
         gbc.gridy++;
         JCheckBox fireKeyboardEventCheckbox = new JCheckBox(
-                "Fire Keyboard Hotkey Events (A/G/T/W, 0-9)",
+                "Fire Keyboard Hotkey Events (A/G/T/W, digits; numpad = market out)",
                 config.isEnabled(IndicatorConfig.FIRE_KEYBOARD_EVENT));
         fireKeyboardEventCheckbox.addActionListener(e ->
                 config.setEnabled(IndicatorConfig.FIRE_KEYBOARD_EVENT, fireKeyboardEventCheckbox.isSelected()));
