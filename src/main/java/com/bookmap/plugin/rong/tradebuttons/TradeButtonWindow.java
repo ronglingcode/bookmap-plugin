@@ -547,23 +547,7 @@ public class TradeButtonWindow {
     }
 
     private void sendHotkeyButtonMessage(String buttonId, String buttonName, String keyCode, boolean shiftKey) {
-        JsonObject json = new JsonObject();
-        json.addProperty("type", "custom_button_click");
-        json.addProperty("symbol", symbol);
-        json.addProperty("button_id", "hotkey:" + buttonId);
-        json.addProperty("button_name", buttonName);
-        json.addProperty("keyCode", keyCode);
-        json.addProperty("key_code", keyCode);
-        json.addProperty("shiftKey", shiftKey);
-        json.addProperty("shift_key", shiftKey);
-        json.addProperty("timestamp", System.currentTimeMillis());
-        server.appendRegularSessionHighLow(symbol, json);
-        server.broadcast(json.toString());
-        if (!"KeyF".equals(keyCode)) {
-            PluginLog.action(symbol, "Button send " + buttonName);
-        }
-        PluginLog.info("[TradeButton] " + buttonName + " clicked for " + symbol + " as "
-                + (shiftKey ? "Shift+" : "") + keyCode);
+        HotkeyButtonAction.send(server, symbol, buttonId, buttonName, keyCode, shiftKey);
     }
 
     private void sendWallOutButtonMessage() {

@@ -44,6 +44,20 @@ class ChartHoverHotkeyHandlerTest {
     }
 
     @Test
+    void cancelAndFlattenDoNotRequireHoveredPrices() {
+        assertTrue(ChartHoverHotkeyHandler.isChartHotkey("c"));
+        assertTrue(ChartHoverHotkeyHandler.isPriceIndependentHotkey("c"));
+        assertEquals("KeyC", ChartHoverHotkeyHandler.toViteKeyCode("c"));
+
+        assertTrue(ChartHoverHotkeyHandler.isChartHotkey("f"));
+        assertTrue(ChartHoverHotkeyHandler.isPriceIndependentHotkey("f"));
+        assertEquals("KeyF", ChartHoverHotkeyHandler.toViteKeyCode("f"));
+
+        assertFalse(ChartHoverHotkeyHandler.isPriceIndependentHotkey("b"));
+        assertFalse(ChartHoverHotkeyHandler.isPriceIndependentHotkey("1"));
+    }
+
+    @Test
     void hoverHotkeyActionLogContainsEveryRequiredField() {
         assertEquals(
                 "hover_key AAPL Numpad3 @ 12.35 + shift",

@@ -32,6 +32,7 @@ import com.bookmap.plugin.rong.IndicatorConfig;
 import com.bookmap.plugin.rong.PluginLog;
 import com.bookmap.plugin.rong.SignalWebSocketServer;
 import com.bookmap.plugin.rong.WallThresholdConfig;
+import com.bookmap.plugin.rong.tradebuttons.HotkeyButtonAction;
 import com.bookmap.plugin.rong.tradebuttons.TradebookButtonGroup;
 import com.google.gson.JsonObject;
 
@@ -79,15 +80,15 @@ public class ChartHoverHotkeyHandler implements ScreenSpacePainterFactory {
     /** Currently held non-modifier keys (e.g. 'b', 's'). Tracked via KEY_PRESSED/KEY_RELEASED. */
     private static final Set<String> heldKeys = Collections.newSetFromMap(new ConcurrentHashMap<>());
 
-    /** Chart hotkeys forwarded to ViteApp with the currently hovered Bookmap price. */
+    /** Chart hotkeys forwarded to ViteApp from the currently hovered Bookmap chart. */
     private static final Set<String> CHART_HOTKEYS =
             Set.of(
-                    "a", "b", "g", "s", "t", "w",
+                    "a", "b", "c", "f", "g", "s", "t", "w",
                     "1", "2", "3", "4", "5", "6", "7", "8", "9", "0",
                     "numpad1", "numpad2", "numpad3", "numpad4", "numpad5",
                     "numpad6", "numpad7", "numpad8", "numpad9", "numpad0");
 
-    /** Last resolved chart hover. Used so KEY_PRESSED can include the hovered chart price. */
+    /** Last resolved chart hover. Cancel/flatten only require its instrument and component. */
     private static volatile HoverContext lastHoverContext;
 
     /** Shared AWT listener — registered once. */
@@ -122,6 +123,10 @@ public class ChartHoverHotkeyHandler implements ScreenSpacePainterFactory {
         painterToInstrument.entrySet().removeIf(e -> e.getValue().equals(instrumentAlias));
         // Drop cached window mappings so a re-opened chart resolves fresh
         windowToInstrument.entrySet().removeIf(e -> e.getValue().equals(instrumentAlias));
+        HoverContext hover = lastHoverContext;
+        if (hover != null && instrumentAlias.equals(hover.instrument)) {
+            lastHoverContext = null;
+        }
     }
 
     /** Remove the global AWT listener so a fresh one can be registered on next init. */
@@ -175,7 +180,14 @@ public class ChartHoverHotkeyHandler implements ScreenSpacePainterFactory {
     private void updateHoverContext(MouseEvent event) {
         Component component = event.getComponent();
         ResolvedChartPrice price = resolveChartPrice(component, event.getY());
-        lastHoverContext = price == null ? null : new HoverContext(price.instrument, price.price, component);
+        if (price != null) {
+            lastHoverContext = new HoverContext(price.instrument, price.price, component);
+            return;
+        }
+
+        String instrument = identifyInstrumentFromComponent(component);
+        lastHoverContext =
+                instrument == null ? null : new HoverContext(instrument, null, component);
     }
 
     private void handleChartHotkey(KeyEvent event, String normalizedKey) {
@@ -193,12 +205,18 @@ public class ChartHoverHotkeyHandler implements ScreenSpacePainterFactory {
             return;
         }
 
-        HoverContext hover = resolveCurrentHoverContext();
+        boolean priceRequired = !isPriceIndependentHotkey(normalizedKey);
+        HoverContext hover = resolveCurrentHoverContext(priceRequired);
         if (hover == null) {
             return;
         }
 
         String keyCode = toViteKeyCode(normalizedKey);
+        if (!priceRequired) {
+            sendPriceIndependentHotkey(hover.instrument, normalizedKey, keyCode);
+            return;
+        }
+
         boolean shiftDown = event.isShiftDown() || heldKeys.contains("shift");
         String actionLog = formatHoverHotkeyActionLog(
                 hover.instrument, keyCode, hover.price, shiftDown);
@@ -256,13 +274,25 @@ public class ChartHoverHotkeyHandler implements ScreenSpacePainterFactory {
         PluginLog.info("[Rong] " + actionLog + " sent");
     }
 
+    private void sendPriceIndependentHotkey(
+            String instrument, String normalizedKey, String keyCode) {
+        boolean cancel = "c".equals(normalizedKey);
+        HotkeyButtonAction.send(
+                wsServer,
+                instrument,
+                cancel ? "cancel" : "flatten",
+                cancel ? "Cancel" : "Flatten",
+                keyCode,
+                false);
+    }
+
     private int getWallThresholdFloor() {
         return wallThresholdConfig == null
                 ? WallThresholdConfig.DEFAULT_THRESHOLD_FLOOR
                 : Math.max(0, wallThresholdConfig.getThresholdFloor());
     }
 
-    private static HoverContext resolveCurrentHoverContext() {
+    private static HoverContext resolveCurrentHoverContext(boolean priceRequired) {
         HoverContext hover = lastHoverContext;
         if (hover == null || hover.component == null || !hover.component.isShowing()) {
             return null;
@@ -281,8 +311,11 @@ public class ChartHoverHotkeyHandler implements ScreenSpacePainterFactory {
 
         ResolvedChartPrice current = resolveChartPrice(hover.component, point.y);
         if (current == null) {
-            lastHoverContext = null;
-            return null;
+            if (priceRequired) {
+                lastHoverContext = null;
+                return null;
+            }
+            return hover;
         }
 
         HoverContext refreshed = new HoverContext(current.instrument, current.price, hover.component);
@@ -495,6 +528,10 @@ public class ChartHoverHotkeyHandler implements ScreenSpacePainterFactory {
         return CHART_HOTKEYS.contains(normalizedKey);
     }
 
+    static boolean isPriceIndependentHotkey(String normalizedKey) {
+        return "c".equals(normalizedKey) || "f".equals(normalizedKey);
+    }
+
     static boolean isWallReversalHotkey(String normalizedKey) {
         return "b".equals(normalizedKey) || "s".equals(normalizedKey);
     }
@@ -644,10 +681,10 @@ public class ChartHoverHotkeyHandler implements ScreenSpacePainterFactory {
 
     private static class HoverContext {
         final String instrument;
-        final double price;
+        final Double price;
         final Component component;
 
-        HoverContext(String instrument, double price, Component component) {
+        HoverContext(String instrument, Double price, Component component) {
             this.instrument = instrument;
             this.price = price;
             this.component = component;
