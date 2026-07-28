@@ -36,4 +36,16 @@ class HotkeyButtonActionTest {
         assertEquals("KeyF", json.get("keyCode").getAsString());
         assertFalse(json.has("price"));
     }
+
+    @Test
+    void swapMessageMatchesSwapButtonPayloadWithoutPrice() {
+        JsonObject json = HotkeyButtonAction.createMessage(
+                "TSLA", "swap", "Swap", "KeyW", false, 789L);
+
+        assertEquals("TSLA", json.get("symbol").getAsString());
+        assertEquals("hotkey:swap", json.get("button_id").getAsString());
+        assertEquals("Swap", json.get("button_name").getAsString());
+        assertEquals("KeyW", json.get("keyCode").getAsString());
+        assertFalse(json.has("price"));
+    }
 }

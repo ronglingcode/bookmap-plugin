@@ -59,7 +59,7 @@ public class ChartHoverHotkeyHandler implements ScreenSpacePainterFactory {
     public static final String PAINTER_NAME_PREFIX = "hoverHotkey_";
     private static final int ORDERBOOK_PROTECTED_ABSOLUTE_LEVELS = 2;
     private static final ZoneId NEW_YORK_TIME_ZONE = ZoneId.of("America/New_York");
-    private static final LocalTime MARKET_CLOSE_TIME = LocalTime.of(16, 0);
+    private static final LocalTime ENTRY_HOTKEY_CUTOFF_TIME = LocalTime.of(10, 0);
 
     /** Coordinate state keyed by painter alias (from createScreenSpacePainter). */
     private static final Map<String, CoordinateState> painterCoords = new ConcurrentHashMap<>();
@@ -88,7 +88,7 @@ public class ChartHoverHotkeyHandler implements ScreenSpacePainterFactory {
                     "numpad1", "numpad2", "numpad3", "numpad4", "numpad5",
                     "numpad6", "numpad7", "numpad8", "numpad9", "numpad0");
 
-    /** Last resolved chart hover. Cancel/flatten only require its instrument and component. */
+    /** Last resolved chart hover. Button-equivalent hotkeys only require its instrument and component. */
     private static volatile HoverContext lastHoverContext;
 
     /** Shared AWT listener — registered once. */
@@ -221,9 +221,9 @@ public class ChartHoverHotkeyHandler implements ScreenSpacePainterFactory {
         String actionLog = formatHoverHotkeyActionLog(
                 hover.instrument, keyCode, hover.price, shiftDown);
         PluginLog.action(hover.instrument, "Bookmap", actionLog);
-        if (isAfterMarketClose(Instant.now())) {
+        if (isEntryHotkeyDisabledAt(normalizedKey, Instant.now())) {
             PluginLog.info("[Rong] " + actionLog
-                    + " logged but not sent after the 4:00 PM New York market close");
+                    + " logged but not sent at or after the 10:00 AM New York entry cutoff");
             return;
         }
 
@@ -276,12 +276,26 @@ public class ChartHoverHotkeyHandler implements ScreenSpacePainterFactory {
 
     private void sendPriceIndependentHotkey(
             String instrument, String normalizedKey, String keyCode) {
-        boolean cancel = "c".equals(normalizedKey);
+        String buttonId;
+        String buttonName;
+        if ("c".equals(normalizedKey)) {
+            buttonId = "cancel";
+            buttonName = "Cancel";
+        } else if ("f".equals(normalizedKey)) {
+            buttonId = "flatten";
+            buttonName = "Flatten";
+        } else if ("w".equals(normalizedKey)) {
+            buttonId = "swap";
+            buttonName = "Swap";
+        } else {
+            return;
+        }
+
         HotkeyButtonAction.send(
                 wsServer,
                 instrument,
-                cancel ? "cancel" : "flatten",
-                cancel ? "Cancel" : "Flatten",
+                buttonId,
+                buttonName,
                 keyCode,
                 false);
     }
@@ -529,7 +543,9 @@ public class ChartHoverHotkeyHandler implements ScreenSpacePainterFactory {
     }
 
     static boolean isPriceIndependentHotkey(String normalizedKey) {
-        return "c".equals(normalizedKey) || "f".equals(normalizedKey);
+        return "c".equals(normalizedKey)
+                || "f".equals(normalizedKey)
+                || "w".equals(normalizedKey);
     }
 
     static boolean isWallReversalHotkey(String normalizedKey) {
@@ -544,9 +560,12 @@ public class ChartHoverHotkeyHandler implements ScreenSpacePainterFactory {
                 + (shiftDown ? " + shift" : "");
     }
 
-    static boolean isAfterMarketClose(Instant instant) {
+    static boolean isEntryHotkeyDisabledAt(String normalizedKey, Instant instant) {
+        if (!isWallReversalHotkey(normalizedKey)) {
+            return false;
+        }
         LocalTime newYorkTime = instant.atZone(NEW_YORK_TIME_ZONE).toLocalTime();
-        return !newYorkTime.isBefore(MARKET_CLOSE_TIME);
+        return !newYorkTime.isBefore(ENTRY_HOTKEY_CUTOFF_TIME);
     }
 
     /**

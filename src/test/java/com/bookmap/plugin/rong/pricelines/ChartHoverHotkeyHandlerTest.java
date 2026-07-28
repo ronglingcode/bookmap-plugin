@@ -44,7 +44,7 @@ class ChartHoverHotkeyHandlerTest {
     }
 
     @Test
-    void cancelAndFlattenDoNotRequireHoveredPrices() {
+    void buttonEquivalentHotkeysDoNotRequireHoveredPrices() {
         assertTrue(ChartHoverHotkeyHandler.isChartHotkey("c"));
         assertTrue(ChartHoverHotkeyHandler.isPriceIndependentHotkey("c"));
         assertEquals("KeyC", ChartHoverHotkeyHandler.toViteKeyCode("c"));
@@ -52,6 +52,10 @@ class ChartHoverHotkeyHandlerTest {
         assertTrue(ChartHoverHotkeyHandler.isChartHotkey("f"));
         assertTrue(ChartHoverHotkeyHandler.isPriceIndependentHotkey("f"));
         assertEquals("KeyF", ChartHoverHotkeyHandler.toViteKeyCode("f"));
+
+        assertTrue(ChartHoverHotkeyHandler.isChartHotkey("w"));
+        assertTrue(ChartHoverHotkeyHandler.isPriceIndependentHotkey("w"));
+        assertEquals("KeyW", ChartHoverHotkeyHandler.toViteKeyCode("w"));
 
         assertFalse(ChartHoverHotkeyHandler.isPriceIndependentHotkey("b"));
         assertFalse(ChartHoverHotkeyHandler.isPriceIndependentHotkey("1"));
@@ -70,16 +74,29 @@ class ChartHoverHotkeyHandlerTest {
     }
 
     @Test
-    void hoverHotkeysStopSendingAtFourPmNewYorkTime() {
-        assertFalse(ChartHoverHotkeyHandler.isAfterMarketClose(
-                Instant.parse("2026-07-24T19:59:59Z")));
-        assertTrue(ChartHoverHotkeyHandler.isAfterMarketClose(
-                Instant.parse("2026-07-24T20:00:00Z")));
+    void entryHotkeysStopSendingAtTenAmNewYorkTime() {
+        assertFalse(ChartHoverHotkeyHandler.isEntryHotkeyDisabledAt(
+                "b", Instant.parse("2026-07-24T13:59:59Z")));
+        assertTrue(ChartHoverHotkeyHandler.isEntryHotkeyDisabledAt(
+                "b", Instant.parse("2026-07-24T14:00:00Z")));
 
-        assertFalse(ChartHoverHotkeyHandler.isAfterMarketClose(
-                Instant.parse("2026-01-15T20:59:59Z")));
-        assertTrue(ChartHoverHotkeyHandler.isAfterMarketClose(
-                Instant.parse("2026-01-15T21:00:00Z")));
+        assertFalse(ChartHoverHotkeyHandler.isEntryHotkeyDisabledAt(
+                "s", Instant.parse("2026-01-15T14:59:59Z")));
+        assertTrue(ChartHoverHotkeyHandler.isEntryHotkeyDisabledAt(
+                "s", Instant.parse("2026-01-15T15:00:00Z")));
+    }
+
+    @Test
+    void exitAndManagementHotkeysRemainEnabledAfterEntryCutoff() {
+        Instant afterMarketClose = Instant.parse("2026-07-24T21:00:00Z");
+
+        for (String key : new String[] {
+                "a", "c", "f", "g", "t", "w", "1", "0", "numpad1", "numpad0"
+        }) {
+            assertFalse(
+                    ChartHoverHotkeyHandler.isEntryHotkeyDisabledAt(key, afterMarketClose),
+                    key);
+        }
     }
 
     private static KeyEvent keyPressed(int keyCode) {
