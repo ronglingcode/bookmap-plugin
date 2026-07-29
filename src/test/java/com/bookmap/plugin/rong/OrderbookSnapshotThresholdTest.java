@@ -51,6 +51,18 @@ class OrderbookSnapshotThresholdTest {
     }
 
     @Test
+    void sharedSizeThresholdUsesHigherOfFloorAndPercentile() {
+        OrderBookState orderBook = new OrderBookState();
+        orderBook.update(false, 10_010, 5_000);
+        orderBook.update(false, 10_020, 6_000);
+        orderBook.update(false, 10_030, 20_000);
+
+        assertEquals(20_000, orderBook.getSizeThreshold(5_000, 90));
+        assertEquals(25_000, orderBook.getSizeThreshold(25_000, 90));
+        assertEquals(20_000, OrderBookState.combineSizeThresholds(5_000, 20_000));
+    }
+
+    @Test
     void wallBreakAlertAvailabilityFollowsBookmapTradeButtons() {
         SignalWebSocketServer server = new SignalWebSocketServer(0, 90, 1000);
 

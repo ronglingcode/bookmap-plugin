@@ -684,10 +684,9 @@ public class RongPlugin implements CustomModuleAdapter,
         int thresholdFloor = wallThresholdConfig == null
                 ? WallThresholdConfig.DEFAULT_THRESHOLD_FLOOR
                 : Math.max(0, wallThresholdConfig.getThresholdFloor());
-        int percentileThreshold = orderBook == null
-                ? 0
-                : orderBook.getPercentileThreshold(ORDERBOOK_PERCENTILE);
-        return Math.max(thresholdFloor, percentileThreshold);
+        return orderBook == null
+                ? thresholdFloor
+                : orderBook.getSizeThreshold(thresholdFloor, ORDERBOOK_PERCENTILE);
     }
 
     private void handlePatternSignal(BookmapPatternSignal signal) {

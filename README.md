@@ -326,9 +326,9 @@ The following parameters are plugin defaults unless noted as configurable:
 | `ORDERBOOK_PERCENTILE`  | 97      | Adaptive crowd filter for wall labels, orderbook snapshots, and size-change alerts |
 | `ORDERBOOK_INTERVAL_MS` | 1000    | Order book snapshot broadcast interval                      |
 | `WALL_THRESHOLD_FLOOR`  | 5,000   | Configurable absolute floor for wall labels, size-change alerts, and wall-out/orderbook snapshot candidates; candidates use `max(WALL_THRESHOLD_FLOOR, ORDERBOOK_PERCENTILE threshold)` |
-| `WALL_OUT_PROTECTED_ABSOLUTE_LEVELS` | 2 | Per-side count of near-touch absolute-floor levels preserved even when the percentile threshold is higher |
+| `ORDERBOOK_PROTECTED_ABSOLUTE_LEVELS` | 2 | Per-side count of near-touch absolute-floor levels preserved in snapshots even when the percentile threshold is higher |
 
-Adjust `WALL_THRESHOLD_FLOOR` from the Rong add-on settings under `Wall threshold floor`. The floating trade button window shows the live effective wall threshold as `max(configured floor, P97)` for the active symbol, and wall labels use that same live value.
+Adjust `WALL_THRESHOLD_FLOOR` from the Rong add-on settings under `Wall threshold floor`. The floating trade button window shows the live effective wall threshold as `max(configured floor, P97)` for the active symbol. Wall labels, alerts, patterns, **Wall Out 1**, and primary snapshot filtering all use that same live value. Snapshots deliberately retain the configured number of nearest absolute-floor levels as supplemental context.
 
 
 ## Logging

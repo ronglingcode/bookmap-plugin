@@ -154,17 +154,17 @@ public class SignalWebSocketServer extends WebSocketServer {
         return String.format(Locale.US, "HOD/LOD: %.2f/%.2f", snapshot.getHigh(), snapshot.getLow());
     }
 
-    public boolean appendOrderbookSnapshot(String symbol, JsonObject target, int minimumWallSize) {
+    public boolean appendOrderbookSnapshot(String symbol, JsonObject target, int thresholdFloor) {
         return appendOrderbookSnapshot(
-                symbol, target, minimumWallSize, DEFAULT_PROTECTED_ABSOLUTE_WALL_LEVELS);
+                symbol, target, thresholdFloor, DEFAULT_PROTECTED_ABSOLUTE_WALL_LEVELS);
     }
 
     public boolean appendOrderbookSnapshot(
             String symbol,
             JsonObject target,
-            int minimumWallSize,
+            int thresholdFloor,
             int protectedAbsoluteWallLevels) {
-        JsonObject snapshot = buildOrderbookSnapshot(symbol, minimumWallSize, protectedAbsoluteWallLevels);
+        JsonObject snapshot = buildOrderbookSnapshot(symbol, thresholdFloor, protectedAbsoluteWallLevels);
         if (snapshot == null) {
             return false;
         }
@@ -181,9 +181,9 @@ public class SignalWebSocketServer extends WebSocketServer {
         return tracker == null ? null : tracker.snapshot();
     }
 
-    public OrderbookWallThreshold getOrderbookWallThreshold(String symbol, int minimumWallSize) {
+    public OrderbookWallThreshold getOrderbookWallThreshold(String symbol, int thresholdFloor) {
         String cleanSymbol = SymbolUtils.cleanSymbol(symbol);
-        int absoluteMinSize = Math.max(0, minimumWallSize);
+        int absoluteMinSize = Math.max(0, thresholdFloor);
         if (cleanSymbol.isEmpty()) {
             return OrderbookWallThreshold.unavailable("", orderbookPercentile, absoluteMinSize);
         }
@@ -208,7 +208,7 @@ public class SignalWebSocketServer extends WebSocketServer {
 
     private JsonObject buildOrderbookSnapshot(
             String symbol,
-            int minimumWallSize,
+            int thresholdFloor,
             int protectedAbsoluteWallLevels) {
         String cleanSymbol = SymbolUtils.cleanSymbol(symbol);
         if (cleanSymbol.isEmpty()) {
@@ -224,13 +224,15 @@ public class SignalWebSocketServer extends WebSocketServer {
         JsonObject snapshot = new JsonObject();
         snapshot.addProperty("symbol", cleanSymbol);
         snapshot.addProperty("timestamp", System.currentTimeMillis());
-        snapshot.addProperty("wallThreshold", minimumWallSize);
-        snapshot.addProperty("absoluteWallThreshold", minimumWallSize);
+        int normalizedThresholdFloor = Math.max(0, thresholdFloor);
+        snapshot.addProperty("wallThreshold", normalizedThresholdFloor);
+        snapshot.addProperty("absoluteWallThreshold", normalizedThresholdFloor);
         snapshot.addProperty("percentile", orderbookPercentile);
         snapshot.addProperty("protectedAbsoluteWallLevels", Math.max(0, protectedAbsoluteWallLevels));
 
         synchronized (orderBook) {
-            WallThreshold threshold = WallThreshold.from(orderBook, minimumWallSize, orderbookPercentile);
+            WallThreshold threshold = WallThreshold.from(
+                    orderBook, normalizedThresholdFloor, orderbookPercentile);
             snapshot.addProperty("percentileWallThreshold", threshold.percentileMinSize);
             snapshot.addProperty("effectiveWallThreshold", threshold.effectiveMinSize);
             Integer bestBidTick = orderBook.getBestBid();
@@ -260,7 +262,8 @@ public class SignalWebSocketServer extends WebSocketServer {
         for (Map.Entry<Integer, Integer> entry : levels.entrySet()) {
             int size = entry.getValue();
             boolean passesEffectiveThreshold = size >= threshold.effectiveMinSize;
-            // Keep the nearest absolute-floor levels so a crowded symbol does not hide 5K candidates entirely.
+            // Explicit snapshot exception: retain a bounded number of nearest
+            // absolute-floor levels even when they do not pass the effective threshold.
             boolean protectedAbsoluteLevel = size >= threshold.absoluteMinSize
                     && size < threshold.effectiveMinSize
                     && protectedLevelsIncluded < protectedLevelLimit;
@@ -423,7 +426,7 @@ public class SignalWebSocketServer extends WebSocketServer {
     public ExitWallAdjustment resolveExitWallAdjustment(
             String symbol,
             int pairIndex,
-            int minimumWallSize,
+            int thresholdFloor,
             double targetOffset) {
         String cleanSymbol = SymbolUtils.cleanSymbol(symbol);
         if (cleanSymbol.isEmpty()) {
@@ -450,10 +453,15 @@ public class SignalWebSocketServer extends WebSocketServer {
         }
 
         boolean bidWall = !longPosition;
-        OrderBookState.DepthLevel wall = orderBook.findFirstLevelAtLeast(bidWall, minimumWallSize);
+        int sizeThreshold;
+        OrderBookState.DepthLevel wall;
+        synchronized (orderBook) {
+            sizeThreshold = orderBook.getSizeThreshold(thresholdFloor, orderbookPercentile);
+            wall = orderBook.findFirstLevelAtLeast(bidWall, sizeThreshold);
+        }
         if (wall == null) {
             return ExitWallAdjustment.unavailable(
-                    "no " + (bidWall ? "bid" : "offer") + " wall >= " + minimumWallSize);
+                    "no " + (bidWall ? "bid" : "offer") + " wall >= " + sizeThreshold);
         }
 
         int offsetTicks = Math.max(1, (int) Math.ceil((targetOffset / pips) - 1e-9));
@@ -471,6 +479,7 @@ public class SignalWebSocketServer extends WebSocketServer {
                 bidWall,
                 wall.getPriceTick(),
                 wall.getSize(),
+                sizeThreshold,
                 wall.getPriceTick() * pips,
                 targetTick * pips,
                 targetOffset,
@@ -1383,7 +1392,8 @@ public class SignalWebSocketServer extends WebSocketServer {
             int percentileMinSize = percentile > 0
                     ? orderBook.getPercentileThreshold(percentile)
                     : 0;
-            int effectiveMinSize = Math.max(normalizedAbsoluteMinSize, percentileMinSize);
+            int effectiveMinSize = OrderBookState.combineSizeThresholds(
+                    normalizedAbsoluteMinSize, percentileMinSize);
             return new WallThreshold(normalizedAbsoluteMinSize, percentileMinSize, effectiveMinSize);
         }
     }
@@ -1421,6 +1431,7 @@ public class SignalWebSocketServer extends WebSocketServer {
         private final boolean bidWall;
         private final int wallPriceTick;
         private final int wallSize;
+        private final int sizeThreshold;
         private final double wallPrice;
         private final double targetPrice;
         private final double offset;
@@ -1440,6 +1451,7 @@ public class SignalWebSocketServer extends WebSocketServer {
                 boolean bidWall,
                 int wallPriceTick,
                 int wallSize,
+                int sizeThreshold,
                 double wallPrice,
                 double targetPrice,
                 double offset,
@@ -1457,6 +1469,7 @@ public class SignalWebSocketServer extends WebSocketServer {
             this.bidWall = bidWall;
             this.wallPriceTick = wallPriceTick;
             this.wallSize = wallSize;
+            this.sizeThreshold = sizeThreshold;
             this.wallPrice = wallPrice;
             this.targetPrice = targetPrice;
             this.offset = offset;
@@ -1470,7 +1483,7 @@ public class SignalWebSocketServer extends WebSocketServer {
 
         private static ExitWallAdjustment unavailable(String reason) {
             return new ExitWallAdjustment(
-                    false, reason, "", 0, false, false, 0, 0, 0,
+                    false, reason, "", 0, false, false, 0, 0, 0, 0,
                     0, 0, "", "", 0, 0, false, "");
         }
 
@@ -1481,6 +1494,7 @@ public class SignalWebSocketServer extends WebSocketServer {
                 boolean bidWall,
                 int wallPriceTick,
                 int wallSize,
+                int sizeThreshold,
                 double wallPrice,
                 double targetPrice,
                 double offset,
@@ -1494,6 +1508,7 @@ public class SignalWebSocketServer extends WebSocketServer {
                     bidWall,
                     wallPriceTick,
                     wallSize,
+                    sizeThreshold,
                     wallPrice,
                     targetPrice,
                     offset,
@@ -1535,6 +1550,10 @@ public class SignalWebSocketServer extends WebSocketServer {
 
         public int getWallSize() {
             return wallSize;
+        }
+
+        public int getSizeThreshold() {
+            return sizeThreshold;
         }
 
         public double getWallPrice() {

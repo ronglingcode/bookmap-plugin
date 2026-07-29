@@ -163,6 +163,25 @@ public class OrderBookState {
     }
 
     /**
+     * Returns the effective wall-size threshold for this book.
+     * The configured absolute floor remains the lower bound when the book is sparse.
+     */
+    public synchronized int getSizeThreshold(int thresholdFloor, double percentile) {
+        int percentileThreshold = percentile > 0
+                ? getPercentileThreshold(percentile)
+                : 0;
+        return combineSizeThresholds(thresholdFloor, percentileThreshold);
+    }
+
+    /**
+     * Combines an already-calculated percentile threshold with the absolute floor.
+     * Consumers that maintain their own order-book histogram can use this helper.
+     */
+    public static int combineSizeThresholds(int thresholdFloor, int percentileThreshold) {
+        return Math.max(Math.max(0, thresholdFloor), Math.max(0, percentileThreshold));
+    }
+
+    /**
      * Serialize all levels of bids and asks to JSON, filtered by percentile.
      * Only levels with size >= the percentile threshold are included.
      * @param pips multiplier to convert tick prices to real prices

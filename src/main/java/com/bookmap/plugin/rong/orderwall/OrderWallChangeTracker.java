@@ -14,6 +14,7 @@ import java.util.function.Consumer;
 import java.util.function.IntSupplier;
 import java.util.function.Predicate;
 
+import com.bookmap.plugin.rong.OrderBookState;
 import com.bookmap.plugin.rong.PluginLog;
 
 import velox.api.layer1.data.TradeInfo;
@@ -544,7 +545,9 @@ public class OrderWallChangeTracker {
         if (largeOrderPercentile <= 0 || totalLevels == 0) {
             return largeOrderThreshold;
         }
-        return Math.max(largeOrderThreshold, getPercentileThreshold(largeOrderPercentile));
+        return OrderBookState.combineSizeThresholds(
+                largeOrderThreshold,
+                getPercentileThreshold(largeOrderPercentile));
     }
 
     private int getAbsoluteLargeOrderThreshold() {

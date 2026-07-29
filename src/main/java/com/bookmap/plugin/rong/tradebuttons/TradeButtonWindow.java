@@ -59,7 +59,7 @@ public class TradeButtonWindow {
     private static final int WINDOW_WIDTH = 570;
     private static final int CONTENT_WIDTH = 540;
     private static final int WALL_OUT_PAIR_INDEX = 1;
-    private static final int WALL_OUT_PROTECTED_ABSOLUTE_LEVELS = 2;
+    private static final int ORDERBOOK_PROTECTED_ABSOLUTE_LEVELS = 2;
     private static final double WALL_OUT_PRICE_OFFSET = 0.02;
     private static final int WALL_THRESHOLD_REFRESH_MS = 1_000;
     private static final double PRIMARY_ENTRY_BUTTON_WEIGHT = 1.35;
@@ -537,9 +537,9 @@ public class TradeButtonWindow {
         json.addProperty("entry_method", entryMethod);
         json.addProperty("timestamp", System.currentTimeMillis());
         server.appendRegularSessionHighLow(symbol, json);
-        int minimumWallSize = getWallThresholdFloor();
+        int thresholdFloor = getWallThresholdFloor();
         server.appendOrderbookSnapshot(
-                symbol, json, minimumWallSize, WALL_OUT_PROTECTED_ABSOLUTE_LEVELS);
+                symbol, json, thresholdFloor, ORDERBOOK_PROTECTED_ABSOLUTE_LEVELS);
         server.broadcast(json.toString());
         PluginLog.action(symbol, "Button send " + orderType + " " + tradebook.getLabel() + " " + entryMethod);
         PluginLog.info("[TradeButton] " + orderType + " " + tradebook.getLabel() + ": " + entryMethod
@@ -551,11 +551,11 @@ public class TradeButtonWindow {
     }
 
     private void sendWallOutButtonMessage() {
-        int minimumWallSize = getWallThresholdFloor();
+        int thresholdFloor = getWallThresholdFloor();
         SignalWebSocketServer.ExitWallAdjustment adjustment = server.resolveExitWallAdjustment(
                 symbol,
                 WALL_OUT_PAIR_INDEX,
-                minimumWallSize,
+                thresholdFloor,
                 WALL_OUT_PRICE_OFFSET);
         if (!adjustment.isAvailable()) {
             PluginLog.action(symbol, "Wall Out 1 blocked: " + adjustment.getReason());
@@ -581,7 +581,8 @@ public class TradeButtonWindow {
         json.addProperty("wall_price_tick", adjustment.getWallPriceTick());
         json.addProperty("wall_price", adjustment.getWallPrice());
         json.addProperty("wall_size", adjustment.getWallSize());
-        json.addProperty("minimum_wall_size", minimumWallSize);
+        json.addProperty("minimum_wall_size", adjustment.getSizeThreshold());
+        json.addProperty("wall_threshold_floor", thresholdFloor);
         json.addProperty("offset", adjustment.getOffset());
         json.addProperty("target_price", adjustment.getTargetPrice());
         json.addProperty("price", adjustment.getTargetPrice());
@@ -596,7 +597,8 @@ public class TradeButtonWindow {
         PluginLog.info("[TradeButton] Wall Out 1 clicked for " + symbol
                 + ": target=" + formatPrice(adjustment.getTargetPrice())
                 + ", wall=" + formatPrice(adjustment.getWallPrice())
-                + ", size=" + adjustment.getWallSize());
+                + ", size=" + adjustment.getWallSize()
+                + ", threshold=" + adjustment.getSizeThreshold());
     }
 
     private int getWallThresholdFloor() {

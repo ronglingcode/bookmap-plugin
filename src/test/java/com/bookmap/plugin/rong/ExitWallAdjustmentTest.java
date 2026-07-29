@@ -9,7 +9,7 @@ import org.junit.jupiter.api.Test;
 class ExitWallAdjustmentTest {
 
     @Test
-    void longPositionTargetsNearestAskWallAtThresholdTwoCentsBelow() {
+    void longPositionSkipsNearestAskBelowEffectiveThreshold() {
         SignalWebSocketServer server = new SignalWebSocketServer(0, 90, 1000);
         OrderBookState orderBook = new OrderBookState();
         orderBook.update(false, 10_010, 5_000);
@@ -23,9 +23,10 @@ class ExitWallAdjustmentTest {
         assertTrue(adjustment.isAvailable(), adjustment.getReason());
         assertTrue(adjustment.isLongPosition());
         assertFalse(adjustment.isBidWall());
-        assertEquals(10_010, adjustment.getWallPriceTick());
-        assertEquals(100.10, adjustment.getWallPrice(), 0.00001);
-        assertEquals(100.08, adjustment.getTargetPrice(), 0.00001);
+        assertEquals(6_200, adjustment.getSizeThreshold());
+        assertEquals(10_050, adjustment.getWallPriceTick());
+        assertEquals(100.50, adjustment.getWallPrice(), 0.00001);
+        assertEquals(100.48, adjustment.getTargetPrice(), 0.00001);
         assertEquals("limit-long-1", adjustment.getLimitOrderId());
     }
 
@@ -44,6 +45,7 @@ class ExitWallAdjustmentTest {
         assertTrue(adjustment.isAvailable(), adjustment.getReason());
         assertFalse(adjustment.isLongPosition());
         assertTrue(adjustment.isBidWall());
+        assertEquals(7_100, adjustment.getSizeThreshold());
         assertEquals(9_960, adjustment.getWallPriceTick());
         assertEquals(99.60, adjustment.getWallPrice(), 0.00001);
         assertEquals(99.62, adjustment.getTargetPrice(), 0.00001);

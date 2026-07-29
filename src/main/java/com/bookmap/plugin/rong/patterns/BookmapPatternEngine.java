@@ -385,8 +385,8 @@ public final class BookmapPatternEngine implements PatternRuntimeContext, Patter
     }
 
     private int effectiveThreshold() {
-        return Math.max(1, Math.max(Math.max(0, wallThresholdFloor.getAsInt()),
-                orderBook.getPercentileThreshold(wallPercentile)));
+        return Math.max(1, orderBook.getSizeThreshold(
+                wallThresholdFloor.getAsInt(), wallPercentile));
     }
 
     private void pruneRecentTrades(long nowMs) {
