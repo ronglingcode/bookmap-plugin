@@ -429,9 +429,9 @@ public class TradeButtonWindow {
         if (wallThresholdLabel == null) {
             return;
         }
-        int minimumWallSize = getWallThresholdFloor();
+        int thresholdFloor = getWallThresholdFloor();
         SignalWebSocketServer.OrderbookWallThreshold threshold =
-                server.getOrderbookWallThreshold(symbol, minimumWallSize);
+                server.getOrderbookWallThreshold(symbol, thresholdFloor);
         if (!threshold.isAvailable()) {
             wallThresholdLabel.setText("Wall: waiting | " + getRegularSessionHighLowText());
             return;
