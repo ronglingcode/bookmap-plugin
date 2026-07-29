@@ -9,6 +9,9 @@ import java.util.UUID;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
+import java.util.function.IntSupplier;
+
+import com.bookmap.plugin.rong.PluginLog;
 
 /**
  * Tracks large liquidity walls and retains meaningful size changes at each level.
@@ -23,7 +26,7 @@ public class OrderWallLabelTracker {
     private final String instrumentAlias;
     private final double pips;
     private final OrderWallLabelStore store;
-    private final int minimumSize;
+    private final IntSupplier minimumSizeSupplier;
     private final long decreaseStabilityMs;
     private final long labelMinLifetimeMs;
     private final Runnable labelChangeListener;
@@ -35,29 +38,47 @@ public class OrderWallLabelTracker {
 
     public OrderWallLabelTracker(String instrumentAlias, double pips, OrderWallLabelStore store,
                                  int minimumSize, int retainDistanceTicks) {
-        this(instrumentAlias, pips, store, minimumSize, retainDistanceTicks, DECREASE_STABILITY_MS, null);
+        this(instrumentAlias, pips, store, fixedMinimumSize(minimumSize),
+                retainDistanceTicks, DECREASE_STABILITY_MS, LABEL_MIN_LIFETIME_MS, null);
     }
 
     public OrderWallLabelTracker(String instrumentAlias, double pips, OrderWallLabelStore store,
                                  int minimumSize, int retainDistanceTicks, Runnable labelChangeListener) {
-        this(instrumentAlias, pips, store, minimumSize, retainDistanceTicks,
-                DECREASE_STABILITY_MS, labelChangeListener);
+        this(instrumentAlias, pips, store, fixedMinimumSize(minimumSize), retainDistanceTicks,
+                DECREASE_STABILITY_MS, LABEL_MIN_LIFETIME_MS, labelChangeListener);
+    }
+
+    public OrderWallLabelTracker(String instrumentAlias, double pips, OrderWallLabelStore store,
+                                 IntSupplier minimumSizeSupplier, int retainDistanceTicks,
+                                 Runnable labelChangeListener) {
+        this(instrumentAlias, pips, store, minimumSizeSupplier, retainDistanceTicks,
+                DECREASE_STABILITY_MS, LABEL_MIN_LIFETIME_MS, labelChangeListener);
     }
 
     OrderWallLabelTracker(String instrumentAlias, double pips, OrderWallLabelStore store,
                           int minimumSize, int retainDistanceTicks, long decreaseStabilityMs,
                           Runnable labelChangeListener) {
-        this(instrumentAlias, pips, store, minimumSize, retainDistanceTicks,
+        this(instrumentAlias, pips, store, fixedMinimumSize(minimumSize), retainDistanceTicks,
                 decreaseStabilityMs, LABEL_MIN_LIFETIME_MS, labelChangeListener);
     }
 
     OrderWallLabelTracker(String instrumentAlias, double pips, OrderWallLabelStore store,
                           int minimumSize, int retainDistanceTicks, long decreaseStabilityMs,
                           long labelMinLifetimeMs, Runnable labelChangeListener) {
+        this(instrumentAlias, pips, store, fixedMinimumSize(minimumSize), retainDistanceTicks,
+                decreaseStabilityMs, labelMinLifetimeMs, labelChangeListener);
+    }
+
+    OrderWallLabelTracker(String instrumentAlias, double pips, OrderWallLabelStore store,
+                          IntSupplier minimumSizeSupplier, int retainDistanceTicks,
+                          long decreaseStabilityMs, long labelMinLifetimeMs,
+                          Runnable labelChangeListener) {
         this.instrumentAlias = instrumentAlias;
         this.pips = pips;
         this.store = store;
-        this.minimumSize = minimumSize;
+        this.minimumSizeSupplier = minimumSizeSupplier == null
+                ? fixedMinimumSize(0)
+                : minimumSizeSupplier;
         this.decreaseStabilityMs = decreaseStabilityMs;
         this.labelMinLifetimeMs = labelMinLifetimeMs;
         this.labelChangeListener = labelChangeListener;
@@ -68,8 +89,13 @@ public class OrderWallLabelTracker {
         });
     }
 
+    private static IntSupplier fixedMinimumSize(int minimumSize) {
+        int normalizedMinimumSize = Math.max(0, minimumSize);
+        return () -> normalizedMinimumSize;
+    }
+
     /**
-     * Labels start as pending once a level exceeds the configured minimum size.
+     * Labels start as pending once a level meets the current minimum size.
      * They become drawable only after surviving the configured minimum lifetime.
      * When a mature level falls back below the threshold, the segment is frozen
      * as a historical wall so the peak size remains visible over the bright section.
@@ -82,7 +108,7 @@ public class OrderWallLabelTracker {
         updateCurrentDisplaySize(key, size);
 
         OrderWallLabel existing = store.getActiveLabel(instrumentAlias, isBid, priceTick);
-        boolean qualifiesNow = size > minimumSize;
+        boolean qualifiesNow = size >= getMinimumSize();
         long timestampNs = eventTimeNs > 0 ? eventTimeNs : System.currentTimeMillis() * 1_000_000L;
 
         if (existing == null) {
@@ -168,12 +194,26 @@ public class OrderWallLabelTracker {
             if (pendingLabels.get(key) != pending || !isPendingLabelMature(pending, timestampNs)) {
                 continue;
             }
+            if (pending.currentSize < getMinimumSize()) {
+                pendingLabels.remove(key, pending);
+                continue;
+            }
             pending.latestEventTimeNs = timestampNs;
             if (promotePendingLabel(key, pending)) {
                 changed = true;
             }
         }
         return changed;
+    }
+
+    private int getMinimumSize() {
+        try {
+            return Math.max(0, minimumSizeSupplier.getAsInt());
+        } catch (RuntimeException e) {
+            PluginLog.error("[OrderWallLabel] Failed to read wall threshold for "
+                    + instrumentAlias + ": " + e.getMessage());
+            return 0;
+        }
     }
 
     private boolean updatePendingLabel(LevelKey key, boolean isBid, int priceTick, int size, long timestampNs) {

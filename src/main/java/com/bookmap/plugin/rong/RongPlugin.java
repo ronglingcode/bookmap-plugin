@@ -68,7 +68,6 @@ public class RongPlugin implements CustomModuleAdapter,
     private static final double WALL_CONSUMED_RATIO = 0.10;
     private static final double ORDERBOOK_PERCENTILE = 97;
     private static final int ORDERBOOK_INTERVAL_MS = 1000;
-    private static final int WALL_LABEL_MIN_SIZE = 5_000;
     private static final int WALL_LABEL_RETAIN_TICKS = 2_000;
     private static final int WALL_LABEL_REFRESH_MS = 200;
     private static final double WALL_CHANGE_REMAINING_RATIO = 0.50;
@@ -183,7 +182,8 @@ public class RongPlugin implements CustomModuleAdapter,
         }
         replayExportConfig.addChangeListener(this);
         this.wallLabelTracker = new OrderWallLabelTracker(
-                cleanAlias, info.pips, wallLabelStore, WALL_LABEL_MIN_SIZE, WALL_LABEL_RETAIN_TICKS,
+                cleanAlias, info.pips, wallLabelStore, this::getEffectiveWallThreshold,
+                WALL_LABEL_RETAIN_TICKS,
                 this::handleWallLabelTrackerChange);
         this.wallChangeTracker = new OrderWallChangeTracker(
                 cleanAlias,
@@ -678,6 +678,16 @@ public class RongPlugin implements CustomModuleAdapter,
 
     private boolean shouldRunPatternAutomation() {
         return patternAutomationEnabled && patternEngine != null;
+    }
+
+    private int getEffectiveWallThreshold() {
+        int thresholdFloor = wallThresholdConfig == null
+                ? WallThresholdConfig.DEFAULT_THRESHOLD_FLOOR
+                : Math.max(0, wallThresholdConfig.getThresholdFloor());
+        int percentileThreshold = orderBook == null
+                ? 0
+                : orderBook.getPercentileThreshold(ORDERBOOK_PERCENTILE);
+        return Math.max(thresholdFloor, percentileThreshold);
     }
 
     private void handlePatternSignal(BookmapPatternSignal signal) {

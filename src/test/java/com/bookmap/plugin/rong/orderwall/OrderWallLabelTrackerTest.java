@@ -9,26 +9,69 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import java.util.Arrays;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import org.junit.jupiter.api.Test;
 
 class OrderWallLabelTrackerTest {
 
     @Test
-    void tracksLevelsOnlyWhenTheyExceedConfiguredMinimumSize() {
+    void tracksLevelsAtOrAboveConfiguredMinimumSize() {
         OrderWallLabelStore store = new OrderWallLabelStore();
         OrderWallLabelTracker tracker = newImmediateTracker(store, 5_000);
 
         try {
-            onDepth(tracker, true, 12_700, 5_000, 1L);
+            onDepth(tracker, true, 12_700, 4_999, 1L);
             assertNull(store.getActiveLabel("TEST", true, 12_700));
 
-            onDepth(tracker, true, 12_700, 5_001, 2L);
+            onDepth(tracker, true, 12_700, 5_000, 2L);
             OrderWallLabel label = store.getActiveLabel("TEST", true, 12_700);
 
             assertNotNull(label);
-            assertEquals(5_001, label.getCurrentSize());
-            assertEquals(5_001, label.getPeakSize());
+            assertEquals(5_000, label.getCurrentSize());
+            assertEquals(5_000, label.getPeakSize());
+        } finally {
+            tracker.shutdown();
+        }
+    }
+
+    @Test
+    void usesCurrentThresholdForFutureDepthDecisions() {
+        OrderWallLabelStore store = new OrderWallLabelStore();
+        AtomicInteger minimumSize = new AtomicInteger(5_000);
+        OrderWallLabelTracker tracker = newImmediateTracker(store, minimumSize);
+
+        try {
+            onDepth(tracker, true, 12_700, 6_000, 1L);
+            assertNotNull(store.getActiveLabel("TEST", true, 12_700));
+
+            minimumSize.set(14_600);
+            onDepth(tracker, true, 12_700, 6_000, 2L);
+            assertNull(store.getActiveLabel("TEST", true, 12_700));
+
+            onDepth(tracker, true, 12_701, 14_599, 3L);
+            assertNull(store.getActiveLabel("TEST", true, 12_701));
+
+            onDepth(tracker, true, 12_701, 14_600, 4L);
+            assertNotNull(store.getActiveLabel("TEST", true, 12_701));
+        } finally {
+            tracker.shutdown();
+        }
+    }
+
+    @Test
+    void pendingLabelMustStillPassCurrentThresholdWhenItMatures() {
+        OrderWallLabelStore store = new OrderWallLabelStore();
+        AtomicInteger minimumSize = new AtomicInteger(5_000);
+        OrderWallLabelTracker tracker = newTracker(
+                store, minimumSize, 1_000, 1_000, null);
+
+        try {
+            onDepth(tracker, false, 11_730, 6_000, ns(10_000));
+            minimumSize.set(14_600);
+
+            assertFalse(tracker.onTimestamp(ns(11_000)));
+            assertNull(store.getActiveLabel("TEST", false, 11_730));
         } finally {
             tracker.shutdown();
         }
@@ -196,6 +239,11 @@ class OrderWallLabelTrackerTest {
         return newTracker(store, minimumSize, decreaseStabilityMs, 0, labelChangeListener);
     }
 
+    private static OrderWallLabelTracker newImmediateTracker(
+            OrderWallLabelStore store, AtomicInteger minimumSize) {
+        return newTracker(store, minimumSize, 1_000, 0, null);
+    }
+
     private static OrderWallLabelTracker newTracker(OrderWallLabelStore store, int minimumSize,
                                                     long decreaseStabilityMs, long labelMinLifetimeMs,
                                                     Runnable labelChangeListener) {
@@ -204,6 +252,21 @@ class OrderWallLabelTrackerTest {
                 0.01,
                 store,
                 minimumSize,
+                2_000,
+                decreaseStabilityMs,
+                labelMinLifetimeMs,
+                labelChangeListener);
+    }
+
+    private static OrderWallLabelTracker newTracker(
+            OrderWallLabelStore store, AtomicInteger minimumSize,
+            long decreaseStabilityMs, long labelMinLifetimeMs,
+            Runnable labelChangeListener) {
+        return new OrderWallLabelTracker(
+                "TEST",
+                0.01,
+                store,
+                minimumSize::get,
                 2_000,
                 decreaseStabilityMs,
                 labelMinLifetimeMs,
