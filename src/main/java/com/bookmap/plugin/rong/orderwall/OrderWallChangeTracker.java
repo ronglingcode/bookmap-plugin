@@ -14,6 +14,7 @@ import java.util.function.Consumer;
 import java.util.function.IntSupplier;
 import java.util.function.Predicate;
 
+import com.bookmap.plugin.rong.BookmapPriceNormalizer;
 import com.bookmap.plugin.rong.OrderBookState;
 import com.bookmap.plugin.rong.PluginLog;
 
@@ -381,7 +382,7 @@ public class OrderWallChangeTracker {
                 instrumentAlias,
                 key.bid,
                 key.priceTick,
-                key.priceTick * pips,
+                BookmapPriceNormalizer.toWirePrice(key.priceTick, pips),
                 pending.originalSize,
                 latestSize,
                 tradedSize,
@@ -463,7 +464,7 @@ public class OrderWallChangeTracker {
                 instrumentAlias,
                 key.bid,
                 key.priceTick,
-                key.priceTick * pips,
+                BookmapPriceNormalizer.toWirePrice(key.priceTick, pips),
                 previousSize,
                 size,
                 0,
@@ -483,7 +484,7 @@ public class OrderWallChangeTracker {
                 instrumentAlias,
                 key.bid,
                 key.priceTick,
-                key.priceTick * pips,
+                BookmapPriceNormalizer.toWirePrice(key.priceTick, pips),
                 previousSize,
                 size,
                 0,
@@ -507,7 +508,7 @@ public class OrderWallChangeTracker {
                 instrumentAlias,
                 key.bid,
                 key.priceTick,
-                key.priceTick * pips,
+                BookmapPriceNormalizer.toWirePrice(key.priceTick, pips),
                 previousSize,
                 size,
                 tradedSize,
@@ -668,7 +669,7 @@ public class OrderWallChangeTracker {
     }
 
     private String priceText(int priceTick) {
-        return String.format("%.4f", priceTick * pips);
+        return String.format("%.4f", BookmapPriceNormalizer.toWirePrice(priceTick, pips));
     }
 
     private static class PendingAdd {

@@ -43,6 +43,14 @@ public class IndicatorSettingsPanel extends StrategyPanel {
         add(premarketCheckbox, gbc);
 
         gbc.gridy++;
+        JCheckBox vwapCheckbox = new JCheckBox(
+                "VWAP (ViteApp seed at 9:05 AM New York)",
+                config.isEnabled(IndicatorConfig.VWAP));
+        vwapCheckbox.addActionListener(e ->
+                config.setEnabled(IndicatorConfig.VWAP, vwapCheckbox.isSelected()));
+        add(vwapCheckbox, gbc);
+
+        gbc.gridy++;
         JCheckBox wallLabelsCheckbox = new JCheckBox(
                 "Order Wall Size Labels",
                 config.isEnabled(IndicatorConfig.ORDER_WALL_SIZE_LABELS));

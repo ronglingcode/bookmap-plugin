@@ -38,6 +38,15 @@ class IndicatorConfigTest {
     }
 
     @Test
+    void vwapIsEnabledByDefaultAndControllable() {
+        IndicatorConfig config = new IndicatorConfig();
+
+        assertTrue(config.isEnabled(IndicatorConfig.VWAP));
+        config.setEnabled(IndicatorConfig.VWAP, false);
+        assertFalse(config.isEnabled(IndicatorConfig.VWAP));
+    }
+
+    @Test
     void filledExecutionLabelsArePersistentByDefaultAndCanUseTimedMode() {
         IndicatorConfig config = new IndicatorConfig();
 

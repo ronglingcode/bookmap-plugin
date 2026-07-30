@@ -11,6 +11,7 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.function.IntSupplier;
 
+import com.bookmap.plugin.rong.BookmapPriceNormalizer;
 import com.bookmap.plugin.rong.PluginLog;
 
 /**
@@ -141,7 +142,7 @@ public class OrderWallLabelTracker {
                     instrumentAlias,
                     isBid,
                     priceTick,
-                    priceTick * pips,
+                    BookmapPriceNormalizer.toWirePrice(priceTick, pips),
                     size,
                     size,
                     timestampNs,
@@ -168,7 +169,7 @@ public class OrderWallLabelTracker {
                 instrumentAlias,
                 isBid,
                 priceTick,
-                priceTick * pips,
+                BookmapPriceNormalizer.toWirePrice(priceTick, pips),
                 currentSize,
                 peakSize,
                 startTimeNs,
@@ -246,7 +247,7 @@ public class OrderWallLabelTracker {
                     instrumentAlias,
                     pending.bid,
                     pending.priceTick,
-                    pending.priceTick * pips,
+                    BookmapPriceNormalizer.toWirePrice(pending.priceTick, pips),
                     pending.currentSize,
                     pending.peakSize,
                     pending.startTimeNs,

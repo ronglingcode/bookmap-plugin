@@ -18,6 +18,7 @@ import java.util.Objects;
 import java.util.function.Consumer;
 import java.util.function.IntSupplier;
 
+import com.bookmap.plugin.rong.BookmapPriceNormalizer;
 import com.bookmap.plugin.rong.OrderBookState;
 import com.bookmap.plugin.rong.pricelines.PriceLine;
 import com.bookmap.plugin.rong.pricelines.PriceLineStore;
@@ -455,7 +456,7 @@ public final class BookmapPatternEngine implements PatternRuntimeContext, Patter
                 instrumentAlias,
                 candidate.patternType,
                 candidate.triggerPriceTick,
-                candidate.triggerPriceTick * pips,
+                BookmapPriceNormalizer.toWirePrice(candidate.triggerPriceTick, pips),
                 candidate.referenceWall.priceTick,
                 candidate.referenceWall.peakSize,
                 result.score,

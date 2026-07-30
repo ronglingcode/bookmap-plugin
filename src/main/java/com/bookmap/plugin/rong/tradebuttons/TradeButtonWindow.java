@@ -37,6 +37,7 @@ import javax.swing.SwingUtilities;
 import javax.swing.Timer;
 import javax.swing.border.EmptyBorder;
 
+import com.bookmap.plugin.rong.BookmapPriceNormalizer;
 import com.bookmap.plugin.rong.PluginLog;
 import com.bookmap.plugin.rong.SignalWebSocketServer;
 import com.bookmap.plugin.rong.WallThresholdConfig;
@@ -526,6 +527,7 @@ public class TradeButtonWindow {
         String orderType = useMarketOrder ? "market" : "breakout";
         JsonObject json = new JsonObject();
         json.addProperty("type", "custom_button_click");
+        BookmapPriceNormalizer.addWirePriceUnit(json);
         json.addProperty("symbol", symbol);
         json.addProperty("button_id", tradebook.getId() + ":" + entryMethod + ":" + orderType);
         json.addProperty("button_name", (useMarketOrder ? "Mkt: " : "Breakout: ") + tradebook.getLabel() + ": " + entryMethod);
@@ -565,6 +567,7 @@ public class TradeButtonWindow {
 
         JsonObject json = new JsonObject();
         json.addProperty("type", "custom_button_click");
+        BookmapPriceNormalizer.addWirePriceUnit(json);
         json.addProperty("symbol", symbol);
         json.addProperty("button_id", "hotkey:wall_out_1");
         json.addProperty("button_name", "Wall Out 1");
@@ -578,7 +581,6 @@ public class TradeButtonWindow {
         json.addProperty("position_side", adjustment.isLongPosition() ? "long" : "short");
         json.addProperty("exit_side", adjustment.isLongPosition() ? "sell" : "buy");
         json.addProperty("wall_side", adjustment.isBidWall() ? "bid" : "ask");
-        json.addProperty("wall_price_tick", adjustment.getWallPriceTick());
         json.addProperty("wall_price", adjustment.getWallPrice());
         json.addProperty("wall_size", adjustment.getWallSize());
         json.addProperty("minimum_wall_size", adjustment.getSizeThreshold());

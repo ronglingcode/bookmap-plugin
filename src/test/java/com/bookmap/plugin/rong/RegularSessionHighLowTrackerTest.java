@@ -35,6 +35,7 @@ class RegularSessionHighLowTrackerTest {
         RegularSessionHighLowTracker.Snapshot snapshot = tracker.snapshot();
         assertEquals(102.75, snapshot.getHigh());
         assertEquals(99.50, snapshot.getLow());
+        assertEquals("real", snapshot.toJson().get("priceUnit").getAsString());
     }
 
     @Test

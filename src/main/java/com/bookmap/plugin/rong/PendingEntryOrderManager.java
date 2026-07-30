@@ -122,7 +122,7 @@ public class PendingEntryOrderManager implements SignalWebSocketServer.AccountSt
     }
 
     private void addLineToStore(String instrumentAlias, EntryOrderLine line, double pips) {
-        double priceInTicks = line.price / pips;
+        double priceInTicks = BookmapPriceNormalizer.toBookmapPriceLevel(line.price, pips);
         store.addLine(new PriceLine(
                 instrumentAlias,
                 PriceLine.LineType.ENTRY_ORDER,

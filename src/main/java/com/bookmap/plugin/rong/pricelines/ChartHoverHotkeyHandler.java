@@ -28,6 +28,7 @@ import javax.swing.JTable;
 import javax.swing.SwingUtilities;
 import javax.swing.text.JTextComponent;
 
+import com.bookmap.plugin.rong.BookmapPriceNormalizer;
 import com.bookmap.plugin.rong.IndicatorConfig;
 import com.bookmap.plugin.rong.PluginLog;
 import com.bookmap.plugin.rong.SignalWebSocketServer;
@@ -229,6 +230,7 @@ public class ChartHoverHotkeyHandler implements ScreenSpacePainterFactory {
 
         JsonObject json = new JsonObject();
         json.addProperty("type", "custom_button_click");
+        BookmapPriceNormalizer.addWirePriceUnit(json);
         json.addProperty("symbol", hover.instrument);
         json.addProperty("button_id", "chart_hotkey:" + normalizedKey);
         json.addProperty("button_name", "Chart Hotkey " + normalizedKey.toUpperCase());
@@ -355,10 +357,14 @@ public class ChartHoverHotkeyHandler implements ScreenSpacePainterFactory {
 
             double pips = instrumentPips.getOrDefault(instrument, 1.0);
             double fraction = cs.fraction(localY, compHeight);
-            double priceTick = cs.yToPriceTick(localY, compHeight);
-            double price = priceTick * pips;
+            if (!Double.isFinite(fraction) || fraction < 0 || fraction > 1) {
+                continue;
+            }
 
-            if (fraction >= 0 && fraction <= 1 && !Double.isNaN(price) && price > 0) {
+            double priceTick = cs.yToPriceTick(localY, compHeight);
+            double price = BookmapPriceNormalizer.toWirePriceOrNaN(priceTick, pips);
+
+            if (BookmapPriceNormalizer.isValidWirePrice(price)) {
                 return new ResolvedChartPrice(instrument, price);
             }
         }

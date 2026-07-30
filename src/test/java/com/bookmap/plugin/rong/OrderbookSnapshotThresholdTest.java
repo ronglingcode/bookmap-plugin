@@ -32,6 +32,8 @@ class OrderbookSnapshotThresholdTest {
         assertTrue(server.appendOrderbookSnapshot("WEN", target, 5_000, 2));
 
         JsonObject snapshot = target.getAsJsonObject("orderbook");
+        assertEquals("real", snapshot.get("priceUnit").getAsString());
+        assertEquals(100.10, snapshot.get("bestAsk").getAsDouble(), 0.00001);
         assertEquals(5_000, snapshot.get("absoluteWallThreshold").getAsInt());
         assertEquals(90.0, snapshot.get("percentile").getAsDouble(), 0.00001);
         assertEquals(200_000, snapshot.get("percentileWallThreshold").getAsInt());

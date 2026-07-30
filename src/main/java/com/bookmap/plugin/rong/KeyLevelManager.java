@@ -72,8 +72,8 @@ public class KeyLevelManager implements SignalWebSocketServer.KeyLevelConfigList
      * @param pips the instrument's price multiplier (realPrice = tickPrice * pips)
      */
     private void addLevelToStore(KeyLevelDefinition def, double pips) {
-        // Convert real price to tick units: tickPrice = realPrice / pips
-        double priceInTicks = def.getPrice() / pips;
+        double priceInTicks = BookmapPriceNormalizer.toBookmapPriceLevel(
+                def.getPrice(), pips);
 
         // Create a PriceLine with the custom label (if provided)
         PriceLine line = new PriceLine(

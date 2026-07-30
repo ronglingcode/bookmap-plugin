@@ -161,7 +161,7 @@ public class ExitOrderManager implements SignalWebSocketServer.ExitOrderPairsCon
     }
 
     private void addLineToStore(String instrumentAlias, ExitOrderLine line, double pips) {
-        double priceInTicks = line.price / pips;
+        double priceInTicks = BookmapPriceNormalizer.toBookmapPriceLevel(line.price, pips);
         store.addLine(new PriceLine(
                 instrumentAlias,
                 PriceLine.LineType.EXIT_ORDER,

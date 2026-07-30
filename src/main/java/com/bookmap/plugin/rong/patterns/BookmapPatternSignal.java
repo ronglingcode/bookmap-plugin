@@ -7,6 +7,7 @@ import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
 
+import com.bookmap.plugin.rong.BookmapPriceNormalizer;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
 
@@ -92,6 +93,7 @@ public final class BookmapPatternSignal {
     public JsonObject toJson() {
         JsonObject json = new JsonObject();
         json.addProperty("type", "bookmap_pattern_signal");
+        BookmapPriceNormalizer.addWirePriceUnit(json);
         json.addProperty("id", id);
         json.addProperty("episodeKey", episodeKey);
         json.addProperty("symbol", instrumentAlias);

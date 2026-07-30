@@ -28,7 +28,7 @@ This repository produces two Bookmap addon plugins in the same build:
 
 - **Chart keyboard hotkeys** — when enabled, C/F cancel or flatten and W swaps the hovered chart's symbol without using its price, B/S place bid/offer wall-reversal stop entries at the hovered price only before 10:00 AM New York time, top-row digits adjust indexed exits, and numpad digits market out indexed partials at any time
 - **Order wall breakout detection** — monitors large ask-side walls and broadcasts signals when consumed
-- **Auto-drawn indicators** — premarket high/low and Camarilla Pivot levels drawn automatically
+- **Auto-drawn indicators** — seeded VWAP, premarket high/low, and Camarilla Pivot levels drawn automatically
 - **WebSocket key levels/zones** — instrument-specific price levels and zones pushed by an external app
 - **WebSocket API** — real-time breakout and order book messages
 - **Settings panels** — enable/disable indicators and optionally export replay data
@@ -135,6 +135,13 @@ ws.onmessage = (event) => {
 
 The plugin exposes a WebSocket server on `ws://localhost:8765`. Clients receive breakout messages as events occur. Additionally, clients can subscribe to real-time order book snapshots and send key levels/zones to draw.
 
+Every price-bearing message uses the canonical wire-price contract:
+
+- `priceUnit` is `"real"`.
+- Price fields contain real instrument prices (for example, `185.50` USD), never Bookmap price levels/ticks.
+- The plugin is the only component that converts between wire prices and Bookmap levels, using the instrument's `pips` value.
+- Missing `priceUnit` remains accepted for older clients; an explicit unsupported unit such as `"ticks"` is rejected.
+
 ### Message types (server → client)
 
 
@@ -160,6 +167,7 @@ All messages include a `symbol` field identifying which instrument the data belo
 ```json
 {
   "type": "key_levels_config",
+  "priceUnit": "real",
   "symbol": "AAPL",
   "levels": [
     { "price": 185.50, "label": "daily resistance" },
@@ -186,11 +194,29 @@ All messages include a `symbol` field identifying which instrument the data belo
 
 Sending an empty `levels` array clears existing key level lines for that symbol. Sending an empty or missing `zones` array clears existing key zones for that symbol. Missing or empty market-level fields clear their corresponding websocket-supplied market lines for that symbol.
 
+### Seed VWAP at 9:05 AM New York (client → server)
+
+```json
+{
+  "type": "vwap_seed",
+  "priceUnit": "real",
+  "symbol": "AAPL",
+  "sessionDate": "2026-07-28",
+  "continueFromTimeMs": 1785243900000,
+  "cumulativeVolume": 1234567,
+  "cumulativeNotional": 254321987.25,
+  "sentAtMs": 1785243900500
+}
+```
+
+`continueFromTimeMs` must be exactly 9:05 AM in `America/New_York` on `sessionDate`. The cumulative fields contain all ViteApp VWAP inputs strictly before that boundary. The plugin initializes VWAP from those values, then adds buffered and live Bookmap trades whose timestamps are at or after the boundary. Repeated seeds for the same session are idempotent.
+
 ### TypeScript example
 
 ```typescript
 interface Breakout {
   type: "breakout";
+  priceUnit: "real";
   symbol: string;
   breakoutLevel: number;
   timestamp: number;
@@ -198,6 +224,7 @@ interface Breakout {
 
 interface OrderBook {
   type: "orderbook";
+  priceUnit: "real";
   symbol: string;
   timestamp: number;
   percentile: number;
@@ -260,6 +287,15 @@ function connectToBookmap(
 The plugin draws market levels supplied by the external WebSocket client. Each indicator can be enabled or disabled in the **Indicators** settings panel.
 
 Order wall size-change sounds are enabled by default. The visual size-change alert overlays are disabled by default to keep the heatmap uncluttered, but they can still be enabled from the **Indicators** settings panel.
+
+### VWAP
+
+Draws a gold primary-chart VWAP line. ViteApp supplies cumulative notional and volume through 9:05 AM New York time, 25 minutes before the regular market open. Bookmap then continues the calculation from its own trades at or after 9:05.
+
+- ViteApp's configured VWAP correction is used as the 9:00 base when present.
+- Without a correction, ViteApp aggregates all available session candles before 9:05.
+- The line remains hidden until a valid seed is received.
+- Enabled by default; disable via the **Indicators** settings panel.
 
 ### Premarket High / Low
 

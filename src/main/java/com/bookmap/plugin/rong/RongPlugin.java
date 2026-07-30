@@ -1,5 +1,6 @@
 package com.bookmap.plugin.rong;
 
+import java.awt.Color;
 import java.time.Duration;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
@@ -38,6 +39,7 @@ import velox.api.layer1.annotations.Layer1StrategyName;
 import velox.api.layer1.data.InstrumentInfo;
 import velox.api.layer1.data.TradeInfo;
 import velox.api.layer1.messages.Layer1ApiSoundAlertMessage;
+import velox.api.layer1.messages.indicators.Layer1ApiUserMessageModifyIndicator.GraphType;
 import velox.api.layer1.messages.indicators.Layer1ApiUserMessageModifyScreenSpacePainter;
 import velox.api.layer1.simplified.Api;
 import velox.api.layer1.simplified.BboListener;
@@ -45,6 +47,7 @@ import velox.api.layer1.simplified.CustomModuleAdapter;
 import velox.api.layer1.simplified.DepthDataListener;
 import velox.api.layer1.simplified.HistoricalModeListener;
 import velox.api.layer1.simplified.InitialState;
+import velox.api.layer1.simplified.IndicatorModifiable;
 import velox.api.layer1.simplified.SnapshotEndListener;
 import velox.api.layer1.simplified.TimeListener;
 import velox.api.layer1.simplified.TradeDataListener;
@@ -73,6 +76,8 @@ public class RongPlugin implements CustomModuleAdapter,
     private static final double WALL_CHANGE_REMAINING_RATIO = 0.50;
     private static final long WALL_CHANGE_DECISION_DELAY_MS = 500;
     private static final byte[] WALL_CHANGE_SOUND = OrderWallChangeSound.createAlertSound();
+    private static final Color VWAP_COLOR = new Color(171, 71, 188);
+    private static final Color VWAP_HIDDEN_COLOR = new Color(171, 71, 188, 0);
 
     // Shared WebSocket server across all symbol instances
     private static SignalWebSocketServer sharedServer;
@@ -118,6 +123,9 @@ public class RongPlugin implements CustomModuleAdapter,
     private long initialTimestampNs;
     private TradeButtonWindow tradeButtonWindow;
     private volatile BookmapReplayExportSession replayExportSession;
+    private VwapTracker vwapTracker;
+    private SignalWebSocketServer.VwapSeedListener vwapSeedListener;
+    private IndicatorModifiable vwapIndicator;
 
     @Override
     public void initialize(String alias, InstrumentInfo info, Api api, InitialState initialState) {
@@ -130,6 +138,12 @@ public class RongPlugin implements CustomModuleAdapter,
         this.lastTimestampNs = initialTimestampNs;
         this.orderBook = new OrderBookState();
         this.wallTracker = new OrderWallTracker(WALL_THRESHOLD, WALL_CONSUMED_RATIO);
+        this.vwapTracker = new VwapTracker(cleanAlias);
+        this.vwapSeedListener = seed -> {
+            if (vwapTracker != null && vwapTracker.applySeed(seed)) {
+                PluginLog.info("[VWAP] Applied 9:05 AM seed for " + cleanAlias);
+            }
+        };
 
         synchronized (RongPlugin.class) {
             if (sharedServer == null) {
@@ -181,6 +195,9 @@ public class RongPlugin implements CustomModuleAdapter,
             instanceCount++;
         }
         replayExportConfig.addChangeListener(this);
+        this.vwapIndicator = api.registerIndicatorModifiable("VWAP", GraphType.PRIMARY);
+        this.vwapIndicator.setWidth(2);
+        updateVwapIndicatorVisibility();
         this.wallLabelTracker = new OrderWallLabelTracker(
                 cleanAlias, info.pips, wallLabelStore, this::getEffectiveWallThreshold,
                 WALL_LABEL_RETAIN_TICKS,
@@ -211,6 +228,7 @@ public class RongPlugin implements CustomModuleAdapter,
                 IndicatorConfig.BOOKMAP_PATTERN_SIGNALS);
         indicatorConfig.addChangeListener(this);
         sharedServer.registerSymbol(cleanAlias, orderBook, info.pips);
+        sharedServer.registerVwapSeedListener(cleanAlias, vwapSeedListener);
         chartHoverHotkeyHandler.registerSymbol(cleanAlias, info.pips);
         priceZonePainter.registerInstrument(cleanAlias);
         priceLinePainter.registerInstrument(cleanAlias);
@@ -317,6 +335,12 @@ public class RongPlugin implements CustomModuleAdapter,
             tradeButtonWindow.dispose();
             tradeButtonWindow = null;
         }
+        if (sharedServer != null && vwapSeedListener != null) {
+            sharedServer.unregisterVwapSeedListener(alias, vwapSeedListener);
+        }
+        vwapSeedListener = null;
+        vwapTracker = null;
+        vwapIndicator = null;
         if (chartHoverHotkeyHandler != null) {
             chartHoverHotkeyHandler.unregisterSymbol(alias);
         }
@@ -539,8 +563,9 @@ public class RongPlugin implements CustomModuleAdapter,
         if (wallChangeTracker != null) {
             wallChangeTracker.onTrade((int) Math.round(price), size, tradeInfo);
         }
-        double realPrice = price * instrumentInfo.pips;
+        double realPrice = BookmapPriceNormalizer.toWirePrice(price, instrumentInfo.pips);
         int priceTick = (int) Math.round(price);
+        updateVwap(realPrice, size, getEventTimeNs());
 
         if (shouldRunPatternAutomation()) {
             patternEngine.onTrade(price, size, tradeInfo, getEventTimeNs());
@@ -561,6 +586,7 @@ public class RongPlugin implements CustomModuleAdapter,
     @Override
     public void onTimestamp(long timestampNs) {
         this.lastTimestampNs = timestampNs;
+        flushPendingVwapPoints();
         if (shouldRunPatternAutomation()) {
             patternEngine.onTimestamp(timestampNs);
         }
@@ -626,6 +652,13 @@ public class RongPlugin implements CustomModuleAdapter,
 
     @Override
     public void onIndicatorConfigChanged(String indicatorKey, boolean enabled) {
+        if (IndicatorConfig.VWAP.equals(indicatorKey)) {
+            updateVwapIndicatorVisibility();
+            if (enabled && vwapTracker != null) {
+                vwapTracker.requestCurrentPoint(getEventTimeNs());
+            }
+            return;
+        }
         if (!IndicatorConfig.BOOKMAP_PATTERN_SIGNALS.equals(indicatorKey)) return;
         patternAutomationEnabled = enabled;
         BookmapPatternEngine engine = patternEngine;
@@ -643,7 +676,8 @@ public class RongPlugin implements CustomModuleAdapter,
     private void checkBreakout(double currentPrice) {
         List<OrderWallTracker.WallInfo> walls = wallTracker.getActiveWalls();
         for (OrderWallTracker.WallInfo wall : walls) {
-            double wallRealPrice = wall.priceTick * instrumentInfo.pips;
+            double wallRealPrice = BookmapPriceNormalizer.toWirePrice(
+                    wall.priceTick, instrumentInfo.pips);
             if (currentPrice > wallRealPrice && wallTracker.isConsumed(wall)) {
                 BreakoutSignal signal = new BreakoutSignal(alias, wallRealPrice);
                 // sharedServer.broadcastSignal(signal.toJson());
@@ -687,6 +721,45 @@ public class RongPlugin implements CustomModuleAdapter,
         return orderBook == null
                 ? thresholdFloor
                 : orderBook.getSizeThreshold(thresholdFloor, ORDERBOOK_PERCENTILE);
+    }
+
+    private void updateVwap(double realPrice, int size, long timestampNs) {
+        VwapTracker tracker = vwapTracker;
+        if (tracker == null) {
+            return;
+        }
+        VwapTracker.VwapPoint point = tracker.onTrade(realPrice, size, timestampNs);
+        flushPendingVwapPoints();
+        addVwapPoint(point);
+    }
+
+    private void flushPendingVwapPoints() {
+        VwapTracker tracker = vwapTracker;
+        if (tracker == null) {
+            return;
+        }
+        for (VwapTracker.VwapPoint point : tracker.drainPendingIndicatorPoints()) {
+            addVwapPoint(point);
+        }
+    }
+
+    private void addVwapPoint(VwapTracker.VwapPoint point) {
+        if (point == null || vwapIndicator == null || indicatorConfig == null
+                || !indicatorConfig.isEnabled(IndicatorConfig.VWAP)) {
+            return;
+        }
+        double priceLevel = BookmapPriceNormalizer.toBookmapPriceLevel(
+                point.getValue(), instrumentInfo.pips);
+        vwapIndicator.addPoint(point.getTimestampNs(), priceLevel);
+    }
+
+    private void updateVwapIndicatorVisibility() {
+        if (vwapIndicator == null || indicatorConfig == null) {
+            return;
+        }
+        vwapIndicator.setColor(indicatorConfig.isEnabled(IndicatorConfig.VWAP)
+                ? VWAP_COLOR
+                : VWAP_HIDDEN_COLOR);
     }
 
     private void handlePatternSignal(BookmapPatternSignal signal) {

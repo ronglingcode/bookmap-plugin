@@ -7,6 +7,7 @@ import java.util.concurrent.ConcurrentHashMap;
 
 import com.bookmap.plugin.rong.AccountExecutionDefinition;
 import com.bookmap.plugin.rong.AccountStateDefinition;
+import com.bookmap.plugin.rong.BookmapPriceNormalizer;
 import com.bookmap.plugin.rong.PluginLog;
 import com.bookmap.plugin.rong.SignalWebSocketServer;
 import com.bookmap.plugin.rong.SymbolUtils;
@@ -65,7 +66,7 @@ public class FilledExecutionManager implements SignalWebSocketServer.AccountStat
             }
             markers.add(new FilledExecutionMarker(
                     instrumentAlias,
-                    execution.getPrice() / pips,
+                    BookmapPriceNormalizer.toBookmapPriceLevel(execution.getPrice(), pips),
                     execution.getPrice(),
                     execution.getQuantity(),
                     execution.isBuy(),

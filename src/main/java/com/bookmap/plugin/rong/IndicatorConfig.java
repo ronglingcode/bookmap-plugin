@@ -21,6 +21,7 @@ public class IndicatorConfig {
      */
     public static final String FILLED_EXECUTION_MARKERS = "filled_execution_markers";
     public static final String BOOKMAP_PATTERN_SIGNALS = "bookmap_pattern_signals";
+    public static final String VWAP = "vwap";
 
     private final Map<String, Boolean> enabled = new ConcurrentHashMap<>();
 
@@ -42,6 +43,7 @@ public class IndicatorConfig {
         enabled.put(FIRE_KEYBOARD_EVENT, false);
         enabled.put(FILLED_EXECUTION_MARKERS, true);
         enabled.put(BOOKMAP_PATTERN_SIGNALS, false);
+        enabled.put(VWAP, true);
     }
 
     public boolean isEnabled(String indicatorKey) {

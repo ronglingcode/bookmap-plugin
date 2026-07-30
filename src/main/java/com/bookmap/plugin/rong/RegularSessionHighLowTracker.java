@@ -90,6 +90,7 @@ final class RegularSessionHighLowTracker {
         JsonObject toJson() {
             JsonObject json = new JsonObject();
             json.addProperty("source", "bookmap");
+            BookmapPriceNormalizer.addWirePriceUnit(json);
             json.addProperty("sessionDate", sessionDate);
             json.addProperty("high", high);
             json.addProperty("low", low);

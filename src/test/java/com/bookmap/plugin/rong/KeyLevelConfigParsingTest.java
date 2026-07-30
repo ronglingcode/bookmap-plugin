@@ -1,6 +1,7 @@
 package com.bookmap.plugin.rong;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.Collections;
 import java.util.List;
@@ -24,6 +25,7 @@ class KeyLevelConfigParsingTest {
 
         server.onMessage(null, "{"
                 + "\"type\":\"key_levels_config\","
+                + "\"priceUnit\":\"real\","
                 + "\"symbol\":\"AAPL\","
                 + "\"levels\":[{\"price\":185.5,\"label\":\"daily resistance\"}]"
                 + "}");
@@ -33,6 +35,23 @@ class KeyLevelConfigParsingTest {
         KeyLevelDefinition level = levelsRef.get().get(0);
         assertEquals(185.5, level.getPrice(), 0.00001);
         assertEquals("daily resistance", level.getLabel());
+    }
+
+    @Test
+    void rejectsPriceConfigsThatClaimBookmapTickUnits() {
+        SignalWebSocketServer server = new SignalWebSocketServer(0, 90, 1000);
+        AtomicReference<List<KeyLevelDefinition>> levelsRef =
+                new AtomicReference<>(Collections.emptyList());
+        server.registerKeyLevelConfigListener((symbol, levels) -> levelsRef.set(levels));
+
+        server.onMessage(null, "{"
+                + "\"type\":\"key_levels_config\","
+                + "\"priceUnit\":\"ticks\","
+                + "\"symbol\":\"AAPL\","
+                + "\"levels\":[{\"price\":18550}]"
+                + "}");
+
+        assertTrue(levelsRef.get().isEmpty());
     }
 
     @Test

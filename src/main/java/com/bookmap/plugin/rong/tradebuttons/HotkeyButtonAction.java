@@ -1,5 +1,6 @@
 package com.bookmap.plugin.rong.tradebuttons;
 
+import com.bookmap.plugin.rong.BookmapPriceNormalizer;
 import com.bookmap.plugin.rong.PluginLog;
 import com.bookmap.plugin.rong.SignalWebSocketServer;
 import com.google.gson.JsonObject;
@@ -39,6 +40,7 @@ public final class HotkeyButtonAction {
             long timestamp) {
         JsonObject json = new JsonObject();
         json.addProperty("type", "custom_button_click");
+        BookmapPriceNormalizer.addWirePriceUnit(json);
         json.addProperty("symbol", symbol);
         json.addProperty("button_id", "hotkey:" + buttonId);
         json.addProperty("button_name", buttonName);

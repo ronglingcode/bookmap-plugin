@@ -1,5 +1,7 @@
 package com.bookmap.plugin.rong;
 
+import java.util.Locale;
+
 public class BreakoutSignal {
 
     public final String symbol;
@@ -8,13 +10,18 @@ public class BreakoutSignal {
 
     public BreakoutSignal(String symbol, double breakoutLevel) {
         this.symbol = symbol;
-        this.breakoutLevel = breakoutLevel;
+        this.breakoutLevel = BookmapPriceNormalizer.normalizeWirePrice(breakoutLevel);
+        if (!Double.isFinite(this.breakoutLevel)) {
+            throw new IllegalArgumentException("breakoutLevel must be a valid wire price");
+        }
         this.timestamp = System.currentTimeMillis();
     }
 
     public String toJson() {
         return String.format(
-            "{\"type\":\"breakout\",\"symbol\":\"%s\",\"breakoutLevel\":%.6f,\"timestamp\":%d}",
-            symbol, breakoutLevel, timestamp);
+            Locale.US,
+            "{\"type\":\"breakout\",\"symbol\":\"%s\",\"priceUnit\":\"%s\","
+                    + "\"breakoutLevel\":%.6f,\"timestamp\":%d}",
+            symbol, BookmapPriceNormalizer.WIRE_PRICE_UNIT, breakoutLevel, timestamp);
     }
 }

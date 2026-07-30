@@ -191,6 +191,7 @@ public class OrderBookState {
         int minSize = (percentile > 0) ? getPercentileThreshold(percentile) : 0;
         StringBuilder sb = new StringBuilder();
         sb.append("{\"type\":\"orderbook\",\"symbol\":\"").append(symbol).append("\"");
+        sb.append(",\"priceUnit\":\"").append(BookmapPriceNormalizer.WIRE_PRICE_UNIT).append("\"");
         sb.append(",\"timestamp\":").append(System.currentTimeMillis());
         sb.append(",\"percentile\":").append(percentile);
         sb.append(",\"minSize\":").append(minSize);
@@ -198,10 +199,16 @@ public class OrderBookState {
         Integer bestBidTick = getBestBid();
         Integer bestAskTick = getBestAsk();
         if (bestBidTick != null) {
-            sb.append(",\"bestBid\":").append(String.format("%.6f", bestBidTick * pips));
+            sb.append(",\"bestBid\":").append(String.format(
+                    java.util.Locale.US,
+                    "%.6f",
+                    BookmapPriceNormalizer.toWirePrice(bestBidTick, pips)));
         }
         if (bestAskTick != null) {
-            sb.append(",\"bestAsk\":").append(String.format("%.6f", bestAskTick * pips));
+            sb.append(",\"bestAsk\":").append(String.format(
+                    java.util.Locale.US,
+                    "%.6f",
+                    BookmapPriceNormalizer.toWirePrice(bestAskTick, pips)));
         }
         sb.append(",\"largeBids\":[");
         appendLevels(sb, bids, pips, minSize);
@@ -216,7 +223,11 @@ public class OrderBookState {
         for (Map.Entry<Integer, Integer> entry : book.entrySet()) {
             if (entry.getValue() < minSize) continue;
             if (!first) sb.append(',');
-            sb.append(String.format("[%.6f,%d]", entry.getKey() * pips, entry.getValue()));
+            sb.append(String.format(
+                    java.util.Locale.US,
+                    "[%.6f,%d]",
+                    BookmapPriceNormalizer.toWirePrice(entry.getKey(), pips),
+                    entry.getValue()));
             first = false;
         }
     }

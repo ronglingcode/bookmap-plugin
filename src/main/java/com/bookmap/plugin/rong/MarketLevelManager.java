@@ -113,7 +113,12 @@ public class MarketLevelManager implements SignalWebSocketServer.MarketLevelConf
                 continue;
             }
             store.replaceByType(instrumentAlias, entry.getValue(),
-                    new PriceLine(instrumentAlias, entry.getValue(), price / pips, price, levelName));
+                    new PriceLine(
+                            instrumentAlias,
+                            entry.getValue(),
+                            BookmapPriceNormalizer.toBookmapPriceLevel(price, pips),
+                            price,
+                            levelName));
             count++;
         }
         return count;
@@ -167,7 +172,12 @@ public class MarketLevelManager implements SignalWebSocketServer.MarketLevelConf
             return 0;
         }
         store.replaceByType(instrumentAlias, type,
-                new PriceLine(instrumentAlias, type, price / pips, price, label));
+                new PriceLine(
+                        instrumentAlias,
+                        type,
+                        BookmapPriceNormalizer.toBookmapPriceLevel(price, pips),
+                        price,
+                        label));
         return 1;
     }
 

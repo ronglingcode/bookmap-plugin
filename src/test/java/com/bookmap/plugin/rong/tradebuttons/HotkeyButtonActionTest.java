@@ -14,6 +14,7 @@ class HotkeyButtonActionTest {
                 "AAPL", "cancel", "Cancel", "KeyC", false, 123L);
 
         assertEquals("custom_button_click", json.get("type").getAsString());
+        assertEquals("real", json.get("priceUnit").getAsString());
         assertEquals("AAPL", json.get("symbol").getAsString());
         assertEquals("hotkey:cancel", json.get("button_id").getAsString());
         assertEquals("Cancel", json.get("button_name").getAsString());

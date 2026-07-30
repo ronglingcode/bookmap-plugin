@@ -7,6 +7,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.StandardOpenOption;
+import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.LinkedHashMap;
@@ -68,6 +69,11 @@ public class SignalWebSocketServer extends WebSocketServer {
         void onAccountStateChanged(AccountStateDefinition state);
     }
 
+    @FunctionalInterface
+    public interface VwapSeedListener {
+        void onVwapSeedChanged(VwapSeedDefinition seed);
+    }
+
     private final Object schedulerLock = new Object();
     private ScheduledExecutorService scheduler;
     private final Path breakoutLogFile;
@@ -83,7 +89,9 @@ public class SignalWebSocketServer extends WebSocketServer {
     private final Map<String, List<ExitOrderPairDefinition>> symbolToExitOrderPairs = new ConcurrentHashMap<>();
     private final Map<String, AccountStateDefinition> symbolToAccountState = new ConcurrentHashMap<>();
     private final Map<String, RegularSessionHighLowTracker> symbolToRegularSessionHighLow = new ConcurrentHashMap<>();
+    private final Map<String, VwapSeedDefinition> symbolToVwapSeed = new ConcurrentHashMap<>();
     private final Map<String, Set<TradeButtonConfigListener>> symbolToTradeButtonListeners = new ConcurrentHashMap<>();
+    private final Map<String, Set<VwapSeedListener>> symbolToVwapSeedListeners = new ConcurrentHashMap<>();
     private final Set<KeyLevelConfigListener> keyLevelConfigListeners =
             Collections.newSetFromMap(new ConcurrentHashMap<>());
     private final Set<KeyZoneConfigListener> keyZoneConfigListeners =
@@ -124,6 +132,7 @@ public class SignalWebSocketServer extends WebSocketServer {
         symbolToOrderBook.remove(symbol);
         symbolToPips.remove(symbol);
         symbolToRegularSessionHighLow.remove(symbol);
+        symbolToVwapSeed.remove(symbol);
         PluginLog.info("[Rong] Unregistered symbol: " + symbol);
     }
 
@@ -224,6 +233,7 @@ public class SignalWebSocketServer extends WebSocketServer {
         JsonObject snapshot = new JsonObject();
         snapshot.addProperty("symbol", cleanSymbol);
         snapshot.addProperty("timestamp", System.currentTimeMillis());
+        BookmapPriceNormalizer.addWirePriceUnit(snapshot);
         int normalizedThresholdFloor = Math.max(0, thresholdFloor);
         snapshot.addProperty("wallThreshold", normalizedThresholdFloor);
         snapshot.addProperty("absoluteWallThreshold", normalizedThresholdFloor);
@@ -238,10 +248,14 @@ public class SignalWebSocketServer extends WebSocketServer {
             Integer bestBidTick = orderBook.getBestBid();
             Integer bestAskTick = orderBook.getBestAsk();
             if (bestBidTick != null) {
-                snapshot.addProperty("bestBid", bestBidTick * pips);
+                snapshot.addProperty(
+                        "bestBid",
+                        BookmapPriceNormalizer.toWirePrice(bestBidTick, pips));
             }
             if (bestAskTick != null) {
-                snapshot.addProperty("bestAsk", bestAskTick * pips);
+                snapshot.addProperty(
+                        "bestAsk",
+                        BookmapPriceNormalizer.toWirePrice(bestAskTick, pips));
             }
             snapshot.add("largeBids",
                     buildWallLevels(orderBook.getBids(), pips, threshold, protectedAbsoluteWallLevels));
@@ -274,7 +288,7 @@ public class SignalWebSocketServer extends WebSocketServer {
                 protectedLevelsIncluded++;
             }
             JsonArray level = new JsonArray();
-            level.add(entry.getKey() * pips);
+            level.add(BookmapPriceNormalizer.toWirePrice(entry.getKey(), pips));
             level.add(size);
             result.add(level);
         }
@@ -386,6 +400,30 @@ public class SignalWebSocketServer extends WebSocketServer {
         }
     }
 
+    public void registerVwapSeedListener(String symbol, VwapSeedListener listener) {
+        String cleanSymbol = SymbolUtils.cleanSymbol(symbol);
+        symbolToVwapSeedListeners
+                .computeIfAbsent(cleanSymbol, ignored -> Collections.newSetFromMap(new ConcurrentHashMap<>()))
+                .add(listener);
+
+        VwapSeedDefinition existingSeed = symbolToVwapSeed.get(cleanSymbol);
+        if (existingSeed != null) {
+            listener.onVwapSeedChanged(existingSeed);
+        }
+    }
+
+    public void unregisterVwapSeedListener(String symbol, VwapSeedListener listener) {
+        String cleanSymbol = SymbolUtils.cleanSymbol(symbol);
+        Set<VwapSeedListener> listeners = symbolToVwapSeedListeners.get(cleanSymbol);
+        if (listeners == null) {
+            return;
+        }
+        listeners.remove(listener);
+        if (listeners.isEmpty()) {
+            symbolToVwapSeedListeners.remove(cleanSymbol, listeners);
+        }
+    }
+
     public void unregisterKeyZoneConfigListener(KeyZoneConfigListener listener) {
         keyZoneConfigListeners.remove(listener);
     }
@@ -464,7 +502,8 @@ public class SignalWebSocketServer extends WebSocketServer {
                     "no " + (bidWall ? "bid" : "offer") + " wall >= " + sizeThreshold);
         }
 
-        int offsetTicks = Math.max(1, (int) Math.ceil((targetOffset / pips) - 1e-9));
+        int offsetTicks = BookmapPriceNormalizer.wireDistanceToBookmapTicksCeiling(
+                targetOffset, pips);
         int targetTick = longPosition
                 ? wall.getPriceTick() - offsetTicks
                 : wall.getPriceTick() + offsetTicks;
@@ -480,8 +519,8 @@ public class SignalWebSocketServer extends WebSocketServer {
                 wall.getPriceTick(),
                 wall.getSize(),
                 sizeThreshold,
-                wall.getPriceTick() * pips,
-                targetTick * pips,
+                BookmapPriceNormalizer.toWirePrice(wall.getPriceTick(), pips),
+                BookmapPriceNormalizer.toWirePrice(targetTick, pips),
                 targetOffset,
                 limitOrder);
     }
@@ -503,6 +542,13 @@ public class SignalWebSocketServer extends WebSocketServer {
         JsonObject json = parseJsonObject(trimmed);
         if (json != null) {
             String type = getString(json, "type");
+            if (isPriceBearingMessageType(type)
+                    && !BookmapPriceNormalizer.isSupportedWirePriceUnit(
+                            getString(json, BookmapPriceNormalizer.WIRE_PRICE_UNIT_FIELD))) {
+                PluginLog.error("[PriceContract] Ignoring " + type
+                        + " with unsupported priceUnit");
+                return;
+            }
             if ("trade_button_config".equals(type) || "trade_buttons_config".equals(type)) {
                 handleTradeButtonConfig(json);
                 return;
@@ -521,6 +567,10 @@ public class SignalWebSocketServer extends WebSocketServer {
             }
             if ("account_state".equals(type)) {
                 handleAccountState(json);
+                return;
+            }
+            if ("vwap_seed".equals(type)) {
+                handleVwapSeed(json);
                 return;
             }
         }
@@ -546,6 +596,42 @@ public class SignalWebSocketServer extends WebSocketServer {
             PluginLog.error("[TradeButton] Failed to parse WebSocket message: " + e.getMessage());
         }
         return null;
+    }
+
+    private void handleVwapSeed(JsonObject json) {
+        String symbol = SymbolUtils.cleanSymbol(getString(json, "symbol"));
+        if (symbol.isEmpty()) {
+            PluginLog.error("[VWAP] Ignoring seed with missing symbol");
+            return;
+        }
+
+        try {
+            VwapSeedDefinition seed = new VwapSeedDefinition(
+                    symbol,
+                    LocalDate.parse(getString(json, "sessionDate")),
+                    getLong(json, "continueFromTimeMs"),
+                    getDouble(json, "cumulativeVolume"),
+                    getDouble(json, "cumulativeNotional"),
+                    getLong(json, "sentAtMs"));
+            VwapSeedDefinition existing = symbolToVwapSeed.get(symbol);
+            if (existing != null
+                    && (seed.getSessionDate().isBefore(existing.getSessionDate())
+                    || (seed.getSessionDate().equals(existing.getSessionDate())
+                    && seed.getSentAtMs() < existing.getSentAtMs()))) {
+                PluginLog.info("[VWAP] Ignoring stale seed for " + symbol
+                        + " session " + seed.getSessionDate());
+                return;
+            }
+
+            symbolToVwapSeed.put(symbol, seed);
+            notifyVwapSeedListeners(symbol, seed);
+            PluginLog.info("[VWAP] Seeded " + symbol
+                    + " at " + seed.getVwap()
+                    + " through " + seed.getContinueFromTimeMs()
+                    + " with volume " + seed.getCumulativeVolume());
+        } catch (IllegalArgumentException e) {
+            PluginLog.error("[VWAP] Ignoring invalid seed for " + symbol + ": " + e.getMessage());
+        }
     }
 
     private void handleTradeButtonConfig(JsonObject json) {
@@ -655,14 +741,14 @@ public class SignalWebSocketServer extends WebSocketServer {
         }
         try {
             if (element.isJsonPrimitive()) {
-                double price = element.getAsDouble();
+                double price = BookmapPriceNormalizer.normalizeWirePrice(element.getAsDouble());
                 return price > 0 ? new KeyLevelDefinition(symbol, price, null) : null;
             }
             if (!element.isJsonObject()) {
                 return null;
             }
             JsonObject levelJson = element.getAsJsonObject();
-            double price = getDouble(levelJson, "price");
+            double price = getWirePrice(levelJson, "price");
             if (price <= 0) {
                 return null;
             }
@@ -700,8 +786,8 @@ public class SignalWebSocketServer extends WebSocketServer {
         }
         try {
             JsonObject zoneJson = element.getAsJsonObject();
-            double low = getDouble(zoneJson, "low");
-            double high = getDouble(zoneJson, "high");
+            double low = getWirePrice(zoneJson, "low");
+            double high = getWirePrice(zoneJson, "high");
             if (!Double.isFinite(low) || !Double.isFinite(high) || low <= 0 || high <= 0 || low == high) {
                 return null;
             }
@@ -743,7 +829,7 @@ public class SignalWebSocketServer extends WebSocketServer {
         String[] levels = {"R1", "R2", "R3", "R4", "R5", "R6",
                            "S1", "S2", "S3", "S4", "S5", "S6"};
         for (String level : levels) {
-            double price = getDouble(pivotsObject, level);
+            double price = getWirePrice(pivotsObject, level);
             if (Double.isFinite(price) && price > 0) {
                 pivots.put(level, price);
             }
@@ -758,16 +844,16 @@ public class SignalWebSocketServer extends WebSocketServer {
             String primaryTopLevelField,
             String secondaryTopLevelField) {
         if (pairObject != null) {
-            double nestedValue = getDouble(pairObject, pairField);
+            double nestedValue = getWirePrice(pairObject, pairField);
             if (Double.isFinite(nestedValue)) {
                 return nestedValue;
             }
         }
-        double primaryValue = getDouble(root, primaryTopLevelField);
+        double primaryValue = getWirePrice(root, primaryTopLevelField);
         if (Double.isFinite(primaryValue)) {
             return primaryValue;
         }
-        return getDouble(root, secondaryTopLevelField);
+        return getWirePrice(root, secondaryTopLevelField);
     }
 
     private JsonObject getFirstObjectField(JsonObject primary, JsonObject secondary, String field) {
@@ -861,7 +947,7 @@ public class SignalWebSocketServer extends WebSocketServer {
         if (!Double.isFinite(netQuantity)) {
             netQuantity = getDouble(positionJson, "quantity");
         }
-        double averagePrice = getDouble(positionJson, "averagePrice");
+        double averagePrice = getWirePrice(positionJson, "averagePrice");
         return new AccountPositionDefinition(
                 symbol,
                 Double.isFinite(netQuantity) ? netQuantity : 0,
@@ -903,7 +989,7 @@ public class SignalWebSocketServer extends WebSocketServer {
         }
         try {
             JsonObject executionJson = element.getAsJsonObject();
-            double price = getDouble(executionJson, "price");
+            double price = getWirePrice(executionJson, "price");
             double quantity = getDouble(executionJson, "quantity");
             long timeMs = getLong(executionJson, "timeMs");
             if (price <= 0 || !Double.isFinite(price)
@@ -949,7 +1035,7 @@ public class SignalWebSocketServer extends WebSocketServer {
                     firstNonEmpty(getString(orderJson, "orderID"), getString(orderJson, "orderId")),
                     role,
                     getString(orderJson, "orderType"),
-                    getDouble(orderJson, "price"),
+                    getWirePrice(orderJson, "price"),
                     Double.isFinite(quantity) ? quantity : 0,
                     parseOrderIsBuy(orderJson),
                     getString(orderJson, "source"),
@@ -1068,7 +1154,7 @@ public class SignalWebSocketServer extends WebSocketServer {
             return null;
         }
         JsonObject legJson = element.getAsJsonObject();
-        double price = getDouble(legJson, "price");
+        double price = getWirePrice(legJson, "price");
         if (price <= 0 || !Double.isFinite(price)) {
             return null;
         }
@@ -1126,6 +1212,21 @@ public class SignalWebSocketServer extends WebSocketServer {
             } catch (RuntimeException e) {
                 PluginLog.error("[AccountState] Failed to update listener for "
                         + state.getSymbol() + ": " + e.getMessage());
+            }
+        }
+    }
+
+    private void notifyVwapSeedListeners(String symbol, VwapSeedDefinition seed) {
+        Set<VwapSeedListener> listeners = symbolToVwapSeedListeners.get(symbol);
+        if (listeners == null) {
+            return;
+        }
+        for (VwapSeedListener listener : listeners) {
+            try {
+                listener.onVwapSeedChanged(seed);
+            } catch (RuntimeException e) {
+                PluginLog.error("[VWAP] Failed to update seed listener for "
+                        + symbol + ": " + e.getMessage());
             }
         }
     }
@@ -1238,6 +1339,15 @@ public class SignalWebSocketServer extends WebSocketServer {
         return values;
     }
 
+    private boolean isPriceBearingMessageType(String type) {
+        return "key_levels_config".equals(type)
+                || "key_level_config".equals(type)
+                || "exit_order_pairs_config".equals(type)
+                || "exit_order_pair_config".equals(type)
+                || "account_state".equals(type)
+                || "vwap_seed".equals(type);
+    }
+
     private String getString(JsonObject json, String field) {
         JsonElement element = json.get(field);
         if (element == null || element.isJsonNull()) {
@@ -1248,6 +1358,10 @@ public class SignalWebSocketServer extends WebSocketServer {
         } catch (RuntimeException e) {
             return "";
         }
+    }
+
+    private double getWirePrice(JsonObject json, String field) {
+        return BookmapPriceNormalizer.normalizeWirePrice(getDouble(json, field));
     }
 
     private double getDouble(JsonObject json, String field) {

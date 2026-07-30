@@ -85,8 +85,8 @@ public class KeyZoneManager implements SignalWebSocketServer.KeyZoneConfigListen
         }
         return new PriceZone(
                 definition.getInstrument(),
-                definition.getLow() / pips,
-                definition.getHigh() / pips,
+                BookmapPriceNormalizer.toBookmapPriceLevel(definition.getLow(), pips),
+                BookmapPriceNormalizer.toBookmapPriceLevel(definition.getHigh(), pips),
                 definition.getLow(),
                 definition.getHigh(),
                 definition.getLabel(),
