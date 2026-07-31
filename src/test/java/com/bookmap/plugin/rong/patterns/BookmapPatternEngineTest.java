@@ -335,6 +335,22 @@ class BookmapPatternEngineTest {
         assertEquals(1, lines.getLinesCalls, "configured-level provider should be shared");
     }
 
+    @Test
+    void vwapComesOnlyFromTheAuthoritativeExternalProvider() {
+        double[] authoritativeVwapTick = {10_025.5};
+        BookmapPatternEngine engine = new BookmapPatternEngine(
+                "TEST", 0.01, () -> 100, 95, new OrderBookState(),
+                new PriceLineStore(), new PriceZoneStore(),
+                () -> authoritativeVwapTick[0], type -> true, signal -> { });
+
+        engine.onTimestamp(BASE * 1_000_000L);
+        engine.onTrade(20_000, 5_000, true, (BASE + 100) * 1_000_000L);
+        assertEquals(10_025.5, engine.vwapTick(), 0.00001);
+
+        authoritativeVwapTick[0] = 10_030.0;
+        assertEquals(10_030.0, engine.vwapTick(), 0.00001);
+    }
+
     private static void depth(BookmapPatternEngine engine, OrderBookState book,
                               boolean bid, int price, int size, long timeMs) {
         book.update(bid, price, size);

@@ -16,6 +16,7 @@ import java.util.Map;
 import java.util.NavigableMap;
 import java.util.Objects;
 import java.util.function.Consumer;
+import java.util.function.DoubleSupplier;
 import java.util.function.IntSupplier;
 
 import com.bookmap.plugin.rong.BookmapPriceNormalizer;
@@ -54,6 +55,7 @@ public final class BookmapPatternEngine implements PatternRuntimeContext, Patter
     private final OrderBookState orderBook;
     private final PriceLineStore priceLineStore;
     private final PriceZoneStore priceZoneStore;
+    private final DoubleSupplier vwapTickSupplier;
     private final PatternEligibility eligibility;
     private final Consumer<BookmapPatternSignal> signalConsumer;
     private final List<PatternDefinition> definitions = new ArrayList<>();
@@ -78,9 +80,6 @@ public final class BookmapPatternEngine implements PatternRuntimeContext, Patter
     private int lastTradeTick;
     private int sessionHighTick;
     private int sessionLowTick;
-    private double regularVolume;
-    private double regularPriceVolume;
-
     public BookmapPatternEngine(
             String instrumentAlias,
             double pips,
@@ -91,6 +90,30 @@ public final class BookmapPatternEngine implements PatternRuntimeContext, Patter
             PriceZoneStore priceZoneStore,
             PatternEligibility eligibility,
             Consumer<BookmapPatternSignal> signalConsumer) {
+        this(
+                instrumentAlias,
+                pips,
+                wallThresholdFloor,
+                wallPercentile,
+                orderBook,
+                priceLineStore,
+                priceZoneStore,
+                () -> Double.NaN,
+                eligibility,
+                signalConsumer);
+    }
+
+    public BookmapPatternEngine(
+            String instrumentAlias,
+            double pips,
+            IntSupplier wallThresholdFloor,
+            double wallPercentile,
+            OrderBookState orderBook,
+            PriceLineStore priceLineStore,
+            PriceZoneStore priceZoneStore,
+            DoubleSupplier vwapTickSupplier,
+            PatternEligibility eligibility,
+            Consumer<BookmapPatternSignal> signalConsumer) {
         this.instrumentAlias = Objects.requireNonNull(instrumentAlias, "instrumentAlias");
         this.pips = pips;
         this.wallThresholdFloor = Objects.requireNonNull(wallThresholdFloor, "wallThresholdFloor");
@@ -98,6 +121,7 @@ public final class BookmapPatternEngine implements PatternRuntimeContext, Patter
         this.orderBook = Objects.requireNonNull(orderBook, "orderBook");
         this.priceLineStore = Objects.requireNonNull(priceLineStore, "priceLineStore");
         this.priceZoneStore = Objects.requireNonNull(priceZoneStore, "priceZoneStore");
+        this.vwapTickSupplier = Objects.requireNonNull(vwapTickSupplier, "vwapTickSupplier");
         this.eligibility = Objects.requireNonNull(eligibility, "eligibility");
         this.signalConsumer = Objects.requireNonNull(signalConsumer, "signalConsumer");
         definitions.add(new WallBreakPatternDefinition(PatternType.OFFER_WALL_BREAKOUT, false));
@@ -141,8 +165,6 @@ public final class BookmapPatternEngine implements PatternRuntimeContext, Patter
         lastTradeTick = 0;
         sessionHighTick = 0;
         sessionLowTick = 0;
-        regularVolume = 0;
-        regularPriceVolume = 0;
     }
 
     /** Called after the shared OrderBookState has received this absolute-size update. */
@@ -206,9 +228,6 @@ public final class BookmapPatternEngine implements PatternRuntimeContext, Patter
         if (!regularSession || size <= 0 || priceTick <= 0) return;
 
         lastTradeTick = priceTick;
-        regularPriceVolume += (double) priceTick * size;
-        regularVolume += size;
-
         if (!ready) {
             if (sessionHighTick == 0 || priceTick > sessionHighTick) sessionHighTick = priceTick;
             if (sessionLowTick == 0 || priceTick < sessionLowTick) sessionLowTick = priceTick;
@@ -265,8 +284,6 @@ public final class BookmapPatternEngine implements PatternRuntimeContext, Patter
             sessionDate = eventDate;
             sessionHighTick = 0;
             sessionLowTick = 0;
-            regularVolume = 0;
-            regularPriceVolume = 0;
             lifecycleSeededForSession = false;
             resetPatternLifecycle();
         }
@@ -475,7 +492,8 @@ public final class BookmapPatternEngine implements PatternRuntimeContext, Patter
 
     @Override
     public double vwapTick() {
-        return regularVolume > 0 ? regularPriceVolume / regularVolume : Double.NaN;
+        double vwapTick = vwapTickSupplier.getAsDouble();
+        return Double.isFinite(vwapTick) && vwapTick > 0 ? vwapTick : Double.NaN;
     }
 
     @Override

@@ -44,7 +44,7 @@ public class IndicatorSettingsPanel extends StrategyPanel {
 
         gbc.gridy++;
         JCheckBox vwapCheckbox = new JCheckBox(
-                "VWAP (ViteApp seed at 9:05 AM New York)",
+                "VWAP (closed-minute values from ViteApp)",
                 config.isEnabled(IndicatorConfig.VWAP));
         vwapCheckbox.addActionListener(e ->
                 config.setEnabled(IndicatorConfig.VWAP, vwapCheckbox.isSelected()));

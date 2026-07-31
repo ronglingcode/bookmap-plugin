@@ -124,7 +124,7 @@ public class RongPlugin implements CustomModuleAdapter,
     private TradeButtonWindow tradeButtonWindow;
     private volatile BookmapReplayExportSession replayExportSession;
     private VwapTracker vwapTracker;
-    private SignalWebSocketServer.VwapSeedListener vwapSeedListener;
+    private SignalWebSocketServer.VwapUpdateListener vwapUpdateListener;
     private IndicatorModifiable vwapIndicator;
 
     @Override
@@ -139,9 +139,10 @@ public class RongPlugin implements CustomModuleAdapter,
         this.orderBook = new OrderBookState();
         this.wallTracker = new OrderWallTracker(WALL_THRESHOLD, WALL_CONSUMED_RATIO);
         this.vwapTracker = new VwapTracker(cleanAlias);
-        this.vwapSeedListener = seed -> {
-            if (vwapTracker != null && vwapTracker.applySeed(seed)) {
-                PluginLog.info("[VWAP] Applied 9:05 AM seed for " + cleanAlias);
+        this.vwapUpdateListener = update -> {
+            if (vwapTracker != null && vwapTracker.applyUpdate(update)) {
+                PluginLog.info("[VWAP] Applied ViteApp update for " + cleanAlias
+                        + " at " + update.getEffectiveTimeMs());
             }
         };
 
@@ -219,6 +220,7 @@ public class RongPlugin implements CustomModuleAdapter,
                 orderBook,
                 priceLineStore,
                 priceZoneStore,
+                this::getVwapTick,
                 patternType -> indicatorConfig != null
                         && indicatorConfig.isEnabled(IndicatorConfig.BOOKMAP_PATTERN_SIGNALS)
                         && sharedServer != null
@@ -228,7 +230,7 @@ public class RongPlugin implements CustomModuleAdapter,
                 IndicatorConfig.BOOKMAP_PATTERN_SIGNALS);
         indicatorConfig.addChangeListener(this);
         sharedServer.registerSymbol(cleanAlias, orderBook, info.pips);
-        sharedServer.registerVwapSeedListener(cleanAlias, vwapSeedListener);
+        sharedServer.registerVwapUpdateListener(cleanAlias, vwapUpdateListener);
         chartHoverHotkeyHandler.registerSymbol(cleanAlias, info.pips);
         priceZonePainter.registerInstrument(cleanAlias);
         priceLinePainter.registerInstrument(cleanAlias);
@@ -335,10 +337,10 @@ public class RongPlugin implements CustomModuleAdapter,
             tradeButtonWindow.dispose();
             tradeButtonWindow = null;
         }
-        if (sharedServer != null && vwapSeedListener != null) {
-            sharedServer.unregisterVwapSeedListener(alias, vwapSeedListener);
+        if (sharedServer != null && vwapUpdateListener != null) {
+            sharedServer.unregisterVwapUpdateListener(alias, vwapUpdateListener);
         }
-        vwapSeedListener = null;
+        vwapUpdateListener = null;
         vwapTracker = null;
         vwapIndicator = null;
         if (chartHoverHotkeyHandler != null) {
@@ -565,7 +567,7 @@ public class RongPlugin implements CustomModuleAdapter,
         }
         double realPrice = BookmapPriceNormalizer.toWirePrice(price, instrumentInfo.pips);
         int priceTick = (int) Math.round(price);
-        updateVwap(realPrice, size, getEventTimeNs());
+        flushPendingVwapPoints();
 
         if (shouldRunPatternAutomation()) {
             patternEngine.onTrade(price, size, tradeInfo, getEventTimeNs());
@@ -723,16 +725,6 @@ public class RongPlugin implements CustomModuleAdapter,
                 : orderBook.getSizeThreshold(thresholdFloor, ORDERBOOK_PERCENTILE);
     }
 
-    private void updateVwap(double realPrice, int size, long timestampNs) {
-        VwapTracker tracker = vwapTracker;
-        if (tracker == null) {
-            return;
-        }
-        VwapTracker.VwapPoint point = tracker.onTrade(realPrice, size, timestampNs);
-        flushPendingVwapPoints();
-        addVwapPoint(point);
-    }
-
     private void flushPendingVwapPoints() {
         VwapTracker tracker = vwapTracker;
         if (tracker == null) {
@@ -751,6 +743,18 @@ public class RongPlugin implements CustomModuleAdapter,
         double priceLevel = BookmapPriceNormalizer.toBookmapPriceLevel(
                 point.getValue(), instrumentInfo.pips);
         vwapIndicator.addPoint(point.getTimestampNs(), priceLevel);
+    }
+
+    private double getVwapTick() {
+        VwapTracker tracker = vwapTracker;
+        if (tracker == null || instrumentInfo == null) {
+            return Double.NaN;
+        }
+        double vwap = tracker.getCurrentVwap();
+        if (!BookmapPriceNormalizer.isValidWirePrice(vwap)) {
+            return Double.NaN;
+        }
+        return BookmapPriceNormalizer.toBookmapPriceLevel(vwap, instrumentInfo.pips);
     }
 
     private void updateVwapIndicatorVisibility() {

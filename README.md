@@ -28,7 +28,7 @@ This repository produces two Bookmap addon plugins in the same build:
 
 - **Chart keyboard hotkeys** — when enabled, C/F cancel or flatten and W swaps the hovered chart's symbol without using its price, B/S place bid/offer wall-reversal stop entries at the hovered price only before 10:00 AM New York time, top-row digits adjust indexed exits, and numpad digits market out indexed partials at any time
 - **Order wall breakout detection** — monitors large ask-side walls and broadcasts signals when consumed
-- **Auto-drawn indicators** — seeded VWAP, premarket high/low, and Camarilla Pivot levels drawn automatically
+- **Auto-drawn indicators** — ViteApp VWAP, premarket high/low, and Camarilla Pivot levels drawn automatically
 - **WebSocket key levels/zones** — instrument-specific price levels and zones pushed by an external app
 - **WebSocket API** — real-time breakout and order book messages
 - **Settings panels** — enable/disable indicators and optionally export replay data
@@ -194,22 +194,20 @@ All messages include a `symbol` field identifying which instrument the data belo
 
 Sending an empty `levels` array clears existing key level lines for that symbol. Sending an empty or missing `zones` array clears existing key zones for that symbol. Missing or empty market-level fields clear their corresponding websocket-supplied market lines for that symbol.
 
-### Seed VWAP at 9:05 AM New York (client → server)
+### Closed-minute VWAP update (client → server)
 
 ```json
 {
-  "type": "vwap_seed",
+  "type": "vwap_update",
   "priceUnit": "real",
   "symbol": "AAPL",
-  "sessionDate": "2026-07-28",
-  "continueFromTimeMs": 1785243900000,
-  "cumulativeVolume": 1234567,
-  "cumulativeNotional": 254321987.25,
-  "sentAtMs": 1785243900500
+  "vwap": 206.0134,
+  "effectiveTimeMs": 1785243960000,
+  "sentAtMs": 1785243960500
 }
 ```
 
-`continueFromTimeMs` must be exactly 9:05 AM in `America/New_York` on `sessionDate`. The cumulative fields contain all ViteApp VWAP inputs strictly before that boundary. The plugin initializes VWAP from those values, then adds buffered and live Bookmap trades whose timestamps are at or after the boundary. Repeated seeds for the same session are idempotent.
+ViteApp sends its authoritative VWAP after each 1-minute candle closes. `effectiveTimeMs` is the candle-close boundary. On connection, ViteApp replays its closed-minute VWAP history; afterward it sends one update per close. The plugin plots these values directly and uses the latest value for pattern scoring. It never calculates VWAP from Bookmap trades. Duplicate and stale updates are ignored.
 
 ### TypeScript example
 
@@ -290,11 +288,12 @@ Order wall size-change sounds are enabled by default. The visual size-change ale
 
 ### VWAP
 
-Draws a gold primary-chart VWAP line. ViteApp supplies cumulative notional and volume through 9:05 AM New York time, 25 minutes before the regular market open. Bookmap then continues the calculation from its own trades at or after 9:05.
+Draws a gold primary-chart VWAP line from ViteApp's authoritative closed-minute values.
 
-- ViteApp's configured VWAP correction is used as the 9:00 base when present.
-- Without a correction, ViteApp aggregates all available session candles before 9:05.
-- The line remains hidden until a valid seed is received.
+- ViteApp replays available closed-minute history when the WebSocket connects.
+- Each subsequent 1-minute candle close adds one new point.
+- The latest received VWAP is also used for Bookmap pattern scoring.
+- The line remains empty until a valid ViteApp update is received.
 - Enabled by default; disable via the **Indicators** settings panel.
 
 ### Premarket High / Low

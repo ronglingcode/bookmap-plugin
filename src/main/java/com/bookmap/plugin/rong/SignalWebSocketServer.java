@@ -7,7 +7,6 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.StandardOpenOption;
-import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.LinkedHashMap;
@@ -70,8 +69,8 @@ public class SignalWebSocketServer extends WebSocketServer {
     }
 
     @FunctionalInterface
-    public interface VwapSeedListener {
-        void onVwapSeedChanged(VwapSeedDefinition seed);
+    public interface VwapUpdateListener {
+        void onVwapChanged(VwapUpdateDefinition update);
     }
 
     private final Object schedulerLock = new Object();
@@ -89,9 +88,9 @@ public class SignalWebSocketServer extends WebSocketServer {
     private final Map<String, List<ExitOrderPairDefinition>> symbolToExitOrderPairs = new ConcurrentHashMap<>();
     private final Map<String, AccountStateDefinition> symbolToAccountState = new ConcurrentHashMap<>();
     private final Map<String, RegularSessionHighLowTracker> symbolToRegularSessionHighLow = new ConcurrentHashMap<>();
-    private final Map<String, VwapSeedDefinition> symbolToVwapSeed = new ConcurrentHashMap<>();
+    private final Map<String, VwapUpdateDefinition> symbolToVwapUpdate = new ConcurrentHashMap<>();
     private final Map<String, Set<TradeButtonConfigListener>> symbolToTradeButtonListeners = new ConcurrentHashMap<>();
-    private final Map<String, Set<VwapSeedListener>> symbolToVwapSeedListeners = new ConcurrentHashMap<>();
+    private final Map<String, Set<VwapUpdateListener>> symbolToVwapUpdateListeners = new ConcurrentHashMap<>();
     private final Set<KeyLevelConfigListener> keyLevelConfigListeners =
             Collections.newSetFromMap(new ConcurrentHashMap<>());
     private final Set<KeyZoneConfigListener> keyZoneConfigListeners =
@@ -132,7 +131,6 @@ public class SignalWebSocketServer extends WebSocketServer {
         symbolToOrderBook.remove(symbol);
         symbolToPips.remove(symbol);
         symbolToRegularSessionHighLow.remove(symbol);
-        symbolToVwapSeed.remove(symbol);
         PluginLog.info("[Rong] Unregistered symbol: " + symbol);
     }
 
@@ -400,27 +398,27 @@ public class SignalWebSocketServer extends WebSocketServer {
         }
     }
 
-    public void registerVwapSeedListener(String symbol, VwapSeedListener listener) {
+    public void registerVwapUpdateListener(String symbol, VwapUpdateListener listener) {
         String cleanSymbol = SymbolUtils.cleanSymbol(symbol);
-        symbolToVwapSeedListeners
+        symbolToVwapUpdateListeners
                 .computeIfAbsent(cleanSymbol, ignored -> Collections.newSetFromMap(new ConcurrentHashMap<>()))
                 .add(listener);
 
-        VwapSeedDefinition existingSeed = symbolToVwapSeed.get(cleanSymbol);
-        if (existingSeed != null) {
-            listener.onVwapSeedChanged(existingSeed);
+        VwapUpdateDefinition existingUpdate = symbolToVwapUpdate.get(cleanSymbol);
+        if (existingUpdate != null) {
+            listener.onVwapChanged(existingUpdate);
         }
     }
 
-    public void unregisterVwapSeedListener(String symbol, VwapSeedListener listener) {
+    public void unregisterVwapUpdateListener(String symbol, VwapUpdateListener listener) {
         String cleanSymbol = SymbolUtils.cleanSymbol(symbol);
-        Set<VwapSeedListener> listeners = symbolToVwapSeedListeners.get(cleanSymbol);
+        Set<VwapUpdateListener> listeners = symbolToVwapUpdateListeners.get(cleanSymbol);
         if (listeners == null) {
             return;
         }
         listeners.remove(listener);
         if (listeners.isEmpty()) {
-            symbolToVwapSeedListeners.remove(cleanSymbol, listeners);
+            symbolToVwapUpdateListeners.remove(cleanSymbol, listeners);
         }
     }
 
@@ -569,8 +567,8 @@ public class SignalWebSocketServer extends WebSocketServer {
                 handleAccountState(json);
                 return;
             }
-            if ("vwap_seed".equals(type)) {
-                handleVwapSeed(json);
+            if ("vwap_update".equals(type)) {
+                handleVwapUpdate(json);
                 return;
             }
         }
@@ -598,39 +596,36 @@ public class SignalWebSocketServer extends WebSocketServer {
         return null;
     }
 
-    private void handleVwapSeed(JsonObject json) {
+    private void handleVwapUpdate(JsonObject json) {
         String symbol = SymbolUtils.cleanSymbol(getString(json, "symbol"));
         if (symbol.isEmpty()) {
-            PluginLog.error("[VWAP] Ignoring seed with missing symbol");
+            PluginLog.error("[VWAP] Ignoring update with missing symbol");
             return;
         }
 
         try {
-            VwapSeedDefinition seed = new VwapSeedDefinition(
+            VwapUpdateDefinition update = new VwapUpdateDefinition(
                     symbol,
-                    LocalDate.parse(getString(json, "sessionDate")),
-                    getLong(json, "continueFromTimeMs"),
-                    getDouble(json, "cumulativeVolume"),
-                    getDouble(json, "cumulativeNotional"),
+                    getWirePrice(json, "vwap"),
+                    getLong(json, "effectiveTimeMs"),
                     getLong(json, "sentAtMs"));
-            VwapSeedDefinition existing = symbolToVwapSeed.get(symbol);
+            VwapUpdateDefinition existing = symbolToVwapUpdate.get(symbol);
             if (existing != null
-                    && (seed.getSessionDate().isBefore(existing.getSessionDate())
-                    || (seed.getSessionDate().equals(existing.getSessionDate())
-                    && seed.getSentAtMs() < existing.getSentAtMs()))) {
-                PluginLog.info("[VWAP] Ignoring stale seed for " + symbol
-                        + " session " + seed.getSessionDate());
+                    && (update.getEffectiveTimeMs() < existing.getEffectiveTimeMs()
+                    || (update.getEffectiveTimeMs() == existing.getEffectiveTimeMs()
+                    && update.getSentAtMs() <= existing.getSentAtMs()))) {
+                PluginLog.info("[VWAP] Ignoring stale update for " + symbol
+                        + " at " + update.getEffectiveTimeMs());
                 return;
             }
 
-            symbolToVwapSeed.put(symbol, seed);
-            notifyVwapSeedListeners(symbol, seed);
-            PluginLog.info("[VWAP] Seeded " + symbol
-                    + " at " + seed.getVwap()
-                    + " through " + seed.getContinueFromTimeMs()
-                    + " with volume " + seed.getCumulativeVolume());
+            symbolToVwapUpdate.put(symbol, update);
+            notifyVwapUpdateListeners(symbol, update);
+            PluginLog.info("[VWAP] Updated " + symbol
+                    + " to " + update.getVwap()
+                    + " at " + update.getEffectiveTimeMs());
         } catch (IllegalArgumentException e) {
-            PluginLog.error("[VWAP] Ignoring invalid seed for " + symbol + ": " + e.getMessage());
+            PluginLog.error("[VWAP] Ignoring invalid update for " + symbol + ": " + e.getMessage());
         }
     }
 
@@ -1216,16 +1211,16 @@ public class SignalWebSocketServer extends WebSocketServer {
         }
     }
 
-    private void notifyVwapSeedListeners(String symbol, VwapSeedDefinition seed) {
-        Set<VwapSeedListener> listeners = symbolToVwapSeedListeners.get(symbol);
+    private void notifyVwapUpdateListeners(String symbol, VwapUpdateDefinition update) {
+        Set<VwapUpdateListener> listeners = symbolToVwapUpdateListeners.get(symbol);
         if (listeners == null) {
             return;
         }
-        for (VwapSeedListener listener : listeners) {
+        for (VwapUpdateListener listener : listeners) {
             try {
-                listener.onVwapSeedChanged(seed);
+                listener.onVwapChanged(update);
             } catch (RuntimeException e) {
-                PluginLog.error("[VWAP] Failed to update seed listener for "
+                PluginLog.error("[VWAP] Failed to notify update listener for "
                         + symbol + ": " + e.getMessage());
             }
         }
@@ -1345,7 +1340,7 @@ public class SignalWebSocketServer extends WebSocketServer {
                 || "exit_order_pairs_config".equals(type)
                 || "exit_order_pair_config".equals(type)
                 || "account_state".equals(type)
-                || "vwap_seed".equals(type);
+                || "vwap_update".equals(type);
     }
 
     private String getString(JsonObject json, String field) {
