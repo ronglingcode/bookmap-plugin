@@ -268,7 +268,7 @@ public class TradeButtonWindow {
 
     private JButton createEntryButton(TradebookButtonGroup tradebook, String entryMethod) {
         JButton button = new JButton(entryMethod);
-        applyTradebookButtonStyle(button, tradebook.getSide());
+        applyTradebookButtonStyle(button, tradebook.isLong());
         button.putClientProperty(SHIFT_DOWN_CLIENT_PROPERTY, Boolean.FALSE);
         button.addMouseListener(new MouseAdapter() {
             @Override
@@ -307,11 +307,8 @@ public class TradeButtonWindow {
         return button;
     }
 
-    private void applyTradebookButtonStyle(JButton button, String side) {
-        Color color = getTradebookButtonColor(side);
-        if (color == null) {
-            return;
-        }
+    private void applyTradebookButtonStyle(JButton button, boolean sideIsLong) {
+        Color color = getTradebookButtonColor(sideIsLong);
         button.setBackground(color);
         button.setForeground(TRADEBOOK_BUTTON_TEXT_COLOR);
         button.setOpaque(true);
@@ -374,18 +371,8 @@ public class TradeButtonWindow {
         return Math.min(255, value + 38);
     }
 
-    private Color getTradebookButtonColor(String side) {
-        if (side == null) {
-            return null;
-        }
-        String normalizedSide = side.trim();
-        if ("long".equalsIgnoreCase(normalizedSide) || "buy".equalsIgnoreCase(normalizedSide)) {
-            return LONG_TRADEBOOK_BUTTON_COLOR;
-        }
-        if ("short".equalsIgnoreCase(normalizedSide) || "sell".equalsIgnoreCase(normalizedSide)) {
-            return SHORT_TRADEBOOK_BUTTON_COLOR;
-        }
-        return null;
+    private Color getTradebookButtonColor(boolean sideIsLong) {
+        return sideIsLong ? LONG_TRADEBOOK_BUTTON_COLOR : SHORT_TRADEBOOK_BUTTON_COLOR;
     }
 
     static boolean isShiftModified(ActionEvent event) {
@@ -533,11 +520,24 @@ public class TradeButtonWindow {
         json.addProperty("button_name", (useMarketOrder ? "Mkt: " : "Breakout: ") + tradebook.getLabel() + ": " + entryMethod);
         json.addProperty("use_market_order", useMarketOrder);
         json.addProperty("order_type", orderType);
-        json.addProperty("side", tradebook.getSide());
+        json.addProperty("sideIsLong", tradebook.isLong());
         json.addProperty("tradebook_id", tradebook.getTradebookId());
         json.addProperty("tradebook_name", tradebook.getTradebookName());
         json.addProperty("entry_method", entryMethod);
         json.addProperty("timestamp", System.currentTimeMillis());
+        if (useMarketOrder) {
+            Double estimatedEntryPrice = server.getMarketEntryEstimate(symbol, tradebook.isLong());
+            if (estimatedEntryPrice != null) {
+                json.addProperty("estimated_entry_price", estimatedEntryPrice);
+                PluginLog.info(String.format(
+                        Locale.US,
+                        "[TradeButton] %s mkt est %.2f",
+                        symbol,
+                        estimatedEntryPrice));
+            } else {
+                PluginLog.info("[TradeButton] " + symbol + " mkt est unavailable");
+            }
+        }
         server.appendRegularSessionHighLow(symbol, json);
         int thresholdFloor = getWallThresholdFloor();
         server.appendOrderbookSnapshot(

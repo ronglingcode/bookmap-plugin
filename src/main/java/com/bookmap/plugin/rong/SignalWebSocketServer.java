@@ -166,6 +166,31 @@ public class SignalWebSocketServer extends WebSocketServer {
                 symbol, target, thresholdFloor, DEFAULT_PROTECTED_ABSOLUTE_WALL_LEVELS);
     }
 
+    /**
+     * Estimate a market fill from Bookmap's current inside market.
+     * Long entries use the best ask and short entries use the best bid.
+     */
+    public Double getMarketEntryEstimate(String symbol, boolean isLong) {
+        String cleanSymbol = SymbolUtils.cleanSymbol(symbol);
+        if (cleanSymbol.isEmpty()) {
+            return null;
+        }
+
+        OrderBookState orderBook = symbolToOrderBook.get(cleanSymbol);
+        Double pips = symbolToPips.get(cleanSymbol);
+        if (orderBook == null || pips == null || pips <= 0 || !Double.isFinite(pips)) {
+            return null;
+        }
+
+        synchronized (orderBook) {
+            Integer priceTick = isLong ? orderBook.getBestAsk() : orderBook.getBestBid();
+            if (priceTick == null || priceTick <= 0) {
+                return null;
+            }
+            return BookmapPriceNormalizer.toWirePrice(priceTick, pips);
+        }
+    }
+
     public boolean appendOrderbookSnapshot(
             String symbol,
             JsonObject target,
@@ -672,10 +697,16 @@ public class SignalWebSocketServer extends WebSocketServer {
             if (entryMethods.isEmpty()) {
                 continue;
             }
+            Boolean sideIsLong = getOptionalBoolean(tradebookJson, "sideIsLong");
+            if (sideIsLong == null) {
+                PluginLog.error("[TradeButton] Ignoring " + label
+                        + " with missing or invalid sideIsLong");
+                continue;
+            }
             tradebooks.add(new TradebookButtonGroup(
                     id,
                     label,
-                    getString(tradebookJson, "side"),
+                    sideIsLong,
                     tradebookId,
                     tradebookName,
                     entryMethods));
@@ -1241,10 +1272,10 @@ public class SignalWebSocketServer extends WebSocketServer {
     }
 
     private boolean isMatchingWallBreakTradebook(TradebookButtonGroup tradebook, boolean bidBreakdown) {
-        if (bidBreakdown && !isShortSide(tradebook.getSide())) {
+        if (bidBreakdown && tradebook.isLong()) {
             return false;
         }
-        if (!bidBreakdown && !isLongSide(tradebook.getSide())) {
+        if (!bidBreakdown && !tradebook.isLong()) {
             return false;
         }
 
@@ -1268,8 +1299,8 @@ public class SignalWebSocketServer extends WebSocketServer {
 
     private boolean matchesDirection(TradebookButtonGroup tradebook, PatternType patternType) {
         return patternType.getDirection() == Direction.LONG
-                ? isLongSide(tradebook.getSide())
-                : isShortSide(tradebook.getSide());
+                ? tradebook.isLong()
+                : !tradebook.isLong();
     }
 
     private boolean isMatchingWallReversalTradebook(
@@ -1302,14 +1333,6 @@ public class SignalWebSocketServer extends WebSocketServer {
                 + tradebook.getLabel() + " "
                 + tradebook.getTradebookId() + " "
                 + tradebook.getTradebookName()).toLowerCase(Locale.US);
-    }
-
-    private boolean isLongSide(String side) {
-        return "long".equalsIgnoreCase(side) || "buy".equalsIgnoreCase(side);
-    }
-
-    private boolean isShortSide(String side) {
-        return "short".equalsIgnoreCase(side) || "sell".equalsIgnoreCase(side);
     }
 
     private List<String> getStringArray(JsonObject json, String field) {
@@ -1393,6 +1416,15 @@ public class SignalWebSocketServer extends WebSocketServer {
         } catch (RuntimeException e) {
             return false;
         }
+    }
+
+    private Boolean getOptionalBoolean(JsonObject json, String field) {
+        JsonElement element = json.get(field);
+        if (element == null || element.isJsonNull() || !element.isJsonPrimitive()
+                || !element.getAsJsonPrimitive().isBoolean()) {
+            return null;
+        }
+        return element.getAsBoolean();
     }
 
     private long getLong(JsonObject json, String field) {

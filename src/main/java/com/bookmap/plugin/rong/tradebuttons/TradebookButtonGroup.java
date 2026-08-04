@@ -11,7 +11,7 @@ public class TradebookButtonGroup {
 
     private final String id;
     private final String label;
-    private final String side;
+    private final boolean sideIsLong;
     private final String tradebookId;
     private final String tradebookName;
     private final List<String> entryMethods;
@@ -19,13 +19,13 @@ public class TradebookButtonGroup {
     public TradebookButtonGroup(
             String id,
             String label,
-            String side,
+            boolean sideIsLong,
             String tradebookId,
             String tradebookName,
             List<String> entryMethods) {
         this.id = normalize(id);
         this.label = normalize(label);
-        this.side = normalize(side);
+        this.sideIsLong = sideIsLong;
         this.tradebookId = normalize(tradebookId);
         this.tradebookName = normalize(tradebookName);
         this.entryMethods = Collections.unmodifiableList(new ArrayList<>(entryMethods));
@@ -39,8 +39,8 @@ public class TradebookButtonGroup {
         return label;
     }
 
-    public String getSide() {
-        return side;
+    public boolean isLong() {
+        return sideIsLong;
     }
 
     public String getTradebookId() {

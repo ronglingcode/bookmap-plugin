@@ -260,7 +260,7 @@ public class ChartHoverHotkeyHandler implements ScreenSpacePainterFactory {
                             : "bookmap_offer_wall_reversal");
             json.addProperty("use_market_order", false);
             json.addProperty("order_type", "breakout");
-            json.addProperty("side", tradebook.getSide());
+            json.addProperty("sideIsLong", tradebook.isLong());
             json.addProperty("tradebook_id", tradebook.getTradebookId());
             json.addProperty("tradebook_name", tradebook.getTradebookName());
             json.addProperty("entry_method", entryMethod);

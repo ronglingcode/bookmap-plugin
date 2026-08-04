@@ -72,8 +72,8 @@ class OrderbookSnapshotThresholdTest {
         config.addProperty("type", "trade_button_config");
         config.addProperty("symbol", "WEN");
         JsonArray tradebooks = new JsonArray();
-        tradebooks.add(tradebook("GapAndGoBookmapOfferWallBreakout", "long", "0.25R"));
-        tradebooks.add(tradebook("GapAndCrapBookmapBidWallBreakdown", "short", "0.25R"));
+        tradebooks.add(tradebook("GapAndGoBookmapOfferWallBreakout", true, "0.25R"));
+        tradebooks.add(tradebook("GapAndCrapBookmapBidWallBreakdown", false, "0.25R"));
         config.add("tradebooks", tradebooks);
 
         server.onMessage(null, config.toString());
@@ -90,8 +90,29 @@ class OrderbookSnapshotThresholdTest {
         config.addProperty("type", "trade_button_config");
         config.addProperty("symbol", "WEN");
         JsonArray tradebooks = new JsonArray();
-        tradebooks.add(tradebook("GapAndGoBookmapOfferWallBreakout", "short", "0.25R"));
-        tradebooks.add(tradebook("GapAndCrapBookmapBidWallBreakdown", "long", "0.25R"));
+        tradebooks.add(tradebook("GapAndGoBookmapOfferWallBreakout", false, "0.25R"));
+        tradebooks.add(tradebook("GapAndCrapBookmapBidWallBreakdown", true, "0.25R"));
+        config.add("tradebooks", tradebooks);
+
+        server.onMessage(null, config.toString());
+
+        assertFalse(server.hasEnabledWallBreakTradeButton("WEN", false));
+        assertFalse(server.hasEnabledWallBreakTradeButton("WEN", true));
+    }
+
+    @Test
+    void tradeButtonConfigRejectsMissingOrNonBooleanSide() {
+        SignalWebSocketServer server = new SignalWebSocketServer(0, 90, 1000);
+        JsonObject config = new JsonObject();
+        config.addProperty("type", "trade_button_config");
+        config.addProperty("symbol", "WEN");
+        JsonArray tradebooks = new JsonArray();
+        JsonObject missingSide = tradebook("GapAndGoBookmapOfferWallBreakout", true, "0.25R");
+        missingSide.remove("sideIsLong");
+        JsonObject stringSide = tradebook("GapAndCrapBookmapBidWallBreakdown", false, "0.25R");
+        stringSide.addProperty("sideIsLong", "false");
+        tradebooks.add(missingSide);
+        tradebooks.add(stringSide);
         config.add("tradebooks", tradebooks);
 
         server.onMessage(null, config.toString());
@@ -107,9 +128,9 @@ class OrderbookSnapshotThresholdTest {
         config.addProperty("type", "trade_button_config");
         config.addProperty("symbol", "WEN");
         JsonArray tradebooks = new JsonArray();
-        tradebooks.add(tradebook("GapAndGoBookmapOfferWallBreakout", "long", "0.25R"));
-        tradebooks.add(tradebook("GapGiveAndGoBookmapReversal", "long", "0.25R"));
-        tradebooks.add(tradebook("GapAndCrapOfferStepDownReappear", "short", "0.25R"));
+        tradebooks.add(tradebook("GapAndGoBookmapOfferWallBreakout", true, "0.25R"));
+        tradebooks.add(tradebook("GapGiveAndGoBookmapReversal", true, "0.25R"));
+        tradebooks.add(tradebook("GapAndCrapOfferStepDownReappear", false, "0.25R"));
         config.add("tradebooks", tradebooks);
         server.onMessage(null, config.toString());
 
@@ -130,9 +151,9 @@ class OrderbookSnapshotThresholdTest {
         config.addProperty("type", "trade_button_config");
         config.addProperty("symbol", "WEN");
         JsonArray tradebooks = new JsonArray();
-        tradebooks.add(tradebook("GapGiveAndGoBookmapReversal", "long", "0.25 R"));
-        tradebooks.add(tradebook("RangeBoundBidReversal", "long", "0.025 R"));
-        tradebooks.add(tradebook("GapAndCrapOfferStepDownReappear", "short", "0.25 R"));
+        tradebooks.add(tradebook("GapGiveAndGoBookmapReversal", true, "0.25 R"));
+        tradebooks.add(tradebook("RangeBoundBidReversal", true, "0.025 R"));
+        tradebooks.add(tradebook("GapAndCrapOfferStepDownReappear", false, "0.25 R"));
         config.add("tradebooks", tradebooks);
         server.onMessage(null, config.toString());
 
@@ -150,11 +171,11 @@ class OrderbookSnapshotThresholdTest {
                 .collect(Collectors.toList());
     }
 
-    private static JsonObject tradebook(String tradebookId, String side, String entryMethod) {
+    private static JsonObject tradebook(String tradebookId, boolean sideIsLong, String entryMethod) {
         JsonObject tradebook = new JsonObject();
         tradebook.addProperty("id", tradebookId);
         tradebook.addProperty("label", tradebookId);
-        tradebook.addProperty("side", side);
+        tradebook.addProperty("sideIsLong", sideIsLong);
         tradebook.addProperty("tradebookId", tradebookId);
         tradebook.addProperty("tradebookName", tradebookId);
         JsonArray entryMethods = new JsonArray();
