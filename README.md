@@ -194,6 +194,21 @@ All messages include a `symbol` field identifying which instrument the data belo
 
 Sending an empty `levels` array clears existing key level lines for that symbol. Sending an empty or missing `zones` array clears existing key zones for that symbol. Missing or empty market-level fields clear their corresponding websocket-supplied market lines for that symbol.
 
+### Mirror a ViteApp screen log (client → server)
+
+```json
+{
+  "type": "screen_log",
+  "symbol": "AAPL",
+  "source": "ViteApp",
+  "level": "Error",
+  "message": "entry inside key level",
+  "timestamp": 1785243960500
+}
+```
+
+The plugin writes the message to its session log and shows it in the always-on-top **Rong Logs** window. `symbol` is optional; `level` is shown beside the source when provided.
+
 ### Closed-minute VWAP update (client → server)
 
 ```json

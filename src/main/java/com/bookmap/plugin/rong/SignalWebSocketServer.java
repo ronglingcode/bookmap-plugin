@@ -588,6 +588,10 @@ public class SignalWebSocketServer extends WebSocketServer {
                 handleActionLog(json);
                 return;
             }
+            if ("screen_log".equals(type)) {
+                handleScreenLog(json);
+                return;
+            }
             if ("account_state".equals(type)) {
                 handleAccountState(json);
                 return;
@@ -1198,6 +1202,17 @@ public class SignalWebSocketServer extends WebSocketServer {
             } catch (RuntimeException e) {
                 PluginLog.error("[KeyLevel] Failed to update listener for " + symbol + ": " + e.getMessage());
             }
+        }
+    }
+
+    private void handleScreenLog(JsonObject json) {
+        String message = getString(json, "message").trim();
+        String symbol = SymbolUtils.cleanSymbol(getString(json, "symbol"));
+        String source = getString(json, "source").trim();
+        String level = getString(json, "level").trim();
+        if (!message.isEmpty()) {
+            String displaySource = level.isEmpty() ? source : source + " " + level.toUpperCase();
+            PluginLog.action(symbol, displaySource.trim(), message);
         }
     }
 
