@@ -104,6 +104,8 @@ public class ActionLogWindow {
         textArea = new JTextArea(20, 41);
         textArea.setEditable(false);
         textArea.setFont(new Font(Font.MONOSPACED, Font.PLAIN, 12));
+        textArea.setLineWrap(true);
+        textArea.setWrapStyleWord(true);
 
         accountStatusLabel = new JLabel("Account: waiting for ViteApp");
         positionStatusLabel = new JLabel("Positions (0)");
