@@ -39,6 +39,7 @@ import velox.api.layer1.annotations.Layer1StrategyName;
 import velox.api.layer1.data.InstrumentInfo;
 import velox.api.layer1.data.TradeInfo;
 import velox.api.layer1.messages.Layer1ApiSoundAlertMessage;
+import velox.api.layer1.messages.indicators.AliasFilter;
 import velox.api.layer1.messages.indicators.Layer1ApiUserMessageModifyIndicator.GraphType;
 import velox.api.layer1.messages.indicators.Layer1ApiUserMessageModifyScreenSpacePainter;
 import velox.api.layer1.simplified.Api;
@@ -238,11 +239,13 @@ public class RongPlugin implements CustomModuleAdapter,
         wallChangePainter.registerInstrument(cleanAlias);
         patternSignalPainter.registerInstrument(cleanAlias);
         filledExecutionPainter.registerInstrument(cleanAlias);
+        AliasFilter painterAliasFilter = exactAliasFilter(rawAlias);
 
         // Register ScreenSpacePainter to receive chart coordinate mappings
         api.sendUserMessage(Layer1ApiUserMessageModifyScreenSpacePainter.builder(
                 RongPlugin.class, ChartHoverHotkeyHandler.PAINTER_NAME_PREFIX + cleanAlias)
                 .setScreenSpacePainterFactory(chartHoverHotkeyHandler)
+                .setAliasFilter(painterAliasFilter)
                 .setIsAdd(true)
                 .build());
 
@@ -250,6 +253,7 @@ public class RongPlugin implements CustomModuleAdapter,
         api.sendUserMessage(Layer1ApiUserMessageModifyScreenSpacePainter.builder(
                 RongPlugin.class, PriceZonePainter.PAINTER_NAME_PREFIX + cleanAlias)
                 .setScreenSpacePainterFactory(priceZonePainter)
+                .setAliasFilter(painterAliasFilter)
                 .setIsAdd(true)
                 .build());
 
@@ -257,26 +261,31 @@ public class RongPlugin implements CustomModuleAdapter,
         api.sendUserMessage(Layer1ApiUserMessageModifyScreenSpacePainter.builder(
                 RongPlugin.class, "priceLines_" + cleanAlias)
                 .setScreenSpacePainterFactory(priceLinePainter)
+                .setAliasFilter(painterAliasFilter)
                 .setIsAdd(true)
                 .build());
         api.sendUserMessage(Layer1ApiUserMessageModifyScreenSpacePainter.builder(
                 RongPlugin.class, OrderWallLabelPainter.PAINTER_NAME_PREFIX + cleanAlias)
                 .setScreenSpacePainterFactory(wallLabelPainter)
+                .setAliasFilter(painterAliasFilter)
                 .setIsAdd(true)
                 .build());
         api.sendUserMessage(Layer1ApiUserMessageModifyScreenSpacePainter.builder(
                 RongPlugin.class, OrderWallChangePainter.PAINTER_NAME_PREFIX + cleanAlias)
                 .setScreenSpacePainterFactory(wallChangePainter)
+                .setAliasFilter(painterAliasFilter)
                 .setIsAdd(true)
                 .build());
         api.sendUserMessage(Layer1ApiUserMessageModifyScreenSpacePainter.builder(
                 RongPlugin.class, PatternSignalPainter.PAINTER_NAME_PREFIX + cleanAlias)
                 .setScreenSpacePainterFactory(patternSignalPainter)
+                .setAliasFilter(painterAliasFilter)
                 .setIsAdd(true)
                 .build());
         api.sendUserMessage(Layer1ApiUserMessageModifyScreenSpacePainter.builder(
                 RongPlugin.class, FilledExecutionPainter.PAINTER_NAME_PREFIX + cleanAlias)
                 .setScreenSpacePainterFactory(filledExecutionPainter)
+                .setAliasFilter(painterAliasFilter)
                 .setIsAdd(true)
                 .build());
 
@@ -308,6 +317,15 @@ public class RongPlugin implements CustomModuleAdapter,
         }
 
         PluginLog.info("[Rong] Plugin initialized for " + cleanAlias);
+    }
+
+    static AliasFilter exactAliasFilter(String expectedAlias) {
+        return new AliasFilter() {
+            @Override
+            public boolean isDisplayedForAlias(String candidateAlias) {
+                return expectedAlias != null && expectedAlias.equals(candidateAlias);
+            }
+        };
     }
 
     @Override
