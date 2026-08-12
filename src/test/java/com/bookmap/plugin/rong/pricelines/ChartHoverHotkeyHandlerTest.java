@@ -2,11 +2,16 @@ package com.bookmap.plugin.rong.pricelines;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.awt.Canvas;
 import java.awt.event.KeyEvent;
 import java.time.Instant;
+import java.util.Set;
+
+import javax.swing.JLabel;
+import javax.swing.JPanel;
 
 import org.junit.jupiter.api.Test;
 
@@ -97,6 +102,71 @@ class ChartHoverHotkeyHandlerTest {
                     ChartHoverHotkeyHandler.isEntryHotkeyDisabledAt(key, afterMarketClose),
                     key);
         }
+    }
+
+    @Test
+    void painterCallbackUsesActualChartAliasInsteadOfRegisteredPainterName() {
+        assertEquals(
+                "MSFT",
+                ChartHoverHotkeyHandler.resolveInstrumentFromPainterContext(
+                        "RongPlugin#hoverHotkey_AAPL", "MSFT:NASDAQ:STOCKS@BMD"));
+    }
+
+    @Test
+    void painterCallbackFallsBackToRegisteredNameWhenChartAliasIsUnavailable() {
+        assertEquals(
+                "AAPL",
+                ChartHoverHotkeyHandler.resolveInstrumentFromPainterContext(
+                        "RongPlugin#hoverHotkey_AAPL", null));
+    }
+
+    @Test
+    void hoveredChartBranchResolvesItsOwnSymbolInSharedWindow() {
+        JPanel sharedWindowContent = new JPanel();
+        JPanel aaplChart = chartPanel("AAPL");
+        JPanel msftChart = chartPanel("MSFT");
+        sharedWindowContent.add(aaplChart);
+        sharedWindowContent.add(msftChart);
+
+        assertEquals(
+                "AAPL",
+                ChartHoverHotkeyHandler.identifyInstrumentFromComponent(
+                        chartSurface(aaplChart), Set.of("AAPL", "MSFT")));
+        assertEquals(
+                "MSFT",
+                ChartHoverHotkeyHandler.identifyInstrumentFromComponent(
+                        chartSurface(msftChart), Set.of("AAPL", "MSFT")));
+    }
+
+    @Test
+    void sharedContainerWithMultipleChartsDoesNotChooseArbitrarySymbol() {
+        JPanel sharedWindowContent = new JPanel();
+        sharedWindowContent.add(chartPanel("AAPL"));
+        sharedWindowContent.add(chartPanel("MSFT"));
+
+        assertNull(ChartHoverHotkeyHandler.identifyInstrumentFromComponent(
+                sharedWindowContent, Set.of("AAPL", "MSFT")));
+    }
+
+    @Test
+    void overlappingSymbolNamesRemainAmbiguousInsteadOfUsingSubstringOrder() {
+        JPanel chart = chartPanel("AAPL1");
+
+        assertNull(ChartHoverHotkeyHandler.identifyInstrumentFromComponent(
+                chartSurface(chart), Set.of("AAPL", "AAPL1")));
+    }
+
+    private static JPanel chartPanel(String symbol) {
+        JPanel chart = new JPanel();
+        chart.add(new JLabel(symbol));
+        JPanel surface = new JPanel();
+        surface.setName("heatmap");
+        chart.add(surface);
+        return chart;
+    }
+
+    private static JPanel chartSurface(JPanel chart) {
+        return (JPanel) chart.getComponent(1);
     }
 
     private static KeyEvent keyPressed(int keyCode) {

@@ -39,6 +39,7 @@ import velox.api.layer1.annotations.Layer1StrategyName;
 import velox.api.layer1.data.InstrumentInfo;
 import velox.api.layer1.data.TradeInfo;
 import velox.api.layer1.messages.Layer1ApiSoundAlertMessage;
+import velox.api.layer1.messages.indicators.AliasFilter;
 import velox.api.layer1.messages.indicators.Layer1ApiUserMessageModifyIndicator.GraphType;
 import velox.api.layer1.messages.indicators.Layer1ApiUserMessageModifyScreenSpacePainter;
 import velox.api.layer1.simplified.Api;
@@ -56,7 +57,7 @@ import velox.gui.StrategyPanel;
 
 @Layer1SimpleAttachable
 @Layer1StrategyName("Rong")
-@Layer1ApiVersion(Layer1ApiVersionValue.VERSION1)
+@Layer1ApiVersion(Layer1ApiVersionValue.VERSION2)
 public class RongPlugin implements CustomModuleAdapter,
         DepthDataListener, TradeDataListener, TimeListener,
         SnapshotEndListener, BboListener, HistoricalModeListener,
@@ -243,6 +244,7 @@ public class RongPlugin implements CustomModuleAdapter,
         api.sendUserMessage(Layer1ApiUserMessageModifyScreenSpacePainter.builder(
                 RongPlugin.class, ChartHoverHotkeyHandler.PAINTER_NAME_PREFIX + cleanAlias)
                 .setScreenSpacePainterFactory(chartHoverHotkeyHandler)
+                .setAliasFilter(exactAliasFilter(rawAlias))
                 .setIsAdd(true)
                 .build());
 
@@ -250,6 +252,7 @@ public class RongPlugin implements CustomModuleAdapter,
         api.sendUserMessage(Layer1ApiUserMessageModifyScreenSpacePainter.builder(
                 RongPlugin.class, PriceZonePainter.PAINTER_NAME_PREFIX + cleanAlias)
                 .setScreenSpacePainterFactory(priceZonePainter)
+                .setAliasFilter(exactAliasFilter(rawAlias))
                 .setIsAdd(true)
                 .build());
 
@@ -257,26 +260,31 @@ public class RongPlugin implements CustomModuleAdapter,
         api.sendUserMessage(Layer1ApiUserMessageModifyScreenSpacePainter.builder(
                 RongPlugin.class, "priceLines_" + cleanAlias)
                 .setScreenSpacePainterFactory(priceLinePainter)
+                .setAliasFilter(exactAliasFilter(rawAlias))
                 .setIsAdd(true)
                 .build());
         api.sendUserMessage(Layer1ApiUserMessageModifyScreenSpacePainter.builder(
                 RongPlugin.class, OrderWallLabelPainter.PAINTER_NAME_PREFIX + cleanAlias)
                 .setScreenSpacePainterFactory(wallLabelPainter)
+                .setAliasFilter(exactAliasFilter(rawAlias))
                 .setIsAdd(true)
                 .build());
         api.sendUserMessage(Layer1ApiUserMessageModifyScreenSpacePainter.builder(
                 RongPlugin.class, OrderWallChangePainter.PAINTER_NAME_PREFIX + cleanAlias)
                 .setScreenSpacePainterFactory(wallChangePainter)
+                .setAliasFilter(exactAliasFilter(rawAlias))
                 .setIsAdd(true)
                 .build());
         api.sendUserMessage(Layer1ApiUserMessageModifyScreenSpacePainter.builder(
                 RongPlugin.class, PatternSignalPainter.PAINTER_NAME_PREFIX + cleanAlias)
                 .setScreenSpacePainterFactory(patternSignalPainter)
+                .setAliasFilter(exactAliasFilter(rawAlias))
                 .setIsAdd(true)
                 .build());
         api.sendUserMessage(Layer1ApiUserMessageModifyScreenSpacePainter.builder(
                 RongPlugin.class, FilledExecutionPainter.PAINTER_NAME_PREFIX + cleanAlias)
                 .setScreenSpacePainterFactory(filledExecutionPainter)
+                .setAliasFilter(exactAliasFilter(rawAlias))
                 .setIsAdd(true)
                 .build());
 
@@ -308,6 +316,15 @@ public class RongPlugin implements CustomModuleAdapter,
         }
 
         PluginLog.info("[Rong] Plugin initialized for " + cleanAlias);
+    }
+
+    static AliasFilter exactAliasFilter(String expectedAlias) {
+        return new AliasFilter() {
+            @Override
+            public boolean isDisplayedForAlias(String candidateAlias) {
+                return expectedAlias != null && expectedAlias.equals(candidateAlias);
+            }
+        };
     }
 
     @Override

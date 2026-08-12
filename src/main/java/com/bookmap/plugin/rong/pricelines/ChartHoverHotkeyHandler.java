@@ -18,9 +18,11 @@ import java.time.Instant;
 import java.time.LocalTime;
 import java.time.ZoneId;
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
+import java.util.WeakHashMap;
 import java.util.concurrent.ConcurrentHashMap;
 import javax.swing.JComboBox;
 import javax.swing.JLabel;
@@ -32,6 +34,7 @@ import com.bookmap.plugin.rong.BookmapPriceNormalizer;
 import com.bookmap.plugin.rong.IndicatorConfig;
 import com.bookmap.plugin.rong.PluginLog;
 import com.bookmap.plugin.rong.SignalWebSocketServer;
+import com.bookmap.plugin.rong.SymbolUtils;
 import com.bookmap.plugin.rong.WallThresholdConfig;
 import com.bookmap.plugin.rong.tradebuttons.HotkeyButtonAction;
 import com.bookmap.plugin.rong.tradebuttons.TradebookButtonGroup;
@@ -49,10 +52,9 @@ import velox.api.layer1.layers.strategies.interfaces.ScreenSpacePainterFactory;
  * a global AWT mouse-motion listener to track the current chart price, and a
  * keyboard listener to broadcast supported hotkeys via WebSocket.
  *
- * NOTE: The ScreenSpacePainterFactory creates one painter per chart.
- * The painter's alias parameter is the full painter name (e.g. "RongPlugin#hoverHotkey"),
- * NOT the instrument symbol. We maintain a separate mapping of painterAlias → instrumentAlias
- * to resolve the correct symbol when broadcasting.
+ * NOTE: The ScreenSpacePainterFactory creates one painter per chart. Bookmap supplies both the
+ * indicator name and the alias of the chart receiving the painter. Each coordinate mapping is
+ * retained with that chart alias so hover events cannot fall back to a different open symbol.
  */
 public class ChartHoverHotkeyHandler implements ScreenSpacePainterFactory {
 
@@ -62,21 +64,19 @@ public class ChartHoverHotkeyHandler implements ScreenSpacePainterFactory {
     private static final ZoneId NEW_YORK_TIME_ZONE = ZoneId.of("America/New_York");
     private static final LocalTime ENTRY_HOTKEY_CUTOFF_TIME = LocalTime.of(10, 0);
 
-    /** Coordinate state keyed by painter alias (from createScreenSpacePainter). */
-    private static final Map<String, CoordinateState> painterCoords = new ConcurrentHashMap<>();
-
-    /** Map painter alias → instrument alias (e.g. "AAPL"). Set in createScreenSpacePainter. */
-    private static final Map<String, String> painterToInstrument = new ConcurrentHashMap<>();
+    /** One coordinate state per painter instance, including its actual chart instrument. */
+    private static final Set<CoordinateState> painterCoords = ConcurrentHashMap.newKeySet();
 
     /** Instrument alias → pips. Set by registerSymbol before painter is created. */
     private static final Map<String, Double> instrumentPips = new ConcurrentHashMap<>();
 
-    /** The most recently registered instrument alias — used as last-resort default. */
-    private static volatile String lastRegisteredInstrument;
-
-    /** Cache: hovered top-level Window → resolved instrument alias.
-     *  Avoids re-walking the AWT tree on every mouse move. */
-    private static final Map<Window, String> windowToInstrument = new ConcurrentHashMap<>();
+    /**
+     * Cache the exact hovered component rather than its top-level window. A Bookmap window may
+     * contain multiple charts, so a window-wide cache can assign one chart's symbol to all of its
+     * siblings. Weak keys avoid retaining chart components after they are closed.
+     */
+    private static final Map<Component, String> componentToInstrument =
+            Collections.synchronizedMap(new WeakHashMap<>());
 
     /** Currently held non-modifier keys (e.g. 'b', 's'). Tracked via KEY_PRESSED/KEY_RELEASED. */
     private static final Set<String> heldKeys = Collections.newSetFromMap(new ConcurrentHashMap<>());
@@ -113,17 +113,18 @@ public class ChartHoverHotkeyHandler implements ScreenSpacePainterFactory {
     /** Register an instrument's pips before the painter is created. */
     public void registerSymbol(String instrumentAlias, double pips) {
         instrumentPips.put(instrumentAlias, pips);
-        lastRegisteredInstrument = instrumentAlias;
+        // Bookmap can reuse component trees as symbols are opened or rearranged.
+        componentToInstrument.clear();
         PluginLog.info("[Rong] ChartHoverHotkeyHandler registered instrument: "
                 + instrumentAlias + " pips=" + pips);
     }
 
     public void unregisterSymbol(String instrumentAlias) {
         instrumentPips.remove(instrumentAlias);
-        // Clean up any painter mappings pointing to this instrument
-        painterToInstrument.entrySet().removeIf(e -> e.getValue().equals(instrumentAlias));
-        // Drop cached window mappings so a re-opened chart resolves fresh
-        windowToInstrument.entrySet().removeIf(e -> e.getValue().equals(instrumentAlias));
+        painterCoords.removeIf(coords -> instrumentAlias.equals(coords.instrument));
+        synchronized (componentToInstrument) {
+            componentToInstrument.entrySet().removeIf(e -> e.getValue().equals(instrumentAlias));
+        }
         HoverContext hover = lastHoverContext;
         if (hover != null && instrumentAlias.equals(hover.instrument)) {
             lastHoverContext = null;
@@ -138,8 +139,8 @@ public class ChartHoverHotkeyHandler implements ScreenSpacePainterFactory {
                 awtListener = null;
                 heldKeys.clear();
                 painterCoords.clear();
-                painterToInstrument.clear();
-                windowToInstrument.clear();
+                componentToInstrument.clear();
+                instrumentPips.clear();
                 lastHoverContext = null;
                 PluginLog.info("[Rong] AWT listener removed");
             }
@@ -342,20 +343,26 @@ public class ChartHoverHotkeyHandler implements ScreenSpacePainterFactory {
     private static ResolvedChartPrice resolveChartPrice(Component comp, int localY) {
         int compHeight = (comp != null) ? comp.getHeight() : 0;
         String componentInstrument = identifyInstrumentFromComponent(comp);
+        if (componentInstrument == null) {
+            componentInstrument = onlyRegisteredInstrument();
+        }
+        if (componentInstrument == null) {
+            // With multiple open symbols, choosing an arbitrary coordinate mapping could send an
+            // order for the wrong instrument. Ambiguous hover events deliberately fail closed.
+            return null;
+        }
 
-        for (Map.Entry<String, CoordinateState> entry : painterCoords.entrySet()) {
-            String painterAlias = entry.getKey();
-            CoordinateState cs = entry.getValue();
+        for (CoordinateState cs : painterCoords) {
             if (cs.pixelsHeight <= 0 || cs.priceHeight <= 0) continue;
 
-            String instrument = painterToInstrument.getOrDefault(painterAlias, lastRegisteredInstrument);
-            if (instrument == null) instrument = painterAlias;
-
-            if (componentInstrument != null && !componentInstrument.equals(instrument)) {
+            String instrument = cs.instrument;
+            if (instrument == null
+                    || !componentInstrument.equals(instrument)
+                    || !instrumentPips.containsKey(instrument)) {
                 continue;
             }
 
-            double pips = instrumentPips.getOrDefault(instrument, 1.0);
+            double pips = instrumentPips.get(instrument);
             double fraction = cs.fraction(localY, compHeight);
             if (!Double.isFinite(fraction) || fraction < 0 || fraction > 1) {
                 continue;
@@ -460,25 +467,17 @@ public class ChartHoverHotkeyHandler implements ScreenSpacePainterFactory {
     }
 
     @Override
-    public ScreenSpacePainter createScreenSpacePainter(String alias, String fullName,
+    public ScreenSpacePainter createScreenSpacePainter(String indicatorName, String indicatorAlias,
                                                         ScreenSpaceCanvasFactory canvasFactory) {
-        CoordinateState coords = new CoordinateState();
-        painterCoords.put(alias, coords);
+        // The second callback argument is the alias of the chart receiving this painter. The
+        // registered indicator name is only a compatibility fallback for older callback behavior.
+        String instrument = resolveInstrumentFromPainterContext(indicatorName, indicatorAlias);
+        CoordinateState coords = new CoordinateState(instrument);
+        painterCoords.add(coords);
 
-        // Resolve the instrument by parsing the painter name we registered with
-        // (Layer1ApiUserMessageModifyScreenSpacePainter.builder(..., "hoverHotkey_<symbol>")).
-        // The Bookmap API exposes that name in either `alias` or `fullName` — search both.
-        // Falls back to `lastRegisteredInstrument` only if parsing fails (best-effort legacy path).
-        String instrument = extractInstrumentFromPainterName(alias, fullName);
-        if (instrument == null) {
-            instrument = lastRegisteredInstrument;
-        }
-        if (instrument != null) {
-            painterToInstrument.put(alias, instrument);
-        }
-        PluginLog.info("[Rong] ScreenSpacePainter created: painterAlias=" + alias
-            + " fullName=" + fullName
-            + " → instrument=" + painterToInstrument.get(alias));
+        PluginLog.info("[Rong] ScreenSpacePainter created: indicatorName=" + indicatorName
+            + " indicatorAlias=" + indicatorAlias
+            + " → instrument=" + instrument);
 
         return new ScreenSpacePainterAdapter() {
             private boolean logged = false;
@@ -507,7 +506,7 @@ public class ChartHoverHotkeyHandler implements ScreenSpacePainterFactory {
             private void logOnce() {
                 if (!logged && coords.priceHeight > 0 && coords.pixelsHeight > 0) {
                     logged = true;
-                    PluginLog.info("[Rong] Coordinate mapping active for painter " + alias
+                    PluginLog.info("[Rong] Coordinate mapping active for painter " + indicatorName
                         + ": priceBottom=" + coords.priceBottom + ", priceHeight=" + coords.priceHeight
                         + ", pixelsBottom=" + coords.pixelsBottom + ", pixelsHeight=" + coords.pixelsHeight);
                 }
@@ -515,11 +514,30 @@ public class ChartHoverHotkeyHandler implements ScreenSpacePainterFactory {
 
             @Override
             public void dispose() {
-                painterCoords.remove(alias);
-                painterToInstrument.remove(alias);
-                PluginLog.info("[Rong] ScreenSpacePainter disposed for " + alias);
+                painterCoords.remove(coords);
+                PluginLog.info("[Rong] ScreenSpacePainter disposed for " + indicatorName
+                        + " on " + indicatorAlias);
             }
         };
+    }
+
+    static String resolveInstrumentFromPainterContext(String indicatorName, String indicatorAlias) {
+        String chartInstrument = SymbolUtils.cleanSymbol(indicatorAlias);
+        if (!chartInstrument.isEmpty()) {
+            return chartInstrument;
+        }
+        String namedInstrument = extractInstrumentFromPainterName(indicatorName, null);
+        if (namedInstrument != null && !namedInstrument.isEmpty()) {
+            return SymbolUtils.cleanSymbol(namedInstrument);
+        }
+        return onlyRegisteredInstrument();
+    }
+
+    private static String onlyRegisteredInstrument() {
+        if (instrumentPips.size() != 1) {
+            return null;
+        }
+        return instrumentPips.keySet().iterator().next();
     }
 
     static String normalizeKey(KeyEvent event) {
@@ -608,90 +626,81 @@ public class ChartHoverHotkeyHandler implements ScreenSpacePainterFactory {
     }
 
     /**
-     * Determine which registered instrument a component belongs to by inspecting the AWT
-     * hierarchy. Strategies (in order):
-     *   1) Cached lookup by top-level Window
-     *   2) Window title contains a known instrument alias
-     *   3) Any ancestor's Component name contains a known instrument alias
-     *   4) Recursive search of the window for a JLabel whose text contains a known alias
-     * Returns null if nothing matches; callers should fall back to the legacy heuristic.
+     * Determine which registered instrument a component belongs to by inspecting its AWT branch.
+     * The nearest ancestor subtree containing exactly one known symbol wins. Once traversal reaches
+     * a container shared by multiple charts, the result remains ambiguous and no symbol is chosen.
      */
     static String identifyInstrumentFromComponent(Component component) {
         if (component == null) return null;
 
-        Window window = SwingUtilities.getWindowAncestor(component);
-        if (window != null) {
-            String cached = windowToInstrument.get(window);
-            if (cached != null && instrumentPips.containsKey(cached)) {
-                return cached;
-            }
+        String cached = componentToInstrument.get(component);
+        if (cached != null && instrumentPips.containsKey(cached)) {
+            return cached;
         }
 
-        Set<String> known = instrumentPips.keySet();
-        if (known.isEmpty()) return null;
-
-        // Strategy 2: window title
-        if (window instanceof Frame) {
-            String title = ((Frame) window).getTitle();
-            String hit = findKnownAliasIn(title, known);
-            if (hit != null) {
-                windowToInstrument.put(window, hit);
-                return hit;
-            }
+        String instrument = identifyInstrumentFromComponent(
+                component, new HashSet<>(instrumentPips.keySet()));
+        if (instrument != null) {
+            componentToInstrument.put(component, instrument);
         }
+        return instrument;
+    }
 
-        // Strategy 3: walk up the component's parent chain and check each Component.getName()
-        Component c = component;
-        while (c != null) {
-            String hit = findKnownAliasIn(c.getName(), known);
-            if (hit != null) {
-                if (window != null) windowToInstrument.put(window, hit);
-                return hit;
-            }
-            c = c.getParent();
-        }
+    static String identifyInstrumentFromComponent(Component component, Set<String> known) {
+        if (component == null || known == null || known.isEmpty()) return null;
 
-        // Strategy 4: recursive search across the whole window for any JLabel/Component name
-        if (window != null) {
-            String hit = searchTreeForKnownAlias(window, known);
-            if (hit != null) {
-                windowToInstrument.put(window, hit);
-                return hit;
+        Component current = component;
+        while (current != null) {
+            // Component names near the event source are stronger evidence than labels elsewhere.
+            // A top-level window is excluded because it can contain several instrument charts.
+            if (!(current instanceof Window)) {
+                Set<String> directMatches = new HashSet<>();
+                collectDirectKnownAliases(current, known, directMatches);
+                if (directMatches.size() == 1) {
+                    return directMatches.iterator().next();
+                }
             }
+
+            Set<String> subtreeMatches = new HashSet<>();
+            collectKnownAliases(current, known, subtreeMatches);
+            if (subtreeMatches.size() == 1) {
+                return subtreeMatches.iterator().next();
+            }
+            current = current.getParent();
         }
 
         return null;
     }
 
-    private static String findKnownAliasIn(String text, Set<String> known) {
-        if (text == null || text.isEmpty()) return null;
-        for (String alias : known) {
-            if (alias != null && !alias.isEmpty() && text.contains(alias)) {
-                return alias;
-            }
-        }
-        return null;
-    }
-
-    private static String searchTreeForKnownAlias(Component root, Set<String> known) {
-        if (root == null) return null;
-        String hit = findKnownAliasIn(root.getName(), known);
-        if (hit != null) return hit;
-        if (root instanceof JLabel) {
-            hit = findKnownAliasIn(((JLabel) root).getText(), known);
-            if (hit != null) return hit;
-        }
-        if (root instanceof Frame) {
-            hit = findKnownAliasIn(((Frame) root).getTitle(), known);
-            if (hit != null) return hit;
-        }
+    private static void collectKnownAliases(
+            Component root, Set<String> known, Set<String> matches) {
+        if (root == null) return;
+        collectDirectKnownAliases(root, known, matches);
         if (root instanceof Container) {
             for (Component child : ((Container) root).getComponents()) {
-                hit = searchTreeForKnownAlias(child, known);
-                if (hit != null) return hit;
+                collectKnownAliases(child, known, matches);
             }
         }
-        return null;
+    }
+
+    private static void collectDirectKnownAliases(
+            Component component, Set<String> known, Set<String> matches) {
+        addKnownAliases(component.getName(), known, matches);
+        if (component instanceof JLabel) {
+            addKnownAliases(((JLabel) component).getText(), known, matches);
+        }
+        if (component instanceof Frame) {
+            addKnownAliases(((Frame) component).getTitle(), known, matches);
+        }
+    }
+
+    private static void addKnownAliases(String text, Set<String> known, Set<String> matches) {
+        if (text == null || text.isEmpty()) return;
+        for (String alias : known) {
+            if (alias != null && !alias.isEmpty() && text.contains(alias)) {
+                matches.add(alias);
+            }
+        }
     }
 
     private static class ResolvedChartPrice {
@@ -718,10 +727,15 @@ public class ChartHoverHotkeyHandler implements ScreenSpacePainterFactory {
 
     /** Stores the chart coordinate mapping for one painter instance. */
     private static class CoordinateState {
+        final String instrument;
         volatile long priceBottom;  // price at bottom of chart (in ticks)
         volatile long priceHeight;  // price range visible (in ticks)
         volatile int pixelsBottom;  // pixels from component bottom to heatmap bottom (bottom margin)
         volatile int pixelsHeight;  // pixel height of heatmap area
+
+        CoordinateState(String instrument) {
+            this.instrument = instrument;
+        }
 
         /**
          * Compute where a mouse coordinate falls in the heatmap (0 = bottom, 1 = top).
