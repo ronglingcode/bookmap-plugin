@@ -59,7 +59,6 @@ public class TradeButtonWindow {
     private static final Color THRESHOLD_TEXT_COLOR = new Color(24, 35, 46);
     private static final int WINDOW_WIDTH = 570;
     private static final int CONTENT_WIDTH = 540;
-    private static final int WALL_OUT_PAIR_INDEX = 1;
     private static final int ORDERBOOK_PROTECTED_ABSOLUTE_LEVELS = 2;
     private static final double WALL_OUT_PRICE_OFFSET = 0.02;
     private static final int WALL_THRESHOLD_REFRESH_MS = 1_000;
@@ -554,9 +553,8 @@ public class TradeButtonWindow {
 
     private void sendWallOutButtonMessage() {
         int thresholdFloor = getWallThresholdFloor();
-        SignalWebSocketServer.ExitWallAdjustment adjustment = server.resolveExitWallAdjustment(
+        SignalWebSocketServer.ExitWallAdjustment adjustment = server.resolveSmallestQuantityExitWallAdjustment(
                 symbol,
-                WALL_OUT_PAIR_INDEX,
                 thresholdFloor,
                 WALL_OUT_PRICE_OFFSET);
         if (!adjustment.isAvailable()) {

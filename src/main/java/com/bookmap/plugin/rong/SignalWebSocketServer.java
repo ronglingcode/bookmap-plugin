@@ -548,6 +548,34 @@ public class SignalWebSocketServer extends WebSocketServer {
                 limitOrder);
     }
 
+    public ExitWallAdjustment resolveSmallestQuantityExitWallAdjustment(
+            String symbol,
+            int thresholdFloor,
+            double targetOffset) {
+        String cleanSymbol = SymbolUtils.cleanSymbol(symbol);
+        if (cleanSymbol.isEmpty()) {
+            return ExitWallAdjustment.unavailable("missing symbol");
+        }
+
+        AccountStateDefinition state = symbolToAccountState.get(cleanSymbol);
+        if (state == null || !state.hasOpenPosition()) {
+            return ExitWallAdjustment.unavailable("no open position for " + cleanSymbol);
+        }
+
+        boolean expectedLimitBuySide = state.getPosition().getNetQuantity() < 0;
+        int pairIndex = findFirstSmallestQuantityPairIndex(
+                cleanSymbol, state, expectedLimitBuySide, true);
+        if (pairIndex <= 0) {
+            pairIndex = findFirstSmallestQuantityPairIndex(
+                    cleanSymbol, state, expectedLimitBuySide, false);
+        }
+        if (pairIndex <= 0) {
+            return ExitWallAdjustment.unavailable(
+                    "no LIMIT exit order with a positive quantity for " + cleanSymbol);
+        }
+        return resolveExitWallAdjustment(cleanSymbol, pairIndex, thresholdFloor, targetOffset);
+    }
+
     @Override
     public void onOpen(WebSocket conn, ClientHandshake handshake) {
         PluginLog.info("[Rong] Client connected: " + conn.getRemoteSocketAddress());
@@ -1138,6 +1166,57 @@ public class SignalWebSocketServer extends WebSocketServer {
             }
         }
         return fallback;
+    }
+
+    private int findFirstSmallestQuantityPairIndex(
+            String symbol,
+            AccountStateDefinition state,
+            boolean expectedBuySide,
+            boolean requireExpectedSide) {
+        int selectedIndex = -1;
+        double smallestQuantity = Double.POSITIVE_INFINITY;
+        for (AccountOrderDefinition order : state.getOpenOrders()) {
+            if (order == null || order.getPairIndex() <= 0 || !isLimitOrder(order)
+                    || (requireExpectedSide && order.isBuy() != expectedBuySide)) {
+                continue;
+            }
+            double quantity = order.getQuantity();
+            if (isEarlierSmallestPair(order.getPairIndex(), quantity, selectedIndex, smallestQuantity)) {
+                selectedIndex = order.getPairIndex();
+                smallestQuantity = quantity;
+            }
+        }
+        if (selectedIndex > 0) {
+            return selectedIndex;
+        }
+
+        List<ExitOrderPairDefinition> pairs =
+                symbolToExitOrderPairs.getOrDefault(symbol, Collections.emptyList());
+        for (ExitOrderPairDefinition pair : pairs) {
+            if (pair == null || pair.getIndex() <= 0 || pair.getLimit() == null
+                    || (requireExpectedSide && pair.getLimit().isBuy() != expectedBuySide)) {
+                continue;
+            }
+            double quantity = pair.getLimit().getQuantity();
+            if (isEarlierSmallestPair(pair.getIndex(), quantity, selectedIndex, smallestQuantity)) {
+                selectedIndex = pair.getIndex();
+                smallestQuantity = quantity;
+            }
+        }
+        return selectedIndex;
+    }
+
+    private boolean isEarlierSmallestPair(
+            int candidateIndex,
+            double candidateQuantity,
+            int selectedIndex,
+            double smallestQuantity) {
+        if (!Double.isFinite(candidateQuantity) || candidateQuantity <= 0) {
+            return false;
+        }
+        return candidateQuantity < smallestQuantity
+                || (Double.compare(candidateQuantity, smallestQuantity) == 0
+                && (selectedIndex < 0 || candidateIndex < selectedIndex));
     }
 
     private boolean isLimitOrder(AccountOrderDefinition order) {

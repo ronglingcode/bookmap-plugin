@@ -52,26 +52,67 @@ class ExitWallAdjustmentTest {
         assertEquals("limit-short-1", adjustment.getLimitOrderId());
     }
 
+    @Test
+    void wallOutSelectsFirstPairWithSmallestQuantity() {
+        SignalWebSocketServer server = new SignalWebSocketServer(0, 90, 1000);
+        OrderBookState orderBook = new OrderBookState();
+        orderBook.update(false, 10_050, 6_200);
+        server.registerSymbol("SMCI", orderBook, 0.01);
+        server.onMessage(null, accountStateWithOrders(
+                "SMCI",
+                100,
+                limitOrder("SELL", "limit-1", 20, 101.00, 1),
+                limitOrder("SELL", "limit-2", 5, 102.00, 2),
+                limitOrder("SELL", "limit-3", 5, 103.00, 3)));
+
+        SignalWebSocketServer.ExitWallAdjustment adjustment =
+                server.resolveSmallestQuantityExitWallAdjustment("SMCI", 5_000, 0.02);
+
+        assertTrue(adjustment.isAvailable(), adjustment.getReason());
+        assertEquals(2, adjustment.getPairIndex());
+        assertEquals("limit-2", adjustment.getLimitOrderId());
+        assertEquals(5, adjustment.getLimitOrderQuantity(), 0.00001);
+    }
+
     private static String accountState(
             String symbol,
             double netQuantity,
             String limitSide,
             String limitOrderId,
             double limitPrice) {
+        return accountStateWithOrders(
+                symbol,
+                netQuantity,
+                limitOrder(limitSide, limitOrderId, 1, limitPrice, 1));
+    }
+
+    private static String accountStateWithOrders(
+            String symbol,
+            double netQuantity,
+            String... orders) {
         return "{"
                 + "\"type\":\"account_state\","
                 + "\"symbol\":\"" + symbol + "\","
                 + "\"position\":{\"netQuantity\":" + netQuantity + ",\"averagePrice\":100.0},"
-                + "\"openOrders\":[{"
+                + "\"openOrders\":[" + String.join(",", orders) + "],"
+                + "\"timestamp\":1"
+                + "}";
+    }
+
+    private static String limitOrder(
+            String limitSide,
+            String limitOrderId,
+            double quantity,
+            double limitPrice,
+            int pairIndex) {
+        return "{"
                 + "\"role\":\"LIMIT\","
                 + "\"orderType\":\"LIMIT\","
                 + "\"side\":\"" + limitSide + "\","
                 + "\"orderId\":\"" + limitOrderId + "\","
-                + "\"quantity\":1,"
+                + "\"quantity\":" + quantity + ","
                 + "\"price\":" + limitPrice + ","
-                + "\"pairIndex\":1"
-                + "}],"
-                + "\"timestamp\":1"
+                + "\"pairIndex\":" + pairIndex
                 + "}";
     }
 }
