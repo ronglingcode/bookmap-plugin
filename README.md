@@ -26,7 +26,7 @@ This repository produces two Bookmap addon plugins in the same build:
 
 ## Features
 
-- **Chart keyboard hotkeys** — when enabled, C/F cancel or flatten and W swaps the hovered chart's symbol without using its price, B/S place bid/offer wall-reversal stop entries at the hovered price only before 10:00 AM New York time, top-row digits adjust exits, and numpad digits market out partials at any time. **Wall Out 1**, **Market Out 1**, Digit1, KeyM, and Numpad1 select the first exit pair tied for the smallest share quantity; digits 2–0 remain positional.
+- **Chart keyboard hotkeys** — the highlighted Bookmap tab is shown at the top of the Rong Logs window and is authoritative for hover hotkeys. When enabled, C/F cancel or flatten and W swaps that symbol without using its price, B/S place bid/offer wall-reversal stop entries at the hovered price only before 10:00 AM New York time, top-row digits adjust exits, and numpad digits market out partials at any time. **Wall Out 1**, **Market Out 1**, Digit1, KeyM, and Numpad1 select the first exit pair tied for the smallest share quantity; digits 2–0 remain positional.
 - **Order wall breakout detection** — monitors large ask-side walls and broadcasts signals when consumed
 - **Auto-drawn indicators** — ViteApp VWAP, premarket high/low, and Camarilla Pivot levels drawn automatically
 - **WebSocket key levels/zones** — instrument-specific price levels and zones pushed by an external app

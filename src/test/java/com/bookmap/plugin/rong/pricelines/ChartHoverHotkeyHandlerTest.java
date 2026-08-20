@@ -149,6 +149,39 @@ class ChartHoverHotkeyHandlerTest {
     }
 
     @Test
+    void singleActivePainterResolvesWhenSeveralSymbolsAreRegistered() {
+        assertEquals(
+                "MSFT",
+                ChartHoverHotkeyHandler.resolveUnidentifiedHoverInstrument(
+                        Set.of("AAPL", "MSFT"), Set.of("MSFT")));
+    }
+
+    @Test
+    void multipleActivePaintersRemainAmbiguous() {
+        assertNull(ChartHoverHotkeyHandler.resolveUnidentifiedHoverInstrument(
+                Set.of("AAPL", "MSFT"), Set.of("AAPL", "MSFT")));
+    }
+
+    @Test
+    void bookmapWindowTitleIdentifiesHighlightedTab() {
+        assertEquals(
+                "MRNA",
+                ChartHoverHotkeyHandler.identifyInstrumentFromTitle(
+                        "MRNA    Bookmap", Set.of("WMT", "MRNA")));
+    }
+
+    @Test
+    void highlightedTabOverridesAStaleComponentSymbol() {
+        assertEquals(
+                "MRNA",
+                ChartHoverHotkeyHandler.resolveHoverInstrument(
+                        "MRNA",
+                        "WMT",
+                        Set.of("WMT", "MRNA"),
+                        Set.of("MRNA")));
+    }
+
+    @Test
     void overlappingSymbolNamesRemainAmbiguousInsteadOfUsingSubstringOrder() {
         JPanel chart = chartPanel("AAPL1");
 

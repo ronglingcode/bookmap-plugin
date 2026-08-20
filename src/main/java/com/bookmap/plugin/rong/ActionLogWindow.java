@@ -41,12 +41,14 @@ public class ActionLogWindow {
     private static final String[] POSITION_COLUMNS = {"Symbol", "Side", "Risk %", "Avg"};
     private static final String[] ORDER_COLUMNS = {"Symbol", "Role", "Side", "Qty", "Type", "Price", "Ref"};
     private static JFrame frame;
+    private static JLabel highlightedSymbolLabel;
     private static JLabel accountStatusLabel;
     private static JLabel positionStatusLabel;
     private static JLabel orderStatusLabel;
     private static DefaultTableModel positionTableModel;
     private static DefaultTableModel orderTableModel;
     private static JTextArea textArea;
+    private static volatile String highlightedSymbol = "";
 
     private ActionLogWindow() {}
 
@@ -77,6 +79,11 @@ public class ActionLogWindow {
         });
     }
 
+    public static void updateHighlightedSymbol(String symbol) {
+        highlightedSymbol = symbol == null ? "" : symbol.trim();
+        SwingUtilities.invokeLater(ActionLogWindow::renderHighlightedSymbol);
+    }
+
     public static void dispose() {
         SwingUtilities.invokeLater(() -> {
             lines.clear();
@@ -84,6 +91,7 @@ public class ActionLogWindow {
             if (frame != null) {
                 frame.dispose();
                 frame = null;
+                highlightedSymbolLabel = null;
                 accountStatusLabel = null;
                 positionStatusLabel = null;
                 orderStatusLabel = null;
@@ -107,6 +115,9 @@ public class ActionLogWindow {
         textArea.setLineWrap(true);
         textArea.setWrapStyleWord(true);
 
+        highlightedSymbolLabel = new JLabel();
+        highlightedSymbolLabel.setFont(
+                highlightedSymbolLabel.getFont().deriveFont(Font.BOLD));
         accountStatusLabel = new JLabel("Account: waiting for ViteApp");
         positionStatusLabel = new JLabel("Positions (0)");
         orderStatusLabel = new JLabel("0 exit pair(s)");
@@ -117,7 +128,10 @@ public class ActionLogWindow {
 
         JPanel accountPanel = new JPanel(new BorderLayout(0, 6));
         accountPanel.setBorder(BorderFactory.createEmptyBorder(8, 8, 4, 8));
-        accountPanel.add(accountStatusLabel, BorderLayout.NORTH);
+        JPanel statusPanel = new JPanel(new GridLayout(2, 1, 0, 2));
+        statusPanel.add(highlightedSymbolLabel);
+        statusPanel.add(accountStatusLabel);
+        accountPanel.add(statusPanel, BorderLayout.NORTH);
 
         JPanel tablesPanel = new JPanel(new GridLayout(2, 1, 0, 6));
         tablesPanel.add(createSection("Positions", positionStatusLabel, positionTable, 82));
@@ -134,7 +148,16 @@ public class ActionLogWindow {
         frame.setPreferredSize(new Dimension(WINDOW_WIDTH, 620));
         frame.pack();
         frame.setVisible(true);
+        renderHighlightedSymbol();
         renderAccountState();
+    }
+
+    private static void renderHighlightedSymbol() {
+        if (highlightedSymbolLabel == null) {
+            return;
+        }
+        highlightedSymbolLabel.setText(
+                "Highlighted chart: " + (highlightedSymbol.isEmpty() ? "unknown" : highlightedSymbol));
     }
 
     private static String formatLine(String symbol, String source, String message) {

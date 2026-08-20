@@ -30,6 +30,7 @@ import javax.swing.JTable;
 import javax.swing.SwingUtilities;
 import javax.swing.text.JTextComponent;
 
+import com.bookmap.plugin.rong.ActionLogWindow;
 import com.bookmap.plugin.rong.BookmapPriceNormalizer;
 import com.bookmap.plugin.rong.IndicatorConfig;
 import com.bookmap.plugin.rong.PluginLog;
@@ -92,6 +93,9 @@ public class ChartHoverHotkeyHandler implements ScreenSpacePainterFactory {
     /** Last resolved chart hover. Button-equivalent hotkeys only require its instrument and component. */
     private static volatile HoverContext lastHoverContext;
 
+    /** Symbol selected in Bookmap's highlighted chart tab. */
+    private static volatile String highlightedInstrument;
+
     /** Shared AWT listener — registered once. */
     private static volatile AWTEventListener awtListener;
     private static final Object listenerLock = new Object();
@@ -129,6 +133,9 @@ public class ChartHoverHotkeyHandler implements ScreenSpacePainterFactory {
         if (hover != null && instrumentAlias.equals(hover.instrument)) {
             lastHoverContext = null;
         }
+        if (instrumentAlias.equals(highlightedInstrument)) {
+            setHighlightedInstrument(onlyInstrument(painterInstruments()));
+        }
     }
 
     /** Remove the global AWT listener so a fresh one can be registered on next init. */
@@ -142,6 +149,7 @@ public class ChartHoverHotkeyHandler implements ScreenSpacePainterFactory {
                 componentToInstrument.clear();
                 instrumentPips.clear();
                 lastHoverContext = null;
+                setHighlightedInstrument(null);
                 PluginLog.info("[Rong] AWT listener removed");
             }
         }
@@ -181,13 +189,17 @@ public class ChartHoverHotkeyHandler implements ScreenSpacePainterFactory {
 
     private void updateHoverContext(MouseEvent event) {
         Component component = event.getComponent();
+        updateHighlightedInstrumentFromWindowTitle(component);
         ResolvedChartPrice price = resolveChartPrice(component, event.getY());
         if (price != null) {
             lastHoverContext = new HoverContext(price.instrument, price.price, component);
             return;
         }
 
-        String instrument = identifyInstrumentFromComponent(component);
+        String instrument = currentHighlightedInstrument();
+        if (instrument == null) {
+            instrument = identifyInstrumentFromComponent(component);
+        }
         lastHoverContext =
                 instrument == null ? null : new HoverContext(instrument, null, component);
     }
@@ -199,6 +211,7 @@ public class ChartHoverHotkeyHandler implements ScreenSpacePainterFactory {
         if (config == null || !config.isEnabled(IndicatorConfig.FIRE_KEYBOARD_EVENT)) {
             return;
         }
+        updateHighlightedInstrumentFromWindowTitle(event.getComponent());
         if (isTextEntryEvent(event)) {
             PluginLog.info("[Rong] Chart hotkey blocked while text entry appears active: key="
                     + normalizedKey + ", focus=" + describeComponent(
@@ -315,6 +328,12 @@ public class ChartHoverHotkeyHandler implements ScreenSpacePainterFactory {
             return null;
         }
 
+        String highlighted = currentHighlightedInstrument();
+        if (highlighted != null && !highlighted.equals(hover.instrument)) {
+            hover = new HoverContext(highlighted, null, hover.component);
+            lastHoverContext = hover;
+        }
+
         PointerInfo pointerInfo = MouseInfo.getPointerInfo();
         if (pointerInfo == null) {
             return null;
@@ -342,10 +361,13 @@ public class ChartHoverHotkeyHandler implements ScreenSpacePainterFactory {
 
     private static ResolvedChartPrice resolveChartPrice(Component comp, int localY) {
         int compHeight = (comp != null) ? comp.getHeight() : 0;
-        String componentInstrument = identifyInstrumentFromComponent(comp);
-        if (componentInstrument == null) {
-            componentInstrument = onlyRegisteredInstrument();
-        }
+        String highlighted = currentHighlightedInstrument();
+        String identified = highlighted == null ? identifyInstrumentFromComponent(comp) : null;
+        String componentInstrument = resolveHoverInstrument(
+                highlighted,
+                identified,
+                instrumentPips.keySet(),
+                activePainterInstruments());
         if (componentInstrument == null) {
             // With multiple open symbols, choosing an arbitrary coordinate mapping could send an
             // order for the wrong instrument. Ambiguous hover events deliberately fail closed.
@@ -377,6 +399,107 @@ public class ChartHoverHotkeyHandler implements ScreenSpacePainterFactory {
         }
 
         return null;
+    }
+
+    /**
+     * Bookmap may keep several symbols registered while creating a screen-space painter only for
+     * the currently displayed chart. In that case the active painter is authoritative even though
+     * the AWT component tree (for example, a tabbed chart container) mentions multiple symbols.
+     */
+    private static Set<String> activePainterInstruments() {
+        Set<String> activeInstruments = new HashSet<>();
+        for (CoordinateState coords : painterCoords) {
+            if (coords.instrument != null
+                    && instrumentPips.containsKey(coords.instrument)
+                    && coords.pixelsHeight > 0
+                    && coords.priceHeight > 0) {
+                activeInstruments.add(coords.instrument);
+            }
+        }
+        return activeInstruments;
+    }
+
+    private static Set<String> painterInstruments() {
+        Set<String> instruments = new HashSet<>();
+        for (CoordinateState coords : painterCoords) {
+            if (coords.instrument != null && instrumentPips.containsKey(coords.instrument)) {
+                instruments.add(coords.instrument);
+            }
+        }
+        return instruments;
+    }
+
+    private static String currentHighlightedInstrument() {
+        String instrument = highlightedInstrument;
+        return instrument != null && instrumentPips.containsKey(instrument) ? instrument : null;
+    }
+
+    private static void setHighlightedInstrument(String instrument) {
+        String next = instrument != null && instrumentPips.containsKey(instrument)
+                ? instrument
+                : null;
+        String previous = highlightedInstrument;
+        if (previous == null ? next == null : previous.equals(next)) {
+            return;
+        }
+        highlightedInstrument = next;
+        ActionLogWindow.updateHighlightedSymbol(next);
+        PluginLog.info("[Rong] Highlighted chart: " + (next == null ? "unknown" : next));
+    }
+
+    private static void updateHighlightedInstrumentFromWindowTitle(Component component) {
+        String instrument = identifyInstrumentFromWindowTitle(
+                component, new HashSet<>(instrumentPips.keySet()));
+        if (instrument != null) {
+            setHighlightedInstrument(instrument);
+        }
+    }
+
+    static String identifyInstrumentFromWindowTitle(Component component, Set<String> known) {
+        Component current = component;
+        while (current != null && !(current instanceof Window)) {
+            current = current.getParent();
+        }
+        if (!(current instanceof Frame)) {
+            return null;
+        }
+        return identifyInstrumentFromTitle(((Frame) current).getTitle(), known);
+    }
+
+    static String identifyInstrumentFromTitle(String title, Set<String> known) {
+        Set<String> matches = new HashSet<>();
+        addKnownAliases(title, known, matches);
+        return onlyInstrument(matches);
+    }
+
+    static String resolveUnidentifiedHoverInstrument(
+            Set<String> registeredInstruments, Set<String> activeInstruments) {
+        if (activeInstruments != null && !activeInstruments.isEmpty()) {
+            return onlyInstrument(activeInstruments);
+        }
+        return onlyInstrument(registeredInstruments);
+    }
+
+    static String resolveHoverInstrument(
+            String highlighted,
+            String identifiedFromComponent,
+            Set<String> registeredInstruments,
+            Set<String> activeInstruments) {
+        if (highlighted != null && registeredInstruments.contains(highlighted)) {
+            return highlighted;
+        }
+        if (identifiedFromComponent != null
+                && registeredInstruments.contains(identifiedFromComponent)) {
+            return identifiedFromComponent;
+        }
+        return resolveUnidentifiedHoverInstrument(registeredInstruments, activeInstruments);
+    }
+
+    private static String onlyInstrument(Set<String> instruments) {
+        if (instruments == null || instruments.size() != 1) {
+            return null;
+        }
+        return instruments.iterator().next();
     }
 
     private static boolean isTextEntryEvent(KeyEvent event) {
@@ -474,6 +597,7 @@ public class ChartHoverHotkeyHandler implements ScreenSpacePainterFactory {
         String instrument = resolveInstrumentFromPainterContext(indicatorName, indicatorAlias);
         CoordinateState coords = new CoordinateState(instrument);
         painterCoords.add(coords);
+        setHighlightedInstrument(instrument);
 
         PluginLog.info("[Rong] ScreenSpacePainter created: indicatorName=" + indicatorName
             + " indicatorAlias=" + indicatorAlias
@@ -515,6 +639,9 @@ public class ChartHoverHotkeyHandler implements ScreenSpacePainterFactory {
             @Override
             public void dispose() {
                 painterCoords.remove(coords);
+                if (instrument != null && instrument.equals(highlightedInstrument)) {
+                    setHighlightedInstrument(onlyInstrument(painterInstruments()));
+                }
                 PluginLog.info("[Rong] ScreenSpacePainter disposed for " + indicatorName
                         + " on " + indicatorAlias);
             }
@@ -534,10 +661,7 @@ public class ChartHoverHotkeyHandler implements ScreenSpacePainterFactory {
     }
 
     private static String onlyRegisteredInstrument() {
-        if (instrumentPips.size() != 1) {
-            return null;
-        }
-        return instrumentPips.keySet().iterator().next();
+        return onlyInstrument(instrumentPips.keySet());
     }
 
     static String normalizeKey(KeyEvent event) {
