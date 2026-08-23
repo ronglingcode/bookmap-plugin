@@ -29,15 +29,19 @@ import java.util.function.IntSupplier;
 import javax.swing.BorderFactory;
 import javax.swing.BoxLayout;
 import javax.swing.JButton;
+import javax.swing.JDialog;
 import javax.swing.JFrame;
 import javax.swing.JLabel;
+import javax.swing.JOptionPane;
 import javax.swing.JPanel;
 import javax.swing.SwingConstants;
 import javax.swing.SwingUtilities;
 import javax.swing.Timer;
+import javax.swing.JTextField;
 import javax.swing.border.EmptyBorder;
 
 import com.bookmap.plugin.rong.BookmapPriceNormalizer;
+import com.bookmap.plugin.rong.CorePlanConfigDefinition;
 import com.bookmap.plugin.rong.PluginLog;
 import com.bookmap.plugin.rong.SignalWebSocketServer;
 import com.bookmap.plugin.rong.WallThresholdConfig;
@@ -77,11 +81,20 @@ public class TradeButtonWindow {
     private final SignalWebSocketServer server;
     private final IntSupplier wallThresholdFloorSupplier;
     private final SignalWebSocketServer.TradeButtonConfigListener buttonConfigListener;
+    private final SignalWebSocketServer.CorePlanConfigListener corePlanConfigListener;
     private JFrame frame;
     private JPanel buttonPanel;
     private JLabel shiftModeLabel;
     private JLabel wallThresholdLabel;
     private Timer wallThresholdTimer;
+    private volatile CorePlanConfigDefinition corePlanConfig;
+    private JDialog corePlanDialog;
+    private JTextField coreTargetField;
+    private JTextField coreCountField;
+    private JLabel corePlanStatusLabel;
+    private JButton corePlanUpdateButton;
+    private String pendingCorePlanRequestId = "";
+    private String lastReminderTradeId = "";
     private volatile boolean disposed;
 
     public TradeButtonWindow(String symbol, SignalWebSocketServer server,
@@ -92,6 +105,7 @@ public class TradeButtonWindow {
                 ? () -> WallThresholdConfig.DEFAULT_THRESHOLD_FLOOR
                 : wallThresholdFloorSupplier;
         this.buttonConfigListener = this::setButtons;
+        this.corePlanConfigListener = this::setCorePlanConfig;
         SwingUtilities.invokeLater(this::buildWindow);
     }
 
@@ -124,6 +138,7 @@ public class TradeButtonWindow {
         frame.setVisible(true);
 
         server.registerTradeButtonConfigListener(symbol, buttonConfigListener);
+        server.registerCorePlanConfigListener(symbol, corePlanConfigListener);
     }
 
     private void setButtons(List<TradebookButtonGroup> tradebooks) {
@@ -132,6 +147,195 @@ public class TradeButtonWindow {
                 renderButtons(tradebooks);
             }
         });
+    }
+
+    private void setCorePlanConfig(CorePlanConfigDefinition config) {
+        SwingUtilities.invokeLater(() -> {
+            if (disposed) {
+                return;
+            }
+            corePlanConfig = config;
+            if (!pendingCorePlanRequestId.isEmpty()
+                    && pendingCorePlanRequestId.equals(config.getRequestId())) {
+                if ("success".equalsIgnoreCase(config.getUpdateStatus())) {
+                    PluginLog.action(symbol, "Exit plan updated: target "
+                            + formatPrice(config.getCoreTarget()) + ", count " + config.getCoreCount());
+                    closeCorePlanDialog();
+                } else if ("error".equalsIgnoreCase(config.getUpdateStatus())) {
+                    pendingCorePlanRequestId = "";
+                    if (corePlanUpdateButton != null) {
+                        corePlanUpdateButton.setEnabled(true);
+                    }
+                    if (corePlanStatusLabel != null) {
+                        corePlanStatusLabel.setForeground(SHORT_TRADEBOOK_BUTTON_COLOR);
+                        corePlanStatusLabel.setText(config.getError().isEmpty()
+                                ? "ViteApp rejected the update."
+                                : config.getError());
+                    }
+                }
+            }
+
+            if (config.hasActiveTrade() && config.isReminderRequested()) {
+                String reminderId = config.getTradeId().isEmpty()
+                        ? symbol + ":" + config.getTimestamp()
+                        : config.getTradeId();
+                if (!reminderId.equals(lastReminderTradeId)) {
+                    lastReminderTradeId = reminderId;
+                    showCorePlanDialog(true);
+                }
+            }
+        });
+    }
+
+    private void showCorePlanDialog(boolean reminder) {
+        if (disposed) {
+            return;
+        }
+        CorePlanConfigDefinition config = corePlanConfig;
+        if (config == null || !config.hasActiveTrade()) {
+            JOptionPane.showMessageDialog(
+                    frame,
+                    "No active trade plan is available for " + symbol + ".",
+                    "Update Exit Plan",
+                    JOptionPane.INFORMATION_MESSAGE);
+            return;
+        }
+        if (corePlanDialog != null && corePlanDialog.isDisplayable()) {
+            corePlanDialog.toFront();
+            corePlanDialog.requestFocus();
+            return;
+        }
+
+        corePlanDialog = new JDialog(
+                frame,
+                (reminder ? "Review" : "Update") + " Exit Plan - " + symbol,
+                false);
+        corePlanDialog.setAlwaysOnTop(true);
+        corePlanDialog.setDefaultCloseOperation(JDialog.DISPOSE_ON_CLOSE);
+        corePlanDialog.setResizable(false);
+        corePlanDialog.addWindowListener(new WindowAdapter() {
+            @Override
+            public void windowClosed(WindowEvent e) {
+                clearCorePlanDialogReferences();
+            }
+        });
+
+        JPanel root = new JPanel(new BorderLayout(8, 8));
+        root.setBorder(new EmptyBorder(12, 12, 12, 12));
+        JLabel info = new JLabel(buildCorePlanInfo(config));
+        root.add(info, BorderLayout.NORTH);
+
+        JPanel fields = new JPanel(new GridLayout(2, 2, 8, 8));
+        fields.add(new JLabel("Core target"));
+        coreTargetField = new JTextField(formatPrice(config.getCoreTarget()), 10);
+        fields.add(coreTargetField);
+        fields.add(new JLabel("Core count"));
+        coreCountField = new JTextField(Integer.toString(config.getCoreCount()), 10);
+        fields.add(coreCountField);
+        root.add(fields, BorderLayout.CENTER);
+
+        JPanel footer = new JPanel(new BorderLayout(8, 8));
+        corePlanStatusLabel = new JLabel(reminder
+                ? "Third partial taken — review or keep this plan."
+                : "The final restricted partials must exit at the buffer or better.");
+        footer.add(corePlanStatusLabel, BorderLayout.NORTH);
+        JPanel actions = new JPanel(new GridLayout(1, 2, 8, 0));
+        JButton keepButton = new JButton("Keep Current");
+        keepButton.addActionListener(e -> closeCorePlanDialog());
+        corePlanUpdateButton = new JButton("Update");
+        corePlanUpdateButton.addActionListener(e -> submitCorePlanUpdate());
+        actions.add(keepButton);
+        actions.add(corePlanUpdateButton);
+        footer.add(actions, BorderLayout.SOUTH);
+        root.add(footer, BorderLayout.SOUTH);
+
+        corePlanDialog.setContentPane(root);
+        corePlanDialog.pack();
+        corePlanDialog.setLocationRelativeTo(frame);
+        corePlanDialog.setVisible(true);
+        coreTargetField.requestFocusInWindow();
+        coreTargetField.selectAll();
+    }
+
+    private String buildCorePlanInfo(CorePlanConfigDefinition config) {
+        return "<html><b>" + (config.isLongPosition() ? "Long" : "Short") + " " + symbol + "</b>"
+                + " &nbsp; Entry: " + formatPrice(config.getEntryPrice())
+                + " &nbsp; 90% buffer: " + formatPrice(config.getBufferedTarget())
+                + "<br>Partials taken: " + config.getPartialsTaken() + "/10"
+                + " &nbsp; (first 3 are always unrestricted)</html>";
+    }
+
+    private void submitCorePlanUpdate() {
+        CorePlanConfigDefinition config = corePlanConfig;
+        if (config == null || !config.hasActiveTrade()
+                || coreTargetField == null || coreCountField == null) {
+            return;
+        }
+
+        double target;
+        int count;
+        try {
+            target = Double.parseDouble(coreTargetField.getText().trim());
+            count = Integer.parseInt(coreCountField.getText().trim());
+        } catch (NumberFormatException e) {
+            showCorePlanValidationError("Target must be a number and count must be a whole number.");
+            return;
+        }
+        if (!Double.isFinite(target) || target <= 0) {
+            showCorePlanValidationError("Core target must be a positive number.");
+            return;
+        }
+        if (count < 0 || count > 7) {
+            showCorePlanValidationError("Core count must be an integer from 0 to 7.");
+            return;
+        }
+        if ((config.isLongPosition() && target <= config.getEntryPrice())
+                || (!config.isLongPosition() && target >= config.getEntryPrice())) {
+            showCorePlanValidationError("Core target must be "
+                    + (config.isLongPosition() ? "above" : "below")
+                    + " entry " + formatPrice(config.getEntryPrice()) + ".");
+            return;
+        }
+
+        pendingCorePlanRequestId = symbol + ":" + System.nanoTime();
+        corePlanUpdateButton.setEnabled(false);
+        corePlanStatusLabel.setForeground(THRESHOLD_TEXT_COLOR);
+        corePlanStatusLabel.setText("Saving in ViteApp...");
+
+        JsonObject json = new JsonObject();
+        json.addProperty("type", "core_plan_update");
+        BookmapPriceNormalizer.addWirePriceUnit(json);
+        json.addProperty("symbol", symbol);
+        json.addProperty("coreTarget", target);
+        json.addProperty("coreCount", count);
+        json.addProperty("requestId", pendingCorePlanRequestId);
+        json.addProperty("timestamp", System.currentTimeMillis());
+        server.broadcast(json.toString());
+        PluginLog.action(symbol, "Requested exit plan update: target "
+                + formatPrice(target) + ", count " + count);
+    }
+
+    private void showCorePlanValidationError(String message) {
+        if (corePlanStatusLabel != null) {
+            corePlanStatusLabel.setForeground(SHORT_TRADEBOOK_BUTTON_COLOR);
+            corePlanStatusLabel.setText(message);
+        }
+    }
+
+    private void closeCorePlanDialog() {
+        if (corePlanDialog != null) {
+            corePlanDialog.dispose();
+        }
+        clearCorePlanDialogReferences();
+    }
+
+    private void clearCorePlanDialogReferences() {
+        corePlanDialog = null;
+        coreTargetField = null;
+        coreCountField = null;
+        corePlanStatusLabel = null;
+        corePlanUpdateButton = null;
+        pendingCorePlanRequestId = "";
     }
 
     private void renderButtons(List<TradebookButtonGroup> tradebooks) {
@@ -187,7 +391,15 @@ public class TradeButtonWindow {
         hotkeyPanel.add(createHotkeyButton("Market Out Half", "market_out_half", "KeyG", true));
         hotkeyPanel.add(createWallOutButton());
         hotkeyPanel.add(createHotkeyButton("Swap", "swap", "KeyW"));
+        hotkeyPanel.add(createCorePlanButton());
         return hotkeyPanel;
+    }
+
+    private JButton createCorePlanButton() {
+        JButton button = new JButton("Update Plan");
+        applyHotkeyButtonStyle(button);
+        button.addActionListener(e -> showCorePlanDialog(false));
+        return button;
     }
 
     private JButton createHotkeyButton(String label, String id, String keyCode) {
@@ -650,7 +862,9 @@ public class TradeButtonWindow {
         }
         unregisterShiftTracker(this);
         server.unregisterTradeButtonConfigListener(symbol, buttonConfigListener);
+        server.unregisterCorePlanConfigListener(symbol, corePlanConfigListener);
         SwingUtilities.invokeLater(() -> {
+            closeCorePlanDialog();
             if (frame != null) {
                 frame.dispose();
                 frame = null;

@@ -31,6 +31,7 @@ This repository produces two Bookmap addon plugins in the same build:
 - **Auto-drawn indicators** — ViteApp VWAP, premarket high/low, and Camarilla Pivot levels drawn automatically
 - **WebSocket key levels/zones** — instrument-specific price levels and zones pushed by an external app
 - **WebSocket API** — real-time breakout and order book messages
+- **Live exit-plan editor** — the floating trade window edits ViteApp's active `coreTarget`/`coreCount` plan and reminds after the third completed partial
 - **Settings panels** — enable/disable indicators and optionally export replay data
 
 ## Project Structure
@@ -208,6 +209,44 @@ Sending an empty `levels` array clears existing key level lines for that symbol.
 ```
 
 The plugin writes the message to its session log and shows it in the always-on-top **Rong Logs** window. `symbol` is optional; `level` is shown beside the source when provided.
+
+### Active core plan (client → server)
+
+ViteApp publishes the authoritative active plan. `coreCount` is the number of final original partials that are restricted to the 90%-of-planned-profit buffered target or better. The first three partials are always unrestricted, so `coreCount` is from 0 to 7. For example, `coreCount: 5` leaves partials 1–5 unrestricted and protects partials 6–10.
+
+```json
+{
+  "type": "core_plan_config",
+  "priceUnit": "real",
+  "symbol": "AAPL",
+  "hasActiveTrade": true,
+  "isLong": true,
+  "entryPrice": 100,
+  "coreTarget": 110,
+  "coreCount": 5,
+  "bufferedTarget": 109,
+  "partialsTaken": 3,
+  "tradeId": "AAPL:long:1785243900000",
+  "reminderRequested": true,
+  "timestamp": 1785243960000
+}
+```
+
+The **Update Plan** button opens the same modeless, always-on-top form used by the third-partial reminder. An update is sent back to ViteApp as:
+
+```json
+{
+  "type": "core_plan_update",
+  "priceUnit": "real",
+  "symbol": "AAPL",
+  "coreTarget": 112,
+  "coreCount": 6,
+  "requestId": "AAPL:123456789",
+  "timestamp": 1785243960500
+}
+```
+
+ViteApp validates and persists the active plan, then acknowledges it with another `core_plan_config` carrying the same `requestId` and `updateStatus` of `success` or `error`.
 
 ### Closed-minute VWAP update (client → server)
 

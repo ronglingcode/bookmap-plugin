@@ -73,6 +73,11 @@ public class SignalWebSocketServer extends WebSocketServer {
         void onVwapChanged(VwapUpdateDefinition update);
     }
 
+    @FunctionalInterface
+    public interface CorePlanConfigListener {
+        void onCorePlanChanged(CorePlanConfigDefinition config);
+    }
+
     private final Object schedulerLock = new Object();
     private ScheduledExecutorService scheduler;
     private final Path breakoutLogFile;
@@ -89,8 +94,10 @@ public class SignalWebSocketServer extends WebSocketServer {
     private final Map<String, AccountStateDefinition> symbolToAccountState = new ConcurrentHashMap<>();
     private final Map<String, RegularSessionHighLowTracker> symbolToRegularSessionHighLow = new ConcurrentHashMap<>();
     private final Map<String, VwapUpdateDefinition> symbolToVwapUpdate = new ConcurrentHashMap<>();
+    private final Map<String, CorePlanConfigDefinition> symbolToCorePlan = new ConcurrentHashMap<>();
     private final Map<String, Set<TradeButtonConfigListener>> symbolToTradeButtonListeners = new ConcurrentHashMap<>();
     private final Map<String, Set<VwapUpdateListener>> symbolToVwapUpdateListeners = new ConcurrentHashMap<>();
+    private final Map<String, Set<CorePlanConfigListener>> symbolToCorePlanListeners = new ConcurrentHashMap<>();
     private final Set<KeyLevelConfigListener> keyLevelConfigListeners =
             Collections.newSetFromMap(new ConcurrentHashMap<>());
     private final Set<KeyZoneConfigListener> keyZoneConfigListeners =
@@ -447,6 +454,30 @@ public class SignalWebSocketServer extends WebSocketServer {
         }
     }
 
+    public void registerCorePlanConfigListener(String symbol, CorePlanConfigListener listener) {
+        String cleanSymbol = SymbolUtils.cleanSymbol(symbol);
+        symbolToCorePlanListeners
+                .computeIfAbsent(cleanSymbol, ignored -> Collections.newSetFromMap(new ConcurrentHashMap<>()))
+                .add(listener);
+
+        CorePlanConfigDefinition existingConfig = symbolToCorePlan.get(cleanSymbol);
+        if (existingConfig != null) {
+            listener.onCorePlanChanged(existingConfig);
+        }
+    }
+
+    public void unregisterCorePlanConfigListener(String symbol, CorePlanConfigListener listener) {
+        String cleanSymbol = SymbolUtils.cleanSymbol(symbol);
+        Set<CorePlanConfigListener> listeners = symbolToCorePlanListeners.get(cleanSymbol);
+        if (listeners == null) {
+            return;
+        }
+        listeners.remove(listener);
+        if (listeners.isEmpty()) {
+            symbolToCorePlanListeners.remove(cleanSymbol, listeners);
+        }
+    }
+
     public void unregisterKeyZoneConfigListener(KeyZoneConfigListener listener) {
         keyZoneConfigListeners.remove(listener);
     }
@@ -628,6 +659,10 @@ public class SignalWebSocketServer extends WebSocketServer {
                 handleVwapUpdate(json);
                 return;
             }
+            if ("core_plan_config".equals(type)) {
+                handleCorePlanConfig(json);
+                return;
+            }
         }
         if (trimmed.contains("\"subscribe\"") && trimmed.contains("\"orderbook\"")) {
             orderbookSubscribers.add(conn);
@@ -683,6 +718,41 @@ public class SignalWebSocketServer extends WebSocketServer {
                     + " at " + update.getEffectiveTimeMs());
         } catch (IllegalArgumentException e) {
             PluginLog.error("[VWAP] Ignoring invalid update for " + symbol + ": " + e.getMessage());
+        }
+    }
+
+    private void handleCorePlanConfig(JsonObject json) {
+        String symbol = SymbolUtils.cleanSymbol(getString(json, "symbol"));
+        if (symbol.isEmpty()) {
+            PluginLog.error("[CorePlan] Ignoring config with missing symbol");
+            return;
+        }
+
+        boolean activeTrade = getBoolean(json, "hasActiveTrade");
+        try {
+            CorePlanConfigDefinition config = new CorePlanConfigDefinition(
+                    symbol,
+                    activeTrade,
+                    getBoolean(json, "isLong"),
+                    activeTrade ? getWirePrice(json, "entryPrice") : 0,
+                    activeTrade ? getWirePrice(json, "coreTarget") : 0,
+                    activeTrade ? getInt(json, "coreCount") : 0,
+                    activeTrade ? getWirePrice(json, "bufferedTarget") : 0,
+                    activeTrade ? getInt(json, "partialsTaken") : 0,
+                    getString(json, "tradeId"),
+                    getBoolean(json, "reminderRequested"),
+                    getString(json, "requestId"),
+                    getString(json, "updateStatus"),
+                    getString(json, "error"),
+                    getLong(json, "timestamp"));
+            symbolToCorePlan.put(symbol, config);
+            notifyCorePlanListeners(symbol, config);
+            PluginLog.info("[CorePlan] Updated " + symbol
+                    + (activeTrade
+                    ? " target=" + config.getCoreTarget() + ", count=" + config.getCoreCount()
+                    : " with no active trade"));
+        } catch (IllegalArgumentException e) {
+            PluginLog.error("[CorePlan] Ignoring invalid config for " + symbol + ": " + e.getMessage());
         }
     }
 
@@ -1351,6 +1421,21 @@ public class SignalWebSocketServer extends WebSocketServer {
         }
     }
 
+    private void notifyCorePlanListeners(String symbol, CorePlanConfigDefinition config) {
+        Set<CorePlanConfigListener> listeners = symbolToCorePlanListeners.get(symbol);
+        if (listeners == null) {
+            return;
+        }
+        for (CorePlanConfigListener listener : listeners) {
+            try {
+                listener.onCorePlanChanged(config);
+            } catch (RuntimeException e) {
+                PluginLog.error("[CorePlan] Failed to notify listener for "
+                        + symbol + ": " + e.getMessage());
+            }
+        }
+    }
+
     private void notifyTradeButtonListeners(String symbol, List<TradebookButtonGroup> tradebooks) {
         Set<TradeButtonConfigListener> listeners = symbolToTradeButtonListeners.get(symbol);
         if (listeners == null) {
@@ -1457,7 +1542,8 @@ public class SignalWebSocketServer extends WebSocketServer {
                 || "exit_order_pairs_config".equals(type)
                 || "exit_order_pair_config".equals(type)
                 || "account_state".equals(type)
-                || "vwap_update".equals(type);
+                || "vwap_update".equals(type)
+                || "core_plan_config".equals(type);
     }
 
     private String getString(JsonObject json, String field) {
