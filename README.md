@@ -224,6 +224,9 @@ ViteApp publishes the authoritative active plan. `coreCount` is the number of fi
   "entryPrice": 100,
   "coreTarget": 110,
   "coreCount": 5,
+  "runnerCondition": "after 10 minutes",
+  "runnerCount": 2,
+  "corePlan": "Hold core through the first pullback\nTrail runners behind M5 structure",
   "bufferedTarget": 109,
   "partialsTaken": 3,
   "tradeId": "AAPL:long:1785243900000",
@@ -232,7 +235,7 @@ ViteApp publishes the authoritative active plan. `coreCount` is the number of fi
 }
 ```
 
-The **Update Plan** button opens the same modeless, always-on-top form used by the third-partial reminder. An update is sent back to ViteApp as:
+The **Update Plan** button opens the same modeless, always-on-top form used by the third-partial reminder. Only **Core target** and **Core count** are editable. Runner condition, runner count, and the multiline core plan are displayed read-only as a reminder. An update is sent back to ViteApp as:
 
 ```json
 {

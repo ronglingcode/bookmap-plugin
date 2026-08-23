@@ -25,6 +25,9 @@ class CorePlanConfigParsingTest {
         assertEquals(100, config.getEntryPrice(), 0.00001);
         assertEquals(110, config.getCoreTarget(), 0.00001);
         assertEquals(5, config.getCoreCount());
+        assertEquals("after 10 minutes", config.getRunnerCondition());
+        assertEquals(2, config.getRunnerCount());
+        assertEquals("Hold core\nTrail runner", config.getCorePlan());
         assertEquals(109, config.getBufferedTarget(), 0.00001);
         assertEquals(3, config.getPartialsTaken());
         assertTrue(config.isReminderRequested());
@@ -73,6 +76,9 @@ class CorePlanConfigParsingTest {
                 + "\"entryPrice\":100,"
                 + "\"coreTarget\":" + target + ","
                 + "\"coreCount\":" + count + ","
+                + "\"runnerCondition\":\"after 10 minutes\","
+                + "\"runnerCount\":2,"
+                + "\"corePlan\":\"Hold core\\nTrail runner\","
                 + "\"bufferedTarget\":" + bufferedTarget + ","
                 + "\"partialsTaken\":3,"
                 + "\"tradeId\":\"AAPL:long:1785243900000\","

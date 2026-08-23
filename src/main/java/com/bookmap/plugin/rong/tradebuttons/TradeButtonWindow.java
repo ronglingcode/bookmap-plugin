@@ -38,6 +38,7 @@ import javax.swing.SwingConstants;
 import javax.swing.SwingUtilities;
 import javax.swing.Timer;
 import javax.swing.JTextField;
+import javax.swing.JTextArea;
 import javax.swing.border.EmptyBorder;
 
 import com.bookmap.plugin.rong.BookmapPriceNormalizer;
@@ -225,14 +226,22 @@ public class TradeButtonWindow {
         JLabel info = new JLabel(buildCorePlanInfo(config));
         root.add(info, BorderLayout.NORTH);
 
+        JPanel content = new JPanel();
+        content.setLayout(new BoxLayout(content, BoxLayout.Y_AXIS));
+
         JPanel fields = new JPanel(new GridLayout(2, 2, 8, 8));
+        fields.setBorder(BorderFactory.createCompoundBorder(
+                BorderFactory.createTitledBorder("Editable"),
+                BorderFactory.createEmptyBorder(4, 6, 6, 6)));
         fields.add(new JLabel("Core target"));
         coreTargetField = new JTextField(formatPrice(config.getCoreTarget()), 10);
         fields.add(coreTargetField);
         fields.add(new JLabel("Core count"));
         coreCountField = new JTextField(Integer.toString(config.getCoreCount()), 10);
         fields.add(coreCountField);
-        root.add(fields, BorderLayout.CENTER);
+        content.add(fields);
+        content.add(createPlanReminderPanel(config));
+        root.add(content, BorderLayout.CENTER);
 
         JPanel footer = new JPanel(new BorderLayout(8, 8));
         corePlanStatusLabel = new JLabel(reminder
@@ -263,6 +272,45 @@ public class TradeButtonWindow {
                 + " &nbsp; 90% buffer: " + formatPrice(config.getBufferedTarget())
                 + "<br>Partials taken: " + config.getPartialsTaken() + "/10"
                 + " &nbsp; (first 3 are always unrestricted)</html>";
+    }
+
+    private JPanel createPlanReminderPanel(CorePlanConfigDefinition config) {
+        JPanel reminder = new JPanel();
+        reminder.setLayout(new BoxLayout(reminder, BoxLayout.Y_AXIS));
+        reminder.setBorder(BorderFactory.createCompoundBorder(
+                BorderFactory.createTitledBorder("Plan reminder"),
+                BorderFactory.createEmptyBorder(4, 6, 6, 6)));
+
+        JLabel runnerCount = new JLabel("Runner count: " + config.getRunnerCount());
+        runnerCount.setAlignmentX(Component.LEFT_ALIGNMENT);
+        reminder.add(runnerCount);
+
+        JLabel runnerConditionLabel = new JLabel("Runner condition");
+        runnerConditionLabel.setAlignmentX(Component.LEFT_ALIGNMENT);
+        reminder.add(runnerConditionLabel);
+        reminder.add(createReadOnlyPlanText(config.getRunnerCondition(), 2));
+
+        JLabel corePlanLabel = new JLabel("Core plan");
+        corePlanLabel.setAlignmentX(Component.LEFT_ALIGNMENT);
+        reminder.add(corePlanLabel);
+        reminder.add(createReadOnlyPlanText(config.getCorePlan(), 5));
+        return reminder;
+    }
+
+    private JTextArea createReadOnlyPlanText(String value, int preferredRows) {
+        String displayValue = value == null || value.trim().isEmpty() ? "—" : value.trim();
+        int lineCount = displayValue.split("\\R", -1).length;
+        JTextArea text = new JTextArea(
+                displayValue,
+                Math.max(1, Math.min(6, Math.max(preferredRows, lineCount))),
+                42);
+        text.setEditable(false);
+        text.setLineWrap(true);
+        text.setWrapStyleWord(true);
+        text.setBackground(THRESHOLD_BACKGROUND);
+        text.setBorder(BorderFactory.createEmptyBorder(4, 6, 4, 6));
+        text.setAlignmentX(Component.LEFT_ALIGNMENT);
+        return text;
     }
 
     private void submitCorePlanUpdate() {

@@ -9,6 +9,9 @@ public final class CorePlanConfigDefinition {
     private final double entryPrice;
     private final double coreTarget;
     private final int coreCount;
+    private final String runnerCondition;
+    private final int runnerCount;
+    private final String corePlan;
     private final double bufferedTarget;
     private final int partialsTaken;
     private final String tradeId;
@@ -25,6 +28,9 @@ public final class CorePlanConfigDefinition {
             double entryPrice,
             double coreTarget,
             int coreCount,
+            String runnerCondition,
+            int runnerCount,
+            String corePlan,
             double bufferedTarget,
             int partialsTaken,
             String tradeId,
@@ -61,6 +67,9 @@ public final class CorePlanConfigDefinition {
         this.entryPrice = entryPrice;
         this.coreTarget = coreTarget;
         this.coreCount = coreCount;
+        this.runnerCondition = runnerCondition == null ? "" : runnerCondition;
+        this.runnerCount = runnerCount;
+        this.corePlan = corePlan == null ? "" : corePlan;
         this.bufferedTarget = bufferedTarget;
         this.partialsTaken = partialsTaken;
         this.tradeId = tradeId == null ? "" : tradeId;
@@ -77,6 +86,9 @@ public final class CorePlanConfigDefinition {
     public double getEntryPrice() { return entryPrice; }
     public double getCoreTarget() { return coreTarget; }
     public int getCoreCount() { return coreCount; }
+    public String getRunnerCondition() { return runnerCondition; }
+    public int getRunnerCount() { return runnerCount; }
+    public String getCorePlan() { return corePlan; }
     public double getBufferedTarget() { return bufferedTarget; }
     public int getPartialsTaken() { return partialsTaken; }
     public String getTradeId() { return tradeId; }
