@@ -43,6 +43,7 @@ import javax.swing.border.EmptyBorder;
 
 import com.bookmap.plugin.rong.BookmapPriceNormalizer;
 import com.bookmap.plugin.rong.CorePlanConfigDefinition;
+import com.bookmap.plugin.rong.NewPositionDefinition;
 import com.bookmap.plugin.rong.PluginLog;
 import com.bookmap.plugin.rong.SignalWebSocketServer;
 import com.bookmap.plugin.rong.WallThresholdConfig;
@@ -83,6 +84,7 @@ public class TradeButtonWindow {
     private final IntSupplier wallThresholdFloorSupplier;
     private final SignalWebSocketServer.TradeButtonConfigListener buttonConfigListener;
     private final SignalWebSocketServer.CorePlanConfigListener corePlanConfigListener;
+    private final SignalWebSocketServer.NewPositionListener newPositionListener;
     private JFrame frame;
     private JPanel buttonPanel;
     private JLabel shiftModeLabel;
@@ -96,6 +98,8 @@ public class TradeButtonWindow {
     private JButton corePlanUpdateButton;
     private String pendingCorePlanRequestId = "";
     private String lastReminderTradeId = "";
+    private JDialog newPositionReminderDialog;
+    private String lastNewPositionReminderEventId = "";
     private volatile boolean disposed;
 
     public TradeButtonWindow(String symbol, SignalWebSocketServer server,
@@ -107,6 +111,7 @@ public class TradeButtonWindow {
                 : wallThresholdFloorSupplier;
         this.buttonConfigListener = this::setButtons;
         this.corePlanConfigListener = this::setCorePlanConfig;
+        this.newPositionListener = this::onNewPosition;
         SwingUtilities.invokeLater(this::buildWindow);
     }
 
@@ -140,6 +145,7 @@ public class TradeButtonWindow {
 
         server.registerTradeButtonConfigListener(symbol, buttonConfigListener);
         server.registerCorePlanConfigListener(symbol, corePlanConfigListener);
+        server.registerNewPositionListener(symbol, newPositionListener);
     }
 
     private void setButtons(List<TradebookButtonGroup> tradebooks) {
@@ -148,6 +154,86 @@ public class TradeButtonWindow {
                 renderButtons(tradebooks);
             }
         });
+    }
+
+    private void onNewPosition(NewPositionDefinition position) {
+        SwingUtilities.invokeLater(() -> {
+            if (disposed || position.getEventId().equals(lastNewPositionReminderEventId)) {
+                return;
+            }
+            lastNewPositionReminderEventId = position.getEventId();
+            showNewPositionReminder(position);
+        });
+    }
+
+    private void showNewPositionReminder(NewPositionDefinition position) {
+        closeNewPositionReminder();
+        newPositionReminderDialog = new JDialog(
+                frame,
+                "New Position Reminder - " + symbol,
+                false);
+        newPositionReminderDialog.setAlwaysOnTop(true);
+        newPositionReminderDialog.setDefaultCloseOperation(JDialog.DISPOSE_ON_CLOSE);
+        newPositionReminderDialog.setResizable(false);
+        JDialog openedDialog = newPositionReminderDialog;
+        newPositionReminderDialog.addWindowListener(new WindowAdapter() {
+            @Override
+            public void windowClosed(WindowEvent e) {
+                if (newPositionReminderDialog == openedDialog) {
+                    newPositionReminderDialog = null;
+                }
+            }
+        });
+
+        String side = position.isLongPosition() ? "LONG" : "SHORT";
+        String averagePrice = position.getAveragePrice() > 0
+                ? formatPrice(position.getAveragePrice())
+                : "waiting";
+        JLabel positionSummary = new JLabel(
+                "<html><div style='width:390px'>"
+                        + "<b>New " + side + " position detected for " + symbol + ".</b>"
+                        + "<br>Quantity: " + formatQuantity(position.getNetQuantity())
+                        + " &nbsp; Average: " + averagePrice
+                        + "</div></html>");
+
+        JPanel reminderItems = buildNewPositionReminderItems();
+
+        JButton doneButton = new JButton("Done");
+        doneButton.addActionListener(e -> closeNewPositionReminder());
+        JPanel actions = new JPanel(new GridLayout(1, 1));
+        actions.add(doneButton);
+
+        JPanel root = new JPanel(new BorderLayout(8, 12));
+        root.setBorder(new EmptyBorder(14, 14, 14, 14));
+        root.add(positionSummary, BorderLayout.NORTH);
+        root.add(reminderItems, BorderLayout.CENTER);
+        root.add(actions, BorderLayout.SOUTH);
+        newPositionReminderDialog.setContentPane(root);
+        newPositionReminderDialog.pack();
+        newPositionReminderDialog.setLocationRelativeTo(frame);
+        newPositionReminderDialog.setVisible(true);
+        newPositionReminderDialog.toFront();
+        PluginLog.action(symbol, "New position reminder: review invalidation condition");
+    }
+
+    private JPanel buildNewPositionReminderItems() {
+        JPanel reminderItems = new JPanel();
+        reminderItems.setLayout(new BoxLayout(reminderItems, BoxLayout.Y_AXIS));
+        reminderItems.setBorder(BorderFactory.createTitledBorder("Reminders"));
+        reminderItems.add(new JLabel(
+                "<html><div style='width:370px'>"
+                        + "<b>Review the invalidation condition for this trade.</b>"
+                        + "<br>Be specific about what price action or market behavior invalidates the setup."
+                        + "</div></html>"));
+        return reminderItems;
+    }
+
+    private void closeNewPositionReminder() {
+        if (newPositionReminderDialog != null) {
+            JDialog dialog = newPositionReminderDialog;
+            newPositionReminderDialog = null;
+            dialog.dispose();
+        }
     }
 
     private void setCorePlanConfig(CorePlanConfigDefinition config) {
@@ -878,6 +964,13 @@ public class TradeButtonWindow {
         return String.format("%.2f", price);
     }
 
+    private String formatQuantity(double quantity) {
+        if (Math.abs(quantity - Math.rint(quantity)) < 0.00001) {
+            return String.format(Locale.US, "%.0f", quantity);
+        }
+        return String.format(Locale.US, "%.2f", quantity);
+    }
+
     private static String formatShareSize(int size) {
         if (size >= 1_000_000) {
             return formatCompactSize(size, 1_000_000, "M");
@@ -911,8 +1004,10 @@ public class TradeButtonWindow {
         unregisterShiftTracker(this);
         server.unregisterTradeButtonConfigListener(symbol, buttonConfigListener);
         server.unregisterCorePlanConfigListener(symbol, corePlanConfigListener);
+        server.unregisterNewPositionListener(symbol, newPositionListener);
         SwingUtilities.invokeLater(() -> {
             closeCorePlanDialog();
+            closeNewPositionReminder();
             if (frame != null) {
                 frame.dispose();
                 frame = null;

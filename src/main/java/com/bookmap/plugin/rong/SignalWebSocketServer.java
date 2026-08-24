@@ -78,6 +78,11 @@ public class SignalWebSocketServer extends WebSocketServer {
         void onCorePlanChanged(CorePlanConfigDefinition config);
     }
 
+    @FunctionalInterface
+    public interface NewPositionListener {
+        void onNewPosition(NewPositionDefinition position);
+    }
+
     private final Object schedulerLock = new Object();
     private ScheduledExecutorService scheduler;
     private final Path breakoutLogFile;
@@ -98,6 +103,7 @@ public class SignalWebSocketServer extends WebSocketServer {
     private final Map<String, Set<TradeButtonConfigListener>> symbolToTradeButtonListeners = new ConcurrentHashMap<>();
     private final Map<String, Set<VwapUpdateListener>> symbolToVwapUpdateListeners = new ConcurrentHashMap<>();
     private final Map<String, Set<CorePlanConfigListener>> symbolToCorePlanListeners = new ConcurrentHashMap<>();
+    private final Map<String, Set<NewPositionListener>> symbolToNewPositionListeners = new ConcurrentHashMap<>();
     private final Set<KeyLevelConfigListener> keyLevelConfigListeners =
             Collections.newSetFromMap(new ConcurrentHashMap<>());
     private final Set<KeyZoneConfigListener> keyZoneConfigListeners =
@@ -478,6 +484,25 @@ public class SignalWebSocketServer extends WebSocketServer {
         }
     }
 
+    public void registerNewPositionListener(String symbol, NewPositionListener listener) {
+        String cleanSymbol = SymbolUtils.cleanSymbol(symbol);
+        symbolToNewPositionListeners
+                .computeIfAbsent(cleanSymbol, ignored -> Collections.newSetFromMap(new ConcurrentHashMap<>()))
+                .add(listener);
+    }
+
+    public void unregisterNewPositionListener(String symbol, NewPositionListener listener) {
+        String cleanSymbol = SymbolUtils.cleanSymbol(symbol);
+        Set<NewPositionListener> listeners = symbolToNewPositionListeners.get(cleanSymbol);
+        if (listeners == null) {
+            return;
+        }
+        listeners.remove(listener);
+        if (listeners.isEmpty()) {
+            symbolToNewPositionListeners.remove(cleanSymbol, listeners);
+        }
+    }
+
     public void unregisterKeyZoneConfigListener(KeyZoneConfigListener listener) {
         keyZoneConfigListeners.remove(listener);
     }
@@ -663,6 +688,10 @@ public class SignalWebSocketServer extends WebSocketServer {
                 handleCorePlanConfig(json);
                 return;
             }
+            if ("new_position".equals(type)) {
+                handleNewPosition(json);
+                return;
+            }
         }
         if (trimmed.contains("\"subscribe\"") && trimmed.contains("\"orderbook\"")) {
             orderbookSubscribers.add(conn);
@@ -756,6 +785,34 @@ public class SignalWebSocketServer extends WebSocketServer {
                     : " with no active trade"));
         } catch (IllegalArgumentException e) {
             PluginLog.error("[CorePlan] Ignoring invalid config for " + symbol + ": " + e.getMessage());
+        }
+    }
+
+    private void handleNewPosition(JsonObject json) {
+        String symbol = SymbolUtils.cleanSymbol(getString(json, "symbol"));
+        if (symbol.isEmpty()) {
+            PluginLog.error("[NewPosition] Ignoring event with missing symbol");
+            return;
+        }
+
+        try {
+            double averagePrice = getWirePrice(json, "averagePrice");
+            if (!Double.isFinite(averagePrice)) {
+                averagePrice = 0;
+            }
+            NewPositionDefinition position = new NewPositionDefinition(
+                    symbol,
+                    getBoolean(json, "isLong"),
+                    getDouble(json, "netQuantity"),
+                    averagePrice,
+                    getString(json, "eventId"),
+                    getLong(json, "timestamp"));
+            notifyNewPositionListeners(symbol, position);
+            PluginLog.info("[NewPosition] " + symbol + " "
+                    + (position.isLongPosition() ? "long" : "short")
+                    + " quantity=" + position.getNetQuantity());
+        } catch (IllegalArgumentException e) {
+            PluginLog.error("[NewPosition] Ignoring invalid event for " + symbol + ": " + e.getMessage());
         }
     }
 
@@ -1439,6 +1496,21 @@ public class SignalWebSocketServer extends WebSocketServer {
         }
     }
 
+    private void notifyNewPositionListeners(String symbol, NewPositionDefinition position) {
+        Set<NewPositionListener> listeners = symbolToNewPositionListeners.get(symbol);
+        if (listeners == null) {
+            return;
+        }
+        for (NewPositionListener listener : listeners) {
+            try {
+                listener.onNewPosition(position);
+            } catch (RuntimeException e) {
+                PluginLog.error("[NewPosition] Failed to notify listener for "
+                        + symbol + ": " + e.getMessage());
+            }
+        }
+    }
+
     private void notifyTradeButtonListeners(String symbol, List<TradebookButtonGroup> tradebooks) {
         Set<TradeButtonConfigListener> listeners = symbolToTradeButtonListeners.get(symbol);
         if (listeners == null) {
@@ -1546,7 +1618,8 @@ public class SignalWebSocketServer extends WebSocketServer {
                 || "exit_order_pair_config".equals(type)
                 || "account_state".equals(type)
                 || "vwap_update".equals(type)
-                || "core_plan_config".equals(type);
+                || "core_plan_config".equals(type)
+                || "new_position".equals(type);
     }
 
     private String getString(JsonObject json, String field) {

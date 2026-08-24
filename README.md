@@ -210,6 +210,25 @@ Sending an empty `levels` array clears existing key level lines for that symbol.
 
 The plugin writes the message to its session log and shows it in the always-on-top **Rong Logs** window. `symbol` is optional; `level` is shown beside the source when provided.
 
+### New position reminder (client → server)
+
+ViteApp sends this event once when an observed account position changes from flat to non-zero. The matching Bookmap trade window opens an always-on-top **New Position Reminder**. Reminder items are presented separately so more actions can be added later; the current item asks the trader to review the trade's invalidation condition.
+
+```json
+{
+  "type": "new_position",
+  "priceUnit": "real",
+  "symbol": "AAPL",
+  "isLong": true,
+  "netQuantity": 100,
+  "averagePrice": 110.25,
+  "eventId": "AAPL:long:1785243960000",
+  "timestamp": 1785243960000
+}
+```
+
+Increasing or reducing an already-open position does not trigger another reminder. If Bookmap is disconnected at entry time, ViteApp keeps the event pending while the position remains open and sends it after reconnection.
+
 ### Active core plan (client → server)
 
 ViteApp publishes the authoritative active plan. `coreCount` is the number of final original partials that are restricted to the 90%-of-planned-profit buffered target or better. The first three partials are always unrestricted, so `coreCount` is from 0 to 7. For example, `coreCount: 5` leaves partials 1–5 unrestricted and protects partials 6–10.
