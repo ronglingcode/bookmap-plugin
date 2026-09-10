@@ -4,7 +4,7 @@ plugins {
 }
 
 group = 'com.bookmap.plugin'
-version = '1.22'
+version = '1.23'
 
 base {
     archivesName = 'rong'

@@ -439,7 +439,7 @@ The following parameters are plugin defaults unless noted as configurable:
 | `WALL_THRESHOLD_FLOOR`  | 5,000   | Configurable absolute floor for wall labels, size-change alerts, and wall-out/orderbook snapshot candidates; candidates use `max(WALL_THRESHOLD_FLOOR, ORDERBOOK_PERCENTILE threshold)` |
 | `ORDERBOOK_PROTECTED_ABSOLUTE_LEVELS` | 2 | Per-side count of near-touch absolute-floor levels preserved in snapshots even when the percentile threshold is higher |
 
-Adjust `WALL_THRESHOLD_FLOOR` from the Rong add-on settings under `Wall threshold floor`. The floating trade button window shows the live effective wall threshold as `max(configured floor, P97)` for the active symbol. Wall labels, alerts, patterns, **Wall Out 1**, and primary snapshot filtering all use that same live value. Snapshots deliberately retain the configured number of nearest absolute-floor levels as supplemental context.
+Adjust `WALL_THRESHOLD_FLOOR` from the Rong add-on settings under `Wall threshold floor`. The floating trade button window shows the live effective wall threshold as `max(configured floor, P97)` for the active symbol, together with the sizes of the three largest bid/ask depth levels. Wall labels, alerts, patterns, **Wall Out 1**, and primary snapshot filtering all use that same live value. Snapshots deliberately retain the configured number of nearest absolute-floor levels as supplemental context.
 
 
 ## Logging

@@ -776,6 +776,7 @@ public class TradeButtonWindow {
         wallThresholdLabel.setText("Wall: " + formatShareSize(threshold.getEffectiveMinSize())
                 + " (P" + formatPercentile(threshold.getPercentile())
                 + "=" + percentileSize
+                + ", Top3=" + formatLargestSizes(threshold.getLargestLevelSizes())
                 + ", floor=" + formatShareSize(threshold.getAbsoluteMinSize()) + ")"
                 + " | " + getRegularSessionHighLowText());
     }
@@ -986,6 +987,20 @@ public class TradeButtonWindow {
             return (size / unit) + suffix;
         }
         return String.format(Locale.US, "%.1f%s", size / (double) unit, suffix);
+    }
+
+    static String formatLargestSizes(List<Integer> sizes) {
+        if (sizes == null || sizes.isEmpty()) {
+            return "n/a";
+        }
+        StringBuilder text = new StringBuilder();
+        for (Integer size : sizes) {
+            if (text.length() > 0) {
+                text.append('/');
+            }
+            text.append(formatShareSize(size == null ? 0 : size));
+        }
+        return text.toString();
     }
 
     private static String formatPercentile(double percentile) {

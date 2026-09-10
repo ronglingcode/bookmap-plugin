@@ -79,9 +79,6 @@ public class ChartHoverHotkeyHandler implements ScreenSpacePainterFactory {
     private static final Map<Component, String> componentToInstrument =
             Collections.synchronizedMap(new WeakHashMap<>());
 
-    /** Currently held non-modifier keys (e.g. 'b', 's'). Tracked via KEY_PRESSED/KEY_RELEASED. */
-    private static final Set<String> heldKeys = Collections.newSetFromMap(new ConcurrentHashMap<>());
-
     /** Chart hotkeys forwarded to ViteApp from the currently hovered Bookmap chart. */
     private static final Set<String> CHART_HOTKEYS =
             Set.of(
@@ -144,7 +141,6 @@ public class ChartHoverHotkeyHandler implements ScreenSpacePainterFactory {
             if (awtListener != null) {
                 Toolkit.getDefaultToolkit().removeAWTEventListener(awtListener);
                 awtListener = null;
-                heldKeys.clear();
                 painterCoords.clear();
                 componentToInstrument.clear();
                 instrumentPips.clear();
@@ -160,19 +156,9 @@ public class ChartHoverHotkeyHandler implements ScreenSpacePainterFactory {
         synchronized (listenerLock) {
             if (awtListener != null) return;
             awtListener = event -> {
-                // Track key press/release state
                 if (event.getID() == KeyEvent.KEY_PRESSED) {
                     KeyEvent ke = (KeyEvent) event;
-                    String key = normalizeKey(ke);
-                    boolean firstPress = heldKeys.add(key);
-                    if (firstPress) {
-                        handleChartHotkey(ke, key);
-                    }
-                    return;
-                }
-                if (event.getID() == KeyEvent.KEY_RELEASED) {
-                    KeyEvent ke = (KeyEvent) event;
-                    heldKeys.remove(normalizeKey(ke));
+                    handleChartHotkey(ke, normalizeKey(ke));
                     return;
                 }
 
@@ -232,7 +218,7 @@ public class ChartHoverHotkeyHandler implements ScreenSpacePainterFactory {
             return;
         }
 
-        boolean shiftDown = event.isShiftDown() || heldKeys.contains("shift");
+        boolean shiftDown = event.isShiftDown();
         String actionLog = formatHoverHotkeyActionLog(
                 hover.instrument, keyCode, hover.price, shiftDown);
         PluginLog.action(hover.instrument, "Bookmap", actionLog);

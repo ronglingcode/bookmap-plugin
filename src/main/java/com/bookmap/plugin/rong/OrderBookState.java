@@ -163,6 +163,29 @@ public class OrderBookState {
     }
 
     /**
+     * Returns the largest depth-level sizes across both sides of the book.
+     * Duplicate sizes are retained because each occurrence represents a
+     * separate price level.
+     */
+    public synchronized List<Integer> getLargestLevelSizes(int limit) {
+        if (limit <= 0 || totalLevels == 0) {
+            return Collections.emptyList();
+        }
+
+        List<Integer> largestSizes = new ArrayList<>(Math.min(limit, totalLevels));
+        for (Map.Entry<Integer, Integer> entry : sizeCounts.descendingMap().entrySet()) {
+            int occurrences = Math.min(entry.getValue(), limit - largestSizes.size());
+            for (int i = 0; i < occurrences; i++) {
+                largestSizes.add(entry.getKey());
+            }
+            if (largestSizes.size() == limit) {
+                break;
+            }
+        }
+        return Collections.unmodifiableList(largestSizes);
+    }
+
+    /**
      * Returns the effective wall-size threshold for this book.
      * The configured absolute floor remains the lower bound when the book is sparse.
      */

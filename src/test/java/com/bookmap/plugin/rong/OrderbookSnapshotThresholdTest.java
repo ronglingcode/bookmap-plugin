@@ -50,6 +50,7 @@ class OrderbookSnapshotThresholdTest {
         assertEquals(5_000, threshold.getAbsoluteMinSize());
         assertEquals(200_000, threshold.getPercentileMinSize());
         assertEquals(200_000, threshold.getEffectiveMinSize());
+        assertEquals(Arrays.asList(200_000, 200_000, 200_000), threshold.getLargestLevelSizes());
     }
 
     @Test
@@ -62,6 +63,21 @@ class OrderbookSnapshotThresholdTest {
         assertEquals(20_000, orderBook.getSizeThreshold(5_000, 90));
         assertEquals(25_000, orderBook.getSizeThreshold(25_000, 90));
         assertEquals(20_000, OrderBookState.combineSizeThresholds(5_000, 20_000));
+    }
+
+    @Test
+    void largestLevelSizesSpanBothSidesAndRetainDuplicates() {
+        OrderBookState orderBook = new OrderBookState();
+        orderBook.update(true, 10_000, 8_000);
+        orderBook.update(true, 9_990, 20_000);
+        orderBook.update(false, 10_010, 20_000);
+        orderBook.update(false, 10_020, 12_000);
+
+        assertEquals(Arrays.asList(20_000, 20_000, 12_000), orderBook.getLargestLevelSizes(3));
+
+        orderBook.update(false, 10_010, 0);
+
+        assertEquals(Arrays.asList(20_000, 12_000, 8_000), orderBook.getLargestLevelSizes(3));
     }
 
     @Test

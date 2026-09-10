@@ -37,6 +37,7 @@ import com.google.gson.JsonParser;
 public class SignalWebSocketServer extends WebSocketServer {
 
     private static final int DEFAULT_PROTECTED_ABSOLUTE_WALL_LEVELS = 2;
+    private static final int WALL_THRESHOLD_LARGEST_LEVEL_COUNT = 3;
 
     @FunctionalInterface
     public interface TradeButtonConfigListener {
@@ -247,6 +248,7 @@ public class SignalWebSocketServer extends WebSocketServer {
                     threshold.absoluteMinSize,
                     threshold.percentileMinSize,
                     threshold.effectiveMinSize,
+                    orderBook.getLargestLevelSizes(WALL_THRESHOLD_LARGEST_LEVEL_COUNT),
                     System.currentTimeMillis());
         }
     }
@@ -1706,6 +1708,7 @@ public class SignalWebSocketServer extends WebSocketServer {
         private final int absoluteMinSize;
         private final int percentileMinSize;
         private final int effectiveMinSize;
+        private final List<Integer> largestLevelSizes;
         private final long timestamp;
 
         private OrderbookWallThreshold(
@@ -1715,6 +1718,7 @@ public class SignalWebSocketServer extends WebSocketServer {
                 int absoluteMinSize,
                 int percentileMinSize,
                 int effectiveMinSize,
+                List<Integer> largestLevelSizes,
                 long timestamp) {
             this.available = available;
             this.symbol = normalize(symbol);
@@ -1722,6 +1726,7 @@ public class SignalWebSocketServer extends WebSocketServer {
             this.absoluteMinSize = absoluteMinSize;
             this.percentileMinSize = percentileMinSize;
             this.effectiveMinSize = effectiveMinSize;
+            this.largestLevelSizes = Collections.unmodifiableList(new ArrayList<>(largestLevelSizes));
             this.timestamp = timestamp;
         }
 
@@ -1730,7 +1735,8 @@ public class SignalWebSocketServer extends WebSocketServer {
                 double percentile,
                 int absoluteMinSize) {
             return new OrderbookWallThreshold(
-                    false, symbol, percentile, absoluteMinSize, 0, absoluteMinSize, 0);
+                    false, symbol, percentile, absoluteMinSize, 0, absoluteMinSize,
+                    Collections.emptyList(), 0);
         }
 
         private static OrderbookWallThreshold available(
@@ -1739,9 +1745,11 @@ public class SignalWebSocketServer extends WebSocketServer {
                 int absoluteMinSize,
                 int percentileMinSize,
                 int effectiveMinSize,
+                List<Integer> largestLevelSizes,
                 long timestamp) {
             return new OrderbookWallThreshold(
-                    true, symbol, percentile, absoluteMinSize, percentileMinSize, effectiveMinSize, timestamp);
+                    true, symbol, percentile, absoluteMinSize, percentileMinSize, effectiveMinSize,
+                    largestLevelSizes, timestamp);
         }
 
         public boolean isAvailable() {
@@ -1766,6 +1774,10 @@ public class SignalWebSocketServer extends WebSocketServer {
 
         public int getEffectiveMinSize() {
             return effectiveMinSize;
+        }
+
+        public List<Integer> getLargestLevelSizes() {
+            return largestLevelSizes;
         }
 
         public long getTimestamp() {
