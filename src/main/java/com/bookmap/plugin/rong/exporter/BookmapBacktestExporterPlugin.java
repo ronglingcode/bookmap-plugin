@@ -23,7 +23,7 @@ import velox.api.layer1.simplified.TradeDataListener;
 
 @Layer1SimpleAttachable
 @Layer1StrategyName("Rong Backtest Exporter")
-@Layer1ApiVersion(Layer1ApiVersionValue.VERSION1)
+@Layer1ApiVersion(Layer1ApiVersionValue.VERSION2)
 public class BookmapBacktestExporterPlugin implements CustomModuleAdapter,
         DepthDataListener, TradeDataListener, TimeListener,
         SnapshotEndListener, BboListener, HistoricalModeListener {
