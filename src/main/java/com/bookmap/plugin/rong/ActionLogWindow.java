@@ -27,8 +27,8 @@ import javax.swing.SwingUtilities;
 import javax.swing.table.DefaultTableModel;
 
 /**
- * Small action-only log window. It intentionally stays separate from PluginLog's
- * verbose file logging so the UI only shows trading actions worth glancing at.
+ * Small action-only log window. Messages are kept in memory and displayed only
+ * in the UI, so the window shows trading actions worth glancing at.
  */
 public class ActionLogWindow {
 

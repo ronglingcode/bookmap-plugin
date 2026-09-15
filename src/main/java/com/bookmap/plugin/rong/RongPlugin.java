@@ -18,7 +18,6 @@ import com.bookmap.plugin.rong.orderwall.OrderWallLabelTracker;
 import com.bookmap.plugin.rong.orderwall.OrderWallTracker;
 import com.bookmap.plugin.rong.patterns.BookmapPatternEngine;
 import com.bookmap.plugin.rong.patterns.BookmapPatternSignal;
-import com.bookmap.plugin.rong.patterns.PatternSignalLogger;
 import com.bookmap.plugin.rong.patterns.PatternSignalPainter;
 import com.bookmap.plugin.rong.patterns.PatternSignalStore;
 import com.bookmap.plugin.rong.pricelines.ChartHoverHotkeyHandler;
@@ -99,7 +98,6 @@ public class RongPlugin implements CustomModuleAdapter,
     private static FilledExecutionManager filledExecutionManager;
     private static PatternSignalStore patternSignalStore;
     private static PatternSignalPainter patternSignalPainter;
-    private static PatternSignalLogger patternSignalLogger;
 
     private String rawAlias;
     private String alias;
@@ -166,7 +164,6 @@ public class RongPlugin implements CustomModuleAdapter,
                 wallChangePainter = new OrderWallChangePainter(wallChangeStore, indicatorConfig);
                 patternSignalStore = new PatternSignalStore();
                 patternSignalPainter = new PatternSignalPainter(patternSignalStore, indicatorConfig);
-                patternSignalLogger = new PatternSignalLogger();
                 keyLevelManager = new KeyLevelManager(priceLineStore);
                 sharedServer.registerKeyLevelConfigListener(keyLevelManager);
                 keyZoneManager = new KeyZoneManager(priceZoneStore);
@@ -479,9 +476,6 @@ public class RongPlugin implements CustomModuleAdapter,
                 if (patternSignalPainter != null) {
                     patternSignalPainter.shutdown();
                 }
-                if (patternSignalLogger != null) {
-                    patternSignalLogger.close();
-                }
                 if (filledExecutionPainter != null) {
                     filledExecutionPainter.shutdown();
                 }
@@ -499,7 +493,6 @@ public class RongPlugin implements CustomModuleAdapter,
                 wallChangePainter = null;
                 patternSignalStore = null;
                 patternSignalPainter = null;
-                patternSignalLogger = null;
                 filledExecutionStore = null;
                 filledExecutionPainter = null;
                 indicatorConfig = null;
@@ -727,8 +720,6 @@ public class RongPlugin implements CustomModuleAdapter,
     private void handlePatternSignal(BookmapPatternSignal signal) {
         PatternSignalStore store = patternSignalStore;
         if (store != null) store.addOrUpdate(signal);
-        PatternSignalLogger logger = patternSignalLogger;
-        if (logger != null) logger.append(signal);
         PluginLog.info("[PatternSignal] " + signal.toJson());
     }
 

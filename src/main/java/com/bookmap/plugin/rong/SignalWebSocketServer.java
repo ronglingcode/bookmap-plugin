@@ -1,12 +1,6 @@
 package com.bookmap.plugin.rong;
 
-import java.io.BufferedWriter;
-import java.io.IOException;
 import java.net.InetSocketAddress;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
-import java.nio.file.StandardOpenOption;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.LinkedHashMap;
@@ -86,8 +80,6 @@ public class SignalWebSocketServer extends WebSocketServer {
 
     private final Object schedulerLock = new Object();
     private ScheduledExecutorService scheduler;
-    private final Path breakoutLogFile;
-    private BufferedWriter breakoutWriter;
 
     // Per-symbol state
     private final Map<String, OrderBookState> symbolToOrderBook = new ConcurrentHashMap<>();
@@ -129,8 +121,6 @@ public class SignalWebSocketServer extends WebSocketServer {
         setReuseAddr(true);
         this.orderbookPercentile = orderbookPercentile;
         this.orderbookIntervalMs = orderbookIntervalMs;
-        Path signalsDir = Paths.get(System.getProperty("user.home"), "Bookmap", "bookmap-signals");
-        this.breakoutLogFile = signalsDir.resolve("breakout.jsonl");
     }
 
     /** Register a symbol's order book and pips multiplier. */
@@ -2031,18 +2021,9 @@ public class SignalWebSocketServer extends WebSocketServer {
             return;
         }
         PluginLog.info("[Rong] WebSocket server started on port " + getPort());
-        try {
-            Files.createDirectories(breakoutLogFile.getParent());
-            breakoutWriter = Files.newBufferedWriter(breakoutLogFile,
-                StandardOpenOption.CREATE, StandardOpenOption.APPEND);
-            PluginLog.info("[Rong] Logging to " + breakoutLogFile.getParent());
-        } catch (IOException e) {
-            PluginLog.error("[Rong] Failed to open log files: " + e.getMessage());
-        }
     }
 
     public void broadcastSignal(String json) {
-        writeToFile(breakoutWriter, json);
         broadcast(json);
     }
 
@@ -2058,7 +2039,6 @@ public class SignalWebSocketServer extends WebSocketServer {
                 scheduler = null;
             }
         }
-        closeWriter(breakoutWriter);
         try {
             stop(1000);
         } catch (InterruptedException e) {
@@ -2081,28 +2061,6 @@ public class SignalWebSocketServer extends WebSocketServer {
                     // Orderbook snapshot sending is disabled; keep snapshot computation available for now.
                     // conn.send(orderbookJson);
                 }
-            }
-        }
-    }
-
-    private void writeToFile(BufferedWriter writer, String json) {
-        if (writer != null) {
-            try {
-                writer.write(json);
-                writer.newLine();
-                writer.flush();
-            } catch (IOException e) {
-                PluginLog.error("[Rong] Failed to write to log: " + e.getMessage());
-            }
-        }
-    }
-
-    private void closeWriter(BufferedWriter writer) {
-        if (writer != null) {
-            try {
-                writer.close();
-            } catch (IOException e) {
-                PluginLog.error("[Rong] Failed to close log file: " + e.getMessage());
             }
         }
     }

@@ -53,7 +53,7 @@ bookmap-plugin/
     ├── KeyLevel*               # WebSocket key level definitions and drawing bridge
     ├── OrderBookState          # Full order book state
     ├── SignalWebSocketServer   # WebSocket server for external clients
-    └── PluginLog               # File logger
+    └── PluginLog               # UI action logging
 ```
 
 ## Build
@@ -172,7 +172,7 @@ Sending an empty `levels` array clears existing key level lines for that symbol.
 }
 ```
 
-The plugin writes the message to its session log and shows it in the always-on-top **Rong Logs** window. `symbol` is optional; `level` is shown beside the source when provided.
+The plugin shows the message only in the always-on-top **Rong Logs** window. `symbol` is optional; `level` is shown beside the source when provided.
 
 ### New position reminder (client → server)
 
@@ -408,25 +408,13 @@ Adjust `WALL_THRESHOLD_FLOOR` from the Rong add-on settings under `Wall threshol
 
 ## Logging
 
-All logs are written under `~/Bookmap/` (`C:\Users\{username}\Bookmap\` on Windows).
+Logging is UI-only. Trading actions and incoming `action_log` / `screen_log` messages
+appear in the always-on-top **Rong Logs** window, which keeps the latest 20 messages
+in memory. Diagnostic info/error logging is disabled.
 
-| Log | Directory | Files |
-| --- | --------- | ----- |
-| **Plugin logs** | `~/Bookmap/plugin_logs/` | `{datetime}.txt` — one per session |
-| **Signal logs** | `~/Bookmap/bookmap-signals/` | `breakout.jsonl` |
-
-On Windows, the full paths are:
-- `C:\Users\{username}\Bookmap\plugin_logs\`
-- `C:\Users\{username}\Bookmap\bookmap-signals\`
-
-Plugin log files are named by session start time, e.g. `2026-03-21_10-30-45.txt`. Each line includes a timestamp and level:
-
-```
-2026-03-21 10:30:45.123 [INFO] [MarketLevelManager] Drew 16 websocket market level(s) for NVDA
-2026-03-21 10:30:45.456 [INFO] [KeyLevel] Updated 2 websocket key levels for AAPL and 12 cam pivot(s)
-```
-
-Signal logs (`breakout.jsonl`) are appended in JSONL format (one JSON object per line).
+The plugin does not create or append session `.txt` logs, breakout/pattern `.jsonl`
+logs, or stdout/stderr log mirrors. Existing log files from older versions remain
+on disk. Bookmap's own application logging is controlled by Bookmap.
 
 ### Settings Panel
 

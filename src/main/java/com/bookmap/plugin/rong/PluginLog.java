@@ -1,62 +1,21 @@
 package com.bookmap.plugin.rong;
 
-import java.io.FileWriter;
-import java.io.IOException;
-import java.io.PrintWriter;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
-import java.time.LocalDateTime;
-import java.time.format.DateTimeFormatter;
-
 /**
- * Simple file logger for the plugin. Writes to ~/Bookmap/plugin_logs/{datetime}.txt
- * where datetime is captured once at first load, so each session gets its own log file.
+ * Displays action messages in Bookmap's Rong Logs window only.
+ * Diagnostic info/error entry points are retained but disabled. Nothing is written
+ * to files or stdout/stderr, which Bookmap can capture in its own log files.
  */
 public class PluginLog {
 
-    private static final DateTimeFormatter TIMESTAMP_FMT =
-            DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss.SSS");
-
-    private static final DateTimeFormatter FILE_NAME_FMT =
-            DateTimeFormatter.ofPattern("yyyy-MM-dd_HH-mm-ss");
-
-    private static PrintWriter writer;
-    private static boolean initFailed = false;
-
     private PluginLog() {}
 
-    private static synchronized PrintWriter getWriter() {
-        if (writer != null) return writer;
-        if (initFailed) return null;
+    public static void info(String msg) {}
 
-        try {
-            Path logDir = Paths.get(System.getProperty("user.home"), "Bookmap", "plugin_logs");
-            Files.createDirectories(logDir);
-            String fileName = LocalDateTime.now().format(FILE_NAME_FMT) + ".txt";
-            Path logFile = logDir.resolve(fileName);
-            writer = new PrintWriter(new FileWriter(logFile.toFile(), true), true);
-        } catch (IOException e) {
-            initFailed = true;
-            System.err.println("[PluginLog] Failed to open log file: " + e.getMessage());
-        }
-        return writer;
-    }
+    public static void error(String msg) {}
 
-    public static void info(String msg) {
-        log("INFO", msg);
-    }
-
-    public static void error(String msg) {
-        log("ERROR", msg);
-    }
-
-    public static void error(String msg, Throwable t) {
-        log("ERROR", msg + ": " + t.getMessage());
-    }
+    public static void error(String msg, Throwable t) {}
 
     public static void action(String msg) {
-        log("ACTION", msg);
         ActionLogWindow.append("", "", msg);
     }
 
@@ -67,25 +26,6 @@ public class PluginLog {
     public static void action(String symbol, String source, String msg) {
         String cleanSymbol = symbol == null ? "" : symbol.trim();
         String cleanSource = source == null ? "" : source.trim();
-        String logMessage = cleanSymbol.isEmpty() ? msg : cleanSymbol + " " + msg;
-        if (!cleanSource.isEmpty()) {
-            logMessage = "[" + cleanSource + "] " + logMessage;
-        }
-        log("ACTION", logMessage);
         ActionLogWindow.append(cleanSymbol, cleanSource, msg);
-    }
-
-    private static void log(String level, String msg) {
-        String line = LocalDateTime.now().format(TIMESTAMP_FMT) + " [" + level + "] " + msg;
-        PrintWriter w = getWriter();
-        if (w != null) {
-            w.println(line);
-        }
-        // Also write to stdout/stderr so it still appears in Bookmap logs during debugging
-        if ("ERROR".equals(level)) {
-            System.err.println(line);
-        } else {
-            System.out.println(line);
-        }
     }
 }

@@ -3,19 +3,12 @@ package com.bookmap.plugin.rong.patterns;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import java.nio.file.Files;
-import java.nio.file.Path;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.List;
 
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.io.TempDir;
 
 class PatternSignalArtifactsTest {
-
-    @TempDir
-    Path tempDir;
 
     @Test
     void storeUpdatesEpisodeInsteadOfDuplicatingAndExpiresAtThirtySeconds() {
@@ -30,19 +23,6 @@ class PatternSignalArtifactsTest {
         assertEquals(75, active.get(0).getScore());
         assertTrue(store.getRecentSignals(
                 "TEST", 2_000 + PatternSignalStore.DISPLAY_TTL_MS + 1).isEmpty());
-    }
-
-    @Test
-    void loggerWritesExplainableJsonLines() throws Exception {
-        Path file = tempDir.resolve("pattern-signals.jsonl");
-        try (PatternSignalLogger logger = new PatternSignalLogger(file)) {
-            logger.append(signal("one", 72, 1_000));
-            logger.append(signal("two", 84, 2_000));
-        }
-        List<String> lines = Files.readAllLines(file);
-        assertEquals(2, lines.size());
-        assertTrue(lines.get(0).contains("\"type\":\"bookmap_pattern_signal\""));
-        assertTrue(lines.get(0).contains("\"scoreContributions\""));
     }
 
     @Test
