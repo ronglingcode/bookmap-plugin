@@ -36,6 +36,7 @@ import velox.api.layer1.annotations.Layer1ApiVersion;
 import velox.api.layer1.annotations.Layer1ApiVersionValue;
 import velox.api.layer1.annotations.Layer1SimpleAttachable;
 import velox.api.layer1.annotations.Layer1StrategyName;
+import velox.api.layer1.annotations.UnrestrictedData;
 import velox.api.layer1.data.InstrumentInfo;
 import velox.api.layer1.data.TradeInfo;
 import velox.api.layer1.messages.Layer1ApiSoundAlertMessage;
@@ -58,6 +59,7 @@ import velox.gui.StrategyPanel;
 @Layer1SimpleAttachable
 @Layer1StrategyName("Rong")
 @Layer1ApiVersion(Layer1ApiVersionValue.VERSION2)
+@UnrestrictedData
 public class RongPlugin implements CustomModuleAdapter,
         DepthDataListener, TradeDataListener, TimeListener,
         SnapshotEndListener, BboListener, HistoricalModeListener,

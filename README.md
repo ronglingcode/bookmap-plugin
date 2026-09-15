@@ -6,8 +6,8 @@ This repository produces two Bookmap addon plugins in the same build:
 
 | Plugin   | JAR                | Description                   |
 | -------- | ------------------ | ----------------------------- |
-| **Rong** | `rong-1.0-all.jar` | Personal plugin (private use) |
-| **Rong Backtest Exporter** | `rong-1.0-all.jar` | Replay data exporter for Bookmap backtests |
+| **Rong** | `rong-1.25-all.jar` | Personal plugin (private use) |
+| **Rong Backtest Exporter** | `rong-1.25-all.jar` | Replay data exporter for Bookmap backtests |
 
 ## How It Works
 
@@ -68,7 +68,7 @@ windows: gradlew shadowJar
 
 Output JARs:
 
-- `build/libs/rong-1.0-all.jar` contains both `Rong` and `Rong Backtest Exporter`
+- `build/libs/rong-1.25-all.jar` contains both `Rong` and `Rong Backtest Exporter`
 
 ## Install in Bookmap
 
