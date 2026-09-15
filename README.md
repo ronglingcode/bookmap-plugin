@@ -6,7 +6,7 @@ This repository builds the bmtrader trading addon:
 
 | Plugin   | JAR                | Description                   |
 | -------- | ------------------ | ----------------------------- |
-| **bmtrader** | `lingrong1988_bmtrader_1.25.jar` | Personal plugin (private use) |
+| **bmtrader** | `lingrong1988_bmtrader_1.26.jar` | Personal plugin (private use) |
 
 ## How It Works
 
@@ -51,22 +51,36 @@ bookmap-plugin/
 
 ## Build
 
-Requires Java 11+ installed.
+Requires a JDK 11+ installed. For JDK distributions without `jmods`, the build uses
+the JDK's `jimage` tool to prepare a local runtime library for obfuscation.
 
 ```bash
-mac: ./gradlew shadowJar
-windows: gradlew shadowJar
+mac: ./gradlew build
+windows: gradlew build
 ```
 
 Output JAR:
 
-- `build/libs/lingrong1988_bmtrader_1.25.jar` contains the `bmtrader` trading addon
+- `build/libs/lingrong1988_bmtrader_1.26.jar` contains the `bmtrader` trading addon
+
+The release JAR obfuscates implementation class, method, and field names and removes
+source filenames, line numbers, and local-variable metadata. README/Markdown files,
+Java sources, Maven project metadata, and the obfuscation mapping are excluded.
+Bookmap's entry point, annotations, and API callbacks are preserved.
+
+`shadowJar` also finishes by generating the obfuscated release JAR. Unobfuscated
+intermediate JARs stay under `build/intermediates/`; the private mapping stays at
+`build/private/obfuscation/mapping.txt`. Share only the release JAR. Obfuscation makes
+decompilation harder but does not prevent reverse engineering.
+
+`build` runs the regular unit tests plus release checks against the actual obfuscated
+JAR, without putting the original implementation classes on their classpath.
 
 ## Install in Bookmap
 
 1. Open Bookmap
 2. Go to **Settings** (gear icon) > **API Plugins Configuration**
-3. Click **Add** and select `lingrong1988_bmtrader_1.25.jar`
+3. Click **Add** and select `lingrong1988_bmtrader_1.26.jar`
 4. In the popup, check the plugin name and click OK
 5. Add the addon to a chart: right-click the chart > **Add Addon** > select the plugin
 

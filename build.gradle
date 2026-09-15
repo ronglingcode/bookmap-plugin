@@ -1,10 +1,19 @@
+buildscript {
+    repositories {
+        mavenCentral()
+    }
+    dependencies {
+        classpath 'com.guardsquare:proguard-gradle:7.10.0'
+    }
+}
+
 plugins {
     id 'java'
     id 'com.gradleup.shadow' version '9.0.0-beta4'
 }
 
 group = 'com.bookmap.plugin'
-version = '1.25'
+version = '1.26'
 
 def bookmapApiVersion = '7.8.0.13'
 
@@ -33,21 +42,115 @@ dependencies {
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
 }
 
+sourceSets {
+    releaseTest
+}
+
+configurations {
+    obfuscationLibrary {
+        canBeConsumed = false
+        canBeResolved = true
+        extendsFrom compileOnly
+    }
+    releaseTestImplementation.extendsFrom testImplementation
+    releaseTestRuntimeOnly.extendsFrom testRuntimeOnly
+}
+
+def releaseJar = layout.buildDirectory.file("libs/lingrong1988_bmtrader_${project.version}.jar")
+def obfuscationMapping = layout.buildDirectory.file('private/obfuscation/mapping.txt')
+def javaHome = file(System.getProperty('java.home'))
+def runtimeClasses = layout.buildDirectory.dir('private/jdk/classes')
+
+// Temurin 24+ can omit jmods. Extract a local analysis library from its runtime image.
+tasks.register('extractRuntimeClasses', Exec) {
+    inputs.file(new File(javaHome, 'lib/modules'))
+    outputs.dir(runtimeClasses)
+    def executableName = System.getProperty('os.name').toLowerCase(Locale.ROOT).contains('windows')
+            ? 'jimage.exe' : 'jimage'
+    executable new File(javaHome, "bin/${executableName}")
+    args 'extract', '--dir', runtimeClasses.get().asFile.absolutePath,
+            '--include', 'glob:**/*.class', new File(javaHome, 'lib/modules').absolutePath
+}
+
+tasks.register('runtimeLibraryJar', Jar) {
+    dependsOn tasks.named('extractRuntimeClasses')
+    destinationDirectory.set(layout.buildDirectory.dir('private/jdk'))
+    archiveFileName.set('runtime-library.jar')
+    from { runtimeClasses.get().asFile.listFiles().findAll { it.isDirectory() } }
+    exclude '**/module-info.class'
+}
+
+tasks.withType(AbstractArchiveTask).configureEach {
+    preserveFileTimestamps = false
+    reproducibleFileOrder = true
+}
+
+tasks.withType(Jar).configureEach {
+    exclude { details ->
+        def name = details.name.toLowerCase(Locale.ROOT)
+        name.startsWith('readme') || name.endsWith('.md') || name.endsWith('.java') ||
+                name == 'mapping.txt' || details.path.startsWith('META-INF/maven/')
+    }
+    exclude 'module-info.class', 'META-INF/versions/**/module-info.class'
+}
+
 shadowJar {
-    archiveFileName.set("lingrong1988_bmtrader_${project.version}.jar")
+    destinationDirectory.set(layout.buildDirectory.dir('intermediates/shaded'))
+    archiveFileName.set("bmtrader-${project.version}-unobfuscated.jar")
     relocate 'org.java_websocket', 'com.bookmap.plugin.shaded.websocket'
     relocate 'com.google.gson', 'com.bookmap.plugin.shaded.gson'
+    finalizedBy 'obfuscateJar'
 }
 
 jar {
+    destinationDirectory.set(layout.buildDirectory.dir('intermediates/thin'))
     manifest {
         attributes 'Implementation-Title': 'bmtrader'
         attributes 'Implementation-Version': version
     }
 }
 
-tasks.named('build') {
+tasks.register('obfuscateJar', proguard.gradle.ProGuardTask) {
+    group = 'build'
+    description = 'Creates the obfuscated Bookmap release JAR; mappings stay local.'
     dependsOn tasks.named('shadowJar')
+    configuration 'proguard-rules.pro'
+    injars tasks.named('shadowJar').flatMap { it.archiveFile }
+    outjars releaseJar
+    libraryjars configurations.obfuscationLibrary
+    if (new File(javaHome, 'jmods').isDirectory()) {
+        libraryjars fileTree(new File(javaHome, 'jmods')) { include '*.jmod' },
+                jarfilter: '!**.jar', filter: '!module-info.class'
+    } else {
+        dependsOn tasks.named('runtimeLibraryJar')
+        libraryjars tasks.named('runtimeLibraryJar').flatMap { it.archiveFile }
+    }
+    printmapping obfuscationMapping
+    outputs.file(obfuscationMapping)
+}
+
+tasks.register('releaseTest', Test) {
+    description = 'Checks packaging and loads the actual obfuscated JAR without the original classes.'
+    group = 'verification'
+    dependsOn tasks.named('obfuscateJar')
+    testClassesDirs = sourceSets.releaseTest.output.classesDirs
+    classpath = sourceSets.releaseTest.runtimeClasspath + files(releaseJar)
+    inputs.file(releaseJar)
+    inputs.file(obfuscationMapping)
+    systemProperty 'release.jar', releaseJar.get().asFile.absolutePath
+    systemProperty 'release.mapping', obfuscationMapping.get().asFile.absolutePath
+    systemProperty 'release.version', project.version.toString()
+    systemProperty 'java.awt.headless', 'true'
+    jvmArgs '-Xverify:all'
+    useJUnitPlatform()
+}
+
+tasks.named('assemble') {
+    dependsOn tasks.named('obfuscateJar')
+}
+
+tasks.named('check') {
+    dependsOn tasks.named('releaseTest')
 }
 
 test {
