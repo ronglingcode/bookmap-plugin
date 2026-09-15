@@ -2,11 +2,8 @@ package com.bookmap.plugin.rong;
 
 import java.awt.Color;
 import java.time.Duration;
-import java.time.LocalDateTime;
-import java.time.format.DateTimeFormatter;
 import java.util.List;
 
-import com.bookmap.plugin.rong.exporter.BookmapReplayExportSession;
 import com.bookmap.plugin.rong.executions.FilledExecutionManager;
 import com.bookmap.plugin.rong.executions.FilledExecutionPainter;
 import com.bookmap.plugin.rong.executions.FilledExecutionStore;
@@ -63,13 +60,9 @@ import velox.gui.StrategyPanel;
 public class RongPlugin implements CustomModuleAdapter,
         DepthDataListener, TradeDataListener, TimeListener,
         SnapshotEndListener, BboListener, HistoricalModeListener,
-        CustomSettingsPanelProvider, ReplayExportConfig.ChangeListener,
-        IndicatorConfig.ChangeListener {
+        CustomSettingsPanelProvider, IndicatorConfig.ChangeListener {
 
     private static final int WS_PORT = 8765;
-    private static final DateTimeFormatter EXPORT_RUN_ID_FORMAT =
-            DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss");
-    private static final String EXPORT_RUN_ID = LocalDateTime.now().format(EXPORT_RUN_ID_FORMAT);
     private static final int WALL_THRESHOLD = 500_000;
     private static final double WALL_CONSUMED_RATIO = 0.10;
     private static final double ORDERBOOK_PERCENTILE = 97;
@@ -96,7 +89,6 @@ public class RongPlugin implements CustomModuleAdapter,
     private static OrderWallChangePainter wallChangePainter;
     private static IndicatorConfig indicatorConfig;
     private static WallThresholdConfig wallThresholdConfig;
-    private static ReplayExportConfig replayExportConfig;
     private static KeyLevelManager keyLevelManager;
     private static KeyZoneManager keyZoneManager;
     private static MarketLevelManager marketLevelManager;
@@ -123,9 +115,7 @@ public class RongPlugin implements CustomModuleAdapter,
     private boolean wallLabelsDirty;
     private long lastWallLabelRefreshMs;
     private long lastTimestampNs;
-    private long initialTimestampNs;
     private TradeButtonWindow tradeButtonWindow;
-    private volatile BookmapReplayExportSession replayExportSession;
     private VwapTracker vwapTracker;
     private SignalWebSocketServer.VwapUpdateListener vwapUpdateListener;
     private IndicatorModifiable vwapIndicator;
@@ -137,8 +127,7 @@ public class RongPlugin implements CustomModuleAdapter,
         this.alias = cleanAlias;
         this.api = api;
         this.instrumentInfo = info;
-        this.initialTimestampNs = initialState != null ? initialState.getCurrentTime() : 0L;
-        this.lastTimestampNs = initialTimestampNs;
+        this.lastTimestampNs = initialState != null ? initialState.getCurrentTime() : 0L;
         this.orderBook = new OrderBookState();
         this.wallTracker = new OrderWallTracker(WALL_THRESHOLD, WALL_CONSUMED_RATIO);
         this.vwapTracker = new VwapTracker(cleanAlias);
@@ -161,9 +150,6 @@ public class RongPlugin implements CustomModuleAdapter,
             }
             if (wallThresholdConfig == null) {
                 wallThresholdConfig = new WallThresholdConfig();
-            }
-            if (replayExportConfig == null) {
-                replayExportConfig = new ReplayExportConfig();
             }
             if (chartHoverHotkeyHandler == null) {
                 chartHoverHotkeyHandler = new ChartHoverHotkeyHandler(
@@ -198,7 +184,6 @@ public class RongPlugin implements CustomModuleAdapter,
             }
             instanceCount++;
         }
-        replayExportConfig.addChangeListener(this);
         this.vwapIndicator = api.registerIndicatorModifiable("VWAP", GraphType.PRIMARY);
         this.vwapIndicator.setWidth(2);
         updateVwapIndicatorVisibility();
@@ -313,10 +298,6 @@ public class RongPlugin implements CustomModuleAdapter,
         tradeButtonWindow = new TradeButtonWindow(
                 cleanAlias, sharedServer, wallThresholdConfig::getThresholdFloor);
 
-        if (replayExportConfig.isEnabled()) {
-            startReplayExport();
-        }
-
         PluginLog.info("[Rong] Plugin initialized for " + cleanAlias);
     }
 
@@ -334,10 +315,6 @@ public class RongPlugin implements CustomModuleAdapter,
         if (indicatorConfig != null) {
             indicatorConfig.removeChangeListener(this);
         }
-        if (replayExportConfig != null) {
-            replayExportConfig.removeChangeListener(this);
-        }
-        stopReplayExport();
         if (wallLabelTracker != null) {
             wallLabelTracker.shutdown();
             wallLabelTracker = null;
@@ -527,7 +504,6 @@ public class RongPlugin implements CustomModuleAdapter,
                 filledExecutionPainter = null;
                 indicatorConfig = null;
                 wallThresholdConfig = null;
-                replayExportConfig = null;
                 pendingEntryOrderManager = null;
                 instanceCount = 0;
                 PluginLog.info("[Rong] Shared WebSocket server shut down");
@@ -545,22 +521,14 @@ public class RongPlugin implements CustomModuleAdapter,
             if (wallThresholdConfig == null) {
                 wallThresholdConfig = new WallThresholdConfig();
             }
-            if (replayExportConfig == null) {
-                replayExportConfig = new ReplayExportConfig();
-            }
         }
         return new StrategyPanel[] {
-            new IndicatorSettingsPanel(indicatorConfig, wallThresholdConfig),
-            new ReplayExportSettingsPanel(replayExportConfig)
+            new IndicatorSettingsPanel(indicatorConfig, wallThresholdConfig)
         };
     }
 
     @Override
     public void onDepth(boolean isBid, int price, int size) {
-        BookmapReplayExportSession exportSession = replayExportSession;
-        if (exportSession != null) {
-            exportSession.onDepth(isBid, price, size);
-        }
         if (wallChangeTracker != null) {
             wallChangeTracker.onDepth(isBid, price, size, getEventTimeNs());
         }
@@ -577,10 +545,6 @@ public class RongPlugin implements CustomModuleAdapter,
 
     @Override
     public void onTrade(double price, int size, TradeInfo tradeInfo) {
-        BookmapReplayExportSession exportSession = replayExportSession;
-        if (exportSession != null) {
-            exportSession.onTrade(price, size, tradeInfo);
-        }
         if (wallChangeTracker != null) {
             wallChangeTracker.onTrade((int) Math.round(price), size, tradeInfo);
         }
@@ -615,10 +579,6 @@ public class RongPlugin implements CustomModuleAdapter,
             wallLabelsDirty = true;
             refreshWallLabelsIfNeeded(true);
         }
-        BookmapReplayExportSession exportSession = replayExportSession;
-        if (exportSession != null) {
-            exportSession.onTimestamp(timestampNs);
-        }
     }
 
     @Override
@@ -626,19 +586,11 @@ public class RongPlugin implements CustomModuleAdapter,
         if (shouldRunPatternAutomation()) {
             patternEngine.onBbo(bidPrice, bidSize, askPrice, askSize, getEventTimeNs());
         }
-        BookmapReplayExportSession exportSession = replayExportSession;
-        if (exportSession != null) {
-            exportSession.onBbo(bidPrice, bidSize, askPrice, askSize);
-        }
     }
 
     @Override
     public void onSnapshotEnd() {
         patternSnapshotComplete = true;
-        BookmapReplayExportSession exportSession = replayExportSession;
-        if (exportSession != null) {
-            exportSession.onSnapshotEnd();
-        }
         if (wallChangeTracker != null) {
             wallChangeTracker.markReady();
         }
@@ -650,24 +602,11 @@ public class RongPlugin implements CustomModuleAdapter,
     @Override
     public void onRealtimeStart() {
         patternSnapshotComplete = true;
-        BookmapReplayExportSession exportSession = replayExportSession;
-        if (exportSession != null) {
-            exportSession.onRealtimeStart();
-        }
         if (wallChangeTracker != null) {
             wallChangeTracker.markReady();
         }
         if (shouldRunPatternAutomation()) {
             patternEngine.markReady();
-        }
-    }
-
-    @Override
-    public void onReplayExportConfigChanged(boolean enabled) {
-        if (enabled) {
-            startReplayExport();
-        } else {
-            stopReplayExport();
         }
     }
 
@@ -832,30 +771,5 @@ public class RongPlugin implements CustomModuleAdapter,
 
     private long getEventTimeNs() {
         return lastTimestampNs > 0 ? lastTimestampNs : System.currentTimeMillis() * 1_000_000L;
-    }
-
-    private synchronized void startReplayExport() {
-        if (replayExportSession != null) {
-            return;
-        }
-        replayExportSession = BookmapReplayExportSession.open(
-                EXPORT_RUN_ID,
-                "Rong",
-                rawAlias,
-                alias,
-                instrumentInfo,
-                lastTimestampNs > 0 ? lastTimestampNs : initialTimestampNs);
-        if (replayExportSession != null) {
-            PluginLog.info("[Rong] Replay export enabled for " + alias);
-        }
-    }
-
-    private synchronized void stopReplayExport() {
-        if (replayExportSession == null) {
-            return;
-        }
-        replayExportSession.stop();
-        replayExportSession = null;
-        PluginLog.info("[Rong] Replay export disabled for " + alias);
     }
 }

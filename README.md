@@ -2,12 +2,11 @@
 
 A Bookmap addon that detects order wall breakouts, draws chart price levels, and sends real-time signals via WebSocket.
 
-This repository produces two Bookmap addon plugins in the same build:
+This repository builds the Rong trading addon:
 
 | Plugin   | JAR                | Description                   |
 | -------- | ------------------ | ----------------------------- |
 | **Rong** | `rong-1.25-all.jar` | Personal plugin (private use) |
-| **Rong Backtest Exporter** | `rong-1.25-all.jar` | Replay data exporter for Bookmap backtests |
 
 ## How It Works
 
@@ -32,7 +31,7 @@ This repository produces two Bookmap addon plugins in the same build:
 - **WebSocket key levels/zones** — instrument-specific price levels and zones pushed by an external app
 - **WebSocket API** — real-time breakout and order book messages
 - **Live exit-plan editor** — the floating trade window edits ViteApp's active `coreTarget`/`coreCount` plan and reminds after the third completed partial
-- **Settings panels** — enable/disable indicators and optionally export replay data
+- **Settings panel** — enable/disable indicators
 
 ## Project Structure
 
@@ -66,9 +65,9 @@ mac: ./gradlew shadowJar
 windows: gradlew shadowJar
 ```
 
-Output JARs:
+Output JAR:
 
-- `build/libs/rong-1.25-all.jar` contains both `Rong` and `Rong Backtest Exporter`
+- `build/libs/rong-1.25-all.jar` contains the `Rong` trading addon
 
 ## Install in Bookmap
 
@@ -78,42 +77,7 @@ Output JARs:
 4. In the popup, check the plugin name and click OK
 5. Add the addon to a chart: right-click the chart > **Add Addon** > select the plugin
 
-The `Rong` plugin starts a WebSocket server on `localhost:8765` when attached to an instrument. The `Rong Backtest Exporter` plugin does not start a server; it writes replay data to disk.
-
-## Backtest Exporter
-
-Use `Rong Backtest Exporter` when replaying a `.bmf` file in Bookmap. Attach it to each instrument you want to export. It writes normalized JSONL events that can be consumed later by a standalone backtest engine.
-
-The live `Rong` plugin can also export the same replay event format, but this is disabled by default. To enable it, open the `Rong` addon configuration and turn on **Replay Export > Export replay data from Rong**. This lets you keep the Rong plugin attached while replaying feeds and collect the same historical data without attaching the separate exporter addon.
-
-Default output:
-
-```text
-C:\Users\{username}\Bookmap\backtest-exports\{run-id}\{symbol}\
-  metadata.json
-  events.jsonl
-```
-
-The event stream includes:
-
-- `session_start`
-- `depth`
-- `trade`
-- `bbo`
-- `snapshot_end`
-- `realtime_start`
-- `session_end`
-
-Optional Java system properties:
-
-| Property | Default | Description |
-| -------- | ------- | ----------- |
-| `bookmap.export.dir` | `~/Bookmap/backtest-exports` | Export root directory |
-| `bookmap.export.depthMinSize` | `0` | Minimum absolute depth level size to export; `0` exports all depth updates |
-| `bookmap.export.flushEvery` | `1000` | Flush after this many JSONL events |
-| `rong.replayExport.enabled` | `false` | Optional startup default for Rong's own replay export toggle |
-
-Design details are in `docs/bookmap-backtest-system-design.md`.
+The `Rong` plugin starts a WebSocket server on `localhost:8765` when attached to an instrument.
 
 ## Connect Your Trading Bot
 
@@ -464,12 +428,11 @@ Plugin log files are named by session start time, e.g. `2026-03-21_10-30-45.txt`
 
 Signal logs (`breakout.jsonl`) are appended in JSONL format (one JSON object per line).
 
-### Settings Panels
+### Settings Panel
 
-The plugin provides settings panels accessible via the addon's configuration in Bookmap:
+The plugin provides an Indicators settings panel accessible via the addon's configuration in Bookmap:
 
 
 | Panel                       | Purpose                                                                         |
 | --------------------------- | ------------------------------------------------------------------------------- |
 | **Indicators**              | Enable/disable auto-drawn indicators (Premarket High/Low, Camarilla Pivots)     |
-| **Replay Export**           | Enable/disable JSONL replay export from the live Rong plugin                    |
