@@ -60,8 +60,6 @@ public class ExitOrderManager implements SignalWebSocketServer.ExitOrderPairsCon
         for (ExitOrderLine line : aggregateLines(buildLineCandidates(pairs))) {
             addLineToStore(instrumentAlias, line, pips);
         }
-
-        PluginLog.info("[ExitOrder] Drew " + pairs.size() + " websocket exit pair(s) for " + instrumentAlias);
     }
 
     private List<ExitOrderLine> buildLineCandidates(List<ExitOrderPairDefinition> pairs) {

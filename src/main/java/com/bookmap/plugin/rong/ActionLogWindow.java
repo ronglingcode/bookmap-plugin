@@ -106,7 +106,7 @@ public class ActionLogWindow {
         if (frame != null) {
             return;
         }
-        frame = new JFrame("Rong Logs");
+        frame = new JFrame(PluginVersion.NAME + " Logs");
         frame.setAlwaysOnTop(true);
         frame.setDefaultCloseOperation(JFrame.DO_NOTHING_ON_CLOSE);
         textArea = new JTextArea(20, 41);

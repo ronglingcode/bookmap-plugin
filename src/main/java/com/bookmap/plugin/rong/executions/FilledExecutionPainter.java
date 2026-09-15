@@ -20,7 +20,6 @@ import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 
 import com.bookmap.plugin.rong.IndicatorConfig;
-import com.bookmap.plugin.rong.PluginLog;
 import com.bookmap.plugin.rong.SymbolUtils;
 
 import velox.api.layer1.layers.strategies.interfaces.ScreenSpaceCanvas;
@@ -174,7 +173,6 @@ public class FilledExecutionPainter implements ScreenSpacePainterFactory,
                     .computeIfAbsent(instrumentAlias, ignored -> new CopyOnWriteArrayList<>())
                     .add(instance);
         }
-        PluginLog.info("[FilledExecutionPainter] Created painter: " + alias + " -> " + instrumentAlias);
         return instance;
     }
 
@@ -351,7 +349,6 @@ public class FilledExecutionPainter implements ScreenSpacePainterFactory,
                     paintersByInstrument.remove(instrumentAlias);
                 }
             }
-            PluginLog.info("[FilledExecutionPainter] Disposed painter: " + painterAlias);
         }
 
         private void removeActiveShapesLocked() {

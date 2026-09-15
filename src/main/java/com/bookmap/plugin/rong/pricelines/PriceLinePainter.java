@@ -11,7 +11,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
-import com.bookmap.plugin.rong.PluginLog;
 import com.bookmap.plugin.rong.SymbolUtils;
 
 import velox.api.layer1.layers.strategies.interfaces.ScreenSpaceCanvas;
@@ -66,8 +65,6 @@ public class PriceLinePainter implements ScreenSpacePainterFactory {
         if (instrumentAlias != null) {
             painterToInstrument.put(alias, instrumentAlias);
         }
-
-        PluginLog.info("[PriceLinePainter] Created painter: " + alias + " → " + instrumentAlias);
 
         return new PainterInstance(alias, instrumentAlias, canvas);
     }
@@ -220,7 +217,6 @@ public class PriceLinePainter implements ScreenSpacePainterFactory {
             activeShapes.clear();
             canvas.dispose();
             painterToInstrument.remove(painterAlias);
-            PluginLog.info("[PriceLinePainter] Disposed painter: " + painterAlias);
         }
     }
 }

@@ -11,7 +11,7 @@ class MarketEntryEstimateTest {
 
     @Test
     void longUsesBestAskAndShortUsesBestBid() {
-        SignalWebSocketServer server = new SignalWebSocketServer(0, 90, 1000);
+        SignalWebSocketServer server = new SignalWebSocketServer(0, 90);
         OrderBookState orderBook = new OrderBookState();
         orderBook.update(true, 14_434, 100);
         orderBook.update(false, 14_435, 100);
@@ -23,7 +23,7 @@ class MarketEntryEstimateTest {
 
     @Test
     void unavailableBookReturnsNoEstimate() {
-        SignalWebSocketServer server = new SignalWebSocketServer(0, 90, 1000);
+        SignalWebSocketServer server = new SignalWebSocketServer(0, 90);
 
         assertNull(server.getMarketEntryEstimate("PLTR", true));
     }

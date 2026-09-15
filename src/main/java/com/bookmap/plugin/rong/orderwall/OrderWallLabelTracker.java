@@ -12,7 +12,6 @@ import java.util.concurrent.TimeUnit;
 import java.util.function.IntSupplier;
 
 import com.bookmap.plugin.rong.BookmapPriceNormalizer;
-import com.bookmap.plugin.rong.PluginLog;
 
 /**
  * Tracks large liquidity walls and retains meaningful size changes at each level.
@@ -211,8 +210,6 @@ public class OrderWallLabelTracker {
         try {
             return Math.max(0, minimumSizeSupplier.getAsInt());
         } catch (RuntimeException e) {
-            PluginLog.error("[OrderWallLabel] Failed to read wall threshold for "
-                    + instrumentAlias + ": " + e.getMessage());
             return 0;
         }
     }

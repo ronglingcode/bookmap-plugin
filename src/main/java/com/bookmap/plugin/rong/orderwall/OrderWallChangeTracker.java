@@ -16,7 +16,6 @@ import java.util.function.Predicate;
 
 import com.bookmap.plugin.rong.BookmapPriceNormalizer;
 import com.bookmap.plugin.rong.OrderBookState;
-import com.bookmap.plugin.rong.PluginLog;
 
 import velox.api.layer1.data.TradeInfo;
 
@@ -189,9 +188,6 @@ public class OrderWallChangeTracker {
             } else {
                 pendingAdds.remove(key);
                 largeSinceMsByLevel.remove(key);
-                PluginLog.info("[WallChange] Suppressed flash add for " + instrumentAlias + " "
-                        + (key.bid ? "BID" : "ASK") + " " + priceText(key.priceTick)
-                        + " lifetime=" + (nowMs - existingPendingAdd.createdAtMs) + "ms");
             }
             return;
         }
@@ -203,9 +199,6 @@ public class OrderWallChangeTracker {
                 return;
             }
             pendingIncreases.remove(key);
-            PluginLog.info("[WallChange] Suppressed flash increase for " + instrumentAlias + " "
-                    + (key.bid ? "BID" : "ASK") + " " + priceText(key.priceTick)
-                    + " lifetime=" + (nowMs - existingPendingIncrease.createdAtMs) + "ms");
             previousSize = existingPendingIncrease.previousSize;
         }
 
@@ -280,7 +273,6 @@ public class OrderWallChangeTracker {
             }
         }
         recentTrades.clear();
-        PluginLog.info("[WallChange] Alerts armed for " + instrumentAlias);
     }
 
     public synchronized void shutdown() {
@@ -309,9 +301,6 @@ public class OrderWallChangeTracker {
         if (latestSize < currentThreshold) {
             pendingAdds.remove(key);
             largeSinceMsByLevel.remove(key);
-            PluginLog.info("[WallChange] Suppressed flash add for " + instrumentAlias + " "
-                    + (key.bid ? "BID" : "ASK") + " " + priceText(key.priceTick)
-                    + " lifetime=" + (nowMs - pending.createdAtMs) + "ms");
             return;
         }
 
@@ -356,18 +345,12 @@ public class OrderWallChangeTracker {
                     latestSize, tradedSize, pending.latestEventTimeNs, nowMs)) {
                 return;
             }
-            PluginLog.info("[WallChange] Suppressed traded decrease for " + instrumentAlias + " "
-                    + (key.bid ? "BID" : "ASK") + " " + priceText(key.priceTick)
-                    + " drop=" + dropSize + " traded=" + tradedSize);
             return;
         }
 
         int samePriceTradeSize = sumSamePriceTradeSize(key.priceTick, tradeWindowStartMs, nowMs);
         if (latestSize < currentThreshold
                 && samePriceTradeSize >= dropSize * SAME_PRICE_TRADE_EXPLAINED_RATIO) {
-            PluginLog.info("[WallChange] Suppressed price-touched decrease for " + instrumentAlias + " "
-                    + (key.bid ? "BID" : "ASK") + " " + priceText(key.priceTick)
-                    + " drop=" + dropSize + " samePriceTraded=" + samePriceTradeSize);
             return;
         }
 
@@ -391,7 +374,6 @@ public class OrderWallChangeTracker {
                 nowMs);
         markAlerted(key, nowMs);
         alertConsumer.accept(event);
-        PluginLog.info("[WallChange] " + event.getLogMessage());
     }
 
     private synchronized void evaluatePendingIncrease(LevelKey key) {
@@ -408,9 +390,6 @@ public class OrderWallChangeTracker {
         int currentThreshold = getEffectiveLargeOrderThreshold();
         if (!isSignificantIncrease(pending.previousSize, latestSize, currentThreshold)) {
             pendingIncreases.remove(key);
-            PluginLog.info("[WallChange] Suppressed flash increase for " + instrumentAlias + " "
-                    + (key.bid ? "BID" : "ASK") + " " + priceText(key.priceTick)
-                    + " lifetime=" + (nowMs - pending.createdAtMs) + "ms");
             return;
         }
 
@@ -473,7 +452,6 @@ public class OrderWallChangeTracker {
                 nowMs);
         markAlerted(key, nowMs);
         alertConsumer.accept(event);
-        PluginLog.info("[WallChange] " + event.getLogMessage());
     }
 
     private void emitIncrease(LevelKey key, int previousSize, int size, long eventTimeNs, long nowMs) {
@@ -493,7 +471,6 @@ public class OrderWallChangeTracker {
                 nowMs);
         markAlerted(key, nowMs);
         alertConsumer.accept(event);
-        PluginLog.info("[WallChange] " + event.getLogMessage());
     }
 
     private boolean emitWallBreak(LevelKey key, int previousSize, int size, int tradedSize,
@@ -519,8 +496,6 @@ public class OrderWallChangeTracker {
                 nowMs);
         markWallBreakAlerted(key, nowMs);
         alertConsumer.accept(event);
-        PluginLog.info("[WallBreak] " + event.getLogMessage()
-                + " traded=" + OrderWallChangeEvent.formatSize(tradedSize));
         return true;
     }
 
@@ -555,8 +530,6 @@ public class OrderWallChangeTracker {
         try {
             return Math.max(0, largeOrderThresholdSupplier.getAsInt());
         } catch (RuntimeException e) {
-            PluginLog.error("[WallChange] Failed to read wall threshold floor for "
-                    + instrumentAlias + ": " + e.getMessage());
             return 0;
         }
     }
@@ -653,8 +626,6 @@ public class OrderWallChangeTracker {
         try {
             return wallBreakAlertEnabled.test(key.bid);
         } catch (RuntimeException e) {
-            PluginLog.error("[WallBreak] Failed to check alert enablement for "
-                    + instrumentAlias + ": " + e.getMessage());
             return false;
         }
     }
@@ -666,10 +637,6 @@ public class OrderWallChangeTracker {
 
     private void markWallBreakAlerted(LevelKey key, long nowMs) {
         lastWallBreakAlertMsByLevel.put(key, nowMs);
-    }
-
-    private String priceText(int priceTick) {
-        return String.format("%.4f", BookmapPriceNormalizer.toWirePrice(priceTick, pips));
     }
 
     private static class PendingAdd {

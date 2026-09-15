@@ -53,12 +53,6 @@ public final class BookmapPriceNormalizer {
         return wirePrice / pips;
     }
 
-    public static int wireDistanceToBookmapTicksCeiling(double wireDistance, double pips) {
-        requirePositiveFinite(wireDistance, "wireDistance");
-        requirePositiveFinite(pips, "pips");
-        return Math.max(1, (int) Math.ceil((wireDistance / pips) - 1e-9));
-    }
-
     public static boolean isSupportedWirePriceUnit(String priceUnit) {
         return priceUnit == null || priceUnit.trim().isEmpty()
                 || WIRE_PRICE_UNIT.equalsIgnoreCase(priceUnit.trim());

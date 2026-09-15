@@ -27,8 +27,6 @@ public final class HotkeyButtonAction {
         if (!"KeyF".equals(keyCode)) {
             PluginLog.action(symbol, "Button send " + buttonName);
         }
-        PluginLog.info("[TradeButton] " + buttonName + " clicked for " + symbol + " as "
-                + (shiftKey ? "Shift+" : "") + keyCode);
     }
 
     static JsonObject createMessage(

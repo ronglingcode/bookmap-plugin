@@ -76,17 +76,6 @@ public class OrderBookState {
         return book.getOrDefault(price, 0);
     }
 
-    /** First level on the requested side whose size is at least minSize. */
-    public synchronized DepthLevel findFirstLevelAtLeast(boolean isBid, int minSize) {
-        TreeMap<Integer, Integer> book = isBid ? bids : asks;
-        for (Map.Entry<Integer, Integer> entry : book.entrySet()) {
-            if (entry.getValue() >= minSize) {
-                return new DepthLevel(entry.getKey(), entry.getValue());
-            }
-        }
-        return null;
-    }
-
     /**
      * Top N bid levels (best first). Returns a snapshot.
      * If fewer than N levels exist, returns all available.
@@ -204,57 +193,6 @@ public class OrderBookState {
         return Math.max(Math.max(0, thresholdFloor), Math.max(0, percentileThreshold));
     }
 
-    /**
-     * Serialize all levels of bids and asks to JSON, filtered by percentile.
-     * Only levels with size >= the percentile threshold are included.
-     * @param pips multiplier to convert tick prices to real prices
-     * @param percentile 0-100; 0 means no filtering
-     */
-    public String toJson(String symbol, double pips, double percentile) {
-        int minSize = (percentile > 0) ? getPercentileThreshold(percentile) : 0;
-        StringBuilder sb = new StringBuilder();
-        sb.append("{\"type\":\"orderbook\",\"symbol\":\"").append(symbol).append("\"");
-        sb.append(",\"priceUnit\":\"").append(BookmapPriceNormalizer.WIRE_PRICE_UNIT).append("\"");
-        sb.append(",\"timestamp\":").append(System.currentTimeMillis());
-        sb.append(",\"percentile\":").append(percentile);
-        sb.append(",\"minSize\":").append(minSize);
-        // Always include unfiltered best bid/ask so clients know the current price
-        Integer bestBidTick = getBestBid();
-        Integer bestAskTick = getBestAsk();
-        if (bestBidTick != null) {
-            sb.append(",\"bestBid\":").append(String.format(
-                    java.util.Locale.US,
-                    "%.6f",
-                    BookmapPriceNormalizer.toWirePrice(bestBidTick, pips)));
-        }
-        if (bestAskTick != null) {
-            sb.append(",\"bestAsk\":").append(String.format(
-                    java.util.Locale.US,
-                    "%.6f",
-                    BookmapPriceNormalizer.toWirePrice(bestAskTick, pips)));
-        }
-        sb.append(",\"largeBids\":[");
-        appendLevels(sb, bids, pips, minSize);
-        sb.append("],\"largeAsks\":[");
-        appendLevels(sb, asks, pips, minSize);
-        sb.append("]}");
-        return sb.toString();
-    }
-
-    private void appendLevels(StringBuilder sb, TreeMap<Integer, Integer> book, double pips, int minSize) {
-        boolean first = true;
-        for (Map.Entry<Integer, Integer> entry : book.entrySet()) {
-            if (entry.getValue() < minSize) continue;
-            if (!first) sb.append(',');
-            sb.append(String.format(
-                    java.util.Locale.US,
-                    "[%.6f,%d]",
-                    BookmapPriceNormalizer.toWirePrice(entry.getKey(), pips),
-                    entry.getValue()));
-            first = false;
-        }
-    }
-
     private NavigableMap<Integer, Integer> getTopLevels(TreeMap<Integer, Integer> book, int levels) {
         TreeMap<Integer, Integer> result = new TreeMap<>(book.comparator());
         int count = 0;
@@ -272,23 +210,5 @@ public class OrderBookState {
 
     private void decrementSizeCount(int size) {
         sizeCounts.computeIfPresent(size, (ignored, count) -> count > 1 ? count - 1 : null);
-    }
-
-    public static class DepthLevel {
-        private final int priceTick;
-        private final int size;
-
-        public DepthLevel(int priceTick, int size) {
-            this.priceTick = priceTick;
-            this.size = size;
-        }
-
-        public int getPriceTick() {
-            return priceTick;
-        }
-
-        public int getSize() {
-            return size;
-        }
     }
 }

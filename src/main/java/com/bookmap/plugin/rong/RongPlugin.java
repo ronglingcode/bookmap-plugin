@@ -2,7 +2,6 @@ package com.bookmap.plugin.rong;
 
 import java.awt.Color;
 import java.time.Duration;
-import java.util.List;
 
 import com.bookmap.plugin.rong.executions.FilledExecutionManager;
 import com.bookmap.plugin.rong.executions.FilledExecutionPainter;
@@ -15,7 +14,6 @@ import com.bookmap.plugin.rong.orderwall.OrderWallChangeTracker;
 import com.bookmap.plugin.rong.orderwall.OrderWallLabelPainter;
 import com.bookmap.plugin.rong.orderwall.OrderWallLabelStore;
 import com.bookmap.plugin.rong.orderwall.OrderWallLabelTracker;
-import com.bookmap.plugin.rong.orderwall.OrderWallTracker;
 import com.bookmap.plugin.rong.patterns.BookmapPatternEngine;
 import com.bookmap.plugin.rong.patterns.BookmapPatternSignal;
 import com.bookmap.plugin.rong.patterns.PatternSignalPainter;
@@ -51,9 +49,8 @@ import velox.api.layer1.simplified.TimeListener;
 import velox.api.layer1.simplified.TradeDataListener;
 import velox.gui.StrategyPanel;
 
-
 @Layer1SimpleAttachable
-@Layer1StrategyName("Rong")
+@Layer1StrategyName(PluginVersion.NAME)
 @Layer1ApiVersion(Layer1ApiVersionValue.VERSION2)
 @UnrestrictedData
 public class RongPlugin implements CustomModuleAdapter,
@@ -62,10 +59,7 @@ public class RongPlugin implements CustomModuleAdapter,
         CustomSettingsPanelProvider, IndicatorConfig.ChangeListener {
 
     private static final int WS_PORT = 8765;
-    private static final int WALL_THRESHOLD = 500_000;
-    private static final double WALL_CONSUMED_RATIO = 0.10;
     private static final double ORDERBOOK_PERCENTILE = 97;
-    private static final int ORDERBOOK_INTERVAL_MS = 1000;
     private static final int WALL_LABEL_RETAIN_TICKS = 2_000;
     private static final int WALL_LABEL_REFRESH_MS = 200;
     private static final double WALL_CHANGE_REMAINING_RATIO = 0.50;
@@ -102,7 +96,6 @@ public class RongPlugin implements CustomModuleAdapter,
     private String rawAlias;
     private String alias;
     private Api api;
-    private OrderWallTracker wallTracker;
     private InstrumentInfo instrumentInfo;
     private OrderBookState orderBook;
     private OrderWallLabelTracker wallLabelTracker;
@@ -127,21 +120,18 @@ public class RongPlugin implements CustomModuleAdapter,
         this.instrumentInfo = info;
         this.lastTimestampNs = initialState != null ? initialState.getCurrentTime() : 0L;
         this.orderBook = new OrderBookState();
-        this.wallTracker = new OrderWallTracker(WALL_THRESHOLD, WALL_CONSUMED_RATIO);
         this.vwapTracker = new VwapTracker(cleanAlias);
         this.vwapUpdateListener = update -> {
-            if (vwapTracker != null && vwapTracker.applyUpdate(update)) {
-                PluginLog.info("[VWAP] Applied ViteApp update for " + cleanAlias
-                        + " at " + update.getEffectiveTimeMs());
+            if (vwapTracker != null) {
+                vwapTracker.applyUpdate(update);
             }
         };
 
         synchronized (RongPlugin.class) {
             if (sharedServer == null) {
-                sharedServer = new SignalWebSocketServer(WS_PORT, ORDERBOOK_PERCENTILE, ORDERBOOK_INTERVAL_MS);
+                sharedServer = new SignalWebSocketServer(WS_PORT, ORDERBOOK_PERCENTILE);
                 sharedServer.start();
                 ActionLogWindow.showWindow();
-                PluginLog.info("[Rong] Shared WebSocket server started on port " + WS_PORT);
             }
             if (indicatorConfig == null) {
                 indicatorConfig = new IndicatorConfig();
@@ -151,7 +141,7 @@ public class RongPlugin implements CustomModuleAdapter,
             }
             if (chartHoverHotkeyHandler == null) {
                 chartHoverHotkeyHandler = new ChartHoverHotkeyHandler(
-                        sharedServer, indicatorConfig, wallThresholdConfig);
+                        sharedServer, indicatorConfig);
             }
             if (priceLineStore == null) {
                 priceLineStore = new PriceLineStore();
@@ -294,8 +284,6 @@ public class RongPlugin implements CustomModuleAdapter,
 
         tradeButtonWindow = new TradeButtonWindow(
                 cleanAlias, sharedServer, wallThresholdConfig::getThresholdFloor);
-
-        PluginLog.info("[Rong] Plugin initialized for " + cleanAlias);
     }
 
     static AliasFilter exactAliasFilter(String expectedAlias) {
@@ -499,10 +487,8 @@ public class RongPlugin implements CustomModuleAdapter,
                 wallThresholdConfig = null;
                 pendingEntryOrderManager = null;
                 instanceCount = 0;
-                PluginLog.info("[Rong] Shared WebSocket server shut down");
             }
         }
-        PluginLog.info("[Rong] Plugin stopped for " + alias);
     }
 
     @Override
@@ -529,7 +515,6 @@ public class RongPlugin implements CustomModuleAdapter,
         if (shouldRunPatternAutomation()) {
             patternEngine.onDepth(isBid, price, size, getEventTimeNs());
         }
-        wallTracker.updateLevel(isBid, price, size);
         if (wallLabelTracker != null && wallLabelTracker.onDepth(isBid, price, size, getEventTimeNs())) {
             wallLabelsDirty = true;
             refreshWallLabelsIfNeeded(false);
@@ -552,13 +537,10 @@ public class RongPlugin implements CustomModuleAdapter,
         if (sharedServer != null) {
             sharedServer.updateRegularSessionHighLow(alias, realPrice, getEventTimeNs());
         }
-        checkBreakout(realPrice);
-        wallTracker.cleanup(priceTick);
         if (wallLabelTracker != null && wallLabelTracker.cleanup(priceTick)) {
             wallLabelsDirty = true;
         }
         refreshWallLabelsIfNeeded(true);
-
     }
 
     @Override
@@ -623,20 +605,6 @@ public class RongPlugin implements CustomModuleAdapter,
         }
         if (!enabled && patternSignalStore != null && alias != null) {
             patternSignalStore.clearAll(alias);
-        }
-    }
-
-    private void checkBreakout(double currentPrice) {
-        List<OrderWallTracker.WallInfo> walls = wallTracker.getActiveWalls();
-        for (OrderWallTracker.WallInfo wall : walls) {
-            double wallRealPrice = BookmapPriceNormalizer.toWirePrice(
-                    wall.priceTick, instrumentInfo.pips);
-            if (currentPrice > wallRealPrice && wallTracker.isConsumed(wall)) {
-                BreakoutSignal signal = new BreakoutSignal(alias, wallRealPrice);
-                // sharedServer.broadcastSignal(signal.toJson());
-                PluginLog.info("[Rong] BREAKOUT signal: " + signal.toJson());
-                wallTracker.removeWall(wall.priceTick);
-            }
         }
     }
 
@@ -720,7 +688,6 @@ public class RongPlugin implements CustomModuleAdapter,
     private void handlePatternSignal(BookmapPatternSignal signal) {
         PatternSignalStore store = patternSignalStore;
         if (store != null) store.addOrUpdate(signal);
-        PluginLog.info("[PatternSignal] " + signal.toJson());
     }
 
     private void playWallChangeSound(OrderWallChangeEvent event) {
@@ -738,7 +705,7 @@ public class RongPlugin implements CustomModuleAdapter,
                     RongPlugin.class,
                     event.getId()));
         } catch (RuntimeException e) {
-            PluginLog.error("[WallChange] Failed to play alert sound", e);
+            // Keep sound-alert failures inside Bookmap without writing diagnostic logs.
         }
     }
 

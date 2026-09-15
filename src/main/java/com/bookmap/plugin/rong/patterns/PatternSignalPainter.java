@@ -19,7 +19,6 @@ import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 
 import com.bookmap.plugin.rong.IndicatorConfig;
-import com.bookmap.plugin.rong.PluginLog;
 
 import velox.api.layer1.layers.strategies.interfaces.ScreenSpaceCanvas;
 import velox.api.layer1.layers.strategies.interfaces.ScreenSpaceCanvas.CanvasIcon;
@@ -148,7 +147,6 @@ public class PatternSignalPainter implements ScreenSpacePainterFactory,
             paintersByInstrument.computeIfAbsent(
                     instrumentAlias, ignored -> new CopyOnWriteArrayList<>()).add(instance);
         }
-        PluginLog.info("[PatternSignalPainter] Created painter: " + alias + " -> " + instrumentAlias);
         return instance;
     }
 

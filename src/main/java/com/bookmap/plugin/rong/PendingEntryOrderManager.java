@@ -64,8 +64,6 @@ public class PendingEntryOrderManager implements SignalWebSocketServer.AccountSt
         for (EntryOrderLine line : lines) {
             addLineToStore(instrumentAlias, line, pips);
         }
-
-        PluginLog.info("[EntryOrder] Drew " + lines.size() + " pending entry line(s) for " + instrumentAlias);
     }
 
     private List<EntryOrderLine> buildLineCandidates(AccountStateDefinition state) {

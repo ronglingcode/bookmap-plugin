@@ -93,15 +93,11 @@ public class MarketLevelManager implements SignalWebSocketServer.MarketLevelConf
             return;
         }
 
-        int linesDrawn = 0;
         if (levels.hasCamPivots()) {
-            linesDrawn += drawCamPivots(instrumentAlias, pips, levels.getCamPivots());
+            drawCamPivots(instrumentAlias, pips, levels.getCamPivots());
         }
-        linesDrawn += drawPreviousDayLevels(instrumentAlias, pips, levels);
-        linesDrawn += drawPremarketLevels(instrumentAlias, pips, levels);
-
-        PluginLog.info("[MarketLevelManager] Drew " + linesDrawn
-                + " websocket market level(s) for " + instrumentAlias);
+        drawPreviousDayLevels(instrumentAlias, pips, levels);
+        drawPremarketLevels(instrumentAlias, pips, levels);
     }
 
     private int drawCamPivots(String instrumentAlias, double pips, Map<String, Double> camPivots) {

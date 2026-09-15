@@ -13,7 +13,7 @@ class KeyLevelConfigParsingTest {
 
     @Test
     void keyLevelLabelFieldBecomesCustomLabel() {
-        SignalWebSocketServer server = new SignalWebSocketServer(0, 90, 1000);
+        SignalWebSocketServer server = new SignalWebSocketServer(0, 90);
         AtomicReference<String> symbolRef = new AtomicReference<>("");
         AtomicReference<List<KeyLevelDefinition>> levelsRef =
                 new AtomicReference<>(Collections.emptyList());
@@ -39,7 +39,7 @@ class KeyLevelConfigParsingTest {
 
     @Test
     void rejectsPriceConfigsThatClaimBookmapTickUnits() {
-        SignalWebSocketServer server = new SignalWebSocketServer(0, 90, 1000);
+        SignalWebSocketServer server = new SignalWebSocketServer(0, 90);
         AtomicReference<List<KeyLevelDefinition>> levelsRef =
                 new AtomicReference<>(Collections.emptyList());
         server.registerKeyLevelConfigListener((symbol, levels) -> levelsRef.set(levels));
@@ -56,7 +56,7 @@ class KeyLevelConfigParsingTest {
 
     @Test
     void keyZoneFieldsBecomeZoneDefinition() {
-        SignalWebSocketServer server = new SignalWebSocketServer(0, 90, 1000);
+        SignalWebSocketServer server = new SignalWebSocketServer(0, 90);
         AtomicReference<String> symbolRef = new AtomicReference<>("");
         AtomicReference<List<KeyZoneDefinition>> zonesRef =
                 new AtomicReference<>(Collections.emptyList());

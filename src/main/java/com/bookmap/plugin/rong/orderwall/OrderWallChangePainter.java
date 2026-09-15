@@ -18,7 +18,6 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 
 import com.bookmap.plugin.rong.IndicatorConfig;
-import com.bookmap.plugin.rong.PluginLog;
 
 import velox.api.layer1.layers.strategies.interfaces.ScreenSpaceCanvas;
 import velox.api.layer1.layers.strategies.interfaces.ScreenSpaceCanvas.CanvasIcon;
@@ -139,7 +138,6 @@ public class OrderWallChangePainter implements ScreenSpacePainterFactory,
                     .computeIfAbsent(instrumentAlias, ignored -> new CopyOnWriteArrayList<>())
                     .add(instance);
         }
-        PluginLog.info("[OrderWallChangePainter] Created painter: " + alias + " -> " + instrumentAlias);
         return instance;
     }
 
@@ -369,7 +367,6 @@ public class OrderWallChangePainter implements ScreenSpacePainterFactory,
                     paintersByInstrument.remove(instrumentAlias);
                 }
             }
-            PluginLog.info("[OrderWallChangePainter] Disposed painter: " + painterAlias);
         }
 
         private void removeActiveShapesLocked() {

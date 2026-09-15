@@ -75,8 +75,6 @@ public class KeyZoneManager implements SignalWebSocketServer.KeyZoneConfigListen
         }
 
         store.replaceAll(instrumentAlias, zones);
-        PluginLog.info("[KeyZoneManager] Drew " + zones.size()
-                + " websocket key zone(s) for " + instrumentAlias);
     }
 
     private PriceZone toPriceZone(KeyZoneDefinition definition, double pips) {
@@ -122,7 +120,6 @@ public class KeyZoneManager implements SignalWebSocketServer.KeyZoneConfigListen
             }
             return Color.decode(normalized);
         } catch (NumberFormatException e) {
-            PluginLog.error("[KeyZoneManager] Ignoring invalid zone color '" + value + "'");
             return null;
         }
     }

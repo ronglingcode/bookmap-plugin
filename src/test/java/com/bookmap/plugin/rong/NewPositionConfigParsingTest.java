@@ -12,7 +12,7 @@ class NewPositionConfigParsingTest {
 
     @Test
     void validNewPositionIsDeliveredToMatchingSymbolListener() {
-        SignalWebSocketServer server = new SignalWebSocketServer(0, 90, 1000);
+        SignalWebSocketServer server = new SignalWebSocketServer(0, 90);
         AtomicReference<NewPositionDefinition> positionRef = new AtomicReference<>();
         server.registerNewPositionListener("AAPL", positionRef::set);
 
@@ -28,7 +28,7 @@ class NewPositionConfigParsingTest {
 
     @Test
     void zeroQuantityIsRejected() {
-        SignalWebSocketServer server = new SignalWebSocketServer(0, 90, 1000);
+        SignalWebSocketServer server = new SignalWebSocketServer(0, 90);
         AtomicReference<NewPositionDefinition> positionRef = new AtomicReference<>();
         server.registerNewPositionListener("AAPL", positionRef::set);
 
@@ -39,7 +39,7 @@ class NewPositionConfigParsingTest {
 
     @Test
     void mismatchedSideIsRejected() {
-        SignalWebSocketServer server = new SignalWebSocketServer(0, 90, 1000);
+        SignalWebSocketServer server = new SignalWebSocketServer(0, 90);
         AtomicReference<NewPositionDefinition> positionRef = new AtomicReference<>();
         server.registerNewPositionListener("AAPL", positionRef::set);
 

@@ -1,19 +1,13 @@
 package com.bookmap.plugin.rong;
 
 /**
- * Displays action messages in Bookmap's Rong Logs window only.
- * Diagnostic info/error entry points are retained but disabled. Nothing is written
- * to files or stdout/stderr, which Bookmap can capture in its own log files.
+ * Displays action messages in Bookmap's bmtrader Logs window only.
+ * Nothing is written to files or stdout/stderr, which Bookmap can capture
+ * in its own log files.
  */
 public class PluginLog {
 
     private PluginLog() {}
-
-    public static void info(String msg) {}
-
-    public static void error(String msg) {}
-
-    public static void error(String msg, Throwable t) {}
 
     public static void action(String msg) {
         ActionLogWindow.append("", "", msg);

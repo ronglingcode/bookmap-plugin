@@ -60,9 +60,6 @@ public class KeyLevelManager implements SignalWebSocketServer.KeyLevelConfigList
         for (KeyLevelDefinition def : levels) {
             addLevelToStore(def, pips);
         }
-
-        PluginLog.info("[KeyLevelManager] Drew " + levels.size()
-                + " websocket key level(s) for " + instrumentAlias);
     }
 
     /**

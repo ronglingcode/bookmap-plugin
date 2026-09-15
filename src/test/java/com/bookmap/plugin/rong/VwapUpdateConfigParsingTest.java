@@ -11,7 +11,7 @@ class VwapUpdateConfigParsingTest {
 
     @Test
     void validUpdateIsDeliveredToTheMatchingSymbolListener() {
-        SignalWebSocketServer server = new SignalWebSocketServer(0, 90, 1000);
+        SignalWebSocketServer server = new SignalWebSocketServer(0, 90);
         AtomicReference<VwapUpdateDefinition> updateRef = new AtomicReference<>();
         server.registerVwapUpdateListener("AAPL", updateRef::set);
 
@@ -32,7 +32,7 @@ class VwapUpdateConfigParsingTest {
 
     @Test
     void staleUpdateIsRejected() {
-        SignalWebSocketServer server = new SignalWebSocketServer(0, 90, 1000);
+        SignalWebSocketServer server = new SignalWebSocketServer(0, 90);
         AtomicReference<VwapUpdateDefinition> updateRef = new AtomicReference<>();
         server.registerVwapUpdateListener("AAPL", updateRef::set);
 
@@ -44,7 +44,7 @@ class VwapUpdateConfigParsingTest {
 
     @Test
     void invalidVwapIsRejected() {
-        SignalWebSocketServer server = new SignalWebSocketServer(0, 90, 1000);
+        SignalWebSocketServer server = new SignalWebSocketServer(0, 90);
         AtomicReference<VwapUpdateDefinition> updateRef = new AtomicReference<>();
         server.registerVwapUpdateListener("AAPL", updateRef::set);
 

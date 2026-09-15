@@ -13,7 +13,7 @@ class CorePlanConfigParsingTest {
 
     @Test
     void activePlanIsDeliveredToMatchingSymbolListener() {
-        SignalWebSocketServer server = new SignalWebSocketServer(0, 90, 1000);
+        SignalWebSocketServer server = new SignalWebSocketServer(0, 90);
         AtomicReference<CorePlanConfigDefinition> configRef = new AtomicReference<>();
         server.registerCorePlanConfigListener("AAPL", configRef::set);
 
@@ -35,7 +35,7 @@ class CorePlanConfigParsingTest {
 
     @Test
     void inactivePlanClearsTheCachedActivePlan() {
-        SignalWebSocketServer server = new SignalWebSocketServer(0, 90, 1000);
+        SignalWebSocketServer server = new SignalWebSocketServer(0, 90);
         AtomicReference<CorePlanConfigDefinition> configRef = new AtomicReference<>();
         server.registerCorePlanConfigListener("AAPL", configRef::set);
 
@@ -53,7 +53,7 @@ class CorePlanConfigParsingTest {
 
     @Test
     void invalidCountIsRejected() {
-        SignalWebSocketServer server = new SignalWebSocketServer(0, 90, 1000);
+        SignalWebSocketServer server = new SignalWebSocketServer(0, 90);
         AtomicReference<CorePlanConfigDefinition> configRef = new AtomicReference<>();
         server.registerCorePlanConfigListener("AAPL", configRef::set);
 

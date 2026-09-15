@@ -1,7 +1,7 @@
 package com.bookmap.plugin.rong;
 
 /**
- * Position snapshot pushed from ViteApp to the Rong account panel.
+ * Position snapshot pushed from ViteApp to the bmtrader account panel.
  */
 public class AccountPositionDefinition {
 

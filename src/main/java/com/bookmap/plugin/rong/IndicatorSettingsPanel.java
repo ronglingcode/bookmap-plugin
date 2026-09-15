@@ -31,7 +31,7 @@ public class IndicatorSettingsPanel extends StrategyPanel {
         gbc.fill = GridBagConstraints.HORIZONTAL;
         gbc.weightx = 1.0;
 
-        JLabel versionLabel = new JLabel("Rong Version: " + PluginVersion.VERSION);
+        JLabel versionLabel = new JLabel(PluginVersion.NAME + " Version: " + PluginVersion.VERSION);
         add(versionLabel, gbc);
 
         gbc.gridy++;

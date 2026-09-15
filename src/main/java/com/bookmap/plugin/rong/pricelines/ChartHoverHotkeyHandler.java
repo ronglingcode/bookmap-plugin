@@ -36,7 +36,6 @@ import com.bookmap.plugin.rong.IndicatorConfig;
 import com.bookmap.plugin.rong.PluginLog;
 import com.bookmap.plugin.rong.SignalWebSocketServer;
 import com.bookmap.plugin.rong.SymbolUtils;
-import com.bookmap.plugin.rong.WallThresholdConfig;
 import com.bookmap.plugin.rong.tradebuttons.HotkeyButtonAction;
 import com.bookmap.plugin.rong.tradebuttons.TradebookButtonGroup;
 import com.google.gson.JsonObject;
@@ -61,7 +60,6 @@ public class ChartHoverHotkeyHandler implements ScreenSpacePainterFactory {
 
     /** Prefix used when registering this painter (see plugin initialize methods). */
     public static final String PAINTER_NAME_PREFIX = "hoverHotkey_";
-    private static final int ORDERBOOK_PROTECTED_ABSOLUTE_LEVELS = 2;
     private static final ZoneId NEW_YORK_TIME_ZONE = ZoneId.of("America/New_York");
     private static final LocalTime ENTRY_HOTKEY_CUTOFF_TIME = LocalTime.of(10, 0);
 
@@ -99,15 +97,12 @@ public class ChartHoverHotkeyHandler implements ScreenSpacePainterFactory {
 
     private final SignalWebSocketServer wsServer;
     private final IndicatorConfig config;
-    private final WallThresholdConfig wallThresholdConfig;
 
     public ChartHoverHotkeyHandler(
             SignalWebSocketServer wsServer,
-            IndicatorConfig config,
-            WallThresholdConfig wallThresholdConfig) {
+            IndicatorConfig config) {
         this.wsServer = wsServer;
         this.config = config;
-        this.wallThresholdConfig = wallThresholdConfig;
         ensureAwtListener();
     }
 
@@ -116,8 +111,6 @@ public class ChartHoverHotkeyHandler implements ScreenSpacePainterFactory {
         instrumentPips.put(instrumentAlias, pips);
         // Bookmap can reuse component trees as symbols are opened or rearranged.
         componentToInstrument.clear();
-        PluginLog.info("[Rong] ChartHoverHotkeyHandler registered instrument: "
-                + instrumentAlias + " pips=" + pips);
     }
 
     public void unregisterSymbol(String instrumentAlias) {
@@ -146,7 +139,6 @@ public class ChartHoverHotkeyHandler implements ScreenSpacePainterFactory {
                 instrumentPips.clear();
                 lastHoverContext = null;
                 setHighlightedInstrument(null);
-                PluginLog.info("[Rong] AWT listener removed");
             }
         }
     }
@@ -169,7 +161,6 @@ public class ChartHoverHotkeyHandler implements ScreenSpacePainterFactory {
             };
             Toolkit.getDefaultToolkit().addAWTEventListener(awtListener,
                 AWTEvent.MOUSE_MOTION_EVENT_MASK | AWTEvent.KEY_EVENT_MASK);
-            PluginLog.info("[Rong] AWT listener registered for chart hover hotkeys");
         }
     }
 
@@ -199,10 +190,6 @@ public class ChartHoverHotkeyHandler implements ScreenSpacePainterFactory {
         }
         updateHighlightedInstrumentFromWindowTitle(event.getComponent());
         if (isTextEntryEvent(event)) {
-            PluginLog.info("[Rong] Chart hotkey blocked while text entry appears active: key="
-                    + normalizedKey + ", focus=" + describeComponent(
-                            KeyboardFocusManager.getCurrentKeyboardFocusManager().getFocusOwner())
-                    + ", source=" + describeComponent(event.getComponent()));
             return;
         }
 
@@ -223,8 +210,6 @@ public class ChartHoverHotkeyHandler implements ScreenSpacePainterFactory {
                 hover.instrument, keyCode, hover.price, shiftDown);
         PluginLog.action(hover.instrument, "Bookmap", actionLog);
         if (isEntryHotkeyDisabledAt(normalizedKey, Instant.now())) {
-            PluginLog.info("[Rong] " + actionLog
-                    + " logged but not sent at or after the 10:00 AM New York entry cutoff");
             return;
         }
 
@@ -247,8 +232,6 @@ public class ChartHoverHotkeyHandler implements ScreenSpacePainterFactory {
             TradebookButtonGroup tradebook =
                     wsServer.getPrimaryWallReversalTradebook(hover.instrument, bidWallReversal);
             if (tradebook == null || tradebook.getEntryMethods().isEmpty()) {
-                PluginLog.info("[Rong] " + actionLog
-                        + " blocked because no matching Bookmap wall-reversal button is enabled");
                 return;
             }
 
@@ -265,15 +248,9 @@ public class ChartHoverHotkeyHandler implements ScreenSpacePainterFactory {
             json.addProperty("tradebook_name", tradebook.getTradebookName());
             json.addProperty("entry_method", entryMethod);
             wsServer.appendRegularSessionHighLow(hover.instrument, json);
-            wsServer.appendOrderbookSnapshot(
-                    hover.instrument,
-                    json,
-                    getWallThresholdFloor(),
-                    ORDERBOOK_PROTECTED_ABSOLUTE_LEVELS);
         }
 
         wsServer.broadcast(json.toString());
-        PluginLog.info("[Rong] " + actionLog + " sent");
     }
 
     private void sendPriceIndependentHotkey(
@@ -300,12 +277,6 @@ public class ChartHoverHotkeyHandler implements ScreenSpacePainterFactory {
                 buttonName,
                 keyCode,
                 false);
-    }
-
-    private int getWallThresholdFloor() {
-        return wallThresholdConfig == null
-                ? WallThresholdConfig.DEFAULT_THRESHOLD_FLOOR
-                : Math.max(0, wallThresholdConfig.getThresholdFloor());
     }
 
     private static HoverContext resolveCurrentHoverContext(boolean priceRequired) {
@@ -430,7 +401,6 @@ public class ChartHoverHotkeyHandler implements ScreenSpacePainterFactory {
         }
         highlightedInstrument = next;
         ActionLogWindow.updateHighlightedSymbol(next);
-        PluginLog.info("[Rong] Highlighted chart: " + (next == null ? "unknown" : next));
     }
 
     private static void updateHighlightedInstrumentFromWindowTitle(Component component) {
@@ -585,17 +555,10 @@ public class ChartHoverHotkeyHandler implements ScreenSpacePainterFactory {
         painterCoords.add(coords);
         setHighlightedInstrument(instrument);
 
-        PluginLog.info("[Rong] ScreenSpacePainter created: indicatorName=" + indicatorName
-            + " indicatorAlias=" + indicatorAlias
-            + " → instrument=" + instrument);
-
         return new ScreenSpacePainterAdapter() {
-            private boolean logged = false;
-
             @Override
             public void onHeatmapPriceBottom(long priceBottom) {
                 coords.priceBottom = priceBottom;
-                logOnce();
             }
 
             @Override
@@ -613,23 +576,12 @@ public class ChartHoverHotkeyHandler implements ScreenSpacePainterFactory {
                 coords.pixelsHeight = pixelsHeight;
             }
 
-            private void logOnce() {
-                if (!logged && coords.priceHeight > 0 && coords.pixelsHeight > 0) {
-                    logged = true;
-                    PluginLog.info("[Rong] Coordinate mapping active for painter " + indicatorName
-                        + ": priceBottom=" + coords.priceBottom + ", priceHeight=" + coords.priceHeight
-                        + ", pixelsBottom=" + coords.pixelsBottom + ", pixelsHeight=" + coords.pixelsHeight);
-                }
-            }
-
             @Override
             public void dispose() {
                 painterCoords.remove(coords);
                 if (instrument != null && instrument.equals(highlightedInstrument)) {
                     setHighlightedInstrument(onlyInstrument(painterInstruments()));
                 }
-                PluginLog.info("[Rong] ScreenSpacePainter disposed for " + indicatorName
-                        + " on " + indicatorAlias);
             }
         };
     }

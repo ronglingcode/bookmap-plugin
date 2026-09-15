@@ -5,7 +5,7 @@ import java.util.Collections;
 import java.util.List;
 
 /**
- * Per-symbol account snapshot pushed from ViteApp to the Rong account panel.
+ * Per-symbol account snapshot pushed from ViteApp to the bmtrader account panel.
  */
 public class AccountStateDefinition {
 

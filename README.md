@@ -1,35 +1,28 @@
 # Bookmap Plugin
 
-A Bookmap addon that detects order wall breakouts, draws chart price levels, and sends real-time signals via WebSocket.
+A Bookmap addon that draws chart indicators and liquidity-wall signals, and forwards manual trading actions and exit-plan updates via WebSocket.
 
-This repository builds the Rong trading addon:
+This repository builds the bmtrader trading addon:
 
 | Plugin   | JAR                | Description                   |
 | -------- | ------------------ | ----------------------------- |
-| **Rong** | `rong-1.25-all.jar` | Personal plugin (private use) |
+| **bmtrader** | `lingrong1988_bmtrader_1.25.jar` | Personal plugin (private use) |
 
 ## How It Works
 
-**Breakout detection:**
-
-1. Monitors the order book for large resting ask orders (default: >= 500,000 shares at a single price level)
-2. Tracks when these walls get consumed by aggressive buying (size drops to 10% or less of peak)
-3. When price trades above a consumed wall, broadcasts a breakout signal via WebSocket
-
-**Chart drawing:**
-4. Premarket high/low lines are drawn and updated automatically during 4:00-9:30 AM ET
-5. Key price levels received over WebSocket are drawn on the matching instrument
-6. Large liquidity walls are labeled directly on the heatmap using compact growth paths like `5→7→10`
-7. Wall labels retain the increasing size path seen at each level and start a new phase label after 2x growth
-8. All lines and labels use Bookmap's data coordinates so they track through scroll and zoom
+1. Receives instrument-specific VWAP, market levels, key levels, and zones from ViteApp and draws them in Bookmap.
+2. Labels large liquidity walls directly on the heatmap using compact growth paths like `5→7→10`.
+3. Displays wall-change alerts and pattern badges inside Bookmap.
+4. Forwards trade-button and chart-hotkey actions to ViteApp, and allows editing the active exit plan.
+5. Uses Bookmap's data coordinates so lines and labels track through scroll and zoom.
 
 ## Features
 
-- **Chart keyboard hotkeys** — the highlighted Bookmap tab is shown at the top of the Rong Logs window and is authoritative for hover hotkeys. When enabled, C/F cancel or flatten and W swaps that symbol without using its price, B/S place bid/offer wall-reversal stop entries at the hovered price only before 10:00 AM New York time, top-row digits adjust exits, and numpad digits market out partials at any time. **Wall Out 1**, **Market Out 1**, Digit1, KeyM, and Numpad1 select the first exit pair tied for the smallest share quantity; digits 2–0 remain positional.
-- **Order wall breakout detection** — monitors large ask-side walls and broadcasts signals when consumed
+- **Chart keyboard hotkeys** — the highlighted Bookmap tab is shown at the top of the bmtrader Logs window and is authoritative for hover hotkeys. When enabled, C/F cancel or flatten and W swaps that symbol without using its price, B/S place bid/offer wall-reversal stop entries at the hovered price only before 10:00 AM New York time, top-row digits adjust exits, and numpad digits market out partials at any time. **Market Out 1**, Digit1, KeyM, and Numpad1 select the first exit pair tied for the smallest share quantity; digits 2–0 remain positional.
+- **Order wall signals** — displays liquidity-wall changes and breakout badges inside Bookmap
 - **Auto-drawn indicators** — ViteApp VWAP, premarket high/low, and Camarilla Pivot levels drawn automatically
 - **WebSocket key levels/zones** — instrument-specific price levels and zones pushed by an external app
-- **WebSocket API** — real-time breakout and order book messages
+- **WebSocket API** — manual trading actions, exit-plan updates, and incoming display configurations
 - **Live exit-plan editor** — the floating trade window edits ViteApp's active `coreTarget`/`coreCount` plan and reminds after the third completed partial
 - **Settings panel** — enable/disable indicators
 
@@ -40,7 +33,7 @@ bookmap-plugin/
 ├── build.gradle
 ├── settings.gradle
 └── src/main/java/com/bookmap/plugin/rong/
-    ├── RongPlugin              # @Layer1StrategyName("Rong")
+    ├── RongPlugin              # @Layer1StrategyName("bmtrader")
     ├── pricelines/             # Line model, storage, painting, and hover price mapping
     │   ├── ChartHoverHotkeyHandler # Hover-key detection & coordinate mapping
     │   └── PriceLine*/PriceZone* # Level/zone model, storage, and painting
@@ -67,17 +60,17 @@ windows: gradlew shadowJar
 
 Output JAR:
 
-- `build/libs/rong-1.25-all.jar` contains the `Rong` trading addon
+- `build/libs/lingrong1988_bmtrader_1.25.jar` contains the `bmtrader` trading addon
 
 ## Install in Bookmap
 
 1. Open Bookmap
 2. Go to **Settings** (gear icon) > **API Plugins Configuration**
-3. Click **Add** and select the desired `-all.jar` file
+3. Click **Add** and select `lingrong1988_bmtrader_1.25.jar`
 4. In the popup, check the plugin name and click OK
 5. Add the addon to a chart: right-click the chart > **Add Addon** > select the plugin
 
-The `Rong` plugin starts a WebSocket server on `localhost:8765` when attached to an instrument.
+The `bmtrader` plugin starts a WebSocket server on `localhost:8765` when attached to an instrument.
 
 ## Connect Your Trading Bot
 
@@ -89,16 +82,17 @@ const ws = new WebSocket('ws://localhost:8765');
 ws.onmessage = (event) => {
   const data = JSON.parse(event.data);
 
-  if (data.type === 'breakout') {
-    // Sent when price breaks through a large order wall
-    // { "type": "breakout", "symbol": "AAPL", "breakoutLevel": 185.50, "timestamp": 1710345600000 }
+  if (data.type === 'custom_button_click') {
+    // Handle a trade-button or chart-hotkey action for data.symbol.
+  } else if (data.type === 'core_plan_update') {
+    // Validate and save the requested exit-plan update, then acknowledge it.
   }
 };
 ```
 
 ## WebSocket API Reference
 
-The plugin exposes a WebSocket server on `ws://localhost:8765`. Clients receive breakout messages as events occur. Additionally, clients can subscribe to real-time order book snapshots and send key levels/zones to draw.
+The plugin exposes a WebSocket server on `ws://localhost:8765`. Clients receive manual trading actions and exit-plan updates, and send display configurations to draw.
 
 Every price-bearing message uses the canonical wire-price contract:
 
@@ -109,23 +103,12 @@ Every price-bearing message uses the canonical wire-price contract:
 
 ### Message types (server → client)
 
+| Type | Description | Frequency |
+| ---- | ----------- | --------- |
+| `custom_button_click` | Manual trade-button or chart-hotkey action | On user action |
+| `core_plan_update` | Requested exit-plan target/count change | On user action |
 
-| Type           | Description                                  | Frequency                             |
-| -------------- | -------------------------------------------- | ------------------------------------- |
-| `breakout`     | Wall breakout signal                         | On event                              |
-| `orderbook`    | Order book snapshot (filtered by percentile) | At subscription interval (default 1s) |
-| `subscribed`   | Confirmation of orderbook subscription       | Once on subscribe                     |
-| `unsubscribed` | Confirmation of orderbook unsubscription     | Once on unsubscribe                   |
-
-
-All messages include a `symbol` field identifying which instrument the data belongs to. Multiple instruments are supported simultaneously.
-
-### Subscribe to order book (client → server)
-
-```json
-{"type":"subscribe","channel":"orderbook"}
-{"type":"unsubscribe","channel":"orderbook"}
-```
+Both message types include a `symbol` field identifying the instrument. Trade actions may include Bookmap session high/low, an estimated market-entry price, or a hovered chart price. The plugin does not send order-book snapshots or wall levels. ViteApp still accepts optional `orderbook` context from compatible clients; without it, initial profit targets use the standard 3R fallback.
 
 ### Send key levels and zones (client → server)
 
@@ -172,7 +155,7 @@ Sending an empty `levels` array clears existing key level lines for that symbol.
 }
 ```
 
-The plugin shows the message only in the always-on-top **Rong Logs** window. `symbol` is optional; `level` is shown beside the source when provided.
+The plugin shows the message only in the always-on-top **bmtrader Logs** window. `symbol` is optional; `level` is shown beside the source when provided.
 
 ### New position reminder (client → server)
 
@@ -249,77 +232,6 @@ ViteApp validates and persists the active plan, then acknowledges it with anothe
 
 ViteApp sends its authoritative VWAP after each 1-minute candle closes. `effectiveTimeMs` is the candle-close boundary. On connection, ViteApp replays its closed-minute VWAP history; afterward it sends one update per close. The plugin plots these values directly and uses the latest value for pattern scoring. It never calculates VWAP from Bookmap trades. Duplicate and stale updates are ignored.
 
-### TypeScript example
-
-```typescript
-interface Breakout {
-  type: "breakout";
-  priceUnit: "real";
-  symbol: string;
-  breakoutLevel: number;
-  timestamp: number;
-}
-
-interface OrderBook {
-  type: "orderbook";
-  priceUnit: "real";
-  symbol: string;
-  timestamp: number;
-  percentile: number;
-  minSize: number;
-  bestBid?: number;
-  bestAsk?: number;
-  largeBids: [number, number][]; // [price, size][]
-  largeAsks: [number, number][]; // [price, size][]
-}
-
-interface Subscribed {
-  type: "subscribed";
-  channel: string;
-  intervalMs: number;
-  percentile: number;
-}
-
-type BookmapMessage = Breakout | OrderBook | Subscribed;
-
-function connectToBookmap(
-  onBreakout: (signal: Breakout) => void,
-  onOrderBook?: (book: OrderBook) => void
-) {
-  const ws = new WebSocket("ws://localhost:8765");
-
-  ws.onopen = () => {
-    console.log("Connected to Bookmap plugin");
-    ws.send(JSON.stringify({ type: "subscribe", channel: "orderbook" }));
-  };
-
-  ws.onmessage = (event: MessageEvent) => {
-    const data: BookmapMessage = JSON.parse(event.data);
-
-    switch (data.type) {
-      case "breakout":
-        onBreakout(data);
-        break;
-
-      case "orderbook":
-        onOrderBook?.(data);
-        break;
-
-      case "subscribed":
-        console.log(`Subscribed to ${data.channel} (every ${data.intervalMs}ms)`);
-        break;
-    }
-  };
-
-  ws.onclose = () => {
-    console.log("Disconnected from Bookmap plugin");
-    setTimeout(() => connectToBookmap(onBreakout, onOrderBook), 3000);
-  };
-
-  return ws;
-}
-```
-
 ## Indicators (Auto-Drawn Levels)
 
 The plugin draws market levels supplied by the external WebSocket client. Each indicator can be enabled or disabled in the **Indicators** settings panel.
@@ -340,12 +252,10 @@ Draws a gold primary-chart VWAP line from ViteApp's authoritative closed-minute 
 
 Draws horizontal lines at the premarket session high and low prices sent by the external client.
 
-
 | Line    | Color  | Description                          |
 | ------- | ------ | ------------------------------------ |
 | PM High | Orange | Highest trade price during premarket |
 | PM Low  | Purple | Lowest trade price during premarket  |
-
 
 - **Data source**: The external client sends `premarket.high` and `premarket.low` in the `key_levels_config` WebSocket message
 - Lines update when the external client pushes refreshed premarket values
@@ -356,12 +266,10 @@ Draws horizontal lines at the premarket session high and low prices sent by the 
 
 Draws Camarilla Pivot levels supplied by the external client.
 
-
 | Lines | Color                        | Description       |
 | ----- | ---------------------------- | ----------------- |
 | R1–R6 | Red gradient (light → dark)  | Resistance levels |
 | S1–S6 | Blue gradient (light → dark) | Support levels    |
-
 
 - **Data source**: The external client sends `camPivots` in the `key_levels_config` WebSocket message
 - **Static levels**: Pivots normally stay fixed for the day, but the plugin redraws them whenever the client sends an updated config
@@ -375,12 +283,10 @@ Draws the previous regular-session high and low supplied by the external client 
 
 Draw key price levels and filled price zones on specific instruments' charts. Useful for marking significant support/resistance levels identified from daily or higher timeframe analysis.
 
-
 | Line      | Color | Description                                         |
 | --------- | ----- | --------------------------------------------------- |
 | Key Level | Gold  | User-defined price level with optional custom label |
 | Key Zone  | Gray by default | User-defined price zone with optional label and color |
-
 
 Key levels and zones are instrument-specific — a $180 level or $179-$184 zone sent for NVDA will only appear on NVDA's chart, not on any other instrument. Bookmap does not read key levels from a local config file and does not expose a key-level entry UI; the external client owns the source data and pushes the latest levels/zones over WebSocket.
 
@@ -392,25 +298,19 @@ Market levels are client-owned. In live or replay mode, the plugin draws the lat
 
 The following parameters are plugin defaults unless noted as configurable:
 
-
 | Parameter               | Default | Description                                                 |
 | ----------------------- | ------- | ----------------------------------------------------------- |
 | `WS_PORT`               | 8765    | WebSocket server port                                       |
-| `WALL_THRESHOLD`        | 500,000 | Minimum shares at a price level to qualify as a wall        |
-| `WALL_CONSUMED_RATIO`   | 0.10    | Wall is "consumed" when size drops to this ratio of peak    |
-| `ORDERBOOK_PERCENTILE`  | 97      | Adaptive crowd filter for wall labels, orderbook snapshots, and size-change alerts |
-| `ORDERBOOK_INTERVAL_MS` | 1000    | Order book snapshot broadcast interval                      |
-| `WALL_THRESHOLD_FLOOR`  | 5,000   | Configurable absolute floor for wall labels, size-change alerts, and wall-out/orderbook snapshot candidates; candidates use `max(WALL_THRESHOLD_FLOOR, ORDERBOOK_PERCENTILE threshold)` |
-| `ORDERBOOK_PROTECTED_ABSOLUTE_LEVELS` | 2 | Per-side count of near-touch absolute-floor levels preserved in snapshots even when the percentile threshold is higher |
+| `ORDERBOOK_PERCENTILE`  | 97      | Adaptive crowd filter for wall labels, patterns, and size-change alerts |
+| `WALL_THRESHOLD_FLOOR`  | 5,000   | Configurable absolute floor for wall labels, patterns, and size-change alerts; wall candidates use `max(WALL_THRESHOLD_FLOOR, ORDERBOOK_PERCENTILE threshold)` |
 
-Adjust `WALL_THRESHOLD_FLOOR` from the Rong add-on settings under `Wall threshold floor`. The floating trade button window shows the live effective wall threshold as `max(configured floor, P97)` for the active symbol, together with the sizes of the three largest bid/ask depth levels. Wall labels, alerts, patterns, **Wall Out 1**, and primary snapshot filtering all use that same live value. Snapshots deliberately retain the configured number of nearest absolute-floor levels as supplemental context.
-
+Adjust `WALL_THRESHOLD_FLOOR` from the Rong add-on settings under `Wall threshold floor`. The floating trade button window shows the live effective wall threshold as `max(configured floor, P97)` for the active symbol, together with the sizes of the three largest bid/ask depth levels. Wall labels, alerts, and patterns all use that same live value. These calculations stay within Bookmap.
 
 ## Logging
 
 Logging is UI-only. Trading actions and incoming `action_log` / `screen_log` messages
-appear in the always-on-top **Rong Logs** window, which keeps the latest 20 messages
-in memory. Diagnostic info/error logging is disabled.
+appear in the always-on-top **bmtrader Logs** window, which keeps the latest 20 messages
+in memory. Diagnostic info/error logging code has been removed.
 
 The plugin does not create or append session `.txt` logs, breakout/pattern `.jsonl`
 logs, or stdout/stderr log mirrors. Existing log files from older versions remain
@@ -419,7 +319,6 @@ on disk. Bookmap's own application logging is controlled by Bookmap.
 ### Settings Panel
 
 The plugin provides an Indicators settings panel accessible via the addon's configuration in Bookmap:
-
 
 | Panel                       | Purpose                                                                         |
 | --------------------------- | ------------------------------------------------------------------------------- |

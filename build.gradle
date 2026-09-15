@@ -9,7 +9,7 @@ version = '1.25'
 def bookmapApiVersion = '7.8.0.13'
 
 base {
-    archivesName = 'rong'
+    archivesName = 'bmtrader'
 }
 
 java {
@@ -34,14 +34,14 @@ dependencies {
 }
 
 shadowJar {
-    archiveClassifier.set('all')
+    archiveFileName.set("lingrong1988_bmtrader_${project.version}.jar")
     relocate 'org.java_websocket', 'com.bookmap.plugin.shaded.websocket'
     relocate 'com.google.gson', 'com.bookmap.plugin.shaded.gson'
 }
 
 jar {
     manifest {
-        attributes 'Implementation-Title': 'Rong'
+        attributes 'Implementation-Title': 'bmtrader'
         attributes 'Implementation-Version': version
     }
 }

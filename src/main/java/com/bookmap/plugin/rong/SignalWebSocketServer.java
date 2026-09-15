@@ -6,15 +6,9 @@ import java.util.List;
 import java.util.LinkedHashMap;
 import java.util.Locale;
 import java.util.Map;
-import java.util.NavigableMap;
 import java.util.Set;
 import java.util.Collections;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.Executors;
-import java.util.concurrent.RejectedExecutionException;
-import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.ScheduledFuture;
-import java.util.concurrent.TimeUnit;
 
 import org.java_websocket.WebSocket;
 import org.java_websocket.handshake.ClientHandshake;
@@ -30,7 +24,6 @@ import com.google.gson.JsonParser;
 
 public class SignalWebSocketServer extends WebSocketServer {
 
-    private static final int DEFAULT_PROTECTED_ABSOLUTE_WALL_LEVELS = 2;
     private static final int WALL_THRESHOLD_LARGEST_LEVEL_COUNT = 3;
 
     @FunctionalInterface
@@ -78,9 +71,6 @@ public class SignalWebSocketServer extends WebSocketServer {
         void onNewPosition(NewPositionDefinition position);
     }
 
-    private final Object schedulerLock = new Object();
-    private ScheduledExecutorService scheduler;
-
     // Per-symbol state
     private final Map<String, OrderBookState> symbolToOrderBook = new ConcurrentHashMap<>();
     private final Map<String, Double> symbolToPips = new ConcurrentHashMap<>();
@@ -108,26 +98,20 @@ public class SignalWebSocketServer extends WebSocketServer {
     private final Set<AccountStateListener> accountStateListeners =
             Collections.newSetFromMap(new ConcurrentHashMap<>());
 
-    // Broadcast config
+    // Wall filtering config
     private final double orderbookPercentile;
-    private final int orderbookIntervalMs;
-    private final Set<WebSocket> orderbookSubscribers = Collections.newSetFromMap(new ConcurrentHashMap<>());
-    private ScheduledFuture<?> orderbookBroadcastTask;
-    private volatile boolean shuttingDown;
 
-    public SignalWebSocketServer(int port, double orderbookPercentile, int orderbookIntervalMs) {
+    public SignalWebSocketServer(int port, double orderbookPercentile) {
         super(new InetSocketAddress("127.0.0.1", port));
         setDaemon(true);
         setReuseAddr(true);
         this.orderbookPercentile = orderbookPercentile;
-        this.orderbookIntervalMs = orderbookIntervalMs;
     }
 
     /** Register a symbol's order book and pips multiplier. */
     public void registerSymbol(String symbol, OrderBookState orderBook, double pips) {
         symbolToOrderBook.put(symbol, orderBook);
         symbolToPips.put(symbol, pips);
-        PluginLog.info("[Rong] Registered symbol: " + symbol);
     }
 
     /** Unregister a symbol when its plugin instance stops. */
@@ -135,7 +119,6 @@ public class SignalWebSocketServer extends WebSocketServer {
         symbolToOrderBook.remove(symbol);
         symbolToPips.remove(symbol);
         symbolToRegularSessionHighLow.remove(symbol);
-        PluginLog.info("[Rong] Unregistered symbol: " + symbol);
     }
 
     public void updateRegularSessionHighLow(String symbol, double price, long timestampNs) {
@@ -165,11 +148,6 @@ public class SignalWebSocketServer extends WebSocketServer {
         return String.format(Locale.US, "HOD/LOD: %.2f/%.2f", snapshot.getHigh(), snapshot.getLow());
     }
 
-    public boolean appendOrderbookSnapshot(String symbol, JsonObject target, int thresholdFloor) {
-        return appendOrderbookSnapshot(
-                symbol, target, thresholdFloor, DEFAULT_PROTECTED_ABSOLUTE_WALL_LEVELS);
-    }
-
     /**
      * Estimate a market fill from Bookmap's current inside market.
      * Long entries use the best ask and short entries use the best bid.
@@ -193,19 +171,6 @@ public class SignalWebSocketServer extends WebSocketServer {
             }
             return BookmapPriceNormalizer.toWirePrice(priceTick, pips);
         }
-    }
-
-    public boolean appendOrderbookSnapshot(
-            String symbol,
-            JsonObject target,
-            int thresholdFloor,
-            int protectedAbsoluteWallLevels) {
-        JsonObject snapshot = buildOrderbookSnapshot(symbol, thresholdFloor, protectedAbsoluteWallLevels);
-        if (snapshot == null) {
-            return false;
-        }
-        target.add("orderbook", snapshot);
-        return true;
     }
 
     private RegularSessionHighLowTracker.Snapshot getRegularSessionHighLow(String symbol) {
@@ -241,86 +206,6 @@ public class SignalWebSocketServer extends WebSocketServer {
                     orderBook.getLargestLevelSizes(WALL_THRESHOLD_LARGEST_LEVEL_COUNT),
                     System.currentTimeMillis());
         }
-    }
-
-    private JsonObject buildOrderbookSnapshot(
-            String symbol,
-            int thresholdFloor,
-            int protectedAbsoluteWallLevels) {
-        String cleanSymbol = SymbolUtils.cleanSymbol(symbol);
-        if (cleanSymbol.isEmpty()) {
-            return null;
-        }
-
-        OrderBookState orderBook = symbolToOrderBook.get(cleanSymbol);
-        Double pips = symbolToPips.get(cleanSymbol);
-        if (orderBook == null || pips == null || pips <= 0 || !Double.isFinite(pips)) {
-            return null;
-        }
-
-        JsonObject snapshot = new JsonObject();
-        snapshot.addProperty("symbol", cleanSymbol);
-        snapshot.addProperty("timestamp", System.currentTimeMillis());
-        BookmapPriceNormalizer.addWirePriceUnit(snapshot);
-        int normalizedThresholdFloor = Math.max(0, thresholdFloor);
-        snapshot.addProperty("wallThreshold", normalizedThresholdFloor);
-        snapshot.addProperty("absoluteWallThreshold", normalizedThresholdFloor);
-        snapshot.addProperty("percentile", orderbookPercentile);
-        snapshot.addProperty("protectedAbsoluteWallLevels", Math.max(0, protectedAbsoluteWallLevels));
-
-        synchronized (orderBook) {
-            WallThreshold threshold = WallThreshold.from(
-                    orderBook, normalizedThresholdFloor, orderbookPercentile);
-            snapshot.addProperty("percentileWallThreshold", threshold.percentileMinSize);
-            snapshot.addProperty("effectiveWallThreshold", threshold.effectiveMinSize);
-            Integer bestBidTick = orderBook.getBestBid();
-            Integer bestAskTick = orderBook.getBestAsk();
-            if (bestBidTick != null) {
-                snapshot.addProperty(
-                        "bestBid",
-                        BookmapPriceNormalizer.toWirePrice(bestBidTick, pips));
-            }
-            if (bestAskTick != null) {
-                snapshot.addProperty(
-                        "bestAsk",
-                        BookmapPriceNormalizer.toWirePrice(bestAskTick, pips));
-            }
-            snapshot.add("largeBids",
-                    buildWallLevels(orderBook.getBids(), pips, threshold, protectedAbsoluteWallLevels));
-            snapshot.add("largeAsks",
-                    buildWallLevels(orderBook.getAsks(), pips, threshold, protectedAbsoluteWallLevels));
-        }
-        return snapshot;
-    }
-
-    private JsonArray buildWallLevels(
-            NavigableMap<Integer, Integer> levels,
-            double pips,
-            WallThreshold threshold,
-            int protectedAbsoluteWallLevels) {
-        JsonArray result = new JsonArray();
-        int protectedLevelsIncluded = 0;
-        int protectedLevelLimit = Math.max(0, protectedAbsoluteWallLevels);
-        for (Map.Entry<Integer, Integer> entry : levels.entrySet()) {
-            int size = entry.getValue();
-            boolean passesEffectiveThreshold = size >= threshold.effectiveMinSize;
-            // Explicit snapshot exception: retain a bounded number of nearest
-            // absolute-floor levels even when they do not pass the effective threshold.
-            boolean protectedAbsoluteLevel = size >= threshold.absoluteMinSize
-                    && size < threshold.effectiveMinSize
-                    && protectedLevelsIncluded < protectedLevelLimit;
-            if (!passesEffectiveThreshold && !protectedAbsoluteLevel) {
-                continue;
-            }
-            if (protectedAbsoluteLevel) {
-                protectedLevelsIncluded++;
-            }
-            JsonArray level = new JsonArray();
-            level.add(BookmapPriceNormalizer.toWirePrice(entry.getKey(), pips));
-            level.add(size);
-            result.add(level);
-        }
-        return result;
     }
 
     public void registerTradeButtonConfigListener(String symbol, TradeButtonConfigListener listener) {
@@ -532,107 +417,12 @@ public class SignalWebSocketServer extends WebSocketServer {
         accountStateListeners.remove(listener);
     }
 
-    public ExitWallAdjustment resolveExitWallAdjustment(
-            String symbol,
-            int pairIndex,
-            int thresholdFloor,
-            double targetOffset) {
-        String cleanSymbol = SymbolUtils.cleanSymbol(symbol);
-        if (cleanSymbol.isEmpty()) {
-            return ExitWallAdjustment.unavailable("missing symbol");
-        }
-
-        AccountStateDefinition state = symbolToAccountState.get(cleanSymbol);
-        if (state == null || !state.hasOpenPosition()) {
-            return ExitWallAdjustment.unavailable("no open position for " + cleanSymbol);
-        }
-
-        AccountPositionDefinition position = state.getPosition();
-        boolean longPosition = position.getNetQuantity() > 0;
-        boolean expectedLimitBuySide = !longPosition;
-        LimitOrderRef limitOrder = findPairLimitOrder(cleanSymbol, state, pairIndex, expectedLimitBuySide);
-        if (limitOrder == null) {
-            return ExitWallAdjustment.unavailable("no LIMIT order found for pair " + pairIndex);
-        }
-
-        OrderBookState orderBook = symbolToOrderBook.get(cleanSymbol);
-        Double pips = symbolToPips.get(cleanSymbol);
-        if (orderBook == null || pips == null || pips <= 0 || !Double.isFinite(pips)) {
-            return ExitWallAdjustment.unavailable("order book is not ready for " + cleanSymbol);
-        }
-
-        boolean bidWall = !longPosition;
-        int sizeThreshold;
-        OrderBookState.DepthLevel wall;
-        synchronized (orderBook) {
-            sizeThreshold = orderBook.getSizeThreshold(thresholdFloor, orderbookPercentile);
-            wall = orderBook.findFirstLevelAtLeast(bidWall, sizeThreshold);
-        }
-        if (wall == null) {
-            return ExitWallAdjustment.unavailable(
-                    "no " + (bidWall ? "bid" : "offer") + " wall >= " + sizeThreshold);
-        }
-
-        int offsetTicks = BookmapPriceNormalizer.wireDistanceToBookmapTicksCeiling(
-                targetOffset, pips);
-        int targetTick = longPosition
-                ? wall.getPriceTick() - offsetTicks
-                : wall.getPriceTick() + offsetTicks;
-        if (targetTick <= 0) {
-            return ExitWallAdjustment.unavailable("computed target price is not valid");
-        }
-
-        return ExitWallAdjustment.available(
-                cleanSymbol,
-                pairIndex,
-                longPosition,
-                bidWall,
-                wall.getPriceTick(),
-                wall.getSize(),
-                sizeThreshold,
-                BookmapPriceNormalizer.toWirePrice(wall.getPriceTick(), pips),
-                BookmapPriceNormalizer.toWirePrice(targetTick, pips),
-                targetOffset,
-                limitOrder);
-    }
-
-    public ExitWallAdjustment resolveSmallestQuantityExitWallAdjustment(
-            String symbol,
-            int thresholdFloor,
-            double targetOffset) {
-        String cleanSymbol = SymbolUtils.cleanSymbol(symbol);
-        if (cleanSymbol.isEmpty()) {
-            return ExitWallAdjustment.unavailable("missing symbol");
-        }
-
-        AccountStateDefinition state = symbolToAccountState.get(cleanSymbol);
-        if (state == null || !state.hasOpenPosition()) {
-            return ExitWallAdjustment.unavailable("no open position for " + cleanSymbol);
-        }
-
-        boolean expectedLimitBuySide = state.getPosition().getNetQuantity() < 0;
-        int pairIndex = findFirstSmallestQuantityPairIndex(
-                cleanSymbol, state, expectedLimitBuySide, true);
-        if (pairIndex <= 0) {
-            pairIndex = findFirstSmallestQuantityPairIndex(
-                    cleanSymbol, state, expectedLimitBuySide, false);
-        }
-        if (pairIndex <= 0) {
-            return ExitWallAdjustment.unavailable(
-                    "no LIMIT exit order with a positive quantity for " + cleanSymbol);
-        }
-        return resolveExitWallAdjustment(cleanSymbol, pairIndex, thresholdFloor, targetOffset);
-    }
-
     @Override
     public void onOpen(WebSocket conn, ClientHandshake handshake) {
-        PluginLog.info("[Rong] Client connected: " + conn.getRemoteSocketAddress());
     }
 
     @Override
     public void onClose(WebSocket conn, int code, String reason, boolean remote) {
-        orderbookSubscribers.remove(conn);
-        PluginLog.info("[Rong] Client disconnected: " + conn.getRemoteSocketAddress());
     }
 
     @Override
@@ -644,8 +434,6 @@ public class SignalWebSocketServer extends WebSocketServer {
             if (isPriceBearingMessageType(type)
                     && !BookmapPriceNormalizer.isSupportedWirePriceUnit(
                             getString(json, BookmapPriceNormalizer.WIRE_PRICE_UNIT_FIELD))) {
-                PluginLog.error("[PriceContract] Ignoring " + type
-                        + " with unsupported priceUnit");
                 return;
             }
             if ("trade_button_config".equals(type) || "trade_buttons_config".equals(type)) {
@@ -685,16 +473,6 @@ public class SignalWebSocketServer extends WebSocketServer {
                 return;
             }
         }
-        if (trimmed.contains("\"subscribe\"") && trimmed.contains("\"orderbook\"")) {
-            orderbookSubscribers.add(conn);
-            ensureOrderbookBroadcast();
-            conn.send("{\"type\":\"subscribed\",\"channel\":\"orderbook\",\"intervalMs\":" + orderbookIntervalMs + ",\"percentile\":" + orderbookPercentile + "}");
-            PluginLog.info("[Rong] Client subscribed to orderbook (interval=" + orderbookIntervalMs + "ms, percentile=" + orderbookPercentile + ")");
-        } else if (trimmed.contains("\"unsubscribe\"") && trimmed.contains("\"orderbook\"")) {
-            orderbookSubscribers.remove(conn);
-            conn.send("{\"type\":\"unsubscribed\",\"channel\":\"orderbook\"}");
-            PluginLog.info("[Rong] Client unsubscribed from orderbook");
-        }
     }
 
     private JsonObject parseJsonObject(String message) {
@@ -703,8 +481,8 @@ public class SignalWebSocketServer extends WebSocketServer {
             if (element != null && element.isJsonObject()) {
                 return element.getAsJsonObject();
             }
-        } catch (RuntimeException e) {
-            PluginLog.error("[TradeButton] Failed to parse WebSocket message: " + e.getMessage());
+        } catch (RuntimeException ignored) {
+            // Ignore invalid messages without writing diagnostic logs.
         }
         return null;
     }
@@ -712,7 +490,6 @@ public class SignalWebSocketServer extends WebSocketServer {
     private void handleVwapUpdate(JsonObject json) {
         String symbol = SymbolUtils.cleanSymbol(getString(json, "symbol"));
         if (symbol.isEmpty()) {
-            PluginLog.error("[VWAP] Ignoring update with missing symbol");
             return;
         }
 
@@ -727,25 +504,19 @@ public class SignalWebSocketServer extends WebSocketServer {
                     && (update.getEffectiveTimeMs() < existing.getEffectiveTimeMs()
                     || (update.getEffectiveTimeMs() == existing.getEffectiveTimeMs()
                     && update.getSentAtMs() <= existing.getSentAtMs()))) {
-                PluginLog.info("[VWAP] Ignoring stale update for " + symbol
-                        + " at " + update.getEffectiveTimeMs());
                 return;
             }
 
             symbolToVwapUpdate.put(symbol, update);
             notifyVwapUpdateListeners(symbol, update);
-            PluginLog.info("[VWAP] Updated " + symbol
-                    + " to " + update.getVwap()
-                    + " at " + update.getEffectiveTimeMs());
-        } catch (IllegalArgumentException e) {
-            PluginLog.error("[VWAP] Ignoring invalid update for " + symbol + ": " + e.getMessage());
+        } catch (IllegalArgumentException ignored) {
+            // Ignore invalid messages without writing diagnostic logs.
         }
     }
 
     private void handleCorePlanConfig(JsonObject json) {
         String symbol = SymbolUtils.cleanSymbol(getString(json, "symbol"));
         if (symbol.isEmpty()) {
-            PluginLog.error("[CorePlan] Ignoring config with missing symbol");
             return;
         }
 
@@ -771,19 +542,14 @@ public class SignalWebSocketServer extends WebSocketServer {
                     getLong(json, "timestamp"));
             symbolToCorePlan.put(symbol, config);
             notifyCorePlanListeners(symbol, config);
-            PluginLog.info("[CorePlan] Updated " + symbol
-                    + (activeTrade
-                    ? " target=" + config.getCoreTarget() + ", count=" + config.getCoreCount()
-                    : " with no active trade"));
-        } catch (IllegalArgumentException e) {
-            PluginLog.error("[CorePlan] Ignoring invalid config for " + symbol + ": " + e.getMessage());
+        } catch (IllegalArgumentException ignored) {
+            // Ignore invalid messages without writing diagnostic logs.
         }
     }
 
     private void handleNewPosition(JsonObject json) {
         String symbol = SymbolUtils.cleanSymbol(getString(json, "symbol"));
         if (symbol.isEmpty()) {
-            PluginLog.error("[NewPosition] Ignoring event with missing symbol");
             return;
         }
 
@@ -800,18 +566,14 @@ public class SignalWebSocketServer extends WebSocketServer {
                     getString(json, "eventId"),
                     getLong(json, "timestamp"));
             notifyNewPositionListeners(symbol, position);
-            PluginLog.info("[NewPosition] " + symbol + " "
-                    + (position.isLongPosition() ? "long" : "short")
-                    + " quantity=" + position.getNetQuantity());
-        } catch (IllegalArgumentException e) {
-            PluginLog.error("[NewPosition] Ignoring invalid event for " + symbol + ": " + e.getMessage());
+        } catch (IllegalArgumentException ignored) {
+            // Ignore invalid messages without writing diagnostic logs.
         }
     }
 
     private void handleTradeButtonConfig(JsonObject json) {
         String symbol = SymbolUtils.cleanSymbol(getString(json, "symbol"));
         if (symbol.isEmpty()) {
-            PluginLog.error("[TradeButton] Ignoring button config with missing symbol");
             return;
         }
 
@@ -821,7 +583,6 @@ public class SignalWebSocketServer extends WebSocketServer {
             tradebooksArray = tradebooksElement.getAsJsonArray();
         }
         if (tradebooksArray == null) {
-            PluginLog.error("[TradeButton] Ignoring button config with missing tradebooks array for " + symbol);
             return;
         }
 
@@ -853,8 +614,6 @@ public class SignalWebSocketServer extends WebSocketServer {
             }
             Boolean sideIsLong = getOptionalBoolean(tradebookJson, "sideIsLong");
             if (sideIsLong == null) {
-                PluginLog.error("[TradeButton] Ignoring " + label
-                        + " with missing or invalid sideIsLong");
                 continue;
             }
             tradebooks.add(new TradebookButtonGroup(
@@ -869,13 +628,11 @@ public class SignalWebSocketServer extends WebSocketServer {
         List<TradebookButtonGroup> immutableTradebooks = Collections.unmodifiableList(tradebooks);
         symbolToTradebooks.put(symbol, immutableTradebooks);
         notifyTradeButtonListeners(symbol, immutableTradebooks);
-        PluginLog.info("[TradeButton] Updated " + tradebooks.size() + " tradebook button groups for " + symbol);
     }
 
     private void handleKeyLevelsConfig(JsonObject json) {
         String symbol = SymbolUtils.cleanSymbol(getString(json, "symbol"));
         if (symbol.isEmpty()) {
-            PluginLog.error("[KeyLevel] Ignoring config with missing symbol");
             return;
         }
 
@@ -884,7 +641,6 @@ public class SignalWebSocketServer extends WebSocketServer {
             levelsElement = json.get("keyLevels");
         }
         if (levelsElement == null || !levelsElement.isJsonArray()) {
-            PluginLog.error("[KeyLevel] Ignoring config with missing levels array for " + symbol);
             return;
         }
 
@@ -909,10 +665,6 @@ public class SignalWebSocketServer extends WebSocketServer {
         MarketLevelDefinition marketLevels = parseMarketLevels(symbol, json);
         symbolToMarketLevels.put(symbol, marketLevels);
         notifyMarketLevelConfigListeners(symbol, marketLevels);
-
-        PluginLog.info("[KeyLevel] Updated " + levels.size() + " websocket key levels for " + symbol
-                + ", " + zones.size() + " key zone(s)"
-                + " and " + marketLevels.getCamPivots().size() + " cam pivot(s)");
     }
 
     private KeyLevelDefinition parseKeyLevel(String symbol, JsonElement element) {
@@ -935,7 +687,6 @@ public class SignalWebSocketServer extends WebSocketServer {
             String label = getString(levelJson, "label");
             return new KeyLevelDefinition(symbol, price, label);
         } catch (RuntimeException e) {
-            PluginLog.error("[KeyLevel] Ignoring malformed level for " + symbol + ": " + e.getMessage());
             return null;
         }
     }
@@ -978,7 +729,6 @@ public class SignalWebSocketServer extends WebSocketServer {
                     getString(zoneJson, "label"),
                     getString(zoneJson, "color"));
         } catch (RuntimeException e) {
-            PluginLog.error("[KeyZone] Ignoring malformed zone for " + symbol + ": " + e.getMessage());
             return null;
         }
     }
@@ -1058,13 +808,11 @@ public class SignalWebSocketServer extends WebSocketServer {
     private void handleExitOrderPairsConfig(JsonObject json) {
         String symbol = SymbolUtils.cleanSymbol(getString(json, "symbol"));
         if (symbol.isEmpty()) {
-            PluginLog.error("[ExitOrder] Ignoring config with missing symbol");
             return;
         }
 
         JsonElement pairsElement = json.get("pairs");
         if (pairsElement == null || !pairsElement.isJsonArray()) {
-            PluginLog.error("[ExitOrder] Ignoring config with missing pairs array for " + symbol);
             return;
         }
 
@@ -1080,7 +828,6 @@ public class SignalWebSocketServer extends WebSocketServer {
         List<ExitOrderPairDefinition> immutablePairs = Collections.unmodifiableList(pairs);
         symbolToExitOrderPairs.put(symbol, immutablePairs);
         notifyExitOrderPairsConfigListeners(symbol, immutablePairs);
-        PluginLog.info("[ExitOrder] Updated " + pairs.size() + " websocket exit pair(s) for " + symbol);
     }
 
     private void handleActionLog(JsonObject json) {
@@ -1095,7 +842,6 @@ public class SignalWebSocketServer extends WebSocketServer {
     private void handleAccountState(JsonObject json) {
         String symbol = SymbolUtils.cleanSymbol(getString(json, "symbol"));
         if (symbol.isEmpty()) {
-            PluginLog.error("[AccountState] Ignoring update with missing symbol");
             return;
         }
 
@@ -1186,7 +932,6 @@ public class SignalWebSocketServer extends WebSocketServer {
                     getBoolean(executionJson, "positionEffectIsOpen"),
                     timeMs);
         } catch (RuntimeException e) {
-            PluginLog.error("[AccountState] Ignoring malformed execution for " + symbol + ": " + e.getMessage());
             return null;
         }
     }
@@ -1222,7 +967,6 @@ public class SignalWebSocketServer extends WebSocketServer {
                     firstNonEmpty(getString(orderJson, "parentOrderID"), getString(orderJson, "parentOrderId")),
                     pairIndex);
         } catch (RuntimeException e) {
-            PluginLog.error("[AccountState] Ignoring malformed order for " + symbol + ": " + e.getMessage());
             return null;
         }
     }
@@ -1236,114 +980,6 @@ public class SignalWebSocketServer extends WebSocketServer {
             return false;
         }
         return getBoolean(orderJson, "isBuy");
-    }
-
-    private LimitOrderRef findPairLimitOrder(
-            String symbol,
-            AccountStateDefinition state,
-            int pairIndex,
-            boolean expectedBuySide) {
-        LimitOrderRef fallback = null;
-        for (AccountOrderDefinition order : state.getOpenOrders()) {
-            if (order == null || order.getPairIndex() != pairIndex || !isLimitOrder(order)) {
-                continue;
-            }
-            LimitOrderRef ref = new LimitOrderRef(
-                    order.getOrderId(),
-                    order.getParentOrderId(),
-                    order.getQuantity(),
-                    order.getPrice(),
-                    order.isBuy(),
-                    order.getSource());
-            if (order.isBuy() == expectedBuySide) {
-                return ref;
-            }
-            if (fallback == null) {
-                fallback = ref;
-            }
-        }
-        if (fallback != null) {
-            return fallback;
-        }
-
-        List<ExitOrderPairDefinition> pairs =
-                symbolToExitOrderPairs.getOrDefault(symbol, Collections.emptyList());
-        for (ExitOrderPairDefinition pair : pairs) {
-            if (pair == null || pair.getIndex() != pairIndex || pair.getLimit() == null) {
-                continue;
-            }
-            ExitOrderLegDefinition limit = pair.getLimit();
-            LimitOrderRef ref = new LimitOrderRef(
-                    limit.getOrderId(),
-                    pair.getParentOrderId(),
-                    limit.getQuantity(),
-                    limit.getPrice(),
-                    limit.isBuy(),
-                    pair.getSource());
-            if (limit.isBuy() == expectedBuySide) {
-                return ref;
-            }
-            if (fallback == null) {
-                fallback = ref;
-            }
-        }
-        return fallback;
-    }
-
-    private int findFirstSmallestQuantityPairIndex(
-            String symbol,
-            AccountStateDefinition state,
-            boolean expectedBuySide,
-            boolean requireExpectedSide) {
-        int selectedIndex = -1;
-        double smallestQuantity = Double.POSITIVE_INFINITY;
-        for (AccountOrderDefinition order : state.getOpenOrders()) {
-            if (order == null || order.getPairIndex() <= 0 || !isLimitOrder(order)
-                    || (requireExpectedSide && order.isBuy() != expectedBuySide)) {
-                continue;
-            }
-            double quantity = order.getQuantity();
-            if (isEarlierSmallestPair(order.getPairIndex(), quantity, selectedIndex, smallestQuantity)) {
-                selectedIndex = order.getPairIndex();
-                smallestQuantity = quantity;
-            }
-        }
-        if (selectedIndex > 0) {
-            return selectedIndex;
-        }
-
-        List<ExitOrderPairDefinition> pairs =
-                symbolToExitOrderPairs.getOrDefault(symbol, Collections.emptyList());
-        for (ExitOrderPairDefinition pair : pairs) {
-            if (pair == null || pair.getIndex() <= 0 || pair.getLimit() == null
-                    || (requireExpectedSide && pair.getLimit().isBuy() != expectedBuySide)) {
-                continue;
-            }
-            double quantity = pair.getLimit().getQuantity();
-            if (isEarlierSmallestPair(pair.getIndex(), quantity, selectedIndex, smallestQuantity)) {
-                selectedIndex = pair.getIndex();
-                smallestQuantity = quantity;
-            }
-        }
-        return selectedIndex;
-    }
-
-    private boolean isEarlierSmallestPair(
-            int candidateIndex,
-            double candidateQuantity,
-            int selectedIndex,
-            double smallestQuantity) {
-        if (!Double.isFinite(candidateQuantity) || candidateQuantity <= 0) {
-            return false;
-        }
-        return candidateQuantity < smallestQuantity
-                || (Double.compare(candidateQuantity, smallestQuantity) == 0
-                && (selectedIndex < 0 || candidateIndex < selectedIndex));
-    }
-
-    private boolean isLimitOrder(AccountOrderDefinition order) {
-        return "LIMIT".equalsIgnoreCase(order.getRole())
-                || "LIMIT".equalsIgnoreCase(order.getOrderType());
     }
 
     private ExitOrderPairDefinition parseExitOrderPair(String symbol, JsonElement element, int fallbackIndex) {
@@ -1375,7 +1011,6 @@ public class SignalWebSocketServer extends WebSocketServer {
                     stop,
                     limit);
         } catch (RuntimeException e) {
-            PluginLog.error("[ExitOrder] Ignoring malformed pair for " + symbol + ": " + e.getMessage());
             return null;
         }
     }
@@ -1400,8 +1035,8 @@ public class SignalWebSocketServer extends WebSocketServer {
         for (KeyLevelConfigListener listener : keyLevelConfigListeners) {
             try {
                 listener.onKeyLevelsChanged(symbol, levels);
-            } catch (RuntimeException e) {
-                PluginLog.error("[KeyLevel] Failed to update listener for " + symbol + ": " + e.getMessage());
+            } catch (RuntimeException ignored) {
+                // Continue notifying other listeners without writing diagnostic logs.
             }
         }
     }
@@ -1421,8 +1056,8 @@ public class SignalWebSocketServer extends WebSocketServer {
         for (KeyZoneConfigListener listener : keyZoneConfigListeners) {
             try {
                 listener.onKeyZonesChanged(symbol, zones);
-            } catch (RuntimeException e) {
-                PluginLog.error("[KeyZone] Failed to update listener for " + symbol + ": " + e.getMessage());
+            } catch (RuntimeException ignored) {
+                // Continue notifying other listeners without writing diagnostic logs.
             }
         }
     }
@@ -1431,8 +1066,8 @@ public class SignalWebSocketServer extends WebSocketServer {
         for (MarketLevelConfigListener listener : marketLevelConfigListeners) {
             try {
                 listener.onMarketLevelsChanged(symbol, marketLevels);
-            } catch (RuntimeException e) {
-                PluginLog.error("[MarketLevel] Failed to update listener for " + symbol + ": " + e.getMessage());
+            } catch (RuntimeException ignored) {
+                // Continue notifying other listeners without writing diagnostic logs.
             }
         }
     }
@@ -1441,8 +1076,8 @@ public class SignalWebSocketServer extends WebSocketServer {
         for (ExitOrderPairsConfigListener listener : exitOrderPairsConfigListeners) {
             try {
                 listener.onExitOrderPairsChanged(symbol, pairs);
-            } catch (RuntimeException e) {
-                PluginLog.error("[ExitOrder] Failed to update listener for " + symbol + ": " + e.getMessage());
+            } catch (RuntimeException ignored) {
+                // Continue notifying other listeners without writing diagnostic logs.
             }
         }
     }
@@ -1451,9 +1086,8 @@ public class SignalWebSocketServer extends WebSocketServer {
         for (AccountStateListener listener : accountStateListeners) {
             try {
                 listener.onAccountStateChanged(state);
-            } catch (RuntimeException e) {
-                PluginLog.error("[AccountState] Failed to update listener for "
-                        + state.getSymbol() + ": " + e.getMessage());
+            } catch (RuntimeException ignored) {
+                // Continue notifying other listeners without writing diagnostic logs.
             }
         }
     }
@@ -1466,9 +1100,8 @@ public class SignalWebSocketServer extends WebSocketServer {
         for (VwapUpdateListener listener : listeners) {
             try {
                 listener.onVwapChanged(update);
-            } catch (RuntimeException e) {
-                PluginLog.error("[VWAP] Failed to notify update listener for "
-                        + symbol + ": " + e.getMessage());
+            } catch (RuntimeException ignored) {
+                // Continue notifying other listeners without writing diagnostic logs.
             }
         }
     }
@@ -1481,9 +1114,8 @@ public class SignalWebSocketServer extends WebSocketServer {
         for (CorePlanConfigListener listener : listeners) {
             try {
                 listener.onCorePlanChanged(config);
-            } catch (RuntimeException e) {
-                PluginLog.error("[CorePlan] Failed to notify listener for "
-                        + symbol + ": " + e.getMessage());
+            } catch (RuntimeException ignored) {
+                // Continue notifying other listeners without writing diagnostic logs.
             }
         }
     }
@@ -1496,9 +1128,8 @@ public class SignalWebSocketServer extends WebSocketServer {
         for (NewPositionListener listener : listeners) {
             try {
                 listener.onNewPosition(position);
-            } catch (RuntimeException e) {
-                PluginLog.error("[NewPosition] Failed to notify listener for "
-                        + symbol + ": " + e.getMessage());
+            } catch (RuntimeException ignored) {
+                // Continue notifying other listeners without writing diagnostic logs.
             }
         }
     }
@@ -1511,8 +1142,8 @@ public class SignalWebSocketServer extends WebSocketServer {
         for (TradeButtonConfigListener listener : listeners) {
             try {
                 listener.onTradeButtonsChanged(tradebooks);
-            } catch (RuntimeException e) {
-                PluginLog.error("[TradeButton] Failed to update button listener for " + symbol + ": " + e.getMessage());
+            } catch (RuntimeException ignored) {
+                // Continue notifying other listeners without writing diagnostic logs.
             }
         }
     }
@@ -1711,7 +1342,7 @@ public class SignalWebSocketServer extends WebSocketServer {
                 List<Integer> largestLevelSizes,
                 long timestamp) {
             this.available = available;
-            this.symbol = normalize(symbol);
+            this.symbol = symbol == null ? "" : symbol;
             this.percentile = percentile;
             this.absoluteMinSize = absoluteMinSize;
             this.percentileMinSize = percentileMinSize;
@@ -1797,284 +1428,19 @@ public class SignalWebSocketServer extends WebSocketServer {
         }
     }
 
-    private static class LimitOrderRef {
-        private final String orderId;
-        private final String parentOrderId;
-        private final double quantity;
-        private final double currentPrice;
-        private final boolean buy;
-        private final String source;
-
-        private LimitOrderRef(
-                String orderId,
-                String parentOrderId,
-                double quantity,
-                double currentPrice,
-                boolean buy,
-                String source) {
-            this.orderId = normalize(orderId);
-            this.parentOrderId = normalize(parentOrderId);
-            this.quantity = quantity;
-            this.currentPrice = currentPrice;
-            this.buy = buy;
-            this.source = normalize(source);
-        }
-    }
-
-    public static class ExitWallAdjustment {
-        private final boolean available;
-        private final String reason;
-        private final String symbol;
-        private final int pairIndex;
-        private final boolean longPosition;
-        private final boolean bidWall;
-        private final int wallPriceTick;
-        private final int wallSize;
-        private final int sizeThreshold;
-        private final double wallPrice;
-        private final double targetPrice;
-        private final double offset;
-        private final String limitOrderId;
-        private final String parentOrderId;
-        private final double limitOrderQuantity;
-        private final double currentLimitPrice;
-        private final boolean limitOrderBuy;
-        private final String source;
-
-        private ExitWallAdjustment(
-                boolean available,
-                String reason,
-                String symbol,
-                int pairIndex,
-                boolean longPosition,
-                boolean bidWall,
-                int wallPriceTick,
-                int wallSize,
-                int sizeThreshold,
-                double wallPrice,
-                double targetPrice,
-                double offset,
-                String limitOrderId,
-                String parentOrderId,
-                double limitOrderQuantity,
-                double currentLimitPrice,
-                boolean limitOrderBuy,
-                String source) {
-            this.available = available;
-            this.reason = normalize(reason);
-            this.symbol = normalize(symbol);
-            this.pairIndex = pairIndex;
-            this.longPosition = longPosition;
-            this.bidWall = bidWall;
-            this.wallPriceTick = wallPriceTick;
-            this.wallSize = wallSize;
-            this.sizeThreshold = sizeThreshold;
-            this.wallPrice = wallPrice;
-            this.targetPrice = targetPrice;
-            this.offset = offset;
-            this.limitOrderId = normalize(limitOrderId);
-            this.parentOrderId = normalize(parentOrderId);
-            this.limitOrderQuantity = limitOrderQuantity;
-            this.currentLimitPrice = currentLimitPrice;
-            this.limitOrderBuy = limitOrderBuy;
-            this.source = normalize(source);
-        }
-
-        private static ExitWallAdjustment unavailable(String reason) {
-            return new ExitWallAdjustment(
-                    false, reason, "", 0, false, false, 0, 0, 0, 0,
-                    0, 0, "", "", 0, 0, false, "");
-        }
-
-        private static ExitWallAdjustment available(
-                String symbol,
-                int pairIndex,
-                boolean longPosition,
-                boolean bidWall,
-                int wallPriceTick,
-                int wallSize,
-                int sizeThreshold,
-                double wallPrice,
-                double targetPrice,
-                double offset,
-                LimitOrderRef limitOrder) {
-            return new ExitWallAdjustment(
-                    true,
-                    "",
-                    symbol,
-                    pairIndex,
-                    longPosition,
-                    bidWall,
-                    wallPriceTick,
-                    wallSize,
-                    sizeThreshold,
-                    wallPrice,
-                    targetPrice,
-                    offset,
-                    limitOrder.orderId,
-                    limitOrder.parentOrderId,
-                    limitOrder.quantity,
-                    limitOrder.currentPrice,
-                    limitOrder.buy,
-                    limitOrder.source);
-        }
-
-        public boolean isAvailable() {
-            return available;
-        }
-
-        public String getReason() {
-            return reason;
-        }
-
-        public String getSymbol() {
-            return symbol;
-        }
-
-        public int getPairIndex() {
-            return pairIndex;
-        }
-
-        public boolean isLongPosition() {
-            return longPosition;
-        }
-
-        public boolean isBidWall() {
-            return bidWall;
-        }
-
-        public int getWallPriceTick() {
-            return wallPriceTick;
-        }
-
-        public int getWallSize() {
-            return wallSize;
-        }
-
-        public int getSizeThreshold() {
-            return sizeThreshold;
-        }
-
-        public double getWallPrice() {
-            return wallPrice;
-        }
-
-        public double getTargetPrice() {
-            return targetPrice;
-        }
-
-        public double getOffset() {
-            return offset;
-        }
-
-        public String getLimitOrderId() {
-            return limitOrderId;
-        }
-
-        public String getParentOrderId() {
-            return parentOrderId;
-        }
-
-        public double getLimitOrderQuantity() {
-            return limitOrderQuantity;
-        }
-
-        public double getCurrentLimitPrice() {
-            return currentLimitPrice;
-        }
-
-        public boolean isLimitOrderBuy() {
-            return limitOrderBuy;
-        }
-
-        public String getSource() {
-            return source;
-        }
-    }
-
-    private static String normalize(String value) {
-        return value == null ? "" : value;
-    }
-
-    private synchronized void ensureOrderbookBroadcast() {
-        if (shuttingDown || orderbookBroadcastTask != null) {
-            return;
-        }
-        try {
-            orderbookBroadcastTask = getOrCreateScheduler().scheduleAtFixedRate(
-                () -> sendOrderbookSnapshots(),
-                0, orderbookIntervalMs, TimeUnit.MILLISECONDS
-            );
-        } catch (RejectedExecutionException e) {
-            PluginLog.error("[Rong] Failed to schedule orderbook broadcast: " + e.getMessage());
-        }
-    }
-
     @Override
     public void onError(WebSocket conn, Exception ex) {
-        PluginLog.error("[Rong] WebSocket error: " + ex.getMessage());
     }
 
     @Override
     public void onStart() {
-        if (shuttingDown) {
-            return;
-        }
-        PluginLog.info("[Rong] WebSocket server started on port " + getPort());
-    }
-
-    public void broadcastSignal(String json) {
-        broadcast(json);
     }
 
     public void shutdown() {
-        shuttingDown = true;
-        synchronized (schedulerLock) {
-            if (orderbookBroadcastTask != null) {
-                orderbookBroadcastTask.cancel(true);
-                orderbookBroadcastTask = null;
-            }
-            if (scheduler != null) {
-                scheduler.shutdownNow();
-                scheduler = null;
-            }
-        }
         try {
             stop(1000);
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
-        }
-    }
-
-    /** Send orderbook snapshots for ALL registered symbols. */
-    private void sendOrderbookSnapshots() {
-        if (orderbookSubscribers.isEmpty()) return;
-        for (Map.Entry<String, OrderBookState> entry : symbolToOrderBook.entrySet()) {
-            String symbol = entry.getKey();
-            OrderBookState orderBook = entry.getValue();
-            Double pips = symbolToPips.get(symbol);
-            if (pips == null) continue;
-
-            String orderbookJson = orderBook.toJson(symbol, pips, orderbookPercentile);
-            for (WebSocket conn : orderbookSubscribers) {
-                if (conn.isOpen()) {
-                    // Orderbook snapshot sending is disabled; keep snapshot computation available for now.
-                    // conn.send(orderbookJson);
-                }
-            }
-        }
-    }
-
-    private ScheduledExecutorService getOrCreateScheduler() {
-        synchronized (schedulerLock) {
-            if (scheduler == null || scheduler.isShutdown()) {
-                scheduler = Executors.newScheduledThreadPool(2, r -> {
-                    Thread t = new Thread(r, "ws-scheduler");
-                    t.setDaemon(true);
-                    return t;
-                });
-            }
-            return scheduler;
         }
     }
 }

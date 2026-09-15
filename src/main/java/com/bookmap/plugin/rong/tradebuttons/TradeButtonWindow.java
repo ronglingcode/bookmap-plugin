@@ -65,8 +65,6 @@ public class TradeButtonWindow {
     private static final Color THRESHOLD_TEXT_COLOR = new Color(24, 35, 46);
     private static final int WINDOW_WIDTH = 570;
     private static final int CONTENT_WIDTH = 540;
-    private static final int ORDERBOOK_PROTECTED_ABSOLUTE_LEVELS = 2;
-    private static final double WALL_OUT_PRICE_OFFSET = 0.02;
     private static final int WALL_THRESHOLD_REFRESH_MS = 1_000;
     private static final double PRIMARY_ENTRY_BUTTON_WEIGHT = 1.35;
     private static final double SECONDARY_ENTRY_BUTTON_WEIGHT = 1.0;
@@ -523,7 +521,6 @@ public class TradeButtonWindow {
         hotkeyPanel.add(createHotkeyButton("Add Partial", "add_partial", "KeyA", true));
         hotkeyPanel.add(createHotkeyButton("Market Out 1", "market_out_1_partial", "KeyM"));
         hotkeyPanel.add(createHotkeyButton("Market Out Half", "market_out_half", "KeyG", true));
-        hotkeyPanel.add(createWallOutButton());
         hotkeyPanel.add(createHotkeyButton("Swap", "swap", "KeyW"));
         hotkeyPanel.add(createCorePlanButton());
         return hotkeyPanel;
@@ -544,13 +541,6 @@ public class TradeButtonWindow {
         JButton button = new JButton(label);
         applyHotkeyButtonStyle(button);
         button.addActionListener(e -> sendHotkeyButtonMessage(id, label, keyCode, shiftKey));
-        return button;
-    }
-
-    private JButton createWallOutButton() {
-        JButton button = new JButton("Wall Out 1");
-        applyHotkeyButtonStyle(button);
-        button.addActionListener(e -> sendWallOutButtonMessage());
         return button;
     }
 
@@ -875,85 +865,21 @@ public class TradeButtonWindow {
             Double estimatedEntryPrice = server.getMarketEntryEstimate(symbol, tradebook.isLong());
             if (estimatedEntryPrice != null) {
                 json.addProperty("estimated_entry_price", estimatedEntryPrice);
-                PluginLog.info(String.format(
-                        Locale.US,
-                        "[TradeButton] %s mkt est %.2f",
-                        symbol,
-                        estimatedEntryPrice));
-            } else {
-                PluginLog.info("[TradeButton] " + symbol + " mkt est unavailable");
             }
         }
         server.appendRegularSessionHighLow(symbol, json);
-        int thresholdFloor = getWallThresholdFloor();
-        server.appendOrderbookSnapshot(
-                symbol, json, thresholdFloor, ORDERBOOK_PROTECTED_ABSOLUTE_LEVELS);
         server.broadcast(json.toString());
         PluginLog.action(symbol, "Button send " + orderType + " " + tradebook.getLabel() + " " + entryMethod);
-        PluginLog.info("[TradeButton] " + orderType + " " + tradebook.getLabel() + ": " + entryMethod
-                + " clicked for " + symbol);
     }
 
     private void sendHotkeyButtonMessage(String buttonId, String buttonName, String keyCode, boolean shiftKey) {
         HotkeyButtonAction.send(server, symbol, buttonId, buttonName, keyCode, shiftKey);
     }
 
-    private void sendWallOutButtonMessage() {
-        int thresholdFloor = getWallThresholdFloor();
-        SignalWebSocketServer.ExitWallAdjustment adjustment = server.resolveSmallestQuantityExitWallAdjustment(
-                symbol,
-                thresholdFloor,
-                WALL_OUT_PRICE_OFFSET);
-        if (!adjustment.isAvailable()) {
-            PluginLog.action(symbol, "Wall Out 1 blocked: " + adjustment.getReason());
-            PluginLog.info("[TradeButton] Wall Out 1 blocked for " + symbol + ": " + adjustment.getReason());
-            return;
-        }
-
-        JsonObject json = new JsonObject();
-        json.addProperty("type", "custom_button_click");
-        BookmapPriceNormalizer.addWirePriceUnit(json);
-        json.addProperty("symbol", symbol);
-        json.addProperty("button_id", "hotkey:wall_out_1");
-        json.addProperty("button_name", "Wall Out 1");
-        json.addProperty("action", "adjust_exit_limit_to_bookmap_wall");
-        json.addProperty("pair_index", adjustment.getPairIndex());
-        json.addProperty("order_role", "LIMIT");
-        json.addProperty("limit_order_id", adjustment.getLimitOrderId());
-        json.addProperty("parent_order_id", adjustment.getParentOrderId());
-        json.addProperty("limit_order_quantity", adjustment.getLimitOrderQuantity());
-        json.addProperty("current_limit_price", adjustment.getCurrentLimitPrice());
-        json.addProperty("position_side", adjustment.isLongPosition() ? "long" : "short");
-        json.addProperty("exit_side", adjustment.isLongPosition() ? "sell" : "buy");
-        json.addProperty("wall_side", adjustment.isBidWall() ? "bid" : "ask");
-        json.addProperty("wall_price", adjustment.getWallPrice());
-        json.addProperty("wall_size", adjustment.getWallSize());
-        json.addProperty("minimum_wall_size", adjustment.getSizeThreshold());
-        json.addProperty("wall_threshold_floor", thresholdFloor);
-        json.addProperty("offset", adjustment.getOffset());
-        json.addProperty("target_price", adjustment.getTargetPrice());
-        json.addProperty("price", adjustment.getTargetPrice());
-        json.addProperty("source", adjustment.getSource());
-        json.addProperty("timestamp", System.currentTimeMillis());
-        server.appendRegularSessionHighLow(symbol, json);
-        server.broadcast(json.toString());
-
-        PluginLog.action(symbol, "Button send Wall Out 1 @ " + formatPrice(adjustment.getTargetPrice())
-                + " before " + (adjustment.isBidWall() ? "bid" : "ask") + " wall "
-                + formatPrice(adjustment.getWallPrice()));
-        PluginLog.info("[TradeButton] Wall Out 1 clicked for " + symbol
-                + ": target=" + formatPrice(adjustment.getTargetPrice())
-                + ", wall=" + formatPrice(adjustment.getWallPrice())
-                + ", size=" + adjustment.getWallSize()
-                + ", threshold=" + adjustment.getSizeThreshold());
-    }
-
     private int getWallThresholdFloor() {
         try {
             return Math.max(0, wallThresholdFloorSupplier.getAsInt());
         } catch (RuntimeException e) {
-            PluginLog.error("[TradeButton] Failed to read wall threshold floor for "
-                    + symbol + ": " + e.getMessage());
             return WallThresholdConfig.DEFAULT_THRESHOLD_FLOOR;
         }
     }

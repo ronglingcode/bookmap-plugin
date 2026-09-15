@@ -8,7 +8,6 @@ import java.util.concurrent.ConcurrentHashMap;
 import com.bookmap.plugin.rong.AccountExecutionDefinition;
 import com.bookmap.plugin.rong.AccountStateDefinition;
 import com.bookmap.plugin.rong.BookmapPriceNormalizer;
-import com.bookmap.plugin.rong.PluginLog;
 import com.bookmap.plugin.rong.SignalWebSocketServer;
 import com.bookmap.plugin.rong.SymbolUtils;
 
@@ -75,7 +74,6 @@ public class FilledExecutionManager implements SignalWebSocketServer.AccountStat
         }
 
         store.replaceAll(instrumentAlias, markers);
-        PluginLog.info("[FilledExecution] Drew " + markers.size() + " fill marker(s) for " + instrumentAlias);
     }
 
     public void shutdown() {
