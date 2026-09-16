@@ -90,8 +90,8 @@ class KeyLevelConfigParsingTest {
         server.onMessage(null, "{"
                 + "\"type\":\"key_levels_config\","
                 + "\"symbol\":\"AAPL\","
-                + "\"waitForBidRetest\":true,"
-                + "\"waitForOfferRetest\":true,"
+                + "\"waitForBidRetest\":\"yes\","
+                + "\"waitForOfferRetest\":\"warning\","
                 + "\"levels\":[]"
                 + "}");
 
@@ -99,6 +99,10 @@ class KeyLevelConfigParsingTest {
                 server.getEntryRetestState("AAPL:NASDAQ:STOCKS@BMD");
         assertTrue(state.isBidRetestPending());
         assertTrue(state.isOfferRetestPending());
+        assertEquals(SignalWebSocketServer.EntryRetestMode.YES, state.getBidRetestMode());
+        assertEquals(SignalWebSocketServer.EntryRetestMode.WARNING, state.getOfferRetestMode());
+        assertTrue(state.isEntryRetestBlocked(true));
+        assertFalse(state.isEntryRetestBlocked(false));
         assertFalse(server.getEntryRetestState("MSFT").isBidRetestPending());
 
         server.markEntryRetestSatisfied("AAPL", true);
@@ -110,20 +114,21 @@ class KeyLevelConfigParsingTest {
         server.onMessage(null, "{"
                 + "\"type\":\"key_levels_config\","
                 + "\"symbol\":\"AAPL\","
-                + "\"waitForBidRetest\":true,"
-                + "\"waitForOfferRetest\":true,"
+                + "\"waitForBidRetest\":\"warning\","
+                + "\"waitForOfferRetest\":\"warning\","
                 + "\"levels\":[]"
                 + "}");
 
         state = server.getEntryRetestState("AAPL");
         assertFalse(state.isBidRetestPending());
         assertTrue(state.isOfferRetestPending());
+        assertEquals(SignalWebSocketServer.EntryRetestMode.WARNING, state.getBidRetestMode());
 
         server.onMessage(null, "{"
                 + "\"type\":\"key_levels_config\","
                 + "\"symbol\":\"AAPL\","
-                + "\"waitForBidRetest\":false,"
-                + "\"waitForOfferRetest\":false,"
+                + "\"waitForBidRetest\":\"no\","
+                + "\"waitForOfferRetest\":\"no\","
                 + "\"levels\":[]"
                 + "}");
 
@@ -135,8 +140,8 @@ class KeyLevelConfigParsingTest {
         server.onMessage(null, "{"
                 + "\"type\":\"key_levels_config\","
                 + "\"symbol\":\"AAPL\","
-                + "\"waitForBidRetest\":true,"
-                + "\"waitForOfferRetest\":false,"
+                + "\"waitForBidRetest\":\"yes\","
+                + "\"waitForOfferRetest\":\"no\","
                 + "\"levels\":[]"
                 + "}");
 

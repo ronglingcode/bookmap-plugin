@@ -131,8 +131,8 @@ Both message types include a `symbol` field identifying the instrument. Trade ac
   "type": "key_levels_config",
   "priceUnit": "real",
   "symbol": "AAPL",
-  "waitForBidRetest": true,
-  "waitForOfferRetest": false,
+  "waitForBidRetest": "yes",
+  "waitForOfferRetest": "warning",
   "levels": [
     { "price": 185.50, "label": "daily resistance" },
     { "price": 180.00 }
@@ -156,7 +156,7 @@ Both message types include a `symbol` field identifying the instrument. Trade ac
 }
 ```
 
-`waitForBidRetest` applies to long-entry buttons and `waitForOfferRetest` applies to short-entry buttons. While required, the corresponding buttons use muted colors and remain clickable, but a click speaks `wait for bid retest` or `wait for offer retest`. A side becomes ready after Bookmap observes a material decrease from an order whose prior size is above the live order-change threshold and attributes the decrease to executions rather than cancellation. On that transition, ViteApp speaks `bid retest done` or `offer retest done`, and the buttons return to their normal colors. Sending an empty `levels` array clears existing key level lines for that symbol. Sending an empty or missing `zones` array clears existing key zones for that symbol. Missing or empty market-level fields clear their corresponding websocket-supplied market lines for that symbol.
+`waitForBidRetest` applies to long entries and `waitForOfferRetest` applies to short entries. Each accepts `"no"` (no wait), `"yes"` (speak the pending warning and block the entry), or `"warning"` (speak the warning but allow the entry). Both waiting modes use muted button colors until Bookmap observes a material decrease from an order whose prior size is above the live order-change threshold and attributes the decrease to executions rather than cancellation. On that transition, ViteApp speaks `bid retest done` or `offer retest done`, and the buttons return to their normal colors. Sending an empty `levels` array clears existing key level lines for that symbol. Sending an empty or missing `zones` array clears existing key zones for that symbol. Missing or empty market-level fields clear their corresponding websocket-supplied market lines for that symbol.
 
 ### Mirror a ViteApp screen log (client → server)
 

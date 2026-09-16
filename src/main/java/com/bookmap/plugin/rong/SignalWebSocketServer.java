@@ -365,17 +365,13 @@ public class SignalWebSocketServer extends WebSocketServer {
     }
 
     private void updateEntryRetestConfiguration(
-            String symbol, Boolean waitForBidRetest, Boolean waitForOfferRetest) {
+            String symbol, EntryRetestMode bidRetestMode, EntryRetestMode offerRetestMode) {
         EntryRetestState updated = null;
         synchronized (entryRetestStateLock) {
             EntryRetestState previous = getEntryRetestState(symbol);
             EntryRetestState candidate = previous.withConfiguration(
-                    waitForBidRetest == null
-                            ? previous.isWaitForBidRetest()
-                            : waitForBidRetest,
-                    waitForOfferRetest == null
-                            ? previous.isWaitForOfferRetest()
-                            : waitForOfferRetest);
+                    bidRetestMode == null ? previous.getBidRetestMode() : bidRetestMode,
+                    offerRetestMode == null ? previous.getOfferRetestMode() : offerRetestMode);
             if (candidate != previous) {
                 symbolToEntryRetestState.put(symbol, candidate);
                 updated = candidate;
@@ -748,10 +744,10 @@ public class SignalWebSocketServer extends WebSocketServer {
         symbolToKeyLevels.put(symbol, immutableLevels);
         notifyKeyLevelConfigListeners(symbol, immutableLevels);
 
-        Boolean waitForBidRetest = getOptionalBoolean(json, "waitForBidRetest");
-        Boolean waitForOfferRetest = getOptionalBoolean(json, "waitForOfferRetest");
-        if (waitForBidRetest != null || waitForOfferRetest != null) {
-            updateEntryRetestConfiguration(symbol, waitForBidRetest, waitForOfferRetest);
+        EntryRetestMode bidRetestMode = getOptionalEntryRetestMode(json, "waitForBidRetest");
+        EntryRetestMode offerRetestMode = getOptionalEntryRetestMode(json, "waitForOfferRetest");
+        if (bidRetestMode != null || offerRetestMode != null) {
+            updateEntryRetestConfiguration(symbol, bidRetestMode, offerRetestMode);
         }
 
         List<KeyZoneDefinition> zones = parseKeyZones(symbol, json);
@@ -1417,6 +1413,25 @@ public class SignalWebSocketServer extends WebSocketServer {
         return element.getAsBoolean();
     }
 
+    private EntryRetestMode getOptionalEntryRetestMode(JsonObject json, String field) {
+        JsonElement element = json.get(field);
+        if (element == null || element.isJsonNull() || !element.isJsonPrimitive()) {
+            return null;
+        }
+        try {
+            if (element.getAsJsonPrimitive().isBoolean()) {
+                // Legacy true had warn-only behavior.
+                return element.getAsBoolean() ? EntryRetestMode.WARNING : EntryRetestMode.NO;
+            }
+            if (!element.getAsJsonPrimitive().isString()) {
+                return null;
+            }
+            return EntryRetestMode.fromWireValue(element.getAsString());
+        } catch (RuntimeException ignored) {
+            return null;
+        }
+    }
+
     private long getLong(JsonObject json, String field) {
         JsonElement element = json.get(field);
         if (element == null || element.isJsonNull()) {
@@ -1517,23 +1532,56 @@ public class SignalWebSocketServer extends WebSocketServer {
         }
     }
 
-    /** Immutable per-symbol readiness for the optional long/short entry retest warnings. */
+    public enum EntryRetestMode {
+        NO("no"),
+        YES("yes"),
+        WARNING("warning");
+
+        private final String wireValue;
+
+        EntryRetestMode(String wireValue) {
+            this.wireValue = wireValue;
+        }
+
+        public String getWireValue() {
+            return wireValue;
+        }
+
+        public boolean requiresRetest() {
+            return this != NO;
+        }
+
+        private static EntryRetestMode fromWireValue(String value) {
+            if (value == null) {
+                return null;
+            }
+            String normalized = value.trim().toLowerCase(Locale.US);
+            for (EntryRetestMode mode : values()) {
+                if (mode.wireValue.equals(normalized)) {
+                    return mode;
+                }
+            }
+            return null;
+        }
+    }
+
+    /** Immutable per-symbol readiness for the optional long/short entry retest rules. */
     public static final class EntryRetestState {
         private static final EntryRetestState READY =
-                new EntryRetestState(false, false, true, true);
+                new EntryRetestState(EntryRetestMode.NO, EntryRetestMode.NO, true, true);
 
-        private final boolean waitForBidRetest;
-        private final boolean waitForOfferRetest;
+        private final EntryRetestMode bidRetestMode;
+        private final EntryRetestMode offerRetestMode;
         private final boolean bidRetestSatisfied;
         private final boolean offerRetestSatisfied;
 
         private EntryRetestState(
-                boolean waitForBidRetest,
-                boolean waitForOfferRetest,
+                EntryRetestMode bidRetestMode,
+                EntryRetestMode offerRetestMode,
                 boolean bidRetestSatisfied,
                 boolean offerRetestSatisfied) {
-            this.waitForBidRetest = waitForBidRetest;
-            this.waitForOfferRetest = waitForOfferRetest;
+            this.bidRetestMode = bidRetestMode;
+            this.offerRetestMode = offerRetestMode;
             this.bidRetestSatisfied = bidRetestSatisfied;
             this.offerRetestSatisfied = offerRetestSatisfied;
         }
@@ -1543,22 +1591,22 @@ public class SignalWebSocketServer extends WebSocketServer {
         }
 
         private EntryRetestState withConfiguration(
-                boolean newWaitForBidRetest, boolean newWaitForOfferRetest) {
-            boolean newBidRetestSatisfied = newWaitForBidRetest
-                    ? waitForBidRetest && bidRetestSatisfied
+                EntryRetestMode newBidRetestMode, EntryRetestMode newOfferRetestMode) {
+            boolean newBidRetestSatisfied = newBidRetestMode.requiresRetest()
+                    ? bidRetestMode.requiresRetest() && bidRetestSatisfied
                     : true;
-            boolean newOfferRetestSatisfied = newWaitForOfferRetest
-                    ? waitForOfferRetest && offerRetestSatisfied
+            boolean newOfferRetestSatisfied = newOfferRetestMode.requiresRetest()
+                    ? offerRetestMode.requiresRetest() && offerRetestSatisfied
                     : true;
-            if (waitForBidRetest == newWaitForBidRetest
-                    && waitForOfferRetest == newWaitForOfferRetest
+            if (bidRetestMode == newBidRetestMode
+                    && offerRetestMode == newOfferRetestMode
                     && bidRetestSatisfied == newBidRetestSatisfied
                     && offerRetestSatisfied == newOfferRetestSatisfied) {
                 return this;
             }
             return new EntryRetestState(
-                    newWaitForBidRetest,
-                    newWaitForOfferRetest,
+                    newBidRetestMode,
+                    newOfferRetestMode,
                     newBidRetestSatisfied,
                     newOfferRetestSatisfied);
         }
@@ -1569,33 +1617,38 @@ public class SignalWebSocketServer extends WebSocketServer {
                     return this;
                 }
                 return new EntryRetestState(
-                        waitForBidRetest, waitForOfferRetest, true, offerRetestSatisfied);
+                        bidRetestMode, offerRetestMode, true, offerRetestSatisfied);
             }
             if (!isOfferRetestPending()) {
                 return this;
             }
             return new EntryRetestState(
-                    waitForBidRetest, waitForOfferRetest, bidRetestSatisfied, true);
+                    bidRetestMode, offerRetestMode, bidRetestSatisfied, true);
         }
 
-        public boolean isWaitForBidRetest() {
-            return waitForBidRetest;
+        public EntryRetestMode getBidRetestMode() {
+            return bidRetestMode;
         }
 
-        public boolean isWaitForOfferRetest() {
-            return waitForOfferRetest;
+        public EntryRetestMode getOfferRetestMode() {
+            return offerRetestMode;
         }
 
         public boolean isBidRetestPending() {
-            return waitForBidRetest && !bidRetestSatisfied;
+            return bidRetestMode.requiresRetest() && !bidRetestSatisfied;
         }
 
         public boolean isOfferRetestPending() {
-            return waitForOfferRetest && !offerRetestSatisfied;
+            return offerRetestMode.requiresRetest() && !offerRetestSatisfied;
         }
 
         public boolean isEntryRetestPending(boolean longEntry) {
             return longEntry ? isBidRetestPending() : isOfferRetestPending();
+        }
+
+        public boolean isEntryRetestBlocked(boolean longEntry) {
+            EntryRetestMode mode = longEntry ? bidRetestMode : offerRetestMode;
+            return mode == EntryRetestMode.YES && isEntryRetestPending(longEntry);
         }
     }
 

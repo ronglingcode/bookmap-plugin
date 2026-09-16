@@ -922,6 +922,8 @@ public class TradeButtonWindow {
         if (!retestWarning.isEmpty()) {
             json.addProperty("retest_warning", retestWarning);
         }
+        boolean retestBlocked = isRetestBlocked(tradebook.isLong(), entryRetestState);
+        json.addProperty("retest_blocked", retestBlocked);
         json.addProperty("timestamp", System.currentTimeMillis());
         if (useMarketOrder) {
             Double estimatedEntryPrice = server.getMarketEntryEstimate(symbol, tradebook.isLong());
@@ -931,7 +933,8 @@ public class TradeButtonWindow {
         }
         server.appendRegularSessionHighLow(symbol, json);
         server.broadcast(json.toString());
-        PluginLog.action(symbol, "Button send " + orderType + " " + tradebook.getLabel() + " " + entryMethod);
+        PluginLog.action(symbol, (retestBlocked ? "Button blocked " : "Button send ")
+                + orderType + " " + tradebook.getLabel() + " " + entryMethod);
     }
 
     private void sendHotkeyButtonMessage(String buttonId, String buttonName, String keyCode, boolean shiftKey) {
@@ -997,6 +1000,11 @@ public class TradeButtonWindow {
             return "";
         }
         return longEntry ? "wait for bid retest" : "wait for offer retest";
+    }
+
+    static boolean isRetestBlocked(
+            boolean longEntry, SignalWebSocketServer.EntryRetestState state) {
+        return state != null && state.isEntryRetestBlocked(longEntry);
     }
 
     private static String formatPercentile(double percentile) {

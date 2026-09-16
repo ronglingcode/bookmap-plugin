@@ -20,23 +20,26 @@ class TradeButtonWindowFormatTest {
     }
 
     @Test
-    void pendingRetestProducesDirectionSpecificWarningWithoutBlockingButtonAction() {
+    void pendingRetestProducesDirectionSpecificWarningAndHonorsBlockingMode() {
         SignalWebSocketServer server = new SignalWebSocketServer(0, 90);
         server.onMessage(null, "{"
                 + "\"type\":\"key_levels_config\","
                 + "\"symbol\":\"AAPL\","
-                + "\"waitForBidRetest\":true,"
-                + "\"waitForOfferRetest\":true,"
+                + "\"waitForBidRetest\":\"yes\","
+                + "\"waitForOfferRetest\":\"warning\","
                 + "\"levels\":[]"
                 + "}");
 
         SignalWebSocketServer.EntryRetestState state = server.getEntryRetestState("AAPL");
         assertEquals("wait for bid retest", TradeButtonWindow.getRetestWarning(true, state));
         assertEquals("wait for offer retest", TradeButtonWindow.getRetestWarning(false, state));
+        assertEquals(true, TradeButtonWindow.isRetestBlocked(true, state));
+        assertEquals(false, TradeButtonWindow.isRetestBlocked(false, state));
 
         server.markEntryRetestSatisfied("AAPL", true);
         state = server.getEntryRetestState("AAPL");
         assertEquals("", TradeButtonWindow.getRetestWarning(true, state));
         assertEquals("wait for offer retest", TradeButtonWindow.getRetestWarning(false, state));
+        assertEquals(false, TradeButtonWindow.isRetestBlocked(true, state));
     }
 }
