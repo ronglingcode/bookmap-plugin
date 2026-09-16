@@ -129,7 +129,21 @@ class OrderWallChangeTrackerTest {
 
         assertTrue(event.isTradeConsumption());
         assertEquals(8_000, event.getTradedSize());
+        assertTrue(event.isQualifyingRetestFill());
         assertFalse(event.isActiveLiquidityAlert());
+    }
+
+    @Test
+    void tradeDrivenDecreaseFromExactlyTheThresholdDoesNotQualifyAsRetest() throws Exception {
+        OrderWallChangeEvent event = captureSingleEvent(tracker -> {
+            tracker.onDepth(true, 11_020, LARGE_THRESHOLD, 1L);
+            tracker.markReady();
+            tracker.onTrade(11_020, LARGE_THRESHOLD, false);
+            tracker.onDepth(true, 11_020, 0, 2L);
+        });
+
+        assertTrue(event.isTradeConsumption());
+        assertFalse(event.isQualifyingRetestFill());
     }
 
     @Test
@@ -141,6 +155,7 @@ class OrderWallChangeTrackerTest {
         });
 
         assertFalse(event.isTradeConsumption());
+        assertFalse(event.isQualifyingRetestFill());
     }
 
     @Test

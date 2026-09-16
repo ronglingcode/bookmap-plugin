@@ -131,7 +131,8 @@ Both message types include a `symbol` field identifying the instrument. Trade ac
   "type": "key_levels_config",
   "priceUnit": "real",
   "symbol": "AAPL",
-  "waitForPriceDiscovery": true,
+  "waitForBidRetest": true,
+  "waitForOfferRetest": false,
   "levels": [
     { "price": 185.50, "label": "daily resistance" },
     { "price": 180.00 }
@@ -155,7 +156,7 @@ Both message types include a `symbol` field identifying the instrument. Trade ac
 }
 ```
 
-`waitForPriceDiscovery` is retained as per-symbol configuration for future plugin behavior. Sending an empty `levels` array clears existing key level lines for that symbol. Sending an empty or missing `zones` array clears existing key zones for that symbol. Missing or empty market-level fields clear their corresponding websocket-supplied market lines for that symbol.
+`waitForBidRetest` applies to long-entry buttons and `waitForOfferRetest` applies to short-entry buttons. While required, the corresponding buttons use muted colors and remain clickable, but a click speaks `wait for bid retest` or `wait for offer retest`. A side becomes ready after Bookmap observes a material decrease from an order whose prior size is above the live order-change threshold and attributes the decrease to executions rather than cancellation. Sending an empty `levels` array clears existing key level lines for that symbol. Sending an empty or missing `zones` array clears existing key zones for that symbol. Missing or empty market-level fields clear their corresponding websocket-supplied market lines for that symbol.
 
 ### Mirror a ViteApp screen log (client → server)
 

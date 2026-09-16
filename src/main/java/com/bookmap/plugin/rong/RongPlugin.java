@@ -626,6 +626,10 @@ public class RongPlugin implements CustomModuleAdapter,
     }
 
     private void handleWallChangeEvent(OrderWallChangeEvent event) {
+        SignalWebSocketServer server = sharedServer;
+        if (server != null && event.isQualifyingRetestFill()) {
+            server.markEntryRetestSatisfied(event.getInstrumentAlias(), event.isBid());
+        }
         if (indicatorConfig == null || !indicatorConfig.areOrderChangeAlertsEnabled()) {
             return;
         }

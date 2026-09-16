@@ -84,34 +84,64 @@ class KeyLevelConfigParsingTest {
     }
 
     @Test
-    void waitForPriceDiscoveryIsStoredBySymbol() {
+    void entryRetestRequirementsAreStoredAndSatisfiedIndependentlyBySymbol() {
         SignalWebSocketServer server = new SignalWebSocketServer(0, 90);
 
         server.onMessage(null, "{"
                 + "\"type\":\"key_levels_config\","
                 + "\"symbol\":\"AAPL\","
-                + "\"waitForPriceDiscovery\":true,"
+                + "\"waitForBidRetest\":true,"
+                + "\"waitForOfferRetest\":true,"
                 + "\"levels\":[]"
                 + "}");
 
-        assertTrue(server.isWaitForPriceDiscovery("AAPL:NASDAQ:STOCKS@BMD"));
-        assertFalse(server.isWaitForPriceDiscovery("MSFT"));
+        SignalWebSocketServer.EntryRetestState state =
+                server.getEntryRetestState("AAPL:NASDAQ:STOCKS@BMD");
+        assertTrue(state.isBidRetestPending());
+        assertTrue(state.isOfferRetestPending());
+        assertFalse(server.getEntryRetestState("MSFT").isBidRetestPending());
+
+        server.markEntryRetestSatisfied("AAPL", true);
+        state = server.getEntryRetestState("AAPL");
+        assertFalse(state.isBidRetestPending());
+        assertTrue(state.isOfferRetestPending());
+
+        // Periodic ViteApp refreshes must not re-arm an already satisfied requirement.
+        server.onMessage(null, "{"
+                + "\"type\":\"key_levels_config\","
+                + "\"symbol\":\"AAPL\","
+                + "\"waitForBidRetest\":true,"
+                + "\"waitForOfferRetest\":true,"
+                + "\"levels\":[]"
+                + "}");
+
+        state = server.getEntryRetestState("AAPL");
+        assertFalse(state.isBidRetestPending());
+        assertTrue(state.isOfferRetestPending());
 
         server.onMessage(null, "{"
                 + "\"type\":\"key_levels_config\","
                 + "\"symbol\":\"AAPL\","
+                + "\"waitForBidRetest\":false,"
+                + "\"waitForOfferRetest\":false,"
                 + "\"levels\":[]"
                 + "}");
 
-        assertTrue(server.isWaitForPriceDiscovery("AAPL"));
+        state = server.getEntryRetestState("AAPL");
+        assertFalse(state.isBidRetestPending());
+        assertFalse(state.isOfferRetestPending());
 
+        // A later false -> true transition starts a fresh wait.
         server.onMessage(null, "{"
                 + "\"type\":\"key_levels_config\","
                 + "\"symbol\":\"AAPL\","
-                + "\"waitForPriceDiscovery\":false,"
+                + "\"waitForBidRetest\":true,"
+                + "\"waitForOfferRetest\":false,"
                 + "\"levels\":[]"
                 + "}");
 
-        assertFalse(server.isWaitForPriceDiscovery("AAPL"));
+        state = server.getEntryRetestState("AAPL");
+        assertTrue(state.isBidRetestPending());
+        assertFalse(state.isOfferRetestPending());
     }
 }

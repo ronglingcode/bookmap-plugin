@@ -71,13 +71,18 @@ public class SignalWebSocketServer extends WebSocketServer {
         void onNewPosition(NewPositionDefinition position);
     }
 
+    @FunctionalInterface
+    public interface EntryRetestStateListener {
+        void onEntryRetestStateChanged(EntryRetestState state);
+    }
+
     // Per-symbol state
     private final Map<String, OrderBookState> symbolToOrderBook = new ConcurrentHashMap<>();
     private final Map<String, Double> symbolToPips = new ConcurrentHashMap<>();
     private final Map<String, List<TradebookButtonGroup>> symbolToTradebooks = new ConcurrentHashMap<>();
     private final Map<String, List<KeyLevelDefinition>> symbolToKeyLevels = new ConcurrentHashMap<>();
     private final Map<String, List<KeyZoneDefinition>> symbolToKeyZones = new ConcurrentHashMap<>();
-    private final Map<String, Boolean> symbolToWaitForPriceDiscovery = new ConcurrentHashMap<>();
+    private final Map<String, EntryRetestState> symbolToEntryRetestState = new ConcurrentHashMap<>();
     private final Map<String, MarketLevelDefinition> symbolToMarketLevels = new ConcurrentHashMap<>();
     private final Map<String, List<ExitOrderPairDefinition>> symbolToExitOrderPairs = new ConcurrentHashMap<>();
     private final Map<String, AccountStateDefinition> symbolToAccountState = new ConcurrentHashMap<>();
@@ -88,6 +93,9 @@ public class SignalWebSocketServer extends WebSocketServer {
     private final Map<String, Set<VwapUpdateListener>> symbolToVwapUpdateListeners = new ConcurrentHashMap<>();
     private final Map<String, Set<CorePlanConfigListener>> symbolToCorePlanListeners = new ConcurrentHashMap<>();
     private final Map<String, Set<NewPositionListener>> symbolToNewPositionListeners = new ConcurrentHashMap<>();
+    private final Map<String, Set<EntryRetestStateListener>> symbolToEntryRetestStateListeners =
+            new ConcurrentHashMap<>();
+    private final Object entryRetestStateLock = new Object();
     private final Set<KeyLevelConfigListener> keyLevelConfigListeners =
             Collections.newSetFromMap(new ConcurrentHashMap<>());
     private final Set<KeyZoneConfigListener> keyZoneConfigListeners =
@@ -296,9 +304,75 @@ public class SignalWebSocketServer extends WebSocketServer {
         return null;
     }
 
-    public boolean isWaitForPriceDiscovery(String symbol) {
+    public EntryRetestState getEntryRetestState(String symbol) {
         String cleanSymbol = SymbolUtils.cleanSymbol(symbol);
-        return Boolean.TRUE.equals(symbolToWaitForPriceDiscovery.get(cleanSymbol));
+        return symbolToEntryRetestState.getOrDefault(cleanSymbol, EntryRetestState.ready());
+    }
+
+    public void registerEntryRetestStateListener(
+            String symbol, EntryRetestStateListener listener) {
+        String cleanSymbol = SymbolUtils.cleanSymbol(symbol);
+        symbolToEntryRetestStateListeners
+                .computeIfAbsent(
+                        cleanSymbol,
+                        ignored -> Collections.newSetFromMap(new ConcurrentHashMap<>()))
+                .add(listener);
+        listener.onEntryRetestStateChanged(getEntryRetestState(cleanSymbol));
+    }
+
+    public void unregisterEntryRetestStateListener(
+            String symbol, EntryRetestStateListener listener) {
+        String cleanSymbol = SymbolUtils.cleanSymbol(symbol);
+        Set<EntryRetestStateListener> listeners = symbolToEntryRetestStateListeners.get(cleanSymbol);
+        if (listeners == null) {
+            return;
+        }
+        listeners.remove(listener);
+        if (listeners.isEmpty()) {
+            symbolToEntryRetestStateListeners.remove(cleanSymbol, listeners);
+        }
+    }
+
+    /** Marks the configured side ready after Bookmap sees a qualifying filled-depth decrease. */
+    public void markEntryRetestSatisfied(String symbol, boolean bidRetest) {
+        String cleanSymbol = SymbolUtils.cleanSymbol(symbol);
+        if (cleanSymbol.isEmpty()) {
+            return;
+        }
+        EntryRetestState updated = null;
+        synchronized (entryRetestStateLock) {
+            EntryRetestState previous = getEntryRetestState(cleanSymbol);
+            EntryRetestState candidate = previous.withRetestSatisfied(bidRetest);
+            if (candidate != previous) {
+                symbolToEntryRetestState.put(cleanSymbol, candidate);
+                updated = candidate;
+            }
+        }
+        if (updated != null) {
+            notifyEntryRetestStateListeners(cleanSymbol, updated);
+        }
+    }
+
+    private void updateEntryRetestConfiguration(
+            String symbol, Boolean waitForBidRetest, Boolean waitForOfferRetest) {
+        EntryRetestState updated = null;
+        synchronized (entryRetestStateLock) {
+            EntryRetestState previous = getEntryRetestState(symbol);
+            EntryRetestState candidate = previous.withConfiguration(
+                    waitForBidRetest == null
+                            ? previous.isWaitForBidRetest()
+                            : waitForBidRetest,
+                    waitForOfferRetest == null
+                            ? previous.isWaitForOfferRetest()
+                            : waitForOfferRetest);
+            if (candidate != previous) {
+                symbolToEntryRetestState.put(symbol, candidate);
+                updated = candidate;
+            }
+        }
+        if (updated != null) {
+            notifyEntryRetestStateListeners(symbol, updated);
+        }
     }
 
     public void registerKeyLevelConfigListener(KeyLevelConfigListener listener) {
@@ -663,9 +737,10 @@ public class SignalWebSocketServer extends WebSocketServer {
         symbolToKeyLevels.put(symbol, immutableLevels);
         notifyKeyLevelConfigListeners(symbol, immutableLevels);
 
-        Boolean waitForPriceDiscovery = getOptionalBoolean(json, "waitForPriceDiscovery");
-        if (waitForPriceDiscovery != null) {
-            symbolToWaitForPriceDiscovery.put(symbol, waitForPriceDiscovery);
+        Boolean waitForBidRetest = getOptionalBoolean(json, "waitForBidRetest");
+        Boolean waitForOfferRetest = getOptionalBoolean(json, "waitForOfferRetest");
+        if (waitForBidRetest != null || waitForOfferRetest != null) {
+            updateEntryRetestConfiguration(symbol, waitForBidRetest, waitForOfferRetest);
         }
 
         List<KeyZoneDefinition> zones = parseKeyZones(symbol, json);
@@ -1145,6 +1220,20 @@ public class SignalWebSocketServer extends WebSocketServer {
         }
     }
 
+    private void notifyEntryRetestStateListeners(String symbol, EntryRetestState state) {
+        Set<EntryRetestStateListener> listeners = symbolToEntryRetestStateListeners.get(symbol);
+        if (listeners == null) {
+            return;
+        }
+        for (EntryRetestStateListener listener : listeners) {
+            try {
+                listener.onEntryRetestStateChanged(state);
+            } catch (RuntimeException ignored) {
+                // Continue notifying other listeners without writing diagnostic logs.
+            }
+        }
+    }
+
     private void notifyTradeButtonListeners(String symbol, List<TradebookButtonGroup> tradebooks) {
         Set<TradeButtonConfigListener> listeners = symbolToTradeButtonListeners.get(symbol);
         if (listeners == null) {
@@ -1414,6 +1503,88 @@ public class SignalWebSocketServer extends WebSocketServer {
 
         public long getTimestamp() {
             return timestamp;
+        }
+    }
+
+    /** Immutable per-symbol readiness for the optional long/short entry retest warnings. */
+    public static final class EntryRetestState {
+        private static final EntryRetestState READY =
+                new EntryRetestState(false, false, true, true);
+
+        private final boolean waitForBidRetest;
+        private final boolean waitForOfferRetest;
+        private final boolean bidRetestSatisfied;
+        private final boolean offerRetestSatisfied;
+
+        private EntryRetestState(
+                boolean waitForBidRetest,
+                boolean waitForOfferRetest,
+                boolean bidRetestSatisfied,
+                boolean offerRetestSatisfied) {
+            this.waitForBidRetest = waitForBidRetest;
+            this.waitForOfferRetest = waitForOfferRetest;
+            this.bidRetestSatisfied = bidRetestSatisfied;
+            this.offerRetestSatisfied = offerRetestSatisfied;
+        }
+
+        private static EntryRetestState ready() {
+            return READY;
+        }
+
+        private EntryRetestState withConfiguration(
+                boolean newWaitForBidRetest, boolean newWaitForOfferRetest) {
+            boolean newBidRetestSatisfied = newWaitForBidRetest
+                    ? waitForBidRetest && bidRetestSatisfied
+                    : true;
+            boolean newOfferRetestSatisfied = newWaitForOfferRetest
+                    ? waitForOfferRetest && offerRetestSatisfied
+                    : true;
+            if (waitForBidRetest == newWaitForBidRetest
+                    && waitForOfferRetest == newWaitForOfferRetest
+                    && bidRetestSatisfied == newBidRetestSatisfied
+                    && offerRetestSatisfied == newOfferRetestSatisfied) {
+                return this;
+            }
+            return new EntryRetestState(
+                    newWaitForBidRetest,
+                    newWaitForOfferRetest,
+                    newBidRetestSatisfied,
+                    newOfferRetestSatisfied);
+        }
+
+        private EntryRetestState withRetestSatisfied(boolean bidRetest) {
+            if (bidRetest) {
+                if (!isBidRetestPending()) {
+                    return this;
+                }
+                return new EntryRetestState(
+                        waitForBidRetest, waitForOfferRetest, true, offerRetestSatisfied);
+            }
+            if (!isOfferRetestPending()) {
+                return this;
+            }
+            return new EntryRetestState(
+                    waitForBidRetest, waitForOfferRetest, bidRetestSatisfied, true);
+        }
+
+        public boolean isWaitForBidRetest() {
+            return waitForBidRetest;
+        }
+
+        public boolean isWaitForOfferRetest() {
+            return waitForOfferRetest;
+        }
+
+        public boolean isBidRetestPending() {
+            return waitForBidRetest && !bidRetestSatisfied;
+        }
+
+        public boolean isOfferRetestPending() {
+            return waitForOfferRetest && !offerRetestSatisfied;
+        }
+
+        public boolean isEntryRetestPending(boolean longEntry) {
+            return longEntry ? isBidRetestPending() : isOfferRetestPending();
         }
     }
 

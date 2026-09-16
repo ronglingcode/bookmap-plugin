@@ -215,6 +215,15 @@ public class OrderWallChangeEvent {
         return isMaterialChange() && withinDayRange && !tradeConsumption;
     }
 
+    /** A material above-threshold depth decrease explained by actual executions. */
+    public boolean isQualifyingRetestFill() {
+        return isMaterialChange()
+                && tradeConsumption
+                && effectiveThreshold > 0
+                && previousSize > effectiveThreshold
+                && currentSize < previousSize;
+    }
+
     public LabelType getLabelType() {
         switch (type) {
             case BID_MOVED_UP:

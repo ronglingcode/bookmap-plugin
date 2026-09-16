@@ -56,6 +56,8 @@ public class TradeButtonWindow {
 
     private static final Color LONG_TRADEBOOK_BUTTON_COLOR = new Color(38, 139, 88);
     private static final Color SHORT_TRADEBOOK_BUTTON_COLOR = new Color(180, 62, 62);
+    private static final Color WAITING_LONG_TRADEBOOK_BUTTON_COLOR = new Color(91, 119, 102);
+    private static final Color WAITING_SHORT_TRADEBOOK_BUTTON_COLOR = new Color(139, 92, 92);
     private static final Color TRADEBOOK_BUTTON_TEXT_COLOR = Color.WHITE;
     private static final Color HOTKEY_BUTTON_HOVER_COLOR = new Color(222, 235, 255);
     private static final Color MODE_BREAKOUT_BACKGROUND = new Color(38, 139, 88);
@@ -83,6 +85,11 @@ public class TradeButtonWindow {
     private final SignalWebSocketServer.TradeButtonConfigListener buttonConfigListener;
     private final SignalWebSocketServer.CorePlanConfigListener corePlanConfigListener;
     private final SignalWebSocketServer.NewPositionListener newPositionListener;
+    private final SignalWebSocketServer.EntryRetestStateListener entryRetestStateListener;
+    private final Set<JButton> longEntryButtons =
+            Collections.newSetFromMap(new ConcurrentHashMap<>());
+    private final Set<JButton> shortEntryButtons =
+            Collections.newSetFromMap(new ConcurrentHashMap<>());
     private JFrame frame;
     private JPanel buttonPanel;
     private JLabel shiftModeLabel;
@@ -98,6 +105,7 @@ public class TradeButtonWindow {
     private String lastReminderTradeId = "";
     private JDialog newPositionReminderDialog;
     private String lastNewPositionReminderEventId = "";
+    private volatile SignalWebSocketServer.EntryRetestState entryRetestState;
     private volatile boolean disposed;
 
     public TradeButtonWindow(String symbol, SignalWebSocketServer server,
@@ -110,6 +118,8 @@ public class TradeButtonWindow {
         this.buttonConfigListener = this::setButtons;
         this.corePlanConfigListener = this::setCorePlanConfig;
         this.newPositionListener = this::onNewPosition;
+        this.entryRetestState = server.getEntryRetestState(symbol);
+        this.entryRetestStateListener = this::setEntryRetestState;
         SwingUtilities.invokeLater(this::buildWindow);
     }
 
@@ -144,12 +154,22 @@ public class TradeButtonWindow {
         server.registerTradeButtonConfigListener(symbol, buttonConfigListener);
         server.registerCorePlanConfigListener(symbol, corePlanConfigListener);
         server.registerNewPositionListener(symbol, newPositionListener);
+        server.registerEntryRetestStateListener(symbol, entryRetestStateListener);
     }
 
     private void setButtons(List<TradebookButtonGroup> tradebooks) {
         SwingUtilities.invokeLater(() -> {
             if (!disposed) {
                 renderButtons(tradebooks);
+            }
+        });
+    }
+
+    private void setEntryRetestState(SignalWebSocketServer.EntryRetestState state) {
+        entryRetestState = state;
+        SwingUtilities.invokeLater(() -> {
+            if (!disposed) {
+                refreshEntryButtonStyles();
             }
         });
     }
@@ -474,6 +494,8 @@ public class TradeButtonWindow {
         if (disposed || buttonPanel == null) {
             return;
         }
+        longEntryButtons.clear();
+        shortEntryButtons.clear();
         buttonPanel.removeAll();
         buttonPanel.setPreferredSize(null);
         buttonPanel.setLayout(new BoxLayout(buttonPanel, BoxLayout.Y_AXIS));
@@ -604,6 +626,7 @@ public class TradeButtonWindow {
     private JButton createEntryButton(TradebookButtonGroup tradebook, String entryMethod) {
         JButton button = new JButton(entryMethod);
         applyTradebookButtonStyle(button, tradebook.isLong());
+        (tradebook.isLong() ? longEntryButtons : shortEntryButtons).add(button);
         button.putClientProperty(SHIFT_DOWN_CLIENT_PROPERTY, Boolean.FALSE);
         button.addMouseListener(new MouseAdapter() {
             @Override
@@ -648,7 +671,33 @@ public class TradeButtonWindow {
         button.setForeground(TRADEBOOK_BUTTON_TEXT_COLOR);
         button.setOpaque(true);
         button.setBorderPainted(false);
-        applyButtonHoverStyle(button, color, brighten(color));
+        button.setContentAreaFilled(true);
+        button.setRolloverEnabled(true);
+        attachShiftMouseRefresh(button);
+        button.addMouseListener(new MouseAdapter() {
+            @Override
+            public void mouseEntered(MouseEvent e) {
+                if (button.isEnabled()) {
+                    button.setBackground(brighten(getTradebookButtonColor(sideIsLong)));
+                }
+            }
+
+            @Override
+            public void mouseExited(MouseEvent e) {
+                button.setBackground(getTradebookButtonColor(sideIsLong));
+            }
+        });
+    }
+
+    private void refreshEntryButtonStyles() {
+        Color longColor = getTradebookButtonColor(true);
+        for (JButton button : longEntryButtons) {
+            button.setBackground(longColor);
+        }
+        Color shortColor = getTradebookButtonColor(false);
+        for (JButton button : shortEntryButtons) {
+            button.setBackground(shortColor);
+        }
     }
 
     private void applyHotkeyButtonStyle(JButton button) {
@@ -707,7 +756,16 @@ public class TradeButtonWindow {
     }
 
     private Color getTradebookButtonColor(boolean sideIsLong) {
-        return sideIsLong ? LONG_TRADEBOOK_BUTTON_COLOR : SHORT_TRADEBOOK_BUTTON_COLOR;
+        boolean waiting = entryRetestState != null
+                && entryRetestState.isEntryRetestPending(sideIsLong);
+        if (sideIsLong) {
+            return waiting
+                    ? WAITING_LONG_TRADEBOOK_BUTTON_COLOR
+                    : LONG_TRADEBOOK_BUTTON_COLOR;
+        }
+        return waiting
+                ? WAITING_SHORT_TRADEBOOK_BUTTON_COLOR
+                : SHORT_TRADEBOOK_BUTTON_COLOR;
     }
 
     static boolean isShiftModified(ActionEvent event) {
@@ -860,6 +918,10 @@ public class TradeButtonWindow {
         json.addProperty("tradebook_id", tradebook.getTradebookId());
         json.addProperty("tradebook_name", tradebook.getTradebookName());
         json.addProperty("entry_method", entryMethod);
+        String retestWarning = getRetestWarning(tradebook.isLong(), entryRetestState);
+        if (!retestWarning.isEmpty()) {
+            json.addProperty("retest_warning", retestWarning);
+        }
         json.addProperty("timestamp", System.currentTimeMillis());
         if (useMarketOrder) {
             Double estimatedEntryPrice = server.getMarketEntryEstimate(symbol, tradebook.isLong());
@@ -929,6 +991,14 @@ public class TradeButtonWindow {
         return text.toString();
     }
 
+    static String getRetestWarning(
+            boolean longEntry, SignalWebSocketServer.EntryRetestState state) {
+        if (state == null || !state.isEntryRetestPending(longEntry)) {
+            return "";
+        }
+        return longEntry ? "wait for bid retest" : "wait for offer retest";
+    }
+
     private static String formatPercentile(double percentile) {
         if (Math.abs(percentile - Math.rint(percentile)) < 0.00001) {
             return String.format(Locale.US, "%.0f", percentile);
@@ -946,6 +1016,7 @@ public class TradeButtonWindow {
         server.unregisterTradeButtonConfigListener(symbol, buttonConfigListener);
         server.unregisterCorePlanConfigListener(symbol, corePlanConfigListener);
         server.unregisterNewPositionListener(symbol, newPositionListener);
+        server.unregisterEntryRetestStateListener(symbol, entryRetestStateListener);
         SwingUtilities.invokeLater(() -> {
             closeCorePlanDialog();
             closeNewPositionReminder();
@@ -956,6 +1027,8 @@ public class TradeButtonWindow {
             buttonPanel = null;
             shiftModeLabel = null;
             wallThresholdLabel = null;
+            longEntryButtons.clear();
+            shortEntryButtons.clear();
         });
     }
 }
