@@ -6,7 +6,7 @@ This repository builds the bmtrader trading addon:
 
 | Plugin   | JAR                | Description                   |
 | -------- | ------------------ | ----------------------------- |
-| **bmtrader** | `lingrong1988_bmtrader_1.26.jar` | Personal plugin (private use) |
+| **bmtrader** | `lingrong1988_bmtrader_1.27.jar` | Personal plugin (private use) |
 
 ## How It Works
 
@@ -61,7 +61,7 @@ windows: gradlew build
 
 Output JAR:
 
-- `build/libs/lingrong1988_bmtrader_1.26.jar` contains the `bmtrader` trading addon
+- `build/libs/lingrong1988_bmtrader_1.27.jar` contains the `bmtrader` trading addon
 
 The release JAR obfuscates implementation class, method, and field names and removes
 source filenames, line numbers, and local-variable metadata. README/Markdown files,
@@ -80,7 +80,7 @@ JAR, without putting the original implementation classes on their classpath.
 
 1. Open Bookmap
 2. Go to **Settings** (gear icon) > **API Plugins Configuration**
-3. Click **Add** and select `lingrong1988_bmtrader_1.26.jar`
+3. Click **Add** and select `lingrong1988_bmtrader_1.27.jar`
 4. In the popup, check the plugin name and click OK
 5. Add the addon to a chart: right-click the chart > **Add Addon** > select the plugin
 
