@@ -350,7 +350,18 @@ public class SignalWebSocketServer extends WebSocketServer {
         }
         if (updated != null) {
             notifyEntryRetestStateListeners(cleanSymbol, updated);
+            broadcastEntryRetestReady(cleanSymbol, bidRetest);
         }
+    }
+
+    private void broadcastEntryRetestReady(String symbol, boolean bidRetest) {
+        JsonObject json = new JsonObject();
+        json.addProperty("type", "entry_retest_ready");
+        json.addProperty("symbol", symbol);
+        json.addProperty("side", bidRetest ? "bid" : "offer");
+        json.addProperty("message", bidRetest ? "bid retest done" : "offer retest done");
+        json.addProperty("timestamp", System.currentTimeMillis());
+        broadcast(json.toString());
     }
 
     private void updateEntryRetestConfiguration(
