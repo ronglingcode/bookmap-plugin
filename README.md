@@ -19,7 +19,7 @@ This repository builds the bmtrader trading addon:
 ## Features
 
 - **Chart keyboard hotkeys** — the highlighted Bookmap tab is shown at the top of the bmtrader Logs window and is authoritative for hover hotkeys. When enabled, C/F cancel or flatten and W swaps that symbol without using its price, B/S place bid/offer wall-reversal stop entries at the hovered price only before 10:00 AM New York time, top-row digits adjust exits, and numpad digits market out partials at any time. **Market Out 1**, Digit1, KeyM, and Numpad1 select the first exit pair tied for the smallest share quantity; digits 2–0 remain positional.
-- **Order wall signals** — displays liquidity-wall changes and breakout badges inside Bookmap
+- **Order wall signals** — displays active bid/offer size changes at their price on Bookmap's right edge
 - **Auto-drawn indicators** — ViteApp VWAP, premarket high/low, and Camarilla Pivot levels drawn automatically
 - **WebSocket key levels/zones** — instrument-specific price levels and zones pushed by an external app
 - **WebSocket API** — manual trading actions, exit-plan updates, and incoming display configurations
@@ -131,6 +131,7 @@ Both message types include a `symbol` field identifying the instrument. Trade ac
   "type": "key_levels_config",
   "priceUnit": "real",
   "symbol": "AAPL",
+  "waitForPriceDiscovery": true,
   "levels": [
     { "price": 185.50, "label": "daily resistance" },
     { "price": 180.00 }
@@ -154,7 +155,7 @@ Both message types include a `symbol` field identifying the instrument. Trade ac
 }
 ```
 
-Sending an empty `levels` array clears existing key level lines for that symbol. Sending an empty or missing `zones` array clears existing key zones for that symbol. Missing or empty market-level fields clear their corresponding websocket-supplied market lines for that symbol.
+`waitForPriceDiscovery` is retained as per-symbol configuration for future plugin behavior. Sending an empty `levels` array clears existing key level lines for that symbol. Sending an empty or missing `zones` array clears existing key zones for that symbol. Missing or empty market-level fields clear their corresponding websocket-supplied market lines for that symbol.
 
 ### Mirror a ViteApp screen log (client → server)
 
@@ -250,7 +251,7 @@ ViteApp sends its authoritative VWAP after each 1-minute candle closes. `effecti
 
 The plugin draws market levels supplied by the external WebSocket client. Each indicator can be enabled or disabled in the **Indicators** settings panel.
 
-Order wall size-change sounds are enabled by default. The visual size-change alert overlays are disabled by default to keep the heatmap uncluttered, but they can still be enabled from the **Indicators** settings panel.
+Order wall size-change sounds and visual alerts are enabled by default. **Enable Order Change Alerts** is the global switch for the feature across all instruments; turning it off suppresses both labels and sounds, while **Play Order Change Alert Sound** remains a subordinate preference. At each price, an event qualifies after a 500 ms stability window when its aggregate depth crosses the live `min(10,000, max(5,000, fifth-largest current order))` threshold or its absolute size delta is greater than that threshold. A same-side pull and add within 500 ms whose quantities match within 10% are combined into one moved-order event instead of two alerts. Timeline-anchored labels show only non-trade-consumed changes in the active intraday range: bids above the low of day and offers below the high of day. Same-price events use `BID UP`, `BID PULL`, `OFFER DOWN`, or `OFFER PULL`; moved orders use `BID UP`, `BID DOWN`, `OFFER UP`, or `OFFER DOWN`. Bullish labels are green and bearish labels are red.
 
 ### VWAP
 
@@ -315,10 +316,10 @@ The following parameters are plugin defaults unless noted as configurable:
 | Parameter               | Default | Description                                                 |
 | ----------------------- | ------- | ----------------------------------------------------------- |
 | `WS_PORT`               | 8765    | WebSocket server port                                       |
-| `ORDERBOOK_PERCENTILE`  | 97      | Adaptive crowd filter for wall labels, patterns, and size-change alerts |
-| `WALL_THRESHOLD_FLOOR`  | 5,000   | Configurable absolute floor for wall labels, patterns, and size-change alerts; wall candidates use `max(WALL_THRESHOLD_FLOOR, ORDERBOOK_PERCENTILE threshold)` |
+| `ORDERBOOK_PERCENTILE`  | 97      | Adaptive crowd filter for wall labels and patterns |
+| `WALL_THRESHOLD_FLOOR`  | 5,000   | Configurable absolute floor for wall labels and patterns; wall candidates use `max(WALL_THRESHOLD_FLOOR, ORDERBOOK_PERCENTILE threshold)` |
 
-Adjust `WALL_THRESHOLD_FLOOR` from the Rong add-on settings under `Wall threshold floor`. The floating trade button window shows the live effective wall threshold as `max(configured floor, P97)` for the active symbol, together with the sizes of the three largest bid/ask depth levels. Wall labels, alerts, and patterns all use that same live value. These calculations stay within Bookmap.
+Adjust `WALL_THRESHOLD_FLOOR` from the Rong add-on settings under `Wall threshold floor`. The floating trade button window shows the live effective wall threshold as `max(configured floor, P97)` for the active symbol, together with the sizes of the three largest bid/ask depth levels. Wall labels and patterns use that value. Order-change alerts separately use `min(10,000, max(5,000, fifth-largest current order))`. These calculations stay within Bookmap.
 
 ## Logging
 

@@ -8,12 +8,30 @@ import org.junit.jupiter.api.Test;
 class IndicatorConfigTest {
 
     @Test
-    void wallChangeVisualAlertsAreDisabledByDefaultButSoundStaysEnabled() {
+    void filteredWallChangeVisualAlertsAndSoundAreEnabledByDefault() {
         IndicatorConfig config = new IndicatorConfig();
 
-        assertFalse(config.isEnabled(IndicatorConfig.ORDER_WALL_CHANGE_ALERTS));
+        assertTrue(config.areOrderChangeAlertsEnabled());
         assertFalse(config.isEnabled(IndicatorConfig.ORDER_WALL_BREAKOUT_SIGNALS));
         assertTrue(config.isEnabled(IndicatorConfig.ORDER_WALL_CHANGE_SOUND));
+        assertTrue(config.isOrderChangeSoundEnabled());
+    }
+
+    @Test
+    void globalOrderChangeSwitchDisablesSoundWithoutLosingSoundPreference() {
+        IndicatorConfig config = new IndicatorConfig();
+
+        config.setEnabled(IndicatorConfig.ORDER_WALL_CHANGE_ALERTS, false);
+
+        assertFalse(config.areOrderChangeAlertsEnabled());
+        assertFalse(config.isOrderChangeSoundEnabled());
+        assertTrue(config.isEnabled(IndicatorConfig.ORDER_WALL_CHANGE_SOUND));
+
+        config.setEnabled(IndicatorConfig.ORDER_WALL_CHANGE_ALERTS, true);
+        assertTrue(config.isOrderChangeSoundEnabled());
+
+        config.setEnabled(IndicatorConfig.ORDER_WALL_CHANGE_SOUND, false);
+        assertFalse(config.isOrderChangeSoundEnabled());
     }
 
     @Test

@@ -60,11 +60,25 @@ public class IndicatorSettingsPanel extends StrategyPanel {
 
         gbc.gridy++;
         JCheckBox wallChangeAlertsCheckbox = new JCheckBox(
-                "Order Wall Change Alerts",
-                config.isEnabled(IndicatorConfig.ORDER_WALL_CHANGE_ALERTS));
-        wallChangeAlertsCheckbox.addActionListener(e ->
-                config.setEnabled(IndicatorConfig.ORDER_WALL_CHANGE_ALERTS, wallChangeAlertsCheckbox.isSelected()));
+                "Enable Order Change Alerts",
+                config.areOrderChangeAlertsEnabled());
+        wallChangeAlertsCheckbox.setToolTipText(
+                "Global switch for order-change labels and sounds on all instruments");
+        JCheckBox wallChangeSoundCheckbox = new JCheckBox(
+                "Play Order Change Alert Sound",
+                config.isEnabled(IndicatorConfig.ORDER_WALL_CHANGE_SOUND));
+        wallChangeSoundCheckbox.setEnabled(wallChangeAlertsCheckbox.isSelected());
+        wallChangeAlertsCheckbox.addActionListener(e -> {
+            boolean enabled = wallChangeAlertsCheckbox.isSelected();
+            config.setEnabled(IndicatorConfig.ORDER_WALL_CHANGE_ALERTS, enabled);
+            wallChangeSoundCheckbox.setEnabled(enabled);
+        });
         add(wallChangeAlertsCheckbox, gbc);
+
+        gbc.gridy++;
+        wallChangeSoundCheckbox.addActionListener(e ->
+                config.setEnabled(IndicatorConfig.ORDER_WALL_CHANGE_SOUND, wallChangeSoundCheckbox.isSelected()));
+        add(wallChangeSoundCheckbox, gbc);
 
         gbc.gridy++;
         JCheckBox wallBreakoutSignalsCheckbox = new JCheckBox(
@@ -83,14 +97,6 @@ public class IndicatorSettingsPanel extends StrategyPanel {
         patternSignalsCheckbox.addActionListener(e ->
                 config.setEnabled(IndicatorConfig.BOOKMAP_PATTERN_SIGNALS, patternSignalsCheckbox.isSelected()));
         add(patternSignalsCheckbox, gbc);
-
-        gbc.gridy++;
-        JCheckBox wallChangeSoundCheckbox = new JCheckBox(
-                "Order Wall Change Sound",
-                config.isEnabled(IndicatorConfig.ORDER_WALL_CHANGE_SOUND));
-        wallChangeSoundCheckbox.addActionListener(e ->
-                config.setEnabled(IndicatorConfig.ORDER_WALL_CHANGE_SOUND, wallChangeSoundCheckbox.isSelected()));
-        add(wallChangeSoundCheckbox, gbc);
 
         gbc.gridy++;
         JPanel wallThresholdPanel = new JPanel(new GridBagLayout());

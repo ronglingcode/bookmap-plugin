@@ -60,6 +60,8 @@ public class RongPlugin implements CustomModuleAdapter,
 
     private static final int WS_PORT = 8765;
     private static final double ORDERBOOK_PERCENTILE = 97;
+    private static final int ORDER_CHANGE_THRESHOLD_FLOOR = 5_000;
+    private static final int ORDER_CHANGE_LARGEST_ORDER_RANK = 5;
     private static final int WALL_LABEL_RETAIN_TICKS = 2_000;
     private static final int WALL_LABEL_REFRESH_MS = 200;
     private static final double WALL_CHANGE_REMAINING_RATIO = 0.50;
@@ -100,6 +102,7 @@ public class RongPlugin implements CustomModuleAdapter,
     private OrderBookState orderBook;
     private OrderWallLabelTracker wallLabelTracker;
     private OrderWallChangeTracker wallChangeTracker;
+    private RegularSessionHighLowTracker wallChangeHighLowTracker;
     private BookmapPatternEngine patternEngine;
     private volatile boolean patternAutomationEnabled;
     private volatile boolean patternSnapshotComplete;
@@ -178,15 +181,18 @@ public class RongPlugin implements CustomModuleAdapter,
                 cleanAlias, info.pips, wallLabelStore, this::getEffectiveWallThreshold,
                 WALL_LABEL_RETAIN_TICKS,
                 this::handleWallLabelTrackerChange);
+        this.wallChangeHighLowTracker = new RegularSessionHighLowTracker();
         this.wallChangeTracker = new OrderWallChangeTracker(
                 cleanAlias,
                 info.pips,
-                wallThresholdConfig::getThresholdFloor,
-                ORDERBOOK_PERCENTILE,
+                () -> ORDER_CHANGE_THRESHOLD_FLOOR,
+                ORDER_CHANGE_LARGEST_ORDER_RANK,
                 WALL_CHANGE_REMAINING_RATIO,
                 WALL_CHANGE_DECISION_DELAY_MS,
                 this::handleWallChangeEvent,
-                this::isWallBreakAlertEnabled);
+                this::isWallBreakAlertEnabled,
+                this::getWallChangeDayHigh,
+                this::getWallChangeDayLow);
         this.patternEngine = new BookmapPatternEngine(
                 cleanAlias,
                 info.pips,
@@ -308,6 +314,7 @@ public class RongPlugin implements CustomModuleAdapter,
             wallChangeTracker.shutdown();
             wallChangeTracker = null;
         }
+        wallChangeHighLowTracker = null;
         if (patternEngine != null) {
             patternEngine.shutdown();
             patternEngine = null;
@@ -523,19 +530,23 @@ public class RongPlugin implements CustomModuleAdapter,
 
     @Override
     public void onTrade(double price, int size, TradeInfo tradeInfo) {
-        if (wallChangeTracker != null) {
-            wallChangeTracker.onTrade((int) Math.round(price), size, tradeInfo);
-        }
+        long eventTimeNs = getEventTimeNs();
         double realPrice = BookmapPriceNormalizer.toWirePrice(price, instrumentInfo.pips);
         int priceTick = (int) Math.round(price);
+        if (wallChangeHighLowTracker != null) {
+            wallChangeHighLowTracker.onTrade(realPrice, eventTimeNs);
+        }
+        if (wallChangeTracker != null) {
+            wallChangeTracker.onTrade(priceTick, size, tradeInfo);
+        }
         flushPendingVwapPoints();
 
         if (shouldRunPatternAutomation()) {
-            patternEngine.onTrade(price, size, tradeInfo, getEventTimeNs());
+            patternEngine.onTrade(price, size, tradeInfo, eventTimeNs);
         }
 
         if (sharedServer != null) {
-            sharedServer.updateRegularSessionHighLow(alias, realPrice, getEventTimeNs());
+            sharedServer.updateRegularSessionHighLow(alias, realPrice, eventTimeNs);
         }
         if (wallLabelTracker != null && wallLabelTracker.cleanup(priceTick)) {
             wallLabelsDirty = true;
@@ -594,6 +605,12 @@ public class RongPlugin implements CustomModuleAdapter,
             }
             return;
         }
+        if (IndicatorConfig.ORDER_WALL_CHANGE_ALERTS.equals(indicatorKey)) {
+            if (!enabled && wallChangeStore != null && alias != null) {
+                wallChangeStore.clearAll(alias);
+            }
+            return;
+        }
         if (!IndicatorConfig.BOOKMAP_PATTERN_SIGNALS.equals(indicatorKey)) return;
         patternAutomationEnabled = enabled;
         BookmapPatternEngine engine = patternEngine;
@@ -609,6 +626,9 @@ public class RongPlugin implements CustomModuleAdapter,
     }
 
     private void handleWallChangeEvent(OrderWallChangeEvent event) {
+        if (indicatorConfig == null || !indicatorConfig.areOrderChangeAlertsEnabled()) {
+            return;
+        }
         if (wallLabelStore != null) {
             wallLabelStore.markBestMatchDisplayed(
                     event.getInstrumentAlias(),
@@ -624,11 +644,24 @@ public class RongPlugin implements CustomModuleAdapter,
 
     private boolean isWallBreakAlertEnabled(boolean bidWall) {
         if (indicatorConfig == null
+                || !indicatorConfig.areOrderChangeAlertsEnabled()
                 || !indicatorConfig.isEnabled(IndicatorConfig.ORDER_WALL_BREAKOUT_SIGNALS)) {
             return false;
         }
         SignalWebSocketServer server = sharedServer;
         return server != null && server.hasEnabledWallBreakTradeButton(alias, bidWall);
+    }
+
+    private double getWallChangeDayHigh() {
+        RegularSessionHighLowTracker tracker = wallChangeHighLowTracker;
+        RegularSessionHighLowTracker.Snapshot snapshot = tracker == null ? null : tracker.snapshot();
+        return snapshot == null ? Double.NaN : snapshot.getHigh();
+    }
+
+    private double getWallChangeDayLow() {
+        RegularSessionHighLowTracker tracker = wallChangeHighLowTracker;
+        RegularSessionHighLowTracker.Snapshot snapshot = tracker == null ? null : tracker.snapshot();
+        return snapshot == null ? Double.NaN : snapshot.getLow();
     }
 
     private boolean shouldRunPatternAutomation() {
@@ -692,7 +725,8 @@ public class RongPlugin implements CustomModuleAdapter,
 
     private void playWallChangeSound(OrderWallChangeEvent event) {
         if (api == null || indicatorConfig == null
-                || !indicatorConfig.isEnabled(IndicatorConfig.ORDER_WALL_CHANGE_SOUND)) {
+                || !indicatorConfig.isOrderChangeSoundEnabled()
+                || !event.isActiveLiquidityAlert()) {
             return;
         }
         try {

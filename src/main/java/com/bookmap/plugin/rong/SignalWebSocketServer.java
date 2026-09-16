@@ -77,6 +77,7 @@ public class SignalWebSocketServer extends WebSocketServer {
     private final Map<String, List<TradebookButtonGroup>> symbolToTradebooks = new ConcurrentHashMap<>();
     private final Map<String, List<KeyLevelDefinition>> symbolToKeyLevels = new ConcurrentHashMap<>();
     private final Map<String, List<KeyZoneDefinition>> symbolToKeyZones = new ConcurrentHashMap<>();
+    private final Map<String, Boolean> symbolToWaitForPriceDiscovery = new ConcurrentHashMap<>();
     private final Map<String, MarketLevelDefinition> symbolToMarketLevels = new ConcurrentHashMap<>();
     private final Map<String, List<ExitOrderPairDefinition>> symbolToExitOrderPairs = new ConcurrentHashMap<>();
     private final Map<String, AccountStateDefinition> symbolToAccountState = new ConcurrentHashMap<>();
@@ -293,6 +294,11 @@ public class SignalWebSocketServer extends WebSocketServer {
             }
         }
         return null;
+    }
+
+    public boolean isWaitForPriceDiscovery(String symbol) {
+        String cleanSymbol = SymbolUtils.cleanSymbol(symbol);
+        return Boolean.TRUE.equals(symbolToWaitForPriceDiscovery.get(cleanSymbol));
     }
 
     public void registerKeyLevelConfigListener(KeyLevelConfigListener listener) {
@@ -656,6 +662,11 @@ public class SignalWebSocketServer extends WebSocketServer {
         List<KeyLevelDefinition> immutableLevels = Collections.unmodifiableList(levels);
         symbolToKeyLevels.put(symbol, immutableLevels);
         notifyKeyLevelConfigListeners(symbol, immutableLevels);
+
+        Boolean waitForPriceDiscovery = getOptionalBoolean(json, "waitForPriceDiscovery");
+        if (waitForPriceDiscovery != null) {
+            symbolToWaitForPriceDiscovery.put(symbol, waitForPriceDiscovery);
+        }
 
         List<KeyZoneDefinition> zones = parseKeyZones(symbol, json);
         List<KeyZoneDefinition> immutableZones = Collections.unmodifiableList(zones);

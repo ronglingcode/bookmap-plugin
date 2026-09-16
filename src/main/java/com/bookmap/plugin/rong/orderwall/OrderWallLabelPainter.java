@@ -431,6 +431,10 @@ public class OrderWallLabelPainter implements ScreenSpacePainterFactory,
                 if (!OrderWallAlertDisplayTiming.isVisible(event, nowMs)) {
                     continue;
                 }
+                // New material-change events have their own fixed right-edge label.
+                if (event.isMaterialChange()) {
+                    continue;
+                }
                 if (event.isBid() != label.isBid() || event.getPriceTick() != label.getPriceTick()) {
                     continue;
                 }

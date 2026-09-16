@@ -1,6 +1,7 @@
 package com.bookmap.plugin.rong;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.Collections;
@@ -80,5 +81,37 @@ class KeyLevelConfigParsingTest {
         assertEquals(620.0, zone.getHigh(), 0.00001);
         assertEquals("daily zone", zone.getLabel());
         assertEquals("#9ca3af", zone.getColor());
+    }
+
+    @Test
+    void waitForPriceDiscoveryIsStoredBySymbol() {
+        SignalWebSocketServer server = new SignalWebSocketServer(0, 90);
+
+        server.onMessage(null, "{"
+                + "\"type\":\"key_levels_config\","
+                + "\"symbol\":\"AAPL\","
+                + "\"waitForPriceDiscovery\":true,"
+                + "\"levels\":[]"
+                + "}");
+
+        assertTrue(server.isWaitForPriceDiscovery("AAPL:NASDAQ:STOCKS@BMD"));
+        assertFalse(server.isWaitForPriceDiscovery("MSFT"));
+
+        server.onMessage(null, "{"
+                + "\"type\":\"key_levels_config\","
+                + "\"symbol\":\"AAPL\","
+                + "\"levels\":[]"
+                + "}");
+
+        assertTrue(server.isWaitForPriceDiscovery("AAPL"));
+
+        server.onMessage(null, "{"
+                + "\"type\":\"key_levels_config\","
+                + "\"symbol\":\"AAPL\","
+                + "\"waitForPriceDiscovery\":false,"
+                + "\"levels\":[]"
+                + "}");
+
+        assertFalse(server.isWaitForPriceDiscovery("AAPL"));
     }
 }

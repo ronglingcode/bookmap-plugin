@@ -34,10 +34,10 @@ public class IndicatorConfig {
     private final java.util.List<ChangeListener> listeners = new java.util.concurrent.CopyOnWriteArrayList<>();
 
     public IndicatorConfig() {
-        // Defaults keep reference levels and sounds on while leaving noisy visual alerts off.
+        // Material, in-range wall-change alerts are filtered enough to be useful by default.
         enabled.put(PREMARKET_HIGH_LOW, true);
         enabled.put(ORDER_WALL_SIZE_LABELS, true);
-        enabled.put(ORDER_WALL_CHANGE_ALERTS, false);
+        enabled.put(ORDER_WALL_CHANGE_ALERTS, true);
         enabled.put(ORDER_WALL_BREAKOUT_SIGNALS, false);
         enabled.put(ORDER_WALL_CHANGE_SOUND, true);
         enabled.put(FIRE_KEYBOARD_EVENT, false);
@@ -48,6 +48,16 @@ public class IndicatorConfig {
 
     public boolean isEnabled(String indicatorKey) {
         return enabled.getOrDefault(indicatorKey, false);
+    }
+
+    /** Global master switch for order-change monitoring outputs. */
+    public boolean areOrderChangeAlertsEnabled() {
+        return isEnabled(ORDER_WALL_CHANGE_ALERTS);
+    }
+
+    /** The sound preference only takes effect while the order-change feature is enabled. */
+    public boolean isOrderChangeSoundEnabled() {
+        return areOrderChangeAlertsEnabled() && isEnabled(ORDER_WALL_CHANGE_SOUND);
     }
 
     public void setEnabled(String indicatorKey, boolean value) {
