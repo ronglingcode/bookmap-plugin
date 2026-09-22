@@ -967,11 +967,17 @@ public class SignalWebSocketServer extends WebSocketServer {
             netQuantity = getDouble(positionJson, "quantity");
         }
         double averagePrice = getWirePrice(positionJson, "averagePrice");
+        // Newer ViteApp sends a pre-formatted riskText label; null when absent
+        // so callers can fall back to the legacy riskPercent value.
+        String riskText = positionJson.has("riskText") && !positionJson.get("riskText").isJsonNull()
+                ? getString(positionJson, "riskText")
+                : null;
         return new AccountPositionDefinition(
                 symbol,
                 Double.isFinite(netQuantity) ? netQuantity : 0,
                 Double.isFinite(averagePrice) ? averagePrice : 0,
-                getDouble(positionJson, "riskPercent"));
+                getDouble(positionJson, "riskPercent"),
+                riskText);
     }
 
     private List<AccountOrderDefinition> parseAccountOrders(String symbol, JsonElement element) {

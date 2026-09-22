@@ -4,6 +4,7 @@ import java.awt.BorderLayout;
 import java.awt.Dimension;
 import java.awt.Font;
 import java.awt.GridLayout;
+import java.math.BigDecimal;
 import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayDeque;
@@ -38,7 +39,7 @@ public class ActionLogWindow {
     private static final DateTimeFormatter TIME_FMT = DateTimeFormatter.ofPattern("HH:mm:ss");
     private static final Deque<String> lines = new ArrayDeque<>();
     private static final Map<String, AccountStateDefinition> accountStates = new LinkedHashMap<>();
-    private static final String[] POSITION_COLUMNS = {"Symbol", "Side", "Risk %", "Avg"};
+    private static final String[] POSITION_COLUMNS = {"Symbol", "Side", "Risk (R)", "Avg"};
     private static final String[] ORDER_COLUMNS = {"Symbol", "Role", "Side", "Qty", "Type", "Price", "Ref"};
     private static JFrame frame;
     private static JLabel highlightedSymbolLabel;
@@ -227,7 +228,7 @@ public class ActionLogWindow {
                 positionTableModel.addRow(new Object[] {
                         state.getSymbol(),
                         position.getNetQuantity() > 0 ? "LONG" : "SHORT",
-                        formatRiskPercent(position.getRiskPercent()),
+                        formatRiskR(position),
                         formatPrice(position.getAveragePrice())
                 });
                 positionCount++;
@@ -324,14 +325,26 @@ public class ActionLogWindow {
         return String.format("%.2f", quantity);
     }
 
-    private static String formatRiskPercent(double riskPercent) {
+    /**
+     * Displays risk as an R multiple (e.g. "-0.05R"). Newer ViteApp sends a
+     * pre-formatted riskText label which is used verbatim; for older payloads
+     * that only send riskPercent (R x 100), convert it back to R with the same
+     * rounding/sign convention ViteApp uses.
+     */
+    private static String formatRiskR(AccountPositionDefinition position) {
+        String riskText = position.getRiskText();
+        if (riskText != null) {
+            return riskText;
+        }
+        double riskPercent = position.getRiskPercent();
         if (!Double.isFinite(riskPercent)) {
             return "";
         }
-        if (riskPercent == Math.rint(riskPercent)) {
-            return Long.toString(Math.round(riskPercent)) + "%";
-        }
-        return String.format("%.1f%%", riskPercent);
+        double r = Math.abs(riskPercent) / 100.0;
+        double rounded = r >= 10 ? Math.round(r) : Math.round(r * 100.0) / 100.0;
+        String magnitude = new BigDecimal(Double.toString(rounded)).stripTrailingZeros().toPlainString();
+        String sign = position.getNetQuantity() < 0 ? "-" : "+";
+        return sign + magnitude + "R";
     }
 
     private static String formatPrice(double price) {

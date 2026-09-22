@@ -9,12 +9,19 @@ public class AccountPositionDefinition {
     private final double netQuantity;
     private final double averagePrice;
     private final double riskPercent;
+    /**
+     * Pre-formatted risk label from ViteApp (e.g. "-0.05R"). Null when the
+     * sender is an older ViteApp that only provides {@link #riskPercent}.
+     */
+    private final String riskText;
 
-    public AccountPositionDefinition(String symbol, double netQuantity, double averagePrice, double riskPercent) {
+    public AccountPositionDefinition(String symbol, double netQuantity, double averagePrice, double riskPercent,
+            String riskText) {
         this.symbol = normalize(symbol);
         this.netQuantity = netQuantity;
         this.averagePrice = averagePrice;
         this.riskPercent = riskPercent;
+        this.riskText = riskText;
     }
 
     public String getSymbol() {
@@ -31,6 +38,15 @@ public class AccountPositionDefinition {
 
     public double getRiskPercent() {
         return riskPercent;
+    }
+
+    /**
+     * @return the pre-formatted risk label, or null if the sender did not
+     *         provide one (older ViteApp) and the caller should fall back to
+     *         {@link #getRiskPercent()}.
+     */
+    public String getRiskText() {
+        return riskText;
     }
 
     public boolean isOpen() {
