@@ -136,7 +136,7 @@ class KeyLevelConfigParsingTest {
         assertFalse(state.isBidRetestPending());
         assertFalse(state.isOfferRetestPending());
 
-        // A later false -> true transition starts a fresh wait.
+        // A later no -> yes transition starts a fresh wait.
         server.onMessage(null, "{"
                 + "\"type\":\"key_levels_config\","
                 + "\"symbol\":\"AAPL\","
@@ -147,6 +147,25 @@ class KeyLevelConfigParsingTest {
 
         state = server.getEntryRetestState("AAPL");
         assertTrue(state.isBidRetestPending());
+        assertFalse(state.isOfferRetestPending());
+    }
+
+    @Test
+    void entryRetestModesIgnoreBooleanValues() {
+        SignalWebSocketServer server = new SignalWebSocketServer(0, 90);
+
+        server.onMessage(null, "{"
+                + "\"type\":\"key_levels_config\","
+                + "\"symbol\":\"AAPL\","
+                + "\"waitForBidRetest\":true,"
+                + "\"waitForOfferRetest\":true,"
+                + "\"levels\":[]"
+                + "}");
+
+        SignalWebSocketServer.EntryRetestState state = server.getEntryRetestState("AAPL");
+        assertEquals(SignalWebSocketServer.EntryRetestMode.NO, state.getBidRetestMode());
+        assertEquals(SignalWebSocketServer.EntryRetestMode.NO, state.getOfferRetestMode());
+        assertFalse(state.isBidRetestPending());
         assertFalse(state.isOfferRetestPending());
     }
 }

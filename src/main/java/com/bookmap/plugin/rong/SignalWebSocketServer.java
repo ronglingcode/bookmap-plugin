@@ -1419,10 +1419,6 @@ public class SignalWebSocketServer extends WebSocketServer {
             return null;
         }
         try {
-            if (element.getAsJsonPrimitive().isBoolean()) {
-                // Legacy true had warn-only behavior.
-                return element.getAsBoolean() ? EntryRetestMode.WARNING : EntryRetestMode.NO;
-            }
             if (!element.getAsJsonPrimitive().isString()) {
                 return null;
             }
