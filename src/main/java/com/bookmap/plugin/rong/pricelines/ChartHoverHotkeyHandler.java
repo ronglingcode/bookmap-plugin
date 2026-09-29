@@ -250,7 +250,7 @@ public class ChartHoverHotkeyHandler implements ScreenSpacePainterFactory {
             wsServer.appendRegularSessionHighLow(hover.instrument, json);
         }
 
-        wsServer.broadcast(json.toString());
+        wsServer.dispatchTradingAction(json);
     }
 
     private void sendPriceIndependentHotkey(

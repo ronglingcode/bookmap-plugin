@@ -932,7 +932,7 @@ public class TradeButtonWindow {
             }
         }
         server.appendRegularSessionHighLow(symbol, json);
-        server.broadcast(json.toString());
+        server.dispatchTradingAction(json);
         PluginLog.action(symbol, (retestBlocked ? "Button blocked " : "Button send ")
                 + orderType + " " + tradebook.getLabel() + " " + entryMethod);
     }

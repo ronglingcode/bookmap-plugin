@@ -22,6 +22,8 @@ public class IndicatorConfig {
     public static final String FILLED_EXECUTION_MARKERS = "filled_execution_markers";
     public static final String BOOKMAP_PATTERN_SIGNALS = "bookmap_pattern_signals";
     public static final String VWAP = "vwap";
+    public static final String EXPERIMENTAL_DIRECT_BROKER_EXECUTION = "experimentalDirectBrokerExecution";
+    public static final String EXPERIMENTAL_DIRECT_EXIT_EXECUTION = "experimentalDirectExitExecution";
 
     private final Map<String, Boolean> enabled = new ConcurrentHashMap<>();
 
@@ -44,6 +46,8 @@ public class IndicatorConfig {
         enabled.put(FILLED_EXECUTION_MARKERS, true);
         enabled.put(BOOKMAP_PATTERN_SIGNALS, false);
         enabled.put(VWAP, true);
+        enabled.put(EXPERIMENTAL_DIRECT_BROKER_EXECUTION, false);
+        enabled.put(EXPERIMENTAL_DIRECT_EXIT_EXECUTION, false);
     }
 
     public boolean isEnabled(String indicatorKey) {

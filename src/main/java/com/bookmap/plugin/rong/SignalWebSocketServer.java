@@ -23,6 +23,29 @@ import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 
 public class SignalWebSocketServer extends WebSocketServer {
+    private final Map<WebSocket, String> executionOrigins = new ConcurrentHashMap<>();
+    private final com.bookmap.plugin.rong.miniviteapp.MiniViteApp miniViteApp =
+            new com.bookmap.plugin.rong.miniviteapp.MiniViteApp((connection, json) -> {
+                if (connection instanceof WebSocket && ((WebSocket) connection).isOpen()) {
+                    ((WebSocket) connection).send(json.toString());
+                }
+            });
+
+    /** The single routing boundary for local button and chart actions. */
+    public void dispatchTradingAction(JsonObject action) {
+        if (!miniViteApp.route(action)) broadcast(action.toString());
+    }
+
+    public void setExperimentalDirectExecution(boolean enabled, boolean exitsEnabled) {
+        miniViteApp.setEnabled(enabled, exitsEnabled);
+        broadcast(miniViteApp.status().toString());
+    }
+
+    public void updateNativeLiveStatus(String symbol, boolean live) { miniViteApp.setLive(symbol, live); }
+
+    public void resetNativeExecutionAfterBrokerReview() {
+        if (miniViteApp.resetAfterBrokerReview()) broadcast(miniViteApp.status().toString());
+    }
 
     private static final int WALL_THRESHOLD_LARGEST_LEVEL_COUNT = 3;
 
@@ -125,6 +148,7 @@ public class SignalWebSocketServer extends WebSocketServer {
 
     /** Unregister a symbol when its plugin instance stops. */
     public void unregisterSymbol(String symbol) {
+        miniViteApp.unregister(symbol);
         symbolToOrderBook.remove(symbol);
         symbolToPips.remove(symbol);
         symbolToRegularSessionHighLow.remove(symbol);
@@ -506,10 +530,14 @@ public class SignalWebSocketServer extends WebSocketServer {
 
     @Override
     public void onOpen(WebSocket conn, ClientHandshake handshake) {
+        executionOrigins.put(conn, handshake.getFieldValue("Origin"));
+        conn.send(miniViteApp.status().toString());
     }
 
     @Override
     public void onClose(WebSocket conn, int code, String reason, boolean remote) {
+        executionOrigins.remove(conn);
+        miniViteApp.disconnected(conn);
     }
 
     @Override
@@ -518,6 +546,7 @@ public class SignalWebSocketServer extends WebSocketServer {
         JsonObject json = parseJsonObject(trimmed);
         if (json != null) {
             String type = getString(json, "type");
+            if (miniViteApp.receive(conn, conn == null ? "" : executionOrigins.getOrDefault(conn, ""), json)) return;
             if (isPriceBearingMessageType(type)
                     && !BookmapPriceNormalizer.isSupportedWirePriceUnit(
                             getString(json, BookmapPriceNormalizer.WIRE_PRICE_UNIT_FIELD))) {
@@ -1685,6 +1714,7 @@ public class SignalWebSocketServer extends WebSocketServer {
     }
 
     public void shutdown() {
+        miniViteApp.close();
         try {
             stop(1000);
         } catch (InterruptedException e) {

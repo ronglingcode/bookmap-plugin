@@ -140,6 +140,7 @@ tasks.register('releaseTest', Test) {
     systemProperty 'release.jar', releaseJar.get().asFile.absolutePath
     systemProperty 'release.mapping', obfuscationMapping.get().asFile.absolutePath
     systemProperty 'release.version', project.version.toString()
+    systemProperty 'execution.fixtures', file('src/test/resources/direct-execution-fixtures.json').absolutePath
     systemProperty 'java.awt.headless', 'true'
     jvmArgs '-Xverify:all'
     useJUnitPlatform()

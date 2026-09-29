@@ -1,0 +1,5112 @@
+[
+  {
+    "name": "cancel all entries below threshold",
+    "key": "KeyC",
+    "shift": false,
+    "price": null,
+    "state": {
+      "symbol": "AAPL",
+      "revision": 1,
+      "observedAt": 1,
+      "quoteObservedAt": 1,
+      "netQuantity": 100,
+      "currentPrice": 105,
+      "bid": 104.99,
+      "ask": 105.01,
+      "batchCount": 10,
+      "splitPartials": true,
+      "hasPlan": true,
+      "entryPrice": 100,
+      "coreTarget": 110,
+      "coreCount": 5,
+      "coreRuleEnabled": false,
+      "rulesSupported": true,
+      "entries": [
+        {
+          "orderID": "101",
+          "orderType": "STOP",
+          "quantity": 10,
+          "price": 106,
+          "isBuy": true
+        },
+        {
+          "orderID": "102",
+          "orderType": "LIMIT",
+          "quantity": 10,
+          "price": 99,
+          "isBuy": true
+        }
+      ],
+      "pairs": [
+        {
+          "LIMIT": {
+            "orderID": "200",
+            "orderType": "LIMIT",
+            "quantity": 10,
+            "price": 110,
+            "isBuy": false
+          },
+          "STOP": {
+            "orderID": "201",
+            "orderType": "STOP",
+            "quantity": 10,
+            "price": 95,
+            "isBuy": false
+          },
+          "originalPartial": 1
+        },
+        {
+          "LIMIT": {
+            "orderID": "202",
+            "orderType": "LIMIT",
+            "quantity": 10,
+            "price": 111,
+            "isBuy": false
+          },
+          "STOP": {
+            "orderID": "203",
+            "orderType": "STOP",
+            "quantity": 10,
+            "price": 95,
+            "isBuy": false
+          },
+          "originalPartial": 2
+        },
+        {
+          "LIMIT": {
+            "orderID": "204",
+            "orderType": "LIMIT",
+            "quantity": 10,
+            "price": 112,
+            "isBuy": false
+          },
+          "STOP": {
+            "orderID": "205",
+            "orderType": "STOP",
+            "quantity": 10,
+            "price": 95,
+            "isBuy": false
+          },
+          "originalPartial": 3
+        }
+      ]
+    },
+    "requests": [
+      {
+        "method": "DELETE",
+        "orderId": "101"
+      },
+      {
+        "method": "DELETE",
+        "orderId": "102"
+      }
+    ],
+    "error": false,
+    "checks": {
+      "cancel": true
+    }
+  },
+  {
+    "name": "cancel only stop entries at threshold",
+    "key": "KeyC",
+    "shift": false,
+    "price": null,
+    "state": {
+      "symbol": "AAPL",
+      "revision": 1,
+      "observedAt": 1,
+      "quoteObservedAt": 1,
+      "netQuantity": 100,
+      "currentPrice": 105,
+      "bid": 104.99,
+      "ask": 105.01,
+      "batchCount": 10,
+      "splitPartials": true,
+      "hasPlan": true,
+      "entryPrice": 100,
+      "coreTarget": 110,
+      "coreCount": 5,
+      "coreRuleEnabled": false,
+      "rulesSupported": true,
+      "entries": [
+        {
+          "orderID": "101",
+          "orderType": "STOP",
+          "quantity": 10,
+          "price": 106,
+          "isBuy": true
+        },
+        {
+          "orderID": "102",
+          "orderType": "LIMIT",
+          "quantity": 10,
+          "price": 99,
+          "isBuy": true
+        }
+      ],
+      "pairs": [
+        {
+          "LIMIT": {
+            "orderID": "200",
+            "orderType": "LIMIT",
+            "quantity": 10,
+            "price": 110,
+            "isBuy": false
+          },
+          "STOP": {
+            "orderID": "201",
+            "orderType": "STOP",
+            "quantity": 10,
+            "price": 95,
+            "isBuy": false
+          },
+          "originalPartial": 1
+        },
+        {
+          "LIMIT": {
+            "orderID": "202",
+            "orderType": "LIMIT",
+            "quantity": 10,
+            "price": 111,
+            "isBuy": false
+          },
+          "STOP": {
+            "orderID": "203",
+            "orderType": "STOP",
+            "quantity": 10,
+            "price": 95,
+            "isBuy": false
+          },
+          "originalPartial": 2
+        },
+        {
+          "LIMIT": {
+            "orderID": "204",
+            "orderType": "LIMIT",
+            "quantity": 10,
+            "price": 112,
+            "isBuy": false
+          },
+          "STOP": {
+            "orderID": "205",
+            "orderType": "STOP",
+            "quantity": 10,
+            "price": 95,
+            "isBuy": false
+          },
+          "originalPartial": 3
+        },
+        {
+          "LIMIT": {
+            "orderID": "206",
+            "orderType": "LIMIT",
+            "quantity": 10,
+            "price": 113,
+            "isBuy": false
+          },
+          "STOP": {
+            "orderID": "207",
+            "orderType": "STOP",
+            "quantity": 10,
+            "price": 95,
+            "isBuy": false
+          },
+          "originalPartial": 4
+        }
+      ]
+    },
+    "requests": [
+      {
+        "method": "DELETE",
+        "orderId": "101"
+      }
+    ],
+    "error": false,
+    "checks": {
+      "cancel": true
+    }
+  },
+  {
+    "name": "cancel no entries",
+    "key": "KeyC",
+    "shift": false,
+    "price": null,
+    "state": {
+      "symbol": "AAPL",
+      "revision": 1,
+      "observedAt": 1,
+      "quoteObservedAt": 1,
+      "netQuantity": 100,
+      "currentPrice": 105,
+      "bid": 104.99,
+      "ask": 105.01,
+      "batchCount": 10,
+      "splitPartials": true,
+      "hasPlan": true,
+      "entryPrice": 100,
+      "coreTarget": 110,
+      "coreCount": 5,
+      "coreRuleEnabled": false,
+      "rulesSupported": true,
+      "entries": [],
+      "pairs": [
+        {
+          "LIMIT": {
+            "orderID": "200",
+            "orderType": "LIMIT",
+            "quantity": 10,
+            "price": 110,
+            "isBuy": false
+          },
+          "STOP": {
+            "orderID": "201",
+            "orderType": "STOP",
+            "quantity": 10,
+            "price": 95,
+            "isBuy": false
+          },
+          "originalPartial": 1
+        },
+        {
+          "LIMIT": {
+            "orderID": "202",
+            "orderType": "LIMIT",
+            "quantity": 10,
+            "price": 111,
+            "isBuy": false
+          },
+          "STOP": {
+            "orderID": "203",
+            "orderType": "STOP",
+            "quantity": 10,
+            "price": 95,
+            "isBuy": false
+          },
+          "originalPartial": 2
+        },
+        {
+          "LIMIT": {
+            "orderID": "204",
+            "orderType": "LIMIT",
+            "quantity": 10,
+            "price": 112,
+            "isBuy": false
+          },
+          "STOP": {
+            "orderID": "205",
+            "orderType": "STOP",
+            "quantity": 10,
+            "price": 95,
+            "isBuy": false
+          },
+          "originalPartial": 3
+        },
+        {
+          "LIMIT": {
+            "orderID": "206",
+            "orderType": "LIMIT",
+            "quantity": 10,
+            "price": 113,
+            "isBuy": false
+          },
+          "STOP": {
+            "orderID": "207",
+            "orderType": "STOP",
+            "quantity": 10,
+            "price": 95,
+            "isBuy": false
+          },
+          "originalPartial": 4
+        },
+        {
+          "LIMIT": {
+            "orderID": "208",
+            "orderType": "LIMIT",
+            "quantity": 10,
+            "price": 114,
+            "isBuy": false
+          },
+          "STOP": {
+            "orderID": "209",
+            "orderType": "STOP",
+            "quantity": 10,
+            "price": 95,
+            "isBuy": false
+          },
+          "originalPartial": 5
+        },
+        {
+          "LIMIT": {
+            "orderID": "210",
+            "orderType": "LIMIT",
+            "quantity": 10,
+            "price": 115,
+            "isBuy": false
+          },
+          "STOP": {
+            "orderID": "211",
+            "orderType": "STOP",
+            "quantity": 10,
+            "price": 95,
+            "isBuy": false
+          },
+          "originalPartial": 6
+        },
+        {
+          "LIMIT": {
+            "orderID": "212",
+            "orderType": "LIMIT",
+            "quantity": 10,
+            "price": 116,
+            "isBuy": false
+          },
+          "STOP": {
+            "orderID": "213",
+            "orderType": "STOP",
+            "quantity": 10,
+            "price": 95,
+            "isBuy": false
+          },
+          "originalPartial": 7
+        },
+        {
+          "LIMIT": {
+            "orderID": "214",
+            "orderType": "LIMIT",
+            "quantity": 10,
+            "price": 117,
+            "isBuy": false
+          },
+          "STOP": {
+            "orderID": "215",
+            "orderType": "STOP",
+            "quantity": 10,
+            "price": 95,
+            "isBuy": false
+          },
+          "originalPartial": 8
+        },
+        {
+          "LIMIT": {
+            "orderID": "216",
+            "orderType": "LIMIT",
+            "quantity": 10,
+            "price": 118,
+            "isBuy": false
+          },
+          "STOP": {
+            "orderID": "217",
+            "orderType": "STOP",
+            "quantity": 10,
+            "price": 95,
+            "isBuy": false
+          },
+          "originalPartial": 9
+        },
+        {
+          "LIMIT": {
+            "orderID": "218",
+            "orderType": "LIMIT",
+            "quantity": 10,
+            "price": 119,
+            "isBuy": false
+          },
+          "STOP": {
+            "orderID": "219",
+            "orderType": "STOP",
+            "quantity": 10,
+            "price": 95,
+            "isBuy": false
+          },
+          "originalPartial": 10
+        }
+      ]
+    },
+    "requests": [],
+    "error": false,
+    "checks": {
+      "cancel": true
+    }
+  },
+  {
+    "name": "market out smallest first tie",
+    "key": "KeyM",
+    "shift": false,
+    "price": null,
+    "state": {
+      "symbol": "AAPL",
+      "revision": 1,
+      "observedAt": 1,
+      "quoteObservedAt": 1,
+      "netQuantity": 20,
+      "currentPrice": 105,
+      "bid": 104.99,
+      "ask": 105.01,
+      "batchCount": 10,
+      "splitPartials": true,
+      "hasPlan": true,
+      "entryPrice": 100,
+      "coreTarget": 110,
+      "coreCount": 5,
+      "coreRuleEnabled": false,
+      "rulesSupported": true,
+      "entries": [
+        {
+          "orderID": "101",
+          "orderType": "STOP",
+          "quantity": 10,
+          "price": 106,
+          "isBuy": true
+        },
+        {
+          "orderID": "102",
+          "orderType": "LIMIT",
+          "quantity": 10,
+          "price": 99,
+          "isBuy": true
+        }
+      ],
+      "pairs": [
+        {
+          "LIMIT": {
+            "orderID": "200",
+            "orderType": "LIMIT",
+            "quantity": 10,
+            "price": 110,
+            "isBuy": false
+          },
+          "STOP": {
+            "orderID": "201",
+            "orderType": "STOP",
+            "quantity": 10,
+            "price": 95,
+            "isBuy": false
+          },
+          "originalPartial": 1
+        },
+        {
+          "LIMIT": {
+            "orderID": "202",
+            "orderType": "LIMIT",
+            "quantity": 5,
+            "price": 111,
+            "isBuy": false
+          },
+          "STOP": {
+            "orderID": "203",
+            "orderType": "STOP",
+            "quantity": 5,
+            "price": 95,
+            "isBuy": false
+          },
+          "originalPartial": 2
+        },
+        {
+          "LIMIT": {
+            "orderID": "204",
+            "orderType": "LIMIT",
+            "quantity": 5,
+            "price": 112,
+            "isBuy": false
+          },
+          "STOP": {
+            "orderID": "205",
+            "orderType": "STOP",
+            "quantity": 5,
+            "price": 95,
+            "isBuy": false
+          },
+          "originalPartial": 3
+        }
+      ]
+    },
+    "requests": [
+      {
+        "method": "PUT",
+        "orderId": "202",
+        "body": {
+          "session": "NORMAL",
+          "duration": "DAY",
+          "orderLegCollection": [
+            {
+              "orderLegType": "EQUITY",
+              "instrument": {
+                "assetType": "EQUITY",
+                "symbol": "AAPL"
+              },
+              "instruction": "SELL",
+              "quantity": 5
+            }
+          ],
+          "orderType": "MARKET",
+          "orderStrategyType": "SINGLE"
+        }
+      }
+    ],
+    "error": false,
+    "checks": {
+      "smallest": true
+    }
+  },
+  {
+    "name": "numpad1 same smallest selection",
+    "key": "Numpad1",
+    "shift": false,
+    "price": null,
+    "state": {
+      "symbol": "AAPL",
+      "revision": 1,
+      "observedAt": 1,
+      "quoteObservedAt": 1,
+      "netQuantity": 20,
+      "currentPrice": 105,
+      "bid": 104.99,
+      "ask": 105.01,
+      "batchCount": 10,
+      "splitPartials": true,
+      "hasPlan": true,
+      "entryPrice": 100,
+      "coreTarget": 110,
+      "coreCount": 5,
+      "coreRuleEnabled": false,
+      "rulesSupported": true,
+      "entries": [
+        {
+          "orderID": "101",
+          "orderType": "STOP",
+          "quantity": 10,
+          "price": 106,
+          "isBuy": true
+        },
+        {
+          "orderID": "102",
+          "orderType": "LIMIT",
+          "quantity": 10,
+          "price": 99,
+          "isBuy": true
+        }
+      ],
+      "pairs": [
+        {
+          "LIMIT": {
+            "orderID": "200",
+            "orderType": "LIMIT",
+            "quantity": 10,
+            "price": 110,
+            "isBuy": false
+          },
+          "STOP": {
+            "orderID": "201",
+            "orderType": "STOP",
+            "quantity": 10,
+            "price": 95,
+            "isBuy": false
+          },
+          "originalPartial": 1
+        },
+        {
+          "LIMIT": {
+            "orderID": "202",
+            "orderType": "LIMIT",
+            "quantity": 5,
+            "price": 111,
+            "isBuy": false
+          },
+          "STOP": {
+            "orderID": "203",
+            "orderType": "STOP",
+            "quantity": 5,
+            "price": 95,
+            "isBuy": false
+          },
+          "originalPartial": 2
+        },
+        {
+          "LIMIT": {
+            "orderID": "204",
+            "orderType": "LIMIT",
+            "quantity": 5,
+            "price": 112,
+            "isBuy": false
+          },
+          "STOP": {
+            "orderID": "205",
+            "orderType": "STOP",
+            "quantity": 5,
+            "price": 95,
+            "isBuy": false
+          },
+          "originalPartial": 3
+        }
+      ]
+    },
+    "requests": [
+      {
+        "method": "PUT",
+        "orderId": "202",
+        "body": {
+          "session": "NORMAL",
+          "duration": "DAY",
+          "orderLegCollection": [
+            {
+              "orderLegType": "EQUITY",
+              "instrument": {
+                "assetType": "EQUITY",
+                "symbol": "AAPL"
+              },
+              "instruction": "SELL",
+              "quantity": 5
+            }
+          ],
+          "orderType": "MARKET",
+          "orderStrategyType": "SINGLE"
+        }
+      }
+    ],
+    "error": false,
+    "checks": {
+      "smallest": true
+    }
+  },
+  {
+    "name": "numpad2 positional",
+    "key": "Numpad2",
+    "shift": false,
+    "price": null,
+    "state": {
+      "symbol": "AAPL",
+      "revision": 1,
+      "observedAt": 1,
+      "quoteObservedAt": 1,
+      "netQuantity": 20,
+      "currentPrice": 105,
+      "bid": 104.99,
+      "ask": 105.01,
+      "batchCount": 10,
+      "splitPartials": true,
+      "hasPlan": true,
+      "entryPrice": 100,
+      "coreTarget": 110,
+      "coreCount": 5,
+      "coreRuleEnabled": false,
+      "rulesSupported": true,
+      "entries": [
+        {
+          "orderID": "101",
+          "orderType": "STOP",
+          "quantity": 10,
+          "price": 106,
+          "isBuy": true
+        },
+        {
+          "orderID": "102",
+          "orderType": "LIMIT",
+          "quantity": 10,
+          "price": 99,
+          "isBuy": true
+        }
+      ],
+      "pairs": [
+        {
+          "LIMIT": {
+            "orderID": "200",
+            "orderType": "LIMIT",
+            "quantity": 10,
+            "price": 110,
+            "isBuy": false
+          },
+          "STOP": {
+            "orderID": "201",
+            "orderType": "STOP",
+            "quantity": 10,
+            "price": 95,
+            "isBuy": false
+          },
+          "originalPartial": 1
+        },
+        {
+          "LIMIT": {
+            "orderID": "202",
+            "orderType": "LIMIT",
+            "quantity": 5,
+            "price": 111,
+            "isBuy": false
+          },
+          "STOP": {
+            "orderID": "203",
+            "orderType": "STOP",
+            "quantity": 5,
+            "price": 95,
+            "isBuy": false
+          },
+          "originalPartial": 2
+        },
+        {
+          "LIMIT": {
+            "orderID": "204",
+            "orderType": "LIMIT",
+            "quantity": 5,
+            "price": 112,
+            "isBuy": false
+          },
+          "STOP": {
+            "orderID": "205",
+            "orderType": "STOP",
+            "quantity": 5,
+            "price": 95,
+            "isBuy": false
+          },
+          "originalPartial": 3
+        }
+      ]
+    },
+    "requests": [
+      {
+        "method": "PUT",
+        "orderId": "202",
+        "body": {
+          "session": "NORMAL",
+          "duration": "DAY",
+          "orderLegCollection": [
+            {
+              "orderLegType": "EQUITY",
+              "instrument": {
+                "assetType": "EQUITY",
+                "symbol": "AAPL"
+              },
+              "instruction": "SELL",
+              "quantity": 5
+            }
+          ],
+          "orderType": "MARKET",
+          "orderStrategyType": "SINGLE"
+        }
+      }
+    ],
+    "error": false,
+    "checks": {}
+  },
+  {
+    "name": "numpad0 tenth pair",
+    "key": "Numpad0",
+    "shift": false,
+    "price": null,
+    "state": {
+      "symbol": "AAPL",
+      "revision": 1,
+      "observedAt": 1,
+      "quoteObservedAt": 1,
+      "netQuantity": 100,
+      "currentPrice": 105,
+      "bid": 104.99,
+      "ask": 105.01,
+      "batchCount": 10,
+      "splitPartials": true,
+      "hasPlan": true,
+      "entryPrice": 100,
+      "coreTarget": 110,
+      "coreCount": 5,
+      "coreRuleEnabled": false,
+      "rulesSupported": true,
+      "entries": [
+        {
+          "orderID": "101",
+          "orderType": "STOP",
+          "quantity": 10,
+          "price": 106,
+          "isBuy": true
+        },
+        {
+          "orderID": "102",
+          "orderType": "LIMIT",
+          "quantity": 10,
+          "price": 99,
+          "isBuy": true
+        }
+      ],
+      "pairs": [
+        {
+          "LIMIT": {
+            "orderID": "200",
+            "orderType": "LIMIT",
+            "quantity": 10,
+            "price": 110,
+            "isBuy": false
+          },
+          "STOP": {
+            "orderID": "201",
+            "orderType": "STOP",
+            "quantity": 10,
+            "price": 95,
+            "isBuy": false
+          },
+          "originalPartial": 1
+        },
+        {
+          "LIMIT": {
+            "orderID": "202",
+            "orderType": "LIMIT",
+            "quantity": 10,
+            "price": 111,
+            "isBuy": false
+          },
+          "STOP": {
+            "orderID": "203",
+            "orderType": "STOP",
+            "quantity": 10,
+            "price": 95,
+            "isBuy": false
+          },
+          "originalPartial": 2
+        },
+        {
+          "LIMIT": {
+            "orderID": "204",
+            "orderType": "LIMIT",
+            "quantity": 10,
+            "price": 112,
+            "isBuy": false
+          },
+          "STOP": {
+            "orderID": "205",
+            "orderType": "STOP",
+            "quantity": 10,
+            "price": 95,
+            "isBuy": false
+          },
+          "originalPartial": 3
+        },
+        {
+          "LIMIT": {
+            "orderID": "206",
+            "orderType": "LIMIT",
+            "quantity": 10,
+            "price": 113,
+            "isBuy": false
+          },
+          "STOP": {
+            "orderID": "207",
+            "orderType": "STOP",
+            "quantity": 10,
+            "price": 95,
+            "isBuy": false
+          },
+          "originalPartial": 4
+        },
+        {
+          "LIMIT": {
+            "orderID": "208",
+            "orderType": "LIMIT",
+            "quantity": 10,
+            "price": 114,
+            "isBuy": false
+          },
+          "STOP": {
+            "orderID": "209",
+            "orderType": "STOP",
+            "quantity": 10,
+            "price": 95,
+            "isBuy": false
+          },
+          "originalPartial": 5
+        },
+        {
+          "LIMIT": {
+            "orderID": "210",
+            "orderType": "LIMIT",
+            "quantity": 10,
+            "price": 115,
+            "isBuy": false
+          },
+          "STOP": {
+            "orderID": "211",
+            "orderType": "STOP",
+            "quantity": 10,
+            "price": 95,
+            "isBuy": false
+          },
+          "originalPartial": 6
+        },
+        {
+          "LIMIT": {
+            "orderID": "212",
+            "orderType": "LIMIT",
+            "quantity": 10,
+            "price": 116,
+            "isBuy": false
+          },
+          "STOP": {
+            "orderID": "213",
+            "orderType": "STOP",
+            "quantity": 10,
+            "price": 95,
+            "isBuy": false
+          },
+          "originalPartial": 7
+        },
+        {
+          "LIMIT": {
+            "orderID": "214",
+            "orderType": "LIMIT",
+            "quantity": 10,
+            "price": 117,
+            "isBuy": false
+          },
+          "STOP": {
+            "orderID": "215",
+            "orderType": "STOP",
+            "quantity": 10,
+            "price": 95,
+            "isBuy": false
+          },
+          "originalPartial": 8
+        },
+        {
+          "LIMIT": {
+            "orderID": "216",
+            "orderType": "LIMIT",
+            "quantity": 10,
+            "price": 118,
+            "isBuy": false
+          },
+          "STOP": {
+            "orderID": "217",
+            "orderType": "STOP",
+            "quantity": 10,
+            "price": 95,
+            "isBuy": false
+          },
+          "originalPartial": 9
+        },
+        {
+          "LIMIT": {
+            "orderID": "218",
+            "orderType": "LIMIT",
+            "quantity": 10,
+            "price": 119,
+            "isBuy": false
+          },
+          "STOP": {
+            "orderID": "219",
+            "orderType": "STOP",
+            "quantity": 10,
+            "price": 95,
+            "isBuy": false
+          },
+          "originalPartial": 10
+        }
+      ]
+    },
+    "requests": [
+      {
+        "method": "PUT",
+        "orderId": "218",
+        "body": {
+          "session": "NORMAL",
+          "duration": "DAY",
+          "orderLegCollection": [
+            {
+              "orderLegType": "EQUITY",
+              "instrument": {
+                "assetType": "EQUITY",
+                "symbol": "AAPL"
+              },
+              "instruction": "SELL",
+              "quantity": 10
+            }
+          ],
+          "orderType": "MARKET",
+          "orderStrategyType": "SINGLE"
+        }
+      }
+    ],
+    "error": false,
+    "checks": {}
+  },
+  {
+    "name": "market out half rounds up pair count",
+    "key": "KeyG",
+    "shift": true,
+    "price": null,
+    "state": {
+      "symbol": "AAPL",
+      "revision": 1,
+      "observedAt": 1,
+      "quoteObservedAt": 1,
+      "netQuantity": 20,
+      "currentPrice": 105,
+      "bid": 104.99,
+      "ask": 105.01,
+      "batchCount": 10,
+      "splitPartials": true,
+      "hasPlan": true,
+      "entryPrice": 100,
+      "coreTarget": 110,
+      "coreCount": 5,
+      "coreRuleEnabled": false,
+      "rulesSupported": true,
+      "entries": [
+        {
+          "orderID": "101",
+          "orderType": "STOP",
+          "quantity": 10,
+          "price": 106,
+          "isBuy": true
+        },
+        {
+          "orderID": "102",
+          "orderType": "LIMIT",
+          "quantity": 10,
+          "price": 99,
+          "isBuy": true
+        }
+      ],
+      "pairs": [
+        {
+          "LIMIT": {
+            "orderID": "200",
+            "orderType": "LIMIT",
+            "quantity": 5,
+            "price": 110,
+            "isBuy": false
+          },
+          "STOP": {
+            "orderID": "201",
+            "orderType": "STOP",
+            "quantity": 5,
+            "price": 95,
+            "isBuy": false
+          },
+          "originalPartial": 1
+        },
+        {
+          "LIMIT": {
+            "orderID": "202",
+            "orderType": "LIMIT",
+            "quantity": 5,
+            "price": 111,
+            "isBuy": false
+          },
+          "STOP": {
+            "orderID": "203",
+            "orderType": "STOP",
+            "quantity": 5,
+            "price": 95,
+            "isBuy": false
+          },
+          "originalPartial": 2
+        },
+        {
+          "LIMIT": {
+            "orderID": "204",
+            "orderType": "LIMIT",
+            "quantity": 10,
+            "price": 112,
+            "isBuy": false
+          },
+          "STOP": {
+            "orderID": "205",
+            "orderType": "STOP",
+            "quantity": 10,
+            "price": 95,
+            "isBuy": false
+          },
+          "originalPartial": 3
+        }
+      ]
+    },
+    "requests": [
+      {
+        "method": "PUT",
+        "orderId": "200",
+        "body": {
+          "session": "NORMAL",
+          "duration": "DAY",
+          "orderLegCollection": [
+            {
+              "orderLegType": "EQUITY",
+              "instrument": {
+                "assetType": "EQUITY",
+                "symbol": "AAPL"
+              },
+              "instruction": "SELL",
+              "quantity": 5
+            }
+          ],
+          "orderType": "MARKET",
+          "orderStrategyType": "SINGLE"
+        }
+      },
+      {
+        "method": "PUT",
+        "orderId": "202",
+        "body": {
+          "session": "NORMAL",
+          "duration": "DAY",
+          "orderLegCollection": [
+            {
+              "orderLegType": "EQUITY",
+              "instrument": {
+                "assetType": "EQUITY",
+                "symbol": "AAPL"
+              },
+              "instruction": "SELL",
+              "quantity": 5
+            }
+          ],
+          "orderType": "MARKET",
+          "orderStrategyType": "SINGLE"
+        }
+      }
+    ],
+    "error": false,
+    "checks": {}
+  },
+  {
+    "name": "short market out closes with buy to cover",
+    "key": "Numpad2",
+    "shift": false,
+    "price": null,
+    "state": {
+      "symbol": "AAPL",
+      "revision": 1,
+      "observedAt": 1,
+      "quoteObservedAt": 1,
+      "netQuantity": -100,
+      "currentPrice": 95,
+      "bid": 94.99,
+      "ask": 95.01,
+      "batchCount": 10,
+      "splitPartials": true,
+      "hasPlan": true,
+      "entryPrice": 100,
+      "coreTarget": 90,
+      "coreCount": 5,
+      "coreRuleEnabled": false,
+      "rulesSupported": true,
+      "entries": [
+        {
+          "orderID": "101",
+          "orderType": "STOP",
+          "quantity": 10,
+          "price": 106,
+          "isBuy": true
+        },
+        {
+          "orderID": "102",
+          "orderType": "LIMIT",
+          "quantity": 10,
+          "price": 99,
+          "isBuy": true
+        }
+      ],
+      "pairs": [
+        {
+          "LIMIT": {
+            "orderID": "200",
+            "orderType": "LIMIT",
+            "quantity": 10,
+            "price": 90,
+            "isBuy": true
+          },
+          "STOP": {
+            "orderID": "201",
+            "orderType": "STOP",
+            "quantity": 10,
+            "price": 105,
+            "isBuy": true
+          },
+          "originalPartial": 1
+        },
+        {
+          "LIMIT": {
+            "orderID": "202",
+            "orderType": "LIMIT",
+            "quantity": 10,
+            "price": 89,
+            "isBuy": true
+          },
+          "STOP": {
+            "orderID": "203",
+            "orderType": "STOP",
+            "quantity": 10,
+            "price": 105,
+            "isBuy": true
+          },
+          "originalPartial": 2
+        },
+        {
+          "LIMIT": {
+            "orderID": "204",
+            "orderType": "LIMIT",
+            "quantity": 10,
+            "price": 88,
+            "isBuy": true
+          },
+          "STOP": {
+            "orderID": "205",
+            "orderType": "STOP",
+            "quantity": 10,
+            "price": 105,
+            "isBuy": true
+          },
+          "originalPartial": 3
+        },
+        {
+          "LIMIT": {
+            "orderID": "206",
+            "orderType": "LIMIT",
+            "quantity": 10,
+            "price": 87,
+            "isBuy": true
+          },
+          "STOP": {
+            "orderID": "207",
+            "orderType": "STOP",
+            "quantity": 10,
+            "price": 105,
+            "isBuy": true
+          },
+          "originalPartial": 4
+        },
+        {
+          "LIMIT": {
+            "orderID": "208",
+            "orderType": "LIMIT",
+            "quantity": 10,
+            "price": 86,
+            "isBuy": true
+          },
+          "STOP": {
+            "orderID": "209",
+            "orderType": "STOP",
+            "quantity": 10,
+            "price": 105,
+            "isBuy": true
+          },
+          "originalPartial": 5
+        },
+        {
+          "LIMIT": {
+            "orderID": "210",
+            "orderType": "LIMIT",
+            "quantity": 10,
+            "price": 85,
+            "isBuy": true
+          },
+          "STOP": {
+            "orderID": "211",
+            "orderType": "STOP",
+            "quantity": 10,
+            "price": 105,
+            "isBuy": true
+          },
+          "originalPartial": 6
+        },
+        {
+          "LIMIT": {
+            "orderID": "212",
+            "orderType": "LIMIT",
+            "quantity": 10,
+            "price": 84,
+            "isBuy": true
+          },
+          "STOP": {
+            "orderID": "213",
+            "orderType": "STOP",
+            "quantity": 10,
+            "price": 105,
+            "isBuy": true
+          },
+          "originalPartial": 7
+        },
+        {
+          "LIMIT": {
+            "orderID": "214",
+            "orderType": "LIMIT",
+            "quantity": 10,
+            "price": 83,
+            "isBuy": true
+          },
+          "STOP": {
+            "orderID": "215",
+            "orderType": "STOP",
+            "quantity": 10,
+            "price": 105,
+            "isBuy": true
+          },
+          "originalPartial": 8
+        },
+        {
+          "LIMIT": {
+            "orderID": "216",
+            "orderType": "LIMIT",
+            "quantity": 10,
+            "price": 82,
+            "isBuy": true
+          },
+          "STOP": {
+            "orderID": "217",
+            "orderType": "STOP",
+            "quantity": 10,
+            "price": 105,
+            "isBuy": true
+          },
+          "originalPartial": 9
+        },
+        {
+          "LIMIT": {
+            "orderID": "218",
+            "orderType": "LIMIT",
+            "quantity": 10,
+            "price": 81,
+            "isBuy": true
+          },
+          "STOP": {
+            "orderID": "219",
+            "orderType": "STOP",
+            "quantity": 10,
+            "price": 105,
+            "isBuy": true
+          },
+          "originalPartial": 10
+        }
+      ]
+    },
+    "requests": [
+      {
+        "method": "PUT",
+        "orderId": "202",
+        "body": {
+          "session": "NORMAL",
+          "duration": "DAY",
+          "orderLegCollection": [
+            {
+              "orderLegType": "EQUITY",
+              "instrument": {
+                "assetType": "EQUITY",
+                "symbol": "AAPL"
+              },
+              "instruction": "BUY_TO_COVER",
+              "quantity": 10
+            }
+          ],
+          "orderType": "MARKET",
+          "orderStrategyType": "SINGLE"
+        }
+      }
+    ],
+    "error": false,
+    "checks": {}
+  },
+  {
+    "name": "short stop adjustment clamps to ask",
+    "key": "Digit2",
+    "shift": false,
+    "price": 95.005,
+    "state": {
+      "symbol": "AAPL",
+      "revision": 1,
+      "observedAt": 1,
+      "quoteObservedAt": 1,
+      "netQuantity": -100,
+      "currentPrice": 95,
+      "bid": 94.99,
+      "ask": 95.01,
+      "batchCount": 10,
+      "splitPartials": true,
+      "hasPlan": true,
+      "entryPrice": 100,
+      "coreTarget": 90,
+      "coreCount": 5,
+      "coreRuleEnabled": false,
+      "rulesSupported": true,
+      "entries": [
+        {
+          "orderID": "101",
+          "orderType": "STOP",
+          "quantity": 10,
+          "price": 106,
+          "isBuy": true
+        },
+        {
+          "orderID": "102",
+          "orderType": "LIMIT",
+          "quantity": 10,
+          "price": 99,
+          "isBuy": true
+        }
+      ],
+      "pairs": [
+        {
+          "LIMIT": {
+            "orderID": "200",
+            "orderType": "LIMIT",
+            "quantity": 10,
+            "price": 90,
+            "isBuy": true
+          },
+          "STOP": {
+            "orderID": "201",
+            "orderType": "STOP",
+            "quantity": 10,
+            "price": 105,
+            "isBuy": true
+          },
+          "originalPartial": 1
+        },
+        {
+          "LIMIT": {
+            "orderID": "202",
+            "orderType": "LIMIT",
+            "quantity": 10,
+            "price": 89,
+            "isBuy": true
+          },
+          "STOP": {
+            "orderID": "203",
+            "orderType": "STOP",
+            "quantity": 10,
+            "price": 105,
+            "isBuy": true
+          },
+          "originalPartial": 2
+        },
+        {
+          "LIMIT": {
+            "orderID": "204",
+            "orderType": "LIMIT",
+            "quantity": 10,
+            "price": 88,
+            "isBuy": true
+          },
+          "STOP": {
+            "orderID": "205",
+            "orderType": "STOP",
+            "quantity": 10,
+            "price": 105,
+            "isBuy": true
+          },
+          "originalPartial": 3
+        },
+        {
+          "LIMIT": {
+            "orderID": "206",
+            "orderType": "LIMIT",
+            "quantity": 10,
+            "price": 87,
+            "isBuy": true
+          },
+          "STOP": {
+            "orderID": "207",
+            "orderType": "STOP",
+            "quantity": 10,
+            "price": 105,
+            "isBuy": true
+          },
+          "originalPartial": 4
+        },
+        {
+          "LIMIT": {
+            "orderID": "208",
+            "orderType": "LIMIT",
+            "quantity": 10,
+            "price": 86,
+            "isBuy": true
+          },
+          "STOP": {
+            "orderID": "209",
+            "orderType": "STOP",
+            "quantity": 10,
+            "price": 105,
+            "isBuy": true
+          },
+          "originalPartial": 5
+        },
+        {
+          "LIMIT": {
+            "orderID": "210",
+            "orderType": "LIMIT",
+            "quantity": 10,
+            "price": 85,
+            "isBuy": true
+          },
+          "STOP": {
+            "orderID": "211",
+            "orderType": "STOP",
+            "quantity": 10,
+            "price": 105,
+            "isBuy": true
+          },
+          "originalPartial": 6
+        },
+        {
+          "LIMIT": {
+            "orderID": "212",
+            "orderType": "LIMIT",
+            "quantity": 10,
+            "price": 84,
+            "isBuy": true
+          },
+          "STOP": {
+            "orderID": "213",
+            "orderType": "STOP",
+            "quantity": 10,
+            "price": 105,
+            "isBuy": true
+          },
+          "originalPartial": 7
+        },
+        {
+          "LIMIT": {
+            "orderID": "214",
+            "orderType": "LIMIT",
+            "quantity": 10,
+            "price": 83,
+            "isBuy": true
+          },
+          "STOP": {
+            "orderID": "215",
+            "orderType": "STOP",
+            "quantity": 10,
+            "price": 105,
+            "isBuy": true
+          },
+          "originalPartial": 8
+        },
+        {
+          "LIMIT": {
+            "orderID": "216",
+            "orderType": "LIMIT",
+            "quantity": 10,
+            "price": 82,
+            "isBuy": true
+          },
+          "STOP": {
+            "orderID": "217",
+            "orderType": "STOP",
+            "quantity": 10,
+            "price": 105,
+            "isBuy": true
+          },
+          "originalPartial": 9
+        },
+        {
+          "LIMIT": {
+            "orderID": "218",
+            "orderType": "LIMIT",
+            "quantity": 10,
+            "price": 81,
+            "isBuy": true
+          },
+          "STOP": {
+            "orderID": "219",
+            "orderType": "STOP",
+            "quantity": 10,
+            "price": 105,
+            "isBuy": true
+          },
+          "originalPartial": 10
+        }
+      ]
+    },
+    "requests": [
+      {
+        "method": "PUT",
+        "orderId": "203",
+        "body": {
+          "session": "NORMAL",
+          "duration": "DAY",
+          "orderLegCollection": [
+            {
+              "orderLegType": "EQUITY",
+              "instrument": {
+                "assetType": "EQUITY",
+                "symbol": "AAPL"
+              },
+              "instruction": "BUY_TO_COVER",
+              "quantity": 10
+            }
+          ],
+          "orderType": "STOP",
+          "orderStrategyType": "SINGLE",
+          "stopPrice": 95.01
+        }
+      }
+    ],
+    "error": false,
+    "checks": {}
+  },
+  {
+    "name": "long stop adjustment clamps to bid",
+    "key": "Digit2",
+    "shift": false,
+    "price": 104.95,
+    "state": {
+      "symbol": "AAPL",
+      "revision": 1,
+      "observedAt": 1,
+      "quoteObservedAt": 1,
+      "netQuantity": 100,
+      "currentPrice": 105,
+      "bid": 104.9,
+      "ask": 105.01,
+      "batchCount": 10,
+      "splitPartials": true,
+      "hasPlan": true,
+      "entryPrice": 100,
+      "coreTarget": 110,
+      "coreCount": 5,
+      "coreRuleEnabled": false,
+      "rulesSupported": true,
+      "entries": [
+        {
+          "orderID": "101",
+          "orderType": "STOP",
+          "quantity": 10,
+          "price": 106,
+          "isBuy": true
+        },
+        {
+          "orderID": "102",
+          "orderType": "LIMIT",
+          "quantity": 10,
+          "price": 99,
+          "isBuy": true
+        }
+      ],
+      "pairs": [
+        {
+          "LIMIT": {
+            "orderID": "200",
+            "orderType": "LIMIT",
+            "quantity": 10,
+            "price": 110,
+            "isBuy": false
+          },
+          "STOP": {
+            "orderID": "201",
+            "orderType": "STOP",
+            "quantity": 10,
+            "price": 95,
+            "isBuy": false
+          },
+          "originalPartial": 1
+        },
+        {
+          "LIMIT": {
+            "orderID": "202",
+            "orderType": "LIMIT",
+            "quantity": 10,
+            "price": 111,
+            "isBuy": false
+          },
+          "STOP": {
+            "orderID": "203",
+            "orderType": "STOP",
+            "quantity": 10,
+            "price": 95,
+            "isBuy": false
+          },
+          "originalPartial": 2
+        },
+        {
+          "LIMIT": {
+            "orderID": "204",
+            "orderType": "LIMIT",
+            "quantity": 10,
+            "price": 112,
+            "isBuy": false
+          },
+          "STOP": {
+            "orderID": "205",
+            "orderType": "STOP",
+            "quantity": 10,
+            "price": 95,
+            "isBuy": false
+          },
+          "originalPartial": 3
+        },
+        {
+          "LIMIT": {
+            "orderID": "206",
+            "orderType": "LIMIT",
+            "quantity": 10,
+            "price": 113,
+            "isBuy": false
+          },
+          "STOP": {
+            "orderID": "207",
+            "orderType": "STOP",
+            "quantity": 10,
+            "price": 95,
+            "isBuy": false
+          },
+          "originalPartial": 4
+        },
+        {
+          "LIMIT": {
+            "orderID": "208",
+            "orderType": "LIMIT",
+            "quantity": 10,
+            "price": 114,
+            "isBuy": false
+          },
+          "STOP": {
+            "orderID": "209",
+            "orderType": "STOP",
+            "quantity": 10,
+            "price": 95,
+            "isBuy": false
+          },
+          "originalPartial": 5
+        },
+        {
+          "LIMIT": {
+            "orderID": "210",
+            "orderType": "LIMIT",
+            "quantity": 10,
+            "price": 115,
+            "isBuy": false
+          },
+          "STOP": {
+            "orderID": "211",
+            "orderType": "STOP",
+            "quantity": 10,
+            "price": 95,
+            "isBuy": false
+          },
+          "originalPartial": 6
+        },
+        {
+          "LIMIT": {
+            "orderID": "212",
+            "orderType": "LIMIT",
+            "quantity": 10,
+            "price": 116,
+            "isBuy": false
+          },
+          "STOP": {
+            "orderID": "213",
+            "orderType": "STOP",
+            "quantity": 10,
+            "price": 95,
+            "isBuy": false
+          },
+          "originalPartial": 7
+        },
+        {
+          "LIMIT": {
+            "orderID": "214",
+            "orderType": "LIMIT",
+            "quantity": 10,
+            "price": 117,
+            "isBuy": false
+          },
+          "STOP": {
+            "orderID": "215",
+            "orderType": "STOP",
+            "quantity": 10,
+            "price": 95,
+            "isBuy": false
+          },
+          "originalPartial": 8
+        },
+        {
+          "LIMIT": {
+            "orderID": "216",
+            "orderType": "LIMIT",
+            "quantity": 10,
+            "price": 118,
+            "isBuy": false
+          },
+          "STOP": {
+            "orderID": "217",
+            "orderType": "STOP",
+            "quantity": 10,
+            "price": 95,
+            "isBuy": false
+          },
+          "originalPartial": 9
+        },
+        {
+          "LIMIT": {
+            "orderID": "218",
+            "orderType": "LIMIT",
+            "quantity": 10,
+            "price": 119,
+            "isBuy": false
+          },
+          "STOP": {
+            "orderID": "219",
+            "orderType": "STOP",
+            "quantity": 10,
+            "price": 95,
+            "isBuy": false
+          },
+          "originalPartial": 10
+        }
+      ]
+    },
+    "requests": [
+      {
+        "method": "PUT",
+        "orderId": "203",
+        "body": {
+          "session": "NORMAL",
+          "duration": "DAY",
+          "orderLegCollection": [
+            {
+              "orderLegType": "EQUITY",
+              "instrument": {
+                "assetType": "EQUITY",
+                "symbol": "AAPL"
+              },
+              "instruction": "SELL",
+              "quantity": 10
+            }
+          ],
+          "orderType": "STOP",
+          "orderStrategyType": "SINGLE",
+          "stopPrice": 104.9
+        }
+      }
+    ],
+    "error": false,
+    "checks": {}
+  },
+  {
+    "name": "hover rounded to current price selects target",
+    "key": "Digit2",
+    "shift": false,
+    "price": 104.999,
+    "state": {
+      "symbol": "AAPL",
+      "revision": 1,
+      "observedAt": 1,
+      "quoteObservedAt": 1,
+      "netQuantity": 100,
+      "currentPrice": 105,
+      "bid": 104.9,
+      "ask": 105.01,
+      "batchCount": 10,
+      "splitPartials": true,
+      "hasPlan": true,
+      "entryPrice": 100,
+      "coreTarget": 110,
+      "coreCount": 5,
+      "coreRuleEnabled": false,
+      "rulesSupported": true,
+      "entries": [
+        {
+          "orderID": "101",
+          "orderType": "STOP",
+          "quantity": 10,
+          "price": 106,
+          "isBuy": true
+        },
+        {
+          "orderID": "102",
+          "orderType": "LIMIT",
+          "quantity": 10,
+          "price": 99,
+          "isBuy": true
+        }
+      ],
+      "pairs": [
+        {
+          "LIMIT": {
+            "orderID": "200",
+            "orderType": "LIMIT",
+            "quantity": 10,
+            "price": 110,
+            "isBuy": false
+          },
+          "STOP": {
+            "orderID": "201",
+            "orderType": "STOP",
+            "quantity": 10,
+            "price": 95,
+            "isBuy": false
+          },
+          "originalPartial": 1
+        },
+        {
+          "LIMIT": {
+            "orderID": "202",
+            "orderType": "LIMIT",
+            "quantity": 10,
+            "price": 111,
+            "isBuy": false
+          },
+          "STOP": {
+            "orderID": "203",
+            "orderType": "STOP",
+            "quantity": 10,
+            "price": 95,
+            "isBuy": false
+          },
+          "originalPartial": 2
+        },
+        {
+          "LIMIT": {
+            "orderID": "204",
+            "orderType": "LIMIT",
+            "quantity": 10,
+            "price": 112,
+            "isBuy": false
+          },
+          "STOP": {
+            "orderID": "205",
+            "orderType": "STOP",
+            "quantity": 10,
+            "price": 95,
+            "isBuy": false
+          },
+          "originalPartial": 3
+        },
+        {
+          "LIMIT": {
+            "orderID": "206",
+            "orderType": "LIMIT",
+            "quantity": 10,
+            "price": 113,
+            "isBuy": false
+          },
+          "STOP": {
+            "orderID": "207",
+            "orderType": "STOP",
+            "quantity": 10,
+            "price": 95,
+            "isBuy": false
+          },
+          "originalPartial": 4
+        },
+        {
+          "LIMIT": {
+            "orderID": "208",
+            "orderType": "LIMIT",
+            "quantity": 10,
+            "price": 114,
+            "isBuy": false
+          },
+          "STOP": {
+            "orderID": "209",
+            "orderType": "STOP",
+            "quantity": 10,
+            "price": 95,
+            "isBuy": false
+          },
+          "originalPartial": 5
+        },
+        {
+          "LIMIT": {
+            "orderID": "210",
+            "orderType": "LIMIT",
+            "quantity": 10,
+            "price": 115,
+            "isBuy": false
+          },
+          "STOP": {
+            "orderID": "211",
+            "orderType": "STOP",
+            "quantity": 10,
+            "price": 95,
+            "isBuy": false
+          },
+          "originalPartial": 6
+        },
+        {
+          "LIMIT": {
+            "orderID": "212",
+            "orderType": "LIMIT",
+            "quantity": 10,
+            "price": 116,
+            "isBuy": false
+          },
+          "STOP": {
+            "orderID": "213",
+            "orderType": "STOP",
+            "quantity": 10,
+            "price": 95,
+            "isBuy": false
+          },
+          "originalPartial": 7
+        },
+        {
+          "LIMIT": {
+            "orderID": "214",
+            "orderType": "LIMIT",
+            "quantity": 10,
+            "price": 117,
+            "isBuy": false
+          },
+          "STOP": {
+            "orderID": "215",
+            "orderType": "STOP",
+            "quantity": 10,
+            "price": 95,
+            "isBuy": false
+          },
+          "originalPartial": 8
+        },
+        {
+          "LIMIT": {
+            "orderID": "216",
+            "orderType": "LIMIT",
+            "quantity": 10,
+            "price": 118,
+            "isBuy": false
+          },
+          "STOP": {
+            "orderID": "217",
+            "orderType": "STOP",
+            "quantity": 10,
+            "price": 95,
+            "isBuy": false
+          },
+          "originalPartial": 9
+        },
+        {
+          "LIMIT": {
+            "orderID": "218",
+            "orderType": "LIMIT",
+            "quantity": 10,
+            "price": 119,
+            "isBuy": false
+          },
+          "STOP": {
+            "orderID": "219",
+            "orderType": "STOP",
+            "quantity": 10,
+            "price": 95,
+            "isBuy": false
+          },
+          "originalPartial": 10
+        }
+      ]
+    },
+    "requests": [
+      {
+        "method": "PUT",
+        "orderId": "202",
+        "body": {
+          "session": "NORMAL",
+          "duration": "DAY",
+          "orderLegCollection": [
+            {
+              "orderLegType": "EQUITY",
+              "instrument": {
+                "assetType": "EQUITY",
+                "symbol": "AAPL"
+              },
+              "instruction": "SELL",
+              "quantity": 10
+            }
+          ],
+          "orderType": "LIMIT",
+          "orderStrategyType": "SINGLE",
+          "price": 105
+        }
+      }
+    ],
+    "error": false,
+    "checks": {}
+  },
+  {
+    "name": "target adjustment",
+    "key": "Digit2",
+    "shift": false,
+    "price": 108,
+    "state": {
+      "symbol": "AAPL",
+      "revision": 1,
+      "observedAt": 1,
+      "quoteObservedAt": 1,
+      "netQuantity": 100,
+      "currentPrice": 105,
+      "bid": 104.9,
+      "ask": 105.01,
+      "batchCount": 10,
+      "splitPartials": true,
+      "hasPlan": true,
+      "entryPrice": 100,
+      "coreTarget": 110,
+      "coreCount": 5,
+      "coreRuleEnabled": false,
+      "rulesSupported": true,
+      "entries": [
+        {
+          "orderID": "101",
+          "orderType": "STOP",
+          "quantity": 10,
+          "price": 106,
+          "isBuy": true
+        },
+        {
+          "orderID": "102",
+          "orderType": "LIMIT",
+          "quantity": 10,
+          "price": 99,
+          "isBuy": true
+        }
+      ],
+      "pairs": [
+        {
+          "LIMIT": {
+            "orderID": "200",
+            "orderType": "LIMIT",
+            "quantity": 10,
+            "price": 110,
+            "isBuy": false
+          },
+          "STOP": {
+            "orderID": "201",
+            "orderType": "STOP",
+            "quantity": 10,
+            "price": 95,
+            "isBuy": false
+          },
+          "originalPartial": 1
+        },
+        {
+          "LIMIT": {
+            "orderID": "202",
+            "orderType": "LIMIT",
+            "quantity": 10,
+            "price": 111,
+            "isBuy": false
+          },
+          "STOP": {
+            "orderID": "203",
+            "orderType": "STOP",
+            "quantity": 10,
+            "price": 95,
+            "isBuy": false
+          },
+          "originalPartial": 2
+        },
+        {
+          "LIMIT": {
+            "orderID": "204",
+            "orderType": "LIMIT",
+            "quantity": 10,
+            "price": 112,
+            "isBuy": false
+          },
+          "STOP": {
+            "orderID": "205",
+            "orderType": "STOP",
+            "quantity": 10,
+            "price": 95,
+            "isBuy": false
+          },
+          "originalPartial": 3
+        },
+        {
+          "LIMIT": {
+            "orderID": "206",
+            "orderType": "LIMIT",
+            "quantity": 10,
+            "price": 113,
+            "isBuy": false
+          },
+          "STOP": {
+            "orderID": "207",
+            "orderType": "STOP",
+            "quantity": 10,
+            "price": 95,
+            "isBuy": false
+          },
+          "originalPartial": 4
+        },
+        {
+          "LIMIT": {
+            "orderID": "208",
+            "orderType": "LIMIT",
+            "quantity": 10,
+            "price": 114,
+            "isBuy": false
+          },
+          "STOP": {
+            "orderID": "209",
+            "orderType": "STOP",
+            "quantity": 10,
+            "price": 95,
+            "isBuy": false
+          },
+          "originalPartial": 5
+        },
+        {
+          "LIMIT": {
+            "orderID": "210",
+            "orderType": "LIMIT",
+            "quantity": 10,
+            "price": 115,
+            "isBuy": false
+          },
+          "STOP": {
+            "orderID": "211",
+            "orderType": "STOP",
+            "quantity": 10,
+            "price": 95,
+            "isBuy": false
+          },
+          "originalPartial": 6
+        },
+        {
+          "LIMIT": {
+            "orderID": "212",
+            "orderType": "LIMIT",
+            "quantity": 10,
+            "price": 116,
+            "isBuy": false
+          },
+          "STOP": {
+            "orderID": "213",
+            "orderType": "STOP",
+            "quantity": 10,
+            "price": 95,
+            "isBuy": false
+          },
+          "originalPartial": 7
+        },
+        {
+          "LIMIT": {
+            "orderID": "214",
+            "orderType": "LIMIT",
+            "quantity": 10,
+            "price": 117,
+            "isBuy": false
+          },
+          "STOP": {
+            "orderID": "215",
+            "orderType": "STOP",
+            "quantity": 10,
+            "price": 95,
+            "isBuy": false
+          },
+          "originalPartial": 8
+        },
+        {
+          "LIMIT": {
+            "orderID": "216",
+            "orderType": "LIMIT",
+            "quantity": 10,
+            "price": 118,
+            "isBuy": false
+          },
+          "STOP": {
+            "orderID": "217",
+            "orderType": "STOP",
+            "quantity": 10,
+            "price": 95,
+            "isBuy": false
+          },
+          "originalPartial": 9
+        },
+        {
+          "LIMIT": {
+            "orderID": "218",
+            "orderType": "LIMIT",
+            "quantity": 10,
+            "price": 119,
+            "isBuy": false
+          },
+          "STOP": {
+            "orderID": "219",
+            "orderType": "STOP",
+            "quantity": 10,
+            "price": 95,
+            "isBuy": false
+          },
+          "originalPartial": 10
+        }
+      ]
+    },
+    "requests": [
+      {
+        "method": "PUT",
+        "orderId": "202",
+        "body": {
+          "session": "NORMAL",
+          "duration": "DAY",
+          "orderLegCollection": [
+            {
+              "orderLegType": "EQUITY",
+              "instrument": {
+                "assetType": "EQUITY",
+                "symbol": "AAPL"
+              },
+              "instruction": "SELL",
+              "quantity": 10
+            }
+          ],
+          "orderType": "LIMIT",
+          "orderStrategyType": "SINGLE",
+          "price": 108
+        }
+      }
+    ],
+    "error": false,
+    "checks": {}
+  },
+  {
+    "name": "adjust all targets",
+    "key": "KeyT",
+    "shift": false,
+    "price": 120,
+    "state": {
+      "symbol": "AAPL",
+      "revision": 1,
+      "observedAt": 1,
+      "quoteObservedAt": 1,
+      "netQuantity": 100,
+      "currentPrice": 105,
+      "bid": 104.9,
+      "ask": 105.01,
+      "batchCount": 10,
+      "splitPartials": true,
+      "hasPlan": true,
+      "entryPrice": 100,
+      "coreTarget": 110,
+      "coreCount": 5,
+      "coreRuleEnabled": false,
+      "rulesSupported": true,
+      "entries": [
+        {
+          "orderID": "101",
+          "orderType": "STOP",
+          "quantity": 10,
+          "price": 106,
+          "isBuy": true
+        },
+        {
+          "orderID": "102",
+          "orderType": "LIMIT",
+          "quantity": 10,
+          "price": 99,
+          "isBuy": true
+        }
+      ],
+      "pairs": [
+        {
+          "LIMIT": {
+            "orderID": "200",
+            "orderType": "LIMIT",
+            "quantity": 10,
+            "price": 110,
+            "isBuy": false
+          },
+          "STOP": {
+            "orderID": "201",
+            "orderType": "STOP",
+            "quantity": 10,
+            "price": 95,
+            "isBuy": false
+          },
+          "originalPartial": 1
+        },
+        {
+          "LIMIT": {
+            "orderID": "202",
+            "orderType": "LIMIT",
+            "quantity": 10,
+            "price": 111,
+            "isBuy": false
+          },
+          "STOP": {
+            "orderID": "203",
+            "orderType": "STOP",
+            "quantity": 10,
+            "price": 95,
+            "isBuy": false
+          },
+          "originalPartial": 2
+        },
+        {
+          "LIMIT": {
+            "orderID": "204",
+            "orderType": "LIMIT",
+            "quantity": 10,
+            "price": 112,
+            "isBuy": false
+          },
+          "STOP": {
+            "orderID": "205",
+            "orderType": "STOP",
+            "quantity": 10,
+            "price": 95,
+            "isBuy": false
+          },
+          "originalPartial": 3
+        },
+        {
+          "LIMIT": {
+            "orderID": "206",
+            "orderType": "LIMIT",
+            "quantity": 10,
+            "price": 113,
+            "isBuy": false
+          },
+          "STOP": {
+            "orderID": "207",
+            "orderType": "STOP",
+            "quantity": 10,
+            "price": 95,
+            "isBuy": false
+          },
+          "originalPartial": 4
+        },
+        {
+          "LIMIT": {
+            "orderID": "208",
+            "orderType": "LIMIT",
+            "quantity": 10,
+            "price": 114,
+            "isBuy": false
+          },
+          "STOP": {
+            "orderID": "209",
+            "orderType": "STOP",
+            "quantity": 10,
+            "price": 95,
+            "isBuy": false
+          },
+          "originalPartial": 5
+        },
+        {
+          "LIMIT": {
+            "orderID": "210",
+            "orderType": "LIMIT",
+            "quantity": 10,
+            "price": 115,
+            "isBuy": false
+          },
+          "STOP": {
+            "orderID": "211",
+            "orderType": "STOP",
+            "quantity": 10,
+            "price": 95,
+            "isBuy": false
+          },
+          "originalPartial": 6
+        },
+        {
+          "LIMIT": {
+            "orderID": "212",
+            "orderType": "LIMIT",
+            "quantity": 10,
+            "price": 116,
+            "isBuy": false
+          },
+          "STOP": {
+            "orderID": "213",
+            "orderType": "STOP",
+            "quantity": 10,
+            "price": 95,
+            "isBuy": false
+          },
+          "originalPartial": 7
+        },
+        {
+          "LIMIT": {
+            "orderID": "214",
+            "orderType": "LIMIT",
+            "quantity": 10,
+            "price": 117,
+            "isBuy": false
+          },
+          "STOP": {
+            "orderID": "215",
+            "orderType": "STOP",
+            "quantity": 10,
+            "price": 95,
+            "isBuy": false
+          },
+          "originalPartial": 8
+        },
+        {
+          "LIMIT": {
+            "orderID": "216",
+            "orderType": "LIMIT",
+            "quantity": 10,
+            "price": 118,
+            "isBuy": false
+          },
+          "STOP": {
+            "orderID": "217",
+            "orderType": "STOP",
+            "quantity": 10,
+            "price": 95,
+            "isBuy": false
+          },
+          "originalPartial": 9
+        },
+        {
+          "LIMIT": {
+            "orderID": "218",
+            "orderType": "LIMIT",
+            "quantity": 10,
+            "price": 119,
+            "isBuy": false
+          },
+          "STOP": {
+            "orderID": "219",
+            "orderType": "STOP",
+            "quantity": 10,
+            "price": 95,
+            "isBuy": false
+          },
+          "originalPartial": 10
+        }
+      ]
+    },
+    "requests": [
+      {
+        "method": "PUT",
+        "orderId": "200",
+        "body": {
+          "session": "NORMAL",
+          "duration": "DAY",
+          "orderLegCollection": [
+            {
+              "orderLegType": "EQUITY",
+              "instrument": {
+                "assetType": "EQUITY",
+                "symbol": "AAPL"
+              },
+              "instruction": "SELL",
+              "quantity": 10
+            }
+          ],
+          "orderType": "LIMIT",
+          "orderStrategyType": "SINGLE",
+          "price": 120
+        }
+      },
+      {
+        "method": "PUT",
+        "orderId": "202",
+        "body": {
+          "session": "NORMAL",
+          "duration": "DAY",
+          "orderLegCollection": [
+            {
+              "orderLegType": "EQUITY",
+              "instrument": {
+                "assetType": "EQUITY",
+                "symbol": "AAPL"
+              },
+              "instruction": "SELL",
+              "quantity": 10
+            }
+          ],
+          "orderType": "LIMIT",
+          "orderStrategyType": "SINGLE",
+          "price": 120
+        }
+      },
+      {
+        "method": "PUT",
+        "orderId": "204",
+        "body": {
+          "session": "NORMAL",
+          "duration": "DAY",
+          "orderLegCollection": [
+            {
+              "orderLegType": "EQUITY",
+              "instrument": {
+                "assetType": "EQUITY",
+                "symbol": "AAPL"
+              },
+              "instruction": "SELL",
+              "quantity": 10
+            }
+          ],
+          "orderType": "LIMIT",
+          "orderStrategyType": "SINGLE",
+          "price": 120
+        }
+      },
+      {
+        "method": "PUT",
+        "orderId": "206",
+        "body": {
+          "session": "NORMAL",
+          "duration": "DAY",
+          "orderLegCollection": [
+            {
+              "orderLegType": "EQUITY",
+              "instrument": {
+                "assetType": "EQUITY",
+                "symbol": "AAPL"
+              },
+              "instruction": "SELL",
+              "quantity": 10
+            }
+          ],
+          "orderType": "LIMIT",
+          "orderStrategyType": "SINGLE",
+          "price": 120
+        }
+      },
+      {
+        "method": "PUT",
+        "orderId": "208",
+        "body": {
+          "session": "NORMAL",
+          "duration": "DAY",
+          "orderLegCollection": [
+            {
+              "orderLegType": "EQUITY",
+              "instrument": {
+                "assetType": "EQUITY",
+                "symbol": "AAPL"
+              },
+              "instruction": "SELL",
+              "quantity": 10
+            }
+          ],
+          "orderType": "LIMIT",
+          "orderStrategyType": "SINGLE",
+          "price": 120
+        }
+      },
+      {
+        "method": "PUT",
+        "orderId": "210",
+        "body": {
+          "session": "NORMAL",
+          "duration": "DAY",
+          "orderLegCollection": [
+            {
+              "orderLegType": "EQUITY",
+              "instrument": {
+                "assetType": "EQUITY",
+                "symbol": "AAPL"
+              },
+              "instruction": "SELL",
+              "quantity": 10
+            }
+          ],
+          "orderType": "LIMIT",
+          "orderStrategyType": "SINGLE",
+          "price": 120
+        }
+      },
+      {
+        "method": "PUT",
+        "orderId": "212",
+        "body": {
+          "session": "NORMAL",
+          "duration": "DAY",
+          "orderLegCollection": [
+            {
+              "orderLegType": "EQUITY",
+              "instrument": {
+                "assetType": "EQUITY",
+                "symbol": "AAPL"
+              },
+              "instruction": "SELL",
+              "quantity": 10
+            }
+          ],
+          "orderType": "LIMIT",
+          "orderStrategyType": "SINGLE",
+          "price": 120
+        }
+      },
+      {
+        "method": "PUT",
+        "orderId": "214",
+        "body": {
+          "session": "NORMAL",
+          "duration": "DAY",
+          "orderLegCollection": [
+            {
+              "orderLegType": "EQUITY",
+              "instrument": {
+                "assetType": "EQUITY",
+                "symbol": "AAPL"
+              },
+              "instruction": "SELL",
+              "quantity": 10
+            }
+          ],
+          "orderType": "LIMIT",
+          "orderStrategyType": "SINGLE",
+          "price": 120
+        }
+      },
+      {
+        "method": "PUT",
+        "orderId": "216",
+        "body": {
+          "session": "NORMAL",
+          "duration": "DAY",
+          "orderLegCollection": [
+            {
+              "orderLegType": "EQUITY",
+              "instrument": {
+                "assetType": "EQUITY",
+                "symbol": "AAPL"
+              },
+              "instruction": "SELL",
+              "quantity": 10
+            }
+          ],
+          "orderType": "LIMIT",
+          "orderStrategyType": "SINGLE",
+          "price": 120
+        }
+      },
+      {
+        "method": "PUT",
+        "orderId": "218",
+        "body": {
+          "session": "NORMAL",
+          "duration": "DAY",
+          "orderLegCollection": [
+            {
+              "orderLegType": "EQUITY",
+              "instrument": {
+                "assetType": "EQUITY",
+                "symbol": "AAPL"
+              },
+              "instruction": "SELL",
+              "quantity": 10
+            }
+          ],
+          "orderType": "LIMIT",
+          "orderStrategyType": "SINGLE",
+          "price": 120
+        }
+      }
+    ],
+    "error": false,
+    "checks": {}
+  },
+  {
+    "name": "adjust half stops",
+    "key": "KeyG",
+    "shift": false,
+    "price": 99,
+    "state": {
+      "symbol": "AAPL",
+      "revision": 1,
+      "observedAt": 1,
+      "quoteObservedAt": 1,
+      "netQuantity": 100,
+      "currentPrice": 105,
+      "bid": 104.9,
+      "ask": 105.01,
+      "batchCount": 10,
+      "splitPartials": true,
+      "hasPlan": true,
+      "entryPrice": 100,
+      "coreTarget": 110,
+      "coreCount": 5,
+      "coreRuleEnabled": false,
+      "rulesSupported": true,
+      "entries": [
+        {
+          "orderID": "101",
+          "orderType": "STOP",
+          "quantity": 10,
+          "price": 106,
+          "isBuy": true
+        },
+        {
+          "orderID": "102",
+          "orderType": "LIMIT",
+          "quantity": 10,
+          "price": 99,
+          "isBuy": true
+        }
+      ],
+      "pairs": [
+        {
+          "LIMIT": {
+            "orderID": "200",
+            "orderType": "LIMIT",
+            "quantity": 10,
+            "price": 110,
+            "isBuy": false
+          },
+          "STOP": {
+            "orderID": "201",
+            "orderType": "STOP",
+            "quantity": 10,
+            "price": 95,
+            "isBuy": false
+          },
+          "originalPartial": 1
+        },
+        {
+          "LIMIT": {
+            "orderID": "202",
+            "orderType": "LIMIT",
+            "quantity": 10,
+            "price": 111,
+            "isBuy": false
+          },
+          "STOP": {
+            "orderID": "203",
+            "orderType": "STOP",
+            "quantity": 10,
+            "price": 95,
+            "isBuy": false
+          },
+          "originalPartial": 2
+        },
+        {
+          "LIMIT": {
+            "orderID": "204",
+            "orderType": "LIMIT",
+            "quantity": 10,
+            "price": 112,
+            "isBuy": false
+          },
+          "STOP": {
+            "orderID": "205",
+            "orderType": "STOP",
+            "quantity": 10,
+            "price": 95,
+            "isBuy": false
+          },
+          "originalPartial": 3
+        },
+        {
+          "LIMIT": {
+            "orderID": "206",
+            "orderType": "LIMIT",
+            "quantity": 10,
+            "price": 113,
+            "isBuy": false
+          },
+          "STOP": {
+            "orderID": "207",
+            "orderType": "STOP",
+            "quantity": 10,
+            "price": 95,
+            "isBuy": false
+          },
+          "originalPartial": 4
+        },
+        {
+          "LIMIT": {
+            "orderID": "208",
+            "orderType": "LIMIT",
+            "quantity": 10,
+            "price": 114,
+            "isBuy": false
+          },
+          "STOP": {
+            "orderID": "209",
+            "orderType": "STOP",
+            "quantity": 10,
+            "price": 95,
+            "isBuy": false
+          },
+          "originalPartial": 5
+        },
+        {
+          "LIMIT": {
+            "orderID": "210",
+            "orderType": "LIMIT",
+            "quantity": 10,
+            "price": 115,
+            "isBuy": false
+          },
+          "STOP": {
+            "orderID": "211",
+            "orderType": "STOP",
+            "quantity": 10,
+            "price": 95,
+            "isBuy": false
+          },
+          "originalPartial": 6
+        },
+        {
+          "LIMIT": {
+            "orderID": "212",
+            "orderType": "LIMIT",
+            "quantity": 10,
+            "price": 116,
+            "isBuy": false
+          },
+          "STOP": {
+            "orderID": "213",
+            "orderType": "STOP",
+            "quantity": 10,
+            "price": 95,
+            "isBuy": false
+          },
+          "originalPartial": 7
+        },
+        {
+          "LIMIT": {
+            "orderID": "214",
+            "orderType": "LIMIT",
+            "quantity": 10,
+            "price": 117,
+            "isBuy": false
+          },
+          "STOP": {
+            "orderID": "215",
+            "orderType": "STOP",
+            "quantity": 10,
+            "price": 95,
+            "isBuy": false
+          },
+          "originalPartial": 8
+        },
+        {
+          "LIMIT": {
+            "orderID": "216",
+            "orderType": "LIMIT",
+            "quantity": 10,
+            "price": 118,
+            "isBuy": false
+          },
+          "STOP": {
+            "orderID": "217",
+            "orderType": "STOP",
+            "quantity": 10,
+            "price": 95,
+            "isBuy": false
+          },
+          "originalPartial": 9
+        },
+        {
+          "LIMIT": {
+            "orderID": "218",
+            "orderType": "LIMIT",
+            "quantity": 10,
+            "price": 119,
+            "isBuy": false
+          },
+          "STOP": {
+            "orderID": "219",
+            "orderType": "STOP",
+            "quantity": 10,
+            "price": 95,
+            "isBuy": false
+          },
+          "originalPartial": 10
+        }
+      ]
+    },
+    "requests": [
+      {
+        "method": "PUT",
+        "orderId": "201",
+        "body": {
+          "session": "NORMAL",
+          "duration": "DAY",
+          "orderLegCollection": [
+            {
+              "orderLegType": "EQUITY",
+              "instrument": {
+                "assetType": "EQUITY",
+                "symbol": "AAPL"
+              },
+              "instruction": "SELL",
+              "quantity": 10
+            }
+          ],
+          "orderType": "STOP",
+          "orderStrategyType": "SINGLE",
+          "stopPrice": 99
+        }
+      },
+      {
+        "method": "PUT",
+        "orderId": "203",
+        "body": {
+          "session": "NORMAL",
+          "duration": "DAY",
+          "orderLegCollection": [
+            {
+              "orderLegType": "EQUITY",
+              "instrument": {
+                "assetType": "EQUITY",
+                "symbol": "AAPL"
+              },
+              "instruction": "SELL",
+              "quantity": 10
+            }
+          ],
+          "orderType": "STOP",
+          "orderStrategyType": "SINGLE",
+          "stopPrice": 99
+        }
+      },
+      {
+        "method": "PUT",
+        "orderId": "205",
+        "body": {
+          "session": "NORMAL",
+          "duration": "DAY",
+          "orderLegCollection": [
+            {
+              "orderLegType": "EQUITY",
+              "instrument": {
+                "assetType": "EQUITY",
+                "symbol": "AAPL"
+              },
+              "instruction": "SELL",
+              "quantity": 10
+            }
+          ],
+          "orderType": "STOP",
+          "orderStrategyType": "SINGLE",
+          "stopPrice": 99
+        }
+      },
+      {
+        "method": "PUT",
+        "orderId": "207",
+        "body": {
+          "session": "NORMAL",
+          "duration": "DAY",
+          "orderLegCollection": [
+            {
+              "orderLegType": "EQUITY",
+              "instrument": {
+                "assetType": "EQUITY",
+                "symbol": "AAPL"
+              },
+              "instruction": "SELL",
+              "quantity": 10
+            }
+          ],
+          "orderType": "STOP",
+          "orderStrategyType": "SINGLE",
+          "stopPrice": 99
+        }
+      },
+      {
+        "method": "PUT",
+        "orderId": "209",
+        "body": {
+          "session": "NORMAL",
+          "duration": "DAY",
+          "orderLegCollection": [
+            {
+              "orderLegType": "EQUITY",
+              "instrument": {
+                "assetType": "EQUITY",
+                "symbol": "AAPL"
+              },
+              "instruction": "SELL",
+              "quantity": 10
+            }
+          ],
+          "orderType": "STOP",
+          "orderStrategyType": "SINGLE",
+          "stopPrice": 99
+        }
+      }
+    ],
+    "error": false,
+    "checks": {}
+  },
+  {
+    "name": "flatten replaces all exit pairs",
+    "key": "KeyF",
+    "shift": false,
+    "price": null,
+    "state": {
+      "symbol": "AAPL",
+      "revision": 1,
+      "observedAt": 1,
+      "quoteObservedAt": 1,
+      "netQuantity": 100,
+      "currentPrice": 105,
+      "bid": 104.9,
+      "ask": 105.01,
+      "batchCount": 10,
+      "splitPartials": true,
+      "hasPlan": true,
+      "entryPrice": 100,
+      "coreTarget": 110,
+      "coreCount": 5,
+      "coreRuleEnabled": false,
+      "rulesSupported": true,
+      "entries": [
+        {
+          "orderID": "101",
+          "orderType": "STOP",
+          "quantity": 10,
+          "price": 106,
+          "isBuy": true
+        },
+        {
+          "orderID": "102",
+          "orderType": "LIMIT",
+          "quantity": 10,
+          "price": 99,
+          "isBuy": true
+        }
+      ],
+      "pairs": [
+        {
+          "LIMIT": {
+            "orderID": "200",
+            "orderType": "LIMIT",
+            "quantity": 10,
+            "price": 110,
+            "isBuy": false
+          },
+          "STOP": {
+            "orderID": "201",
+            "orderType": "STOP",
+            "quantity": 10,
+            "price": 95,
+            "isBuy": false
+          },
+          "originalPartial": 1
+        },
+        {
+          "LIMIT": {
+            "orderID": "202",
+            "orderType": "LIMIT",
+            "quantity": 10,
+            "price": 111,
+            "isBuy": false
+          },
+          "STOP": {
+            "orderID": "203",
+            "orderType": "STOP",
+            "quantity": 10,
+            "price": 95,
+            "isBuy": false
+          },
+          "originalPartial": 2
+        },
+        {
+          "LIMIT": {
+            "orderID": "204",
+            "orderType": "LIMIT",
+            "quantity": 10,
+            "price": 112,
+            "isBuy": false
+          },
+          "STOP": {
+            "orderID": "205",
+            "orderType": "STOP",
+            "quantity": 10,
+            "price": 95,
+            "isBuy": false
+          },
+          "originalPartial": 3
+        },
+        {
+          "LIMIT": {
+            "orderID": "206",
+            "orderType": "LIMIT",
+            "quantity": 10,
+            "price": 113,
+            "isBuy": false
+          },
+          "STOP": {
+            "orderID": "207",
+            "orderType": "STOP",
+            "quantity": 10,
+            "price": 95,
+            "isBuy": false
+          },
+          "originalPartial": 4
+        },
+        {
+          "LIMIT": {
+            "orderID": "208",
+            "orderType": "LIMIT",
+            "quantity": 10,
+            "price": 114,
+            "isBuy": false
+          },
+          "STOP": {
+            "orderID": "209",
+            "orderType": "STOP",
+            "quantity": 10,
+            "price": 95,
+            "isBuy": false
+          },
+          "originalPartial": 5
+        },
+        {
+          "LIMIT": {
+            "orderID": "210",
+            "orderType": "LIMIT",
+            "quantity": 10,
+            "price": 115,
+            "isBuy": false
+          },
+          "STOP": {
+            "orderID": "211",
+            "orderType": "STOP",
+            "quantity": 10,
+            "price": 95,
+            "isBuy": false
+          },
+          "originalPartial": 6
+        },
+        {
+          "LIMIT": {
+            "orderID": "212",
+            "orderType": "LIMIT",
+            "quantity": 10,
+            "price": 116,
+            "isBuy": false
+          },
+          "STOP": {
+            "orderID": "213",
+            "orderType": "STOP",
+            "quantity": 10,
+            "price": 95,
+            "isBuy": false
+          },
+          "originalPartial": 7
+        },
+        {
+          "LIMIT": {
+            "orderID": "214",
+            "orderType": "LIMIT",
+            "quantity": 10,
+            "price": 117,
+            "isBuy": false
+          },
+          "STOP": {
+            "orderID": "215",
+            "orderType": "STOP",
+            "quantity": 10,
+            "price": 95,
+            "isBuy": false
+          },
+          "originalPartial": 8
+        },
+        {
+          "LIMIT": {
+            "orderID": "216",
+            "orderType": "LIMIT",
+            "quantity": 10,
+            "price": 118,
+            "isBuy": false
+          },
+          "STOP": {
+            "orderID": "217",
+            "orderType": "STOP",
+            "quantity": 10,
+            "price": 95,
+            "isBuy": false
+          },
+          "originalPartial": 9
+        },
+        {
+          "LIMIT": {
+            "orderID": "218",
+            "orderType": "LIMIT",
+            "quantity": 10,
+            "price": 119,
+            "isBuy": false
+          },
+          "STOP": {
+            "orderID": "219",
+            "orderType": "STOP",
+            "quantity": 10,
+            "price": 95,
+            "isBuy": false
+          },
+          "originalPartial": 10
+        }
+      ]
+    },
+    "requests": [
+      {
+        "method": "PUT",
+        "orderId": "200",
+        "body": {
+          "session": "NORMAL",
+          "duration": "DAY",
+          "orderLegCollection": [
+            {
+              "orderLegType": "EQUITY",
+              "instrument": {
+                "assetType": "EQUITY",
+                "symbol": "AAPL"
+              },
+              "instruction": "SELL",
+              "quantity": 10
+            }
+          ],
+          "orderType": "MARKET",
+          "orderStrategyType": "SINGLE"
+        }
+      },
+      {
+        "method": "PUT",
+        "orderId": "202",
+        "body": {
+          "session": "NORMAL",
+          "duration": "DAY",
+          "orderLegCollection": [
+            {
+              "orderLegType": "EQUITY",
+              "instrument": {
+                "assetType": "EQUITY",
+                "symbol": "AAPL"
+              },
+              "instruction": "SELL",
+              "quantity": 10
+            }
+          ],
+          "orderType": "MARKET",
+          "orderStrategyType": "SINGLE"
+        }
+      },
+      {
+        "method": "PUT",
+        "orderId": "204",
+        "body": {
+          "session": "NORMAL",
+          "duration": "DAY",
+          "orderLegCollection": [
+            {
+              "orderLegType": "EQUITY",
+              "instrument": {
+                "assetType": "EQUITY",
+                "symbol": "AAPL"
+              },
+              "instruction": "SELL",
+              "quantity": 10
+            }
+          ],
+          "orderType": "MARKET",
+          "orderStrategyType": "SINGLE"
+        }
+      },
+      {
+        "method": "PUT",
+        "orderId": "206",
+        "body": {
+          "session": "NORMAL",
+          "duration": "DAY",
+          "orderLegCollection": [
+            {
+              "orderLegType": "EQUITY",
+              "instrument": {
+                "assetType": "EQUITY",
+                "symbol": "AAPL"
+              },
+              "instruction": "SELL",
+              "quantity": 10
+            }
+          ],
+          "orderType": "MARKET",
+          "orderStrategyType": "SINGLE"
+        }
+      },
+      {
+        "method": "PUT",
+        "orderId": "208",
+        "body": {
+          "session": "NORMAL",
+          "duration": "DAY",
+          "orderLegCollection": [
+            {
+              "orderLegType": "EQUITY",
+              "instrument": {
+                "assetType": "EQUITY",
+                "symbol": "AAPL"
+              },
+              "instruction": "SELL",
+              "quantity": 10
+            }
+          ],
+          "orderType": "MARKET",
+          "orderStrategyType": "SINGLE"
+        }
+      },
+      {
+        "method": "PUT",
+        "orderId": "210",
+        "body": {
+          "session": "NORMAL",
+          "duration": "DAY",
+          "orderLegCollection": [
+            {
+              "orderLegType": "EQUITY",
+              "instrument": {
+                "assetType": "EQUITY",
+                "symbol": "AAPL"
+              },
+              "instruction": "SELL",
+              "quantity": 10
+            }
+          ],
+          "orderType": "MARKET",
+          "orderStrategyType": "SINGLE"
+        }
+      },
+      {
+        "method": "PUT",
+        "orderId": "212",
+        "body": {
+          "session": "NORMAL",
+          "duration": "DAY",
+          "orderLegCollection": [
+            {
+              "orderLegType": "EQUITY",
+              "instrument": {
+                "assetType": "EQUITY",
+                "symbol": "AAPL"
+              },
+              "instruction": "SELL",
+              "quantity": 10
+            }
+          ],
+          "orderType": "MARKET",
+          "orderStrategyType": "SINGLE"
+        }
+      },
+      {
+        "method": "PUT",
+        "orderId": "214",
+        "body": {
+          "session": "NORMAL",
+          "duration": "DAY",
+          "orderLegCollection": [
+            {
+              "orderLegType": "EQUITY",
+              "instrument": {
+                "assetType": "EQUITY",
+                "symbol": "AAPL"
+              },
+              "instruction": "SELL",
+              "quantity": 10
+            }
+          ],
+          "orderType": "MARKET",
+          "orderStrategyType": "SINGLE"
+        }
+      },
+      {
+        "method": "PUT",
+        "orderId": "216",
+        "body": {
+          "session": "NORMAL",
+          "duration": "DAY",
+          "orderLegCollection": [
+            {
+              "orderLegType": "EQUITY",
+              "instrument": {
+                "assetType": "EQUITY",
+                "symbol": "AAPL"
+              },
+              "instruction": "SELL",
+              "quantity": 10
+            }
+          ],
+          "orderType": "MARKET",
+          "orderStrategyType": "SINGLE"
+        }
+      },
+      {
+        "method": "PUT",
+        "orderId": "218",
+        "body": {
+          "session": "NORMAL",
+          "duration": "DAY",
+          "orderLegCollection": [
+            {
+              "orderLegType": "EQUITY",
+              "instrument": {
+                "assetType": "EQUITY",
+                "symbol": "AAPL"
+              },
+              "instruction": "SELL",
+              "quantity": 10
+            }
+          ],
+          "orderType": "MARKET",
+          "orderStrategyType": "SINGLE"
+        }
+      }
+    ],
+    "error": false,
+    "checks": {}
+  },
+  {
+    "name": "flatten closes only uncovered shares",
+    "key": "KeyF",
+    "shift": false,
+    "price": null,
+    "state": {
+      "symbol": "AAPL",
+      "revision": 1,
+      "observedAt": 1,
+      "quoteObservedAt": 1,
+      "netQuantity": 110,
+      "currentPrice": 105,
+      "bid": 104.99,
+      "ask": 105.01,
+      "batchCount": 10,
+      "splitPartials": true,
+      "hasPlan": true,
+      "entryPrice": 100,
+      "coreTarget": 110,
+      "coreCount": 5,
+      "coreRuleEnabled": false,
+      "rulesSupported": true,
+      "entries": [
+        {
+          "orderID": "101",
+          "orderType": "STOP",
+          "quantity": 10,
+          "price": 106,
+          "isBuy": true
+        },
+        {
+          "orderID": "102",
+          "orderType": "LIMIT",
+          "quantity": 10,
+          "price": 99,
+          "isBuy": true
+        }
+      ],
+      "pairs": [
+        {
+          "LIMIT": {
+            "orderID": "200",
+            "orderType": "LIMIT",
+            "quantity": 10,
+            "price": 110,
+            "isBuy": false
+          },
+          "STOP": {
+            "orderID": "201",
+            "orderType": "STOP",
+            "quantity": 10,
+            "price": 95,
+            "isBuy": false
+          },
+          "originalPartial": 1
+        },
+        {
+          "LIMIT": {
+            "orderID": "202",
+            "orderType": "LIMIT",
+            "quantity": 10,
+            "price": 111,
+            "isBuy": false
+          },
+          "STOP": {
+            "orderID": "203",
+            "orderType": "STOP",
+            "quantity": 10,
+            "price": 95,
+            "isBuy": false
+          },
+          "originalPartial": 2
+        },
+        {
+          "LIMIT": {
+            "orderID": "204",
+            "orderType": "LIMIT",
+            "quantity": 10,
+            "price": 112,
+            "isBuy": false
+          },
+          "STOP": {
+            "orderID": "205",
+            "orderType": "STOP",
+            "quantity": 10,
+            "price": 95,
+            "isBuy": false
+          },
+          "originalPartial": 3
+        },
+        {
+          "LIMIT": {
+            "orderID": "206",
+            "orderType": "LIMIT",
+            "quantity": 10,
+            "price": 113,
+            "isBuy": false
+          },
+          "STOP": {
+            "orderID": "207",
+            "orderType": "STOP",
+            "quantity": 10,
+            "price": 95,
+            "isBuy": false
+          },
+          "originalPartial": 4
+        },
+        {
+          "LIMIT": {
+            "orderID": "208",
+            "orderType": "LIMIT",
+            "quantity": 10,
+            "price": 114,
+            "isBuy": false
+          },
+          "STOP": {
+            "orderID": "209",
+            "orderType": "STOP",
+            "quantity": 10,
+            "price": 95,
+            "isBuy": false
+          },
+          "originalPartial": 5
+        },
+        {
+          "LIMIT": {
+            "orderID": "210",
+            "orderType": "LIMIT",
+            "quantity": 10,
+            "price": 115,
+            "isBuy": false
+          },
+          "STOP": {
+            "orderID": "211",
+            "orderType": "STOP",
+            "quantity": 10,
+            "price": 95,
+            "isBuy": false
+          },
+          "originalPartial": 6
+        },
+        {
+          "LIMIT": {
+            "orderID": "212",
+            "orderType": "LIMIT",
+            "quantity": 10,
+            "price": 116,
+            "isBuy": false
+          },
+          "STOP": {
+            "orderID": "213",
+            "orderType": "STOP",
+            "quantity": 10,
+            "price": 95,
+            "isBuy": false
+          },
+          "originalPartial": 7
+        },
+        {
+          "LIMIT": {
+            "orderID": "214",
+            "orderType": "LIMIT",
+            "quantity": 10,
+            "price": 117,
+            "isBuy": false
+          },
+          "STOP": {
+            "orderID": "215",
+            "orderType": "STOP",
+            "quantity": 10,
+            "price": 95,
+            "isBuy": false
+          },
+          "originalPartial": 8
+        },
+        {
+          "LIMIT": {
+            "orderID": "216",
+            "orderType": "LIMIT",
+            "quantity": 10,
+            "price": 118,
+            "isBuy": false
+          },
+          "STOP": {
+            "orderID": "217",
+            "orderType": "STOP",
+            "quantity": 10,
+            "price": 95,
+            "isBuy": false
+          },
+          "originalPartial": 9
+        },
+        {
+          "LIMIT": {
+            "orderID": "218",
+            "orderType": "LIMIT",
+            "quantity": 10,
+            "price": 119,
+            "isBuy": false
+          },
+          "STOP": {
+            "orderID": "219",
+            "orderType": "STOP",
+            "quantity": 10,
+            "price": 95,
+            "isBuy": false
+          },
+          "originalPartial": 10
+        }
+      ]
+    },
+    "requests": [
+      {
+        "method": "POST",
+        "orderId": "",
+        "body": {
+          "session": "NORMAL",
+          "duration": "DAY",
+          "orderLegCollection": [
+            {
+              "orderLegType": "EQUITY",
+              "instrument": {
+                "assetType": "EQUITY",
+                "symbol": "AAPL"
+              },
+              "instruction": "SELL",
+              "quantity": 10
+            }
+          ],
+          "orderType": "MARKET",
+          "orderStrategyType": "SINGLE"
+        }
+      }
+    ],
+    "error": false,
+    "checks": {}
+  },
+  {
+    "name": "protected market partial blocked before target",
+    "key": "Numpad9",
+    "shift": false,
+    "price": null,
+    "state": {
+      "symbol": "AAPL",
+      "revision": 1,
+      "observedAt": 1,
+      "quoteObservedAt": 1,
+      "netQuantity": 100,
+      "currentPrice": 105,
+      "bid": 104.99,
+      "ask": 105.01,
+      "batchCount": 10,
+      "splitPartials": true,
+      "hasPlan": true,
+      "entryPrice": 100,
+      "coreTarget": 110,
+      "coreCount": 5,
+      "coreRuleEnabled": true,
+      "rulesSupported": true,
+      "entries": [
+        {
+          "orderID": "101",
+          "orderType": "STOP",
+          "quantity": 10,
+          "price": 106,
+          "isBuy": true
+        },
+        {
+          "orderID": "102",
+          "orderType": "LIMIT",
+          "quantity": 10,
+          "price": 99,
+          "isBuy": true
+        }
+      ],
+      "pairs": [
+        {
+          "LIMIT": {
+            "orderID": "200",
+            "orderType": "LIMIT",
+            "quantity": 10,
+            "price": 110,
+            "isBuy": false
+          },
+          "STOP": {
+            "orderID": "201",
+            "orderType": "STOP",
+            "quantity": 10,
+            "price": 95,
+            "isBuy": false
+          },
+          "originalPartial": 1
+        },
+        {
+          "LIMIT": {
+            "orderID": "202",
+            "orderType": "LIMIT",
+            "quantity": 10,
+            "price": 111,
+            "isBuy": false
+          },
+          "STOP": {
+            "orderID": "203",
+            "orderType": "STOP",
+            "quantity": 10,
+            "price": 95,
+            "isBuy": false
+          },
+          "originalPartial": 2
+        },
+        {
+          "LIMIT": {
+            "orderID": "204",
+            "orderType": "LIMIT",
+            "quantity": 10,
+            "price": 112,
+            "isBuy": false
+          },
+          "STOP": {
+            "orderID": "205",
+            "orderType": "STOP",
+            "quantity": 10,
+            "price": 95,
+            "isBuy": false
+          },
+          "originalPartial": 3
+        },
+        {
+          "LIMIT": {
+            "orderID": "206",
+            "orderType": "LIMIT",
+            "quantity": 10,
+            "price": 113,
+            "isBuy": false
+          },
+          "STOP": {
+            "orderID": "207",
+            "orderType": "STOP",
+            "quantity": 10,
+            "price": 95,
+            "isBuy": false
+          },
+          "originalPartial": 4
+        },
+        {
+          "LIMIT": {
+            "orderID": "208",
+            "orderType": "LIMIT",
+            "quantity": 10,
+            "price": 114,
+            "isBuy": false
+          },
+          "STOP": {
+            "orderID": "209",
+            "orderType": "STOP",
+            "quantity": 10,
+            "price": 95,
+            "isBuy": false
+          },
+          "originalPartial": 5
+        },
+        {
+          "LIMIT": {
+            "orderID": "210",
+            "orderType": "LIMIT",
+            "quantity": 10,
+            "price": 115,
+            "isBuy": false
+          },
+          "STOP": {
+            "orderID": "211",
+            "orderType": "STOP",
+            "quantity": 10,
+            "price": 95,
+            "isBuy": false
+          },
+          "originalPartial": 6
+        },
+        {
+          "LIMIT": {
+            "orderID": "212",
+            "orderType": "LIMIT",
+            "quantity": 10,
+            "price": 116,
+            "isBuy": false
+          },
+          "STOP": {
+            "orderID": "213",
+            "orderType": "STOP",
+            "quantity": 10,
+            "price": 95,
+            "isBuy": false
+          },
+          "originalPartial": 7
+        },
+        {
+          "LIMIT": {
+            "orderID": "214",
+            "orderType": "LIMIT",
+            "quantity": 10,
+            "price": 117,
+            "isBuy": false
+          },
+          "STOP": {
+            "orderID": "215",
+            "orderType": "STOP",
+            "quantity": 10,
+            "price": 95,
+            "isBuy": false
+          },
+          "originalPartial": 8
+        },
+        {
+          "LIMIT": {
+            "orderID": "216",
+            "orderType": "LIMIT",
+            "quantity": 10,
+            "price": 118,
+            "isBuy": false
+          },
+          "STOP": {
+            "orderID": "217",
+            "orderType": "STOP",
+            "quantity": 10,
+            "price": 95,
+            "isBuy": false
+          },
+          "originalPartial": 9
+        },
+        {
+          "LIMIT": {
+            "orderID": "218",
+            "orderType": "LIMIT",
+            "quantity": 10,
+            "price": 119,
+            "isBuy": false
+          },
+          "STOP": {
+            "orderID": "219",
+            "orderType": "STOP",
+            "quantity": 10,
+            "price": 95,
+            "isBuy": false
+          },
+          "originalPartial": 10
+        }
+      ]
+    },
+    "requests": [],
+    "error": true,
+    "checks": {
+      "core": {
+        "partial": 9,
+        "price": 105,
+        "earlier": true,
+        "allowed": false
+      }
+    }
+  },
+  {
+    "name": "protected partial allowed at buffered target",
+    "key": "Numpad9",
+    "shift": false,
+    "price": null,
+    "state": {
+      "symbol": "AAPL",
+      "revision": 1,
+      "observedAt": 1,
+      "quoteObservedAt": 1,
+      "netQuantity": 100,
+      "currentPrice": 109,
+      "bid": 104.99,
+      "ask": 105.01,
+      "batchCount": 10,
+      "splitPartials": true,
+      "hasPlan": true,
+      "entryPrice": 100,
+      "coreTarget": 110,
+      "coreCount": 5,
+      "coreRuleEnabled": true,
+      "rulesSupported": true,
+      "entries": [
+        {
+          "orderID": "101",
+          "orderType": "STOP",
+          "quantity": 10,
+          "price": 106,
+          "isBuy": true
+        },
+        {
+          "orderID": "102",
+          "orderType": "LIMIT",
+          "quantity": 10,
+          "price": 99,
+          "isBuy": true
+        }
+      ],
+      "pairs": [
+        {
+          "LIMIT": {
+            "orderID": "200",
+            "orderType": "LIMIT",
+            "quantity": 10,
+            "price": 110,
+            "isBuy": false
+          },
+          "STOP": {
+            "orderID": "201",
+            "orderType": "STOP",
+            "quantity": 10,
+            "price": 95,
+            "isBuy": false
+          },
+          "originalPartial": 1
+        },
+        {
+          "LIMIT": {
+            "orderID": "202",
+            "orderType": "LIMIT",
+            "quantity": 10,
+            "price": 111,
+            "isBuy": false
+          },
+          "STOP": {
+            "orderID": "203",
+            "orderType": "STOP",
+            "quantity": 10,
+            "price": 95,
+            "isBuy": false
+          },
+          "originalPartial": 2
+        },
+        {
+          "LIMIT": {
+            "orderID": "204",
+            "orderType": "LIMIT",
+            "quantity": 10,
+            "price": 112,
+            "isBuy": false
+          },
+          "STOP": {
+            "orderID": "205",
+            "orderType": "STOP",
+            "quantity": 10,
+            "price": 95,
+            "isBuy": false
+          },
+          "originalPartial": 3
+        },
+        {
+          "LIMIT": {
+            "orderID": "206",
+            "orderType": "LIMIT",
+            "quantity": 10,
+            "price": 113,
+            "isBuy": false
+          },
+          "STOP": {
+            "orderID": "207",
+            "orderType": "STOP",
+            "quantity": 10,
+            "price": 95,
+            "isBuy": false
+          },
+          "originalPartial": 4
+        },
+        {
+          "LIMIT": {
+            "orderID": "208",
+            "orderType": "LIMIT",
+            "quantity": 10,
+            "price": 114,
+            "isBuy": false
+          },
+          "STOP": {
+            "orderID": "209",
+            "orderType": "STOP",
+            "quantity": 10,
+            "price": 95,
+            "isBuy": false
+          },
+          "originalPartial": 5
+        },
+        {
+          "LIMIT": {
+            "orderID": "210",
+            "orderType": "LIMIT",
+            "quantity": 10,
+            "price": 115,
+            "isBuy": false
+          },
+          "STOP": {
+            "orderID": "211",
+            "orderType": "STOP",
+            "quantity": 10,
+            "price": 95,
+            "isBuy": false
+          },
+          "originalPartial": 6
+        },
+        {
+          "LIMIT": {
+            "orderID": "212",
+            "orderType": "LIMIT",
+            "quantity": 10,
+            "price": 116,
+            "isBuy": false
+          },
+          "STOP": {
+            "orderID": "213",
+            "orderType": "STOP",
+            "quantity": 10,
+            "price": 95,
+            "isBuy": false
+          },
+          "originalPartial": 7
+        },
+        {
+          "LIMIT": {
+            "orderID": "214",
+            "orderType": "LIMIT",
+            "quantity": 10,
+            "price": 117,
+            "isBuy": false
+          },
+          "STOP": {
+            "orderID": "215",
+            "orderType": "STOP",
+            "quantity": 10,
+            "price": 95,
+            "isBuy": false
+          },
+          "originalPartial": 8
+        },
+        {
+          "LIMIT": {
+            "orderID": "216",
+            "orderType": "LIMIT",
+            "quantity": 10,
+            "price": 118,
+            "isBuy": false
+          },
+          "STOP": {
+            "orderID": "217",
+            "orderType": "STOP",
+            "quantity": 10,
+            "price": 95,
+            "isBuy": false
+          },
+          "originalPartial": 9
+        },
+        {
+          "LIMIT": {
+            "orderID": "218",
+            "orderType": "LIMIT",
+            "quantity": 10,
+            "price": 119,
+            "isBuy": false
+          },
+          "STOP": {
+            "orderID": "219",
+            "orderType": "STOP",
+            "quantity": 10,
+            "price": 95,
+            "isBuy": false
+          },
+          "originalPartial": 10
+        }
+      ]
+    },
+    "requests": [
+      {
+        "method": "PUT",
+        "orderId": "216",
+        "body": {
+          "session": "NORMAL",
+          "duration": "DAY",
+          "orderLegCollection": [
+            {
+              "orderLegType": "EQUITY",
+              "instrument": {
+                "assetType": "EQUITY",
+                "symbol": "AAPL"
+              },
+              "instruction": "SELL",
+              "quantity": 10
+            }
+          ],
+          "orderType": "MARKET",
+          "orderStrategyType": "SINGLE"
+        }
+      }
+    ],
+    "error": false,
+    "checks": {
+      "core": {
+        "partial": 9,
+        "price": 109,
+        "earlier": true,
+        "allowed": true
+      }
+    }
+  },
+  {
+    "name": "protected target moved earlier blocked",
+    "key": "Digit9",
+    "shift": false,
+    "price": 108,
+    "state": {
+      "symbol": "AAPL",
+      "revision": 1,
+      "observedAt": 1,
+      "quoteObservedAt": 1,
+      "netQuantity": 100,
+      "currentPrice": 105,
+      "bid": 104.99,
+      "ask": 105.01,
+      "batchCount": 10,
+      "splitPartials": true,
+      "hasPlan": true,
+      "entryPrice": 100,
+      "coreTarget": 110,
+      "coreCount": 5,
+      "coreRuleEnabled": true,
+      "rulesSupported": true,
+      "entries": [
+        {
+          "orderID": "101",
+          "orderType": "STOP",
+          "quantity": 10,
+          "price": 106,
+          "isBuy": true
+        },
+        {
+          "orderID": "102",
+          "orderType": "LIMIT",
+          "quantity": 10,
+          "price": 99,
+          "isBuy": true
+        }
+      ],
+      "pairs": [
+        {
+          "LIMIT": {
+            "orderID": "200",
+            "orderType": "LIMIT",
+            "quantity": 10,
+            "price": 110,
+            "isBuy": false
+          },
+          "STOP": {
+            "orderID": "201",
+            "orderType": "STOP",
+            "quantity": 10,
+            "price": 95,
+            "isBuy": false
+          },
+          "originalPartial": 1
+        },
+        {
+          "LIMIT": {
+            "orderID": "202",
+            "orderType": "LIMIT",
+            "quantity": 10,
+            "price": 111,
+            "isBuy": false
+          },
+          "STOP": {
+            "orderID": "203",
+            "orderType": "STOP",
+            "quantity": 10,
+            "price": 95,
+            "isBuy": false
+          },
+          "originalPartial": 2
+        },
+        {
+          "LIMIT": {
+            "orderID": "204",
+            "orderType": "LIMIT",
+            "quantity": 10,
+            "price": 112,
+            "isBuy": false
+          },
+          "STOP": {
+            "orderID": "205",
+            "orderType": "STOP",
+            "quantity": 10,
+            "price": 95,
+            "isBuy": false
+          },
+          "originalPartial": 3
+        },
+        {
+          "LIMIT": {
+            "orderID": "206",
+            "orderType": "LIMIT",
+            "quantity": 10,
+            "price": 113,
+            "isBuy": false
+          },
+          "STOP": {
+            "orderID": "207",
+            "orderType": "STOP",
+            "quantity": 10,
+            "price": 95,
+            "isBuy": false
+          },
+          "originalPartial": 4
+        },
+        {
+          "LIMIT": {
+            "orderID": "208",
+            "orderType": "LIMIT",
+            "quantity": 10,
+            "price": 114,
+            "isBuy": false
+          },
+          "STOP": {
+            "orderID": "209",
+            "orderType": "STOP",
+            "quantity": 10,
+            "price": 95,
+            "isBuy": false
+          },
+          "originalPartial": 5
+        },
+        {
+          "LIMIT": {
+            "orderID": "210",
+            "orderType": "LIMIT",
+            "quantity": 10,
+            "price": 115,
+            "isBuy": false
+          },
+          "STOP": {
+            "orderID": "211",
+            "orderType": "STOP",
+            "quantity": 10,
+            "price": 95,
+            "isBuy": false
+          },
+          "originalPartial": 6
+        },
+        {
+          "LIMIT": {
+            "orderID": "212",
+            "orderType": "LIMIT",
+            "quantity": 10,
+            "price": 116,
+            "isBuy": false
+          },
+          "STOP": {
+            "orderID": "213",
+            "orderType": "STOP",
+            "quantity": 10,
+            "price": 95,
+            "isBuy": false
+          },
+          "originalPartial": 7
+        },
+        {
+          "LIMIT": {
+            "orderID": "214",
+            "orderType": "LIMIT",
+            "quantity": 10,
+            "price": 117,
+            "isBuy": false
+          },
+          "STOP": {
+            "orderID": "215",
+            "orderType": "STOP",
+            "quantity": 10,
+            "price": 95,
+            "isBuy": false
+          },
+          "originalPartial": 8
+        },
+        {
+          "LIMIT": {
+            "orderID": "216",
+            "orderType": "LIMIT",
+            "quantity": 10,
+            "price": 118,
+            "isBuy": false
+          },
+          "STOP": {
+            "orderID": "217",
+            "orderType": "STOP",
+            "quantity": 10,
+            "price": 95,
+            "isBuy": false
+          },
+          "originalPartial": 9
+        },
+        {
+          "LIMIT": {
+            "orderID": "218",
+            "orderType": "LIMIT",
+            "quantity": 10,
+            "price": 119,
+            "isBuy": false
+          },
+          "STOP": {
+            "orderID": "219",
+            "orderType": "STOP",
+            "quantity": 10,
+            "price": 95,
+            "isBuy": false
+          },
+          "originalPartial": 10
+        }
+      ]
+    },
+    "requests": [],
+    "error": true,
+    "checks": {
+      "core": {
+        "partial": 9,
+        "price": 108,
+        "earlier": true,
+        "allowed": false
+      }
+    }
+  },
+  {
+    "name": "unsplit partials rejected without order side effect",
+    "key": "KeyM",
+    "shift": false,
+    "price": null,
+    "state": {
+      "symbol": "AAPL",
+      "revision": 1,
+      "observedAt": 1,
+      "quoteObservedAt": 1,
+      "netQuantity": 100,
+      "currentPrice": 105,
+      "bid": 104.99,
+      "ask": 105.01,
+      "batchCount": 10,
+      "splitPartials": false,
+      "hasPlan": true,
+      "entryPrice": 100,
+      "coreTarget": 110,
+      "coreCount": 5,
+      "coreRuleEnabled": false,
+      "rulesSupported": true,
+      "entries": [
+        {
+          "orderID": "101",
+          "orderType": "STOP",
+          "quantity": 10,
+          "price": 106,
+          "isBuy": true
+        },
+        {
+          "orderID": "102",
+          "orderType": "LIMIT",
+          "quantity": 10,
+          "price": 99,
+          "isBuy": true
+        }
+      ],
+      "pairs": [
+        {
+          "LIMIT": {
+            "orderID": "200",
+            "orderType": "LIMIT",
+            "quantity": 10,
+            "price": 110,
+            "isBuy": false
+          },
+          "STOP": {
+            "orderID": "201",
+            "orderType": "STOP",
+            "quantity": 10,
+            "price": 95,
+            "isBuy": false
+          },
+          "originalPartial": 1
+        },
+        {
+          "LIMIT": {
+            "orderID": "202",
+            "orderType": "LIMIT",
+            "quantity": 10,
+            "price": 111,
+            "isBuy": false
+          },
+          "STOP": {
+            "orderID": "203",
+            "orderType": "STOP",
+            "quantity": 10,
+            "price": 95,
+            "isBuy": false
+          },
+          "originalPartial": 2
+        },
+        {
+          "LIMIT": {
+            "orderID": "204",
+            "orderType": "LIMIT",
+            "quantity": 10,
+            "price": 112,
+            "isBuy": false
+          },
+          "STOP": {
+            "orderID": "205",
+            "orderType": "STOP",
+            "quantity": 10,
+            "price": 95,
+            "isBuy": false
+          },
+          "originalPartial": 3
+        },
+        {
+          "LIMIT": {
+            "orderID": "206",
+            "orderType": "LIMIT",
+            "quantity": 10,
+            "price": 113,
+            "isBuy": false
+          },
+          "STOP": {
+            "orderID": "207",
+            "orderType": "STOP",
+            "quantity": 10,
+            "price": 95,
+            "isBuy": false
+          },
+          "originalPartial": 4
+        },
+        {
+          "LIMIT": {
+            "orderID": "208",
+            "orderType": "LIMIT",
+            "quantity": 10,
+            "price": 114,
+            "isBuy": false
+          },
+          "STOP": {
+            "orderID": "209",
+            "orderType": "STOP",
+            "quantity": 10,
+            "price": 95,
+            "isBuy": false
+          },
+          "originalPartial": 5
+        },
+        {
+          "LIMIT": {
+            "orderID": "210",
+            "orderType": "LIMIT",
+            "quantity": 10,
+            "price": 115,
+            "isBuy": false
+          },
+          "STOP": {
+            "orderID": "211",
+            "orderType": "STOP",
+            "quantity": 10,
+            "price": 95,
+            "isBuy": false
+          },
+          "originalPartial": 6
+        },
+        {
+          "LIMIT": {
+            "orderID": "212",
+            "orderType": "LIMIT",
+            "quantity": 10,
+            "price": 116,
+            "isBuy": false
+          },
+          "STOP": {
+            "orderID": "213",
+            "orderType": "STOP",
+            "quantity": 10,
+            "price": 95,
+            "isBuy": false
+          },
+          "originalPartial": 7
+        },
+        {
+          "LIMIT": {
+            "orderID": "214",
+            "orderType": "LIMIT",
+            "quantity": 10,
+            "price": 117,
+            "isBuy": false
+          },
+          "STOP": {
+            "orderID": "215",
+            "orderType": "STOP",
+            "quantity": 10,
+            "price": 95,
+            "isBuy": false
+          },
+          "originalPartial": 8
+        },
+        {
+          "LIMIT": {
+            "orderID": "216",
+            "orderType": "LIMIT",
+            "quantity": 10,
+            "price": 118,
+            "isBuy": false
+          },
+          "STOP": {
+            "orderID": "217",
+            "orderType": "STOP",
+            "quantity": 10,
+            "price": 95,
+            "isBuy": false
+          },
+          "originalPartial": 9
+        },
+        {
+          "LIMIT": {
+            "orderID": "218",
+            "orderType": "LIMIT",
+            "quantity": 10,
+            "price": 119,
+            "isBuy": false
+          },
+          "STOP": {
+            "orderID": "219",
+            "orderType": "STOP",
+            "quantity": 10,
+            "price": 95,
+            "isBuy": false
+          },
+          "originalPartial": 10
+        }
+      ]
+    },
+    "requests": [],
+    "error": true,
+    "checks": {}
+  },
+  {
+    "name": "unsupported strategy rule rejected",
+    "key": "KeyM",
+    "shift": false,
+    "price": null,
+    "state": {
+      "symbol": "AAPL",
+      "revision": 1,
+      "observedAt": 1,
+      "quoteObservedAt": 1,
+      "netQuantity": 100,
+      "currentPrice": 105,
+      "bid": 104.99,
+      "ask": 105.01,
+      "batchCount": 10,
+      "splitPartials": true,
+      "hasPlan": true,
+      "entryPrice": 100,
+      "coreTarget": 110,
+      "coreCount": 5,
+      "coreRuleEnabled": false,
+      "rulesSupported": false,
+      "entries": [
+        {
+          "orderID": "101",
+          "orderType": "STOP",
+          "quantity": 10,
+          "price": 106,
+          "isBuy": true
+        },
+        {
+          "orderID": "102",
+          "orderType": "LIMIT",
+          "quantity": 10,
+          "price": 99,
+          "isBuy": true
+        }
+      ],
+      "pairs": [
+        {
+          "LIMIT": {
+            "orderID": "200",
+            "orderType": "LIMIT",
+            "quantity": 10,
+            "price": 110,
+            "isBuy": false
+          },
+          "STOP": {
+            "orderID": "201",
+            "orderType": "STOP",
+            "quantity": 10,
+            "price": 95,
+            "isBuy": false
+          },
+          "originalPartial": 1
+        },
+        {
+          "LIMIT": {
+            "orderID": "202",
+            "orderType": "LIMIT",
+            "quantity": 10,
+            "price": 111,
+            "isBuy": false
+          },
+          "STOP": {
+            "orderID": "203",
+            "orderType": "STOP",
+            "quantity": 10,
+            "price": 95,
+            "isBuy": false
+          },
+          "originalPartial": 2
+        },
+        {
+          "LIMIT": {
+            "orderID": "204",
+            "orderType": "LIMIT",
+            "quantity": 10,
+            "price": 112,
+            "isBuy": false
+          },
+          "STOP": {
+            "orderID": "205",
+            "orderType": "STOP",
+            "quantity": 10,
+            "price": 95,
+            "isBuy": false
+          },
+          "originalPartial": 3
+        },
+        {
+          "LIMIT": {
+            "orderID": "206",
+            "orderType": "LIMIT",
+            "quantity": 10,
+            "price": 113,
+            "isBuy": false
+          },
+          "STOP": {
+            "orderID": "207",
+            "orderType": "STOP",
+            "quantity": 10,
+            "price": 95,
+            "isBuy": false
+          },
+          "originalPartial": 4
+        },
+        {
+          "LIMIT": {
+            "orderID": "208",
+            "orderType": "LIMIT",
+            "quantity": 10,
+            "price": 114,
+            "isBuy": false
+          },
+          "STOP": {
+            "orderID": "209",
+            "orderType": "STOP",
+            "quantity": 10,
+            "price": 95,
+            "isBuy": false
+          },
+          "originalPartial": 5
+        },
+        {
+          "LIMIT": {
+            "orderID": "210",
+            "orderType": "LIMIT",
+            "quantity": 10,
+            "price": 115,
+            "isBuy": false
+          },
+          "STOP": {
+            "orderID": "211",
+            "orderType": "STOP",
+            "quantity": 10,
+            "price": 95,
+            "isBuy": false
+          },
+          "originalPartial": 6
+        },
+        {
+          "LIMIT": {
+            "orderID": "212",
+            "orderType": "LIMIT",
+            "quantity": 10,
+            "price": 116,
+            "isBuy": false
+          },
+          "STOP": {
+            "orderID": "213",
+            "orderType": "STOP",
+            "quantity": 10,
+            "price": 95,
+            "isBuy": false
+          },
+          "originalPartial": 7
+        },
+        {
+          "LIMIT": {
+            "orderID": "214",
+            "orderType": "LIMIT",
+            "quantity": 10,
+            "price": 117,
+            "isBuy": false
+          },
+          "STOP": {
+            "orderID": "215",
+            "orderType": "STOP",
+            "quantity": 10,
+            "price": 95,
+            "isBuy": false
+          },
+          "originalPartial": 8
+        },
+        {
+          "LIMIT": {
+            "orderID": "216",
+            "orderType": "LIMIT",
+            "quantity": 10,
+            "price": 118,
+            "isBuy": false
+          },
+          "STOP": {
+            "orderID": "217",
+            "orderType": "STOP",
+            "quantity": 10,
+            "price": 95,
+            "isBuy": false
+          },
+          "originalPartial": 9
+        },
+        {
+          "LIMIT": {
+            "orderID": "218",
+            "orderType": "LIMIT",
+            "quantity": 10,
+            "price": 119,
+            "isBuy": false
+          },
+          "STOP": {
+            "orderID": "219",
+            "orderType": "STOP",
+            "quantity": 10,
+            "price": 95,
+            "isBuy": false
+          },
+          "originalPartial": 10
+        }
+      ]
+    },
+    "requests": [],
+    "error": true,
+    "checks": {}
+  },
+  {
+    "name": "flatten rejects wrong exit side",
+    "key": "KeyF",
+    "shift": false,
+    "price": null,
+    "state": {
+      "symbol": "AAPL",
+      "revision": 1,
+      "observedAt": 1,
+      "quoteObservedAt": 1,
+      "netQuantity": 100,
+      "currentPrice": 105,
+      "bid": 104.99,
+      "ask": 105.01,
+      "batchCount": 10,
+      "splitPartials": true,
+      "hasPlan": true,
+      "entryPrice": 100,
+      "coreTarget": 110,
+      "coreCount": 5,
+      "coreRuleEnabled": false,
+      "rulesSupported": true,
+      "entries": [
+        {
+          "orderID": "101",
+          "orderType": "STOP",
+          "quantity": 10,
+          "price": 106,
+          "isBuy": true
+        },
+        {
+          "orderID": "102",
+          "orderType": "LIMIT",
+          "quantity": 10,
+          "price": 99,
+          "isBuy": true
+        }
+      ],
+      "pairs": [
+        {
+          "LIMIT": {
+            "orderID": "200",
+            "orderType": "LIMIT",
+            "quantity": 10,
+            "price": 110,
+            "isBuy": true
+          },
+          "STOP": {
+            "orderID": "201",
+            "orderType": "STOP",
+            "quantity": 10,
+            "price": 95,
+            "isBuy": true
+          },
+          "originalPartial": 1
+        },
+        {
+          "LIMIT": {
+            "orderID": "202",
+            "orderType": "LIMIT",
+            "quantity": 10,
+            "price": 111,
+            "isBuy": false
+          },
+          "STOP": {
+            "orderID": "203",
+            "orderType": "STOP",
+            "quantity": 10,
+            "price": 95,
+            "isBuy": false
+          },
+          "originalPartial": 2
+        },
+        {
+          "LIMIT": {
+            "orderID": "204",
+            "orderType": "LIMIT",
+            "quantity": 10,
+            "price": 112,
+            "isBuy": false
+          },
+          "STOP": {
+            "orderID": "205",
+            "orderType": "STOP",
+            "quantity": 10,
+            "price": 95,
+            "isBuy": false
+          },
+          "originalPartial": 3
+        },
+        {
+          "LIMIT": {
+            "orderID": "206",
+            "orderType": "LIMIT",
+            "quantity": 10,
+            "price": 113,
+            "isBuy": false
+          },
+          "STOP": {
+            "orderID": "207",
+            "orderType": "STOP",
+            "quantity": 10,
+            "price": 95,
+            "isBuy": false
+          },
+          "originalPartial": 4
+        },
+        {
+          "LIMIT": {
+            "orderID": "208",
+            "orderType": "LIMIT",
+            "quantity": 10,
+            "price": 114,
+            "isBuy": false
+          },
+          "STOP": {
+            "orderID": "209",
+            "orderType": "STOP",
+            "quantity": 10,
+            "price": 95,
+            "isBuy": false
+          },
+          "originalPartial": 5
+        },
+        {
+          "LIMIT": {
+            "orderID": "210",
+            "orderType": "LIMIT",
+            "quantity": 10,
+            "price": 115,
+            "isBuy": false
+          },
+          "STOP": {
+            "orderID": "211",
+            "orderType": "STOP",
+            "quantity": 10,
+            "price": 95,
+            "isBuy": false
+          },
+          "originalPartial": 6
+        },
+        {
+          "LIMIT": {
+            "orderID": "212",
+            "orderType": "LIMIT",
+            "quantity": 10,
+            "price": 116,
+            "isBuy": false
+          },
+          "STOP": {
+            "orderID": "213",
+            "orderType": "STOP",
+            "quantity": 10,
+            "price": 95,
+            "isBuy": false
+          },
+          "originalPartial": 7
+        },
+        {
+          "LIMIT": {
+            "orderID": "214",
+            "orderType": "LIMIT",
+            "quantity": 10,
+            "price": 117,
+            "isBuy": false
+          },
+          "STOP": {
+            "orderID": "215",
+            "orderType": "STOP",
+            "quantity": 10,
+            "price": 95,
+            "isBuy": false
+          },
+          "originalPartial": 8
+        },
+        {
+          "LIMIT": {
+            "orderID": "216",
+            "orderType": "LIMIT",
+            "quantity": 10,
+            "price": 118,
+            "isBuy": false
+          },
+          "STOP": {
+            "orderID": "217",
+            "orderType": "STOP",
+            "quantity": 10,
+            "price": 95,
+            "isBuy": false
+          },
+          "originalPartial": 9
+        },
+        {
+          "LIMIT": {
+            "orderID": "218",
+            "orderType": "LIMIT",
+            "quantity": 10,
+            "price": 119,
+            "isBuy": false
+          },
+          "STOP": {
+            "orderID": "219",
+            "orderType": "STOP",
+            "quantity": 10,
+            "price": 95,
+            "isBuy": false
+          },
+          "originalPartial": 10
+        }
+      ]
+    },
+    "requests": [],
+    "error": true,
+    "checks": {}
+  }
+]

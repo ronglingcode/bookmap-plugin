@@ -107,6 +107,7 @@ public class RongPlugin implements CustomModuleAdapter,
     private volatile boolean patternAutomationEnabled;
     private volatile boolean patternSnapshotComplete;
     private boolean wallLabelsDirty;
+    private boolean nativeRealtime;
     private long lastWallLabelRefreshMs;
     private long lastTimestampNs;
     private TradeButtonWindow tradeButtonWindow;
@@ -303,6 +304,7 @@ public class RongPlugin implements CustomModuleAdapter,
 
     @Override
     public void stop() {
+        nativeRealtime = false;
         if (indicatorConfig != null) {
             indicatorConfig.removeChangeListener(this);
         }
@@ -556,6 +558,7 @@ public class RongPlugin implements CustomModuleAdapter,
 
     @Override
     public void onTimestamp(long timestampNs) {
+        updateNativeLiveStatus();
         this.lastTimestampNs = timestampNs;
         flushPendingVwapPoints();
         if (shouldRunPatternAutomation()) {
@@ -587,6 +590,8 @@ public class RongPlugin implements CustomModuleAdapter,
 
     @Override
     public void onRealtimeStart() {
+        nativeRealtime = true;
+        updateNativeLiveStatus();
         patternSnapshotComplete = true;
         if (wallChangeTracker != null) {
             wallChangeTracker.markReady();
@@ -596,8 +601,25 @@ public class RongPlugin implements CustomModuleAdapter,
         }
     }
 
+    private void updateNativeLiveStatus() {
+        if (sharedServer != null && api != null) sharedServer.updateNativeLiveStatus(alias,
+                nativeRealtime && com.bookmap.plugin.rong.miniviteapp.bookmap.LiveMode.isVerifiedLive(api.getProvider()));
+    }
+
+    public static void resetNativeExecutionAfterBrokerReview() {
+        if (sharedServer != null) sharedServer.resetNativeExecutionAfterBrokerReview();
+    }
+
     @Override
     public void onIndicatorConfigChanged(String indicatorKey, boolean enabled) {
+        if (IndicatorConfig.EXPERIMENTAL_DIRECT_BROKER_EXECUTION.equals(indicatorKey)
+                || IndicatorConfig.EXPERIMENTAL_DIRECT_EXIT_EXECUTION.equals(indicatorKey)) {
+            if (sharedServer != null) sharedServer.setExperimentalDirectExecution(
+                    indicatorConfig.isEnabled(IndicatorConfig.EXPERIMENTAL_DIRECT_BROKER_EXECUTION),
+                    indicatorConfig.isEnabled(IndicatorConfig.EXPERIMENTAL_DIRECT_EXIT_EXECUTION));
+            updateNativeLiveStatus();
+            return;
+        }
         if (IndicatorConfig.VWAP.equals(indicatorKey)) {
             updateVwapIndicatorVisibility();
             if (enabled && vwapTracker != null) {

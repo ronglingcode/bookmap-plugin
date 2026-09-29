@@ -181,6 +181,28 @@ class ReleaseJarTest {
         }
     }
 
+    @Test
+    void nativeExecutionWireParsingAndClosingPlansSurviveObfuscation() throws Exception {
+        Class<?> parser = Class.forName("com.bookmap.plugin.shaded.gson.JsonParser");
+        Class<?> jsonObject = Class.forName("com.bookmap.plugin.shaded.gson.JsonObject");
+        Object array = parser.getMethod("parseString", String.class).invoke(null,
+                Files.readString(Path.of(System.getProperty("execution.fixtures"))));
+        Object fixtures = array.getClass().getMethod("getAsJsonArray").invoke(array);
+        Object fixture = fixtures.getClass().getMethod("get", int.class).invoke(fixtures, 3);
+        Object json = fixture.getClass().getMethod("getAsJsonObject").invoke(fixture);
+        Object stateJson = jsonObject.getMethod("getAsJsonObject", String.class).invoke(json, "state");
+        String stateName = "com.bookmap.plugin.rong.miniviteapp.models.Models$Snapshot";
+        Object state = mappedClass(stateName).getConstructor(jsonObject).newInstance(stateJson);
+        String handlerName = "com.bookmap.plugin.rong.miniviteapp.controllers.KeyboardHandler";
+        String planName = "com.bookmap.plugin.rong.miniviteapp.models.Models$Plan";
+        Object plan = mappedMethod(handlerName, planName + " handleKeyPressed(" + stateName
+                + ",java.lang.String,boolean,double)", mappedClass(stateName), String.class, boolean.class, double.class)
+                .invoke(null, state, "KeyM", false, Double.NaN);
+        Object requests = mappedMethod(planName, "com.bookmap.plugin.shaded.gson.JsonArray toJson()").invoke(plan);
+        Object expected = jsonObject.getMethod("getAsJsonArray", String.class).invoke(json, "requests");
+        assertEquals(expected, requests);
+    }
+
     private static boolean isImplementation(String name) {
         return name.endsWith(".class") && (name.startsWith("bmtrader/internal/")
                 || name.startsWith("com/bookmap/plugin/rong/"));
