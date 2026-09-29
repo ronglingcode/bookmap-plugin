@@ -170,7 +170,27 @@ broker reads and mutation are separate requests; those comparisons are not atomi
   expiry margin. Schwab decides authorization.
 - Estimated buying power still insufficient after half sizing: warn, then submit
   that half-sized protected entry. No second broker buying-power comparison.
-- Broker rejection: record the HTTP status in the native result and action log.
+- Broker rejection: record the operation/order ID, HTTP status, and broker error
+  response in the native result and action log.
+
+## Error diagnostics
+
+Native plan failures, rejected state updates, preflight reads, and order mutations
+report their failed operation and actual exception type/message with nested causes
+to Bookmap and ViteApp. Entry preflight errors distinguish the positions read from
+the pending-orders read and state whether an order was sent. HTTP failures include
+the response status and broker error body; malformed read responses retain their
+parsing cause and HTTP status. Successful entry responses without an order ID
+identify the missing/invalid Location header.
+
+ViteApp also reports account refresh, trade-state initialization, and WebSocket
+send failures with their causes. An initialization failure sends its diagnostic
+back to Java, so the review message retains the original reason. Error objects
+are formatted as text before UI/Firestore storage instead of serializing to `{}`.
+Diagnostics redact known credentials and token/authorization fields and limit
+response/error excerpts to 2000 characters. They do not log full successful account
+responses, request headers, or inbound token payloads. Logs add no broker reads,
+retries, or local execution gates.
 
 There are no extra warnings/checks for hypothetical malformed symbols, numeric
 order IDs, whole shares, batch bounds, broker instrument/side/shape changes, or

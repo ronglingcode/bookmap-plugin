@@ -22,6 +22,7 @@ public final class MiniViteApp implements AutoCloseable {
         Thread thread = new Thread(task, "bmtrader-native-execution"); thread.setDaemon(true); return thread;
     });
     private boolean enabled, exitsEnabled, entriesEnabled, requiresReview, closed;
+    private String reviewReason = "";
     private Object connection;
     private String account = "", token = "";
     private long expiresAt;
@@ -43,6 +44,7 @@ public final class MiniViteApp implements AutoCloseable {
         json.addProperty("entriesEnabled", entriesEnabled);
         json.addProperty("blocked", requiresReview);
         json.addProperty("requiresReview", requiresReview);
+        json.addProperty("reason", reviewReason);
         return json;
     }
     public synchronized void setEnabled(boolean enabled, boolean exitsEnabled) {
@@ -57,7 +59,7 @@ public final class MiniViteApp implements AutoCloseable {
         marketData.remove(SymbolUtils.cleanSymbol(symbol));
     }
     public synchronized boolean resetAfterBrokerReview() {
-        requiresReview = false; return true;
+        requiresReview = false; reviewReason = ""; return true;
     }
     public synchronized boolean receive(Object connection, JsonObject json) {
         String type = Models.string(json, "type");
@@ -75,13 +77,22 @@ public final class MiniViteApp implements AutoCloseable {
             } else if (type.equals("execution_market_data")) {
                 marketData.put(SymbolUtils.cleanSymbol(Models.string(json, "symbol")), json.deepCopy());
             } else if (type.equals("execution_entry_state")) {
-                if (!Models.bool(json, "initialized")) { requiresReview = true; sender.accept(connection, status()); }
+                if (!Models.bool(json, "initialized")) {
+                    requiresReview = true;
+                    reviewReason = ExecutionDiagnostics.sanitize("entry state initialization failed: " + Models.string(json, "reason"), token, account);
+                    PluginLog.action(Models.string(json, "symbol"), "Native requires review: " + reviewReason);
+                    sender.accept(connection, status());
+                }
             }
         } catch (RuntimeException error) {
-            // Never echo the inbound payload, exceptions, or credentials.
+            // Describe the parsing failure, never echo the inbound payload.
             JsonObject rejected = message("execution_rejected");
-            rejected.addProperty("reason", "invalid execution update");
+            String incomingToken = json.has("accessToken") && json.get("accessToken").isJsonPrimitive()
+                    ? json.get("accessToken").getAsString() : "";
+            String reason = type + " update failed: " + ExecutionDiagnostics.describe(error, token, account, incomingToken);
+            rejected.addProperty("reason", reason);
             sender.accept(connection, rejected);
+            PluginLog.action("Native update rejected: " + reason);
         }
         return true;
     }
@@ -97,7 +108,7 @@ public final class MiniViteApp implements AutoCloseable {
         try {
             long now = System.currentTimeMillis();
             Models.require(enabled && !closed, "native execution disabled");
-            Models.require(!requiresReview, "broker review required after uncertain execution");
+            Models.require(!requiresReview, "broker review required: " + reviewReason);
             Snapshot state = snapshots.get(symbol);
             Models.require(state != null, "execution inputs unavailable");
             if (marketData.containsKey(symbol)) state = new Snapshot(state, marketData.get(symbol));
@@ -122,10 +133,12 @@ public final class MiniViteApp implements AutoCloseable {
             sender.accept(connection, started);
             Snapshot executionState = state;
             executor.execute(() -> execute(capturedAccount, actionId, executionState, plan));
-        } catch (IllegalArgumentException error) {
-            PluginLog.action(symbol, "Native blocked: " + error.getMessage());
         } catch (RuntimeException error) {
-            PluginLog.action(symbol, "Native blocked: invalid execution inputs");
+            String reason = "build " + (entry ? "wall_reversal_entry" : key) + " plan failed: "
+                    + ExecutionDiagnostics.describe(error, token, account);
+            PluginLog.action(symbol, "Native blocked: " + reason);
+            JsonObject blocked = message("execution_blocked"); blocked.addProperty("symbol", symbol);
+            blocked.addProperty("reason", reason); sender.accept(connection, blocked);
         }
         return true; // Migrated failures are never broadcast as executable legacy actions.
     }
@@ -139,31 +152,39 @@ public final class MiniViteApp implements AutoCloseable {
             String actionId, Snapshot state, Plan plan) {
         JsonArray results = new JsonArray(); boolean dispatched = false, unknown = false;
         String outcome = "accepted", reason = "";
+        String operation = "prepare native execution";
+        String accessToken = "";
         try {
             for (var request : plan.requests) {
-                String accessToken = guard(plan);
+                accessToken = guard(plan);
                 if (plan.entry != null) {
+                    operation = "initial-entry broker preflight";
                     api.validateFlatEntry(accountHash, accessToken, state.symbol);
                 }
+                operation = request.method + (request.orderId.isEmpty() ? " new order" : " order " + request.orderId);
                 accessToken = guard(plan);
                 dispatched = true;
                 Api.Result result = api.mutate(accountHash, accessToken, request);
                 results.add(result.toJson());
                 if (!result.outcome.equals("accepted")) {
                     outcome = result.outcome; unknown = outcome.equals("unknown");
-                    reason = "broker HTTP " + result.status; break;
+                    reason = result.reason;
+                    if (unknown) reason += "; broker outcome unknown; review orders before resetting";
+                    break;
                 }
             }
         } catch (IllegalArgumentException error) {
-            outcome = dispatched ? "partial" : "rejected"; reason = error.getMessage();
+            outcome = dispatched ? "partial" : "rejected";
+            reason = operation + " failed: " + ExecutionDiagnostics.describe(error, token, accessToken, accountHash);
         } catch (Exception error) {
             // A network exception after dispatch cannot prove whether the mutation reached the broker.
             outcome = dispatched ? "unknown" : "rejected"; unknown = dispatched;
-            reason = dispatched ? "broker outcome unknown; review orders before resetting" : "broker preflight failed";
+            reason = operation + " failed: " + ExecutionDiagnostics.describe(error, token, accessToken, accountHash)
+                    + (dispatched ? "; broker outcome unknown; review orders before resetting" : "; order not sent");
             if (error instanceof InterruptedException) Thread.currentThread().interrupt();
         }
         synchronized (this) {
-            if (unknown) requiresReview = true;
+            if (unknown) { requiresReview = true; reviewReason = reason; }
             JsonObject finished = message("execution_result"); finished.addProperty("actionId", actionId);
             finished.addProperty("symbol", state.symbol); finished.addProperty("action", plan.action);
             finished.addProperty("outcome", outcome); finished.addProperty("reason", reason);

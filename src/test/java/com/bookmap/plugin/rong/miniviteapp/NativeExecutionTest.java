@@ -39,8 +39,10 @@ class NativeExecutionTest {
         JsonObject state = fixture("cancel all entries below threshold");
         volatile int mutationStatus = 204;
         volatile int readStatus = 200;
+        volatile int ordersReadStatus = 200;
+        volatile String readFailureBody = "", positionsBodyOverride, ordersBodyOverride, mutationBody = "";
         volatile boolean orderFilled;
-        volatile boolean omitLocation, pendingSymbolOrder;
+        volatile boolean omitLocation, pendingSymbolOrder, closeMutationResponse;
         volatile String pendingStatus = "QUEUED";
         volatile double brokerQuantity = Double.NaN, buyingPower = 1_000_000;
         final CountDownLatch mutationEntered = new CountDownLatch(1);
@@ -53,7 +55,15 @@ class NativeExecutionTest {
                     String method = exchange.getRequestMethod(), path = exchange.getRequestURI().getPath();
                     requests.add(method + " " + path);
                     if (method.equals("GET")) {
-                        if (readStatus != 200) { exchange.sendResponseHeaders(readStatus, -1); return; }
+                        int status = path.equals("/accounts/hash/orders") ? ordersReadStatus : readStatus;
+                        String override = status != 200 ? readFailureBody
+                                : path.equals("/accounts/hash") ? positionsBodyOverride : ordersBodyOverride;
+                        if (status != 200 || override != null) {
+                            byte[] bytes = (override == null ? "" : override).getBytes(StandardCharsets.UTF_8);
+                            exchange.sendResponseHeaders(status, bytes.length == 0 ? -1 : bytes.length);
+                            if (bytes.length > 0) exchange.getResponseBody().write(bytes);
+                            return;
+                        }
                         JsonObject response;
                         if (path.equals("/accounts/hash")) {
                             double quantity = Double.isFinite(brokerQuantity) ? brokerQuantity : state.get("netQuantity").getAsDouble();
@@ -88,8 +98,11 @@ class NativeExecutionTest {
                         mutations.incrementAndGet(); mutationEntered.countDown();
                         if (allowMutation != null) allowMutation.await(3, TimeUnit.SECONDS);
                         if (!method.equals("DELETE")) bodies.add(json(new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8)));
+                        if (closeMutationResponse) return;
                         if (!method.equals("DELETE") && !omitLocation) exchange.getResponseHeaders().add("Location", "/accounts/hash/orders/999");
-                        exchange.sendResponseHeaders(mutationStatus, -1); // Success with no JSON body.
+                        byte[] bytes = mutationBody.getBytes(StandardCharsets.UTF_8);
+                        exchange.sendResponseHeaders(mutationStatus, bytes.length == 0 ? -1 : bytes.length);
+                        if (bytes.length > 0) exchange.getResponseBody().write(bytes);
                     }
                 } catch (Exception error) { throw new RuntimeException(error); }
                 finally { exchange.close(); }
@@ -196,7 +209,7 @@ class NativeExecutionTest {
             rig.state.getAsJsonObject("entryContext").addProperty("availableBuyingPower", 1);
             rig.updateState(System.currentTimeMillis()); rig.engine.route(entry);
             var result = rig.finish(); assertEquals("rejected", result.get("outcome").getAsString());
-            assertEquals("broker HTTP 400", result.get("reason").getAsString());
+            assertTrue(result.get("reason").getAsString().contains("POST new order HTTP 400"));
             assertEquals(1, rig.mutations.get());
             assertEquals(980, rig.bodies.get(0).getAsJsonArray("orderLegCollection").get(0).getAsJsonObject().get("quantity").getAsDouble());
             assertFalse(result.get("requiresReview").getAsBoolean());
@@ -284,7 +297,7 @@ class NativeExecutionTest {
             rig.token(2, System.currentTimeMillis() + (scenario == 0 ? 1000 : -1000), scenario == 2 ? "" : "fake-access-token");
             rig.engine.route(action("KeyC")); var result = rig.finish();
             assertEquals("rejected", result.get("outcome").getAsString());
-            assertEquals("broker HTTP 401", result.get("reason").getAsString());
+            assertTrue(result.get("reason").getAsString().contains("DELETE order 101 HTTP 401"));
             assertEquals(List.of("DELETE /accounts/hash/orders/101"), rig.requests);
             assertFalse(result.get("requiresReview").getAsBoolean());
         }
@@ -371,6 +384,79 @@ class NativeExecutionTest {
             assertEquals(97, rig.bodies.get(0).get("stopPrice").getAsDouble());
             assertTrue(rig.requests.stream().noneMatch(request -> request.startsWith("GET ")));
         }
+    }
+    @Test void diagnosticsNameTheFailedPreflightReadAndBrokerErrorWithoutSendingAnOrder() throws Exception {
+        for (boolean ordersRead : new boolean[]{false, true}) try (var rig = new Rig()) {
+            var entry = rig.connectEntry();
+            if (ordersRead) rig.ordersReadStatus = 503; else rig.readStatus = 401;
+            rig.readFailureBody = "{\"message\":\"token invalid or service unavailable\",\"access_token\":\"fake-access-token\"}";
+            rig.engine.route(entry); var result = rig.finish();
+            String reason = result.get("reason").getAsString();
+            assertEquals("rejected", result.get("outcome").getAsString());
+            assertTrue(reason.contains(ordersRead ? "GET pending symbol orders" : "GET account positions"));
+            assertTrue(reason.contains(ordersRead ? "HTTP 503" : "HTTP 401"));
+            assertTrue(reason.contains("token invalid or service unavailable"));
+            assertTrue(reason.contains("order not sent")); assertFalse(reason.contains("fake-access-token"));
+            assertEquals(0, rig.mutations.get()); assertFalse(result.get("requiresReview").getAsBoolean());
+        }
+    }
+    @Test void malformedPreflightResponsesShowRequestStatusAndActualParsingCause() throws Exception {
+        for (boolean ordersRead : new boolean[]{false, true}) try (var rig = new Rig()) {
+            var entry = rig.connectEntry();
+            if (ordersRead) rig.ordersBodyOverride = "{not valid JSON"; else rig.positionsBodyOverride = "{not valid JSON";
+            rig.engine.route(entry); String reason = rig.finish().get("reason").getAsString();
+            assertTrue(reason.contains(ordersRead ? "pending symbol orders" : "account positions"));
+            assertTrue(reason.contains("HTTP 200")); assertTrue(reason.contains("JsonSyntaxException"));
+            assertEquals(0, rig.mutations.get());
+        }
+    }
+    @Test void connectionFailureShowsTheUnderlyingCauseAndConfirmsNoEntrySent() throws Exception {
+        try (var rig = new Rig()) {
+            var entry = rig.connectEntry(); rig.server.stop(0); rig.engine.route(entry);
+            var result = rig.finish(); String reason = result.get("reason").getAsString();
+            assertEquals("rejected", result.get("outcome").getAsString());
+            assertTrue(reason.contains("GET account positions")); assertTrue(reason.contains("ConnectException"));
+            assertTrue(reason.contains("order not sent")); assertEquals(0, rig.mutations.get());
+        }
+    }
+    @Test void lostMutationResponseNamesTheOrderAndPreservesUnknownOutcome() throws Exception {
+        try (var rig = new Rig()) {
+            var entry = rig.connectEntry(); rig.closeMutationResponse = true; rig.engine.route(entry);
+            var result = rig.finish(); String reason = result.get("reason").getAsString();
+            assertEquals("unknown", result.get("outcome").getAsString());
+            assertTrue(reason.contains("POST new order failed")); assertTrue(reason.contains("IOException"));
+            assertTrue(reason.contains("broker outcome unknown")); assertTrue(result.get("requiresReview").getAsBoolean());
+            assertEquals(1, rig.mutations.get());
+        }
+    }
+    @Test void brokerMutationDetailsAndReviewReasonReachLifecycleLogs() throws Exception {
+        for (int status : new int[]{400, 503}) try (var rig = new Rig()) {
+            rig.connect(); rig.mutationStatus = status;
+            rig.mutationBody = "{\"message\":\"Cannot cancel this order\",\"refreshToken\":\"fake-refresh-token\"}";
+            rig.engine.route(action("KeyC")); String reason = rig.finish().get("reason").getAsString();
+            assertTrue(reason.contains("DELETE order 101 HTTP " + status));
+            assertTrue(reason.contains("Cannot cancel this order")); assertFalse(reason.contains("fake-refresh-token"));
+            if (status == 503) {
+                assertEquals(reason, rig.engine.status().get("reason").getAsString());
+                rig.engine.route(action("KeyC"));
+                assertTrue(rig.events.stream().anyMatch(event -> event.get("type").getAsString().equals("execution_blocked")
+                        && event.get("reason").getAsString().contains("Cannot cancel this order")));
+            }
+        }
+    }
+    @Test void badUpdatesAndPlanErrorsExposeTheirCauseToViteApp() throws Exception {
+        try (var rig = new Rig()) {
+            rig.connect(); rig.engine.receive(rig.connection, json("{\"type\":\"execution_state\",\"symbols\":[\"bad state\"]}"));
+            assertTrue(rig.events.stream().anyMatch(event -> event.get("type").getAsString().equals("execution_rejected")
+                    && event.get("reason").getAsString().contains("IllegalStateException")));
+            rig.engine.unregister("AAPL"); rig.engine.route(action("KeyC"));
+            assertTrue(rig.events.stream().anyMatch(event -> event.get("type").getAsString().equals("execution_blocked")
+                    && event.get("reason").getAsString().contains("execution inputs unavailable")));
+            assertEquals(0, rig.mutations.get());
+        }
+        var error = new java.io.IOException("GET positions failed", new javax.net.ssl.SSLHandshakeException("untrusted certificate; Bearer fake-access-token"));
+        String reason = ExecutionDiagnostics.describe(error);
+        assertTrue(reason.contains("SSLHandshakeException: untrusted certificate")); assertFalse(reason.contains("fake-access-token"));
     }
     @Test void ambiguousBrokerFailureHoldsExecutionUntilExplicitReview() throws Exception {
         try (var rig = new Rig()) {
