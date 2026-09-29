@@ -107,7 +107,7 @@ Introduce an additive, versioned protocol for:
    affected order IDs, and per-request result.
 5. Reconciliation requests/results and session revocation.
 
-Use local pairing authentication plus an Origin policy for credential/state
+Use an Origin policy and single-owner session for credential/state
 messages; accept them only from one elected ViteApp connection. Do not broadcast
 credentials to WebSocket clients. Multiple browser tabs must not become competing
 execution owners. Agree exact schemas and timeout values in the foundation change.

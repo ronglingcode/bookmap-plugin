@@ -10,8 +10,6 @@ import com.bookmap.plugin.rong.miniviteapp.models.Models;
 import com.bookmap.plugin.rong.miniviteapp.models.Models.*;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
-import java.nio.charset.StandardCharsets;
-import java.security.MessageDigest;
 import java.util.*;
 import java.util.concurrent.*;
 import java.util.function.BiConsumer;
@@ -20,7 +18,6 @@ import java.util.function.BooleanSupplier;
 /** Session-wide executor. All session/state transitions use this monitor; I/O runs outside it. */
 public final class MiniViteApp implements AutoCloseable {
     private final Api api;
-    private final String pairingKey;
     private final BiConsumer<Object, JsonObject> sender;
     private final ExecutorService executor = Executors.newSingleThreadExecutor(task -> {
         Thread thread = new Thread(task, "bmtrader-native-execution"); thread.setDaemon(true); return thread;
@@ -45,10 +42,10 @@ public final class MiniViteApp implements AutoCloseable {
         }
     }
     public MiniViteApp(BiConsumer<Object, JsonObject> sender) {
-        this(new Api(), System.getenv("BMTRADER_EXECUTION_PAIRING_KEY"), sender);
+        this(new Api(), sender);
     }
-    public MiniViteApp(Api api, String pairingKey, BiConsumer<Object, JsonObject> sender) {
-        this.api = api; this.pairingKey = pairingKey == null ? "" : pairingKey; this.sender = sender;
+    public MiniViteApp(Api api, BiConsumer<Object, JsonObject> sender) {
+        this.api = api; this.sender = sender;
     }
     private JsonObject message(String type) {
         JsonObject json = new JsonObject(); json.addProperty("type", type);
@@ -60,7 +57,6 @@ public final class MiniViteApp implements AutoCloseable {
         json.addProperty("entriesEnabled", entriesEnabled);
         json.addProperty("blocked", busy || pending != null || requiresReview);
         json.addProperty("requiresReview", requiresReview);
-        json.addProperty("pairingConfigured", pairingKey.length() >= 32);
         return json;
     }
     public synchronized void setEnabled(boolean enabled, boolean exitsEnabled) {
@@ -95,11 +91,9 @@ public final class MiniViteApp implements AutoCloseable {
         if (!type.startsWith("execution_")) return false;
         try {
             if (type.equals("execution_hello")) {
-                Models.require(enabled && !closed && pairingKey.length() >= 32, "native execution disabled or unpaired");
+                Models.require(enabled && !closed, "native execution disabled");
                 Models.require(ExecutionConfig.ORIGINS.contains(origin), "untrusted execution origin");
                 Models.require(Models.number(json, "version") == ExecutionConfig.PROTOCOL_VERSION, "unsupported execution protocol");
-                Models.require(MessageDigest.isEqual(pairingKey.getBytes(StandardCharsets.UTF_8),
-                        Models.string(json, "pairingKey").getBytes(StandardCharsets.UTF_8)), "execution pairing failed");
                 Models.require(owner == null || owner == connection, "another ViteApp owns execution");
                 Models.require(Models.bool(json, "live") && Models.string(json, "broker").equals("Schwab"), "live Schwab required");
                 Models.require(owner != null || (!busy && pending == null), "broker review required before reconnect");
@@ -154,7 +148,7 @@ public final class MiniViteApp implements AutoCloseable {
         } catch (RuntimeException error) {
             // Never echo the inbound payload, exceptions, or credentials.
             JsonObject rejected = message("execution_rejected");
-            rejected.addProperty("reason", "execution session rejected; check pairing, account and protocol");
+            rejected.addProperty("reason", "execution session rejected; check origin, account and protocol");
             sender.accept(connection, rejected);
         }
         return true;

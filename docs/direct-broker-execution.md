@@ -7,24 +7,18 @@ plan metadata. Native mutations go straight to Schwab without ProxyServer.
 
 ## Setup
 
-1. Generate a random pairing key of at least 32 characters. Set
-   `BMTRADER_EXECUTION_PAIRING_KEY` in the environment used to launch Bookmap,
-   then restart Bookmap. Keep this key private.
-2. In the ViteApp browser console, set the same key:
-   `localStorage.setItem('tradingscripts.bookmapExecutionPairingKey', '<your key>')`.
-   This stores the pairing key; access tokens remain in memory.
-3. Run ViteApp with a live Schwab equity profile and a successful token refresh.
+1. Run ViteApp with a live Schwab equity profile and a successful token refresh.
    Connect it to Bookmap. Supported origins are the existing Firebase app origins
    and `http://localhost:5173` / `http://127.0.0.1:5173`.
-4. Enable **Experimental: Direct Broker Cancel (Schwab)** in the addon settings.
+2. Enable **Experimental: Direct Broker Cancel (Schwab)** in the addon settings.
    Enable **Experimental: Direct Exit Orders** to migrate exits too.
    Enable **Experimental: Direct Initial Wall-Reversal Entries** separately
    for the first entry workflow. Install matching ViteApp/plugin builds;
    entry support uses execution protocol version 2.
 
-One authenticated browser connection owns execution. Full ViteApp and Lite both
-publish account/quote provenance and use the mutation fence. Enabling the flag
-requires a paired session before browser broker mutations can proceed.
+One allowed browser connection owns execution. Full ViteApp and Lite both
+publish account/quote provenance and use the mutation fence. ViteApp claims the
+local session automatically when direct execution is enabled.
 
 ## Migrated actions
 

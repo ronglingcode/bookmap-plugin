@@ -14,7 +14,6 @@ import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.*;
 
 class NativeExecutionTest {
-    private static final String KEY = "test-pairing-key-at-least-32-characters";
     private static final String ORIGIN = "http://localhost:5173";
     private static JsonObject json(String contents) { return JsonParser.parseString(contents).getAsJsonObject(); }
     private static JsonObject action(String key) {
@@ -94,7 +93,7 @@ class NativeExecutionTest {
                 finally { exchange.close(); }
             });
             server.start();
-            engine = new MiniViteApp(new Api(URI.create("http://127.0.0.1:" + server.getAddress().getPort() + "/")), KEY,
+            engine = new MiniViteApp(new Api(URI.create("http://127.0.0.1:" + server.getAddress().getPort() + "/")),
                     (connection, event) -> events.add(event.deepCopy()));
         }
         JsonObject findOrder(String id) {
@@ -107,7 +106,7 @@ class NativeExecutionTest {
         }
         void connect() {
             engine.setEnabled(true, true); engine.setLive("AAPL", true);
-            engine.receive(owner, ORIGIN, json("{\"type\":\"execution_hello\",\"version\":2,\"live\":true,\"broker\":\"Schwab\",\"pairingKey\":\"" + KEY + "\"}"));
+            engine.receive(owner, ORIGIN, json("{\"type\":\"execution_hello\",\"version\":2,\"live\":true,\"broker\":\"Schwab\"}"));
             epoch = events.get(events.size()-1).get("epoch").getAsString();
             token(1, System.currentTimeMillis() + 120_000);
             updateState(System.currentTimeMillis()-1);
@@ -240,7 +239,7 @@ class NativeExecutionTest {
             assertTrue(rig.engine.route(action("KeyC"))); assertEquals(2, rig.mutations.get());
             rig.state.add("entries", new JsonArray()); rig.updateState(System.currentTimeMillis()+10);
             assertFalse(rig.engine.status().get("blocked").getAsBoolean());
-            assertTrue(rig.events.stream().noneMatch(event -> event.toString().contains(KEY) || event.toString().contains("fake-access-token")));
+            assertTrue(rig.events.stream().noneMatch(event -> event.toString().contains("fake-access-token")));
         }
     }
     @Test void nativeExitUsesClosingPutAndRefusesConcurrentBrowserMutation() throws Exception {
@@ -287,10 +286,10 @@ class NativeExecutionTest {
             assertTrue(rig.engine.status().get("requiresReview").getAsBoolean()); rig.engine.route(action("KeyC")); assertEquals(0, rig.requests.size());
         }
     }
-    @Test void unpairedConnectionsCannotUpdateCredentialsAndSecondTabCannotOwnSession() throws Exception {
+    @Test void untrustedOriginsCannotUpdateCredentialsAndSecondTabCannotOwnSession() throws Exception {
         try (var rig = new Rig()) {
             rig.engine.setEnabled(true, true);
-            var hello = json("{\"type\":\"execution_hello\",\"version\":2,\"live\":true,\"broker\":\"Schwab\",\"pairingKey\":\""+KEY+"\"}");
+            var hello = json("{\"type\":\"execution_hello\",\"version\":2,\"live\":true,\"broker\":\"Schwab\"}");
             rig.engine.receive(rig.owner, "https://untrusted.example", hello);
             assertEquals("execution_rejected", rig.events.get(0).get("type").getAsString());
             rig.connect(); Object secondTab = new Object(); rig.engine.receive(secondTab, ORIGIN, hello);
