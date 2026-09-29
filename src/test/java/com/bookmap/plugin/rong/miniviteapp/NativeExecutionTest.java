@@ -105,7 +105,7 @@ class NativeExecutionTest {
             throw new AssertionError("unexpected order " + id);
         }
         void connect() {
-            engine.setEnabled(true, true); engine.setLive("AAPL", true);
+            engine.setEnabled(true, true);
             engine.receive(owner, ORIGIN, json("{\"type\":\"execution_hello\",\"version\":2,\"live\":true,\"broker\":\"Schwab\"}"));
             epoch = events.get(events.size()-1).get("epoch").getAsString();
             token(1, System.currentTimeMillis() + 120_000);
@@ -217,17 +217,6 @@ class NativeExecutionTest {
             assertTrue(rig.engine.route(entry)); assertEquals(1, rig.mutations.get());
         }
     }
-    @Test void liveProviderIsRecheckedAtActionTimeWithoutWaitingForAnotherTimestamp() throws Exception {
-        try (var rig = new Rig()) {
-            var entry = rig.connectEntry();
-            var live = new java.util.concurrent.atomic.AtomicBoolean(true);
-            rig.engine.setLiveVerifier("AAPL", live::get);
-            live.set(false); // Replay/paused provider can change without another quote callback.
-            assertTrue(rig.engine.route(entry)); assertEquals(0, rig.mutations.get());
-            live.set(true); rig.engine.route(entry);
-            assertEquals("accepted", rig.finish().get("outcome").getAsString());
-        }
-    }
     @Test void directCancelHandlesEmptySuccessAndDoesNotRepeatWhileAwaitingReconciliation() throws Exception {
         try (var rig = new Rig()) {
             rig.connect(); rig.allowMutation = new CountDownLatch(1);
@@ -255,32 +244,22 @@ class NativeExecutionTest {
             assertEquals("SELL", rig.bodies.get(0).getAsJsonArray("orderLegCollection").get(0).getAsJsonObject().get("instruction").getAsString());
         }
     }
-    @Test void flattenAcceptsUnmarkedWrappedRealtimeProviderButBlocksHistoryAndStaleClock() throws Exception {
+    @Test void flattenExecutesWithoutBookmapProviderVerification() throws Exception {
         try (var rig = new Rig()) {
             rig.state = fixture("flatten replaces all exit pairs"); rig.connect();
-            var provider = new LiveModeTest.UnmarkedProvider();
-            var wrapped = new LiveModeTest.WrappedProvider(provider);
-            var realtime = new java.util.concurrent.atomic.AtomicBoolean(false);
-            rig.engine.setLiveBlockReasonProvider("AAPL", () ->
-                    com.bookmap.plugin.rong.miniviteapp.bookmap.LiveMode.getBlockReason(wrapped, realtime.get()));
-            assertTrue(rig.engine.route(action("KeyF"))); assertEquals(0, rig.requests.size());
-            realtime.set(true); provider.clockOffsetMs = -60_000;
-            assertTrue(rig.engine.route(action("KeyF"))); assertEquals(0, rig.requests.size());
-            provider.clockOffsetMs = 0;
             assertTrue(rig.engine.route(action("KeyF")));
             assertEquals("accepted", rig.finish().get("outcome").getAsString());
             assertEquals(rig.state.getAsJsonArray("pairs").size(), rig.mutations.get());
             assertTrue(rig.bodies.stream().allMatch(body -> body.get("orderType").getAsString().equals("MARKET")));
         }
     }
-    @Test void expiryStalenessReplayAndPartialFillsNeverSendMutations() throws Exception {
+    @Test void expiryStalenessAndPartialFillsNeverSendMutations() throws Exception {
         try (var rig = new Rig()) {
             rig.connect(); rig.token(2, System.currentTimeMillis()+1000); rig.engine.route(action("KeyC")); assertEquals(0, rig.requests.size());
             rig.token(3, System.currentTimeMillis()+120_000); rig.updateState(System.currentTimeMillis()-20_000);
             rig.engine.route(action("KeyC")); assertEquals(0, rig.requests.size());
-            rig.updateState(System.currentTimeMillis()); rig.engine.setLive("AAPL", false);
-            rig.engine.route(action("KeyC")); assertEquals(0, rig.requests.size());
-            rig.engine.setLive("AAPL", true); rig.orderFilled = true; rig.engine.route(action("KeyC"));
+            rig.updateState(System.currentTimeMillis());
+            rig.orderFilled = true; rig.engine.route(action("KeyC"));
             assertEquals("rejected", rig.finish().get("outcome").getAsString()); assertEquals(0, rig.mutations.get());
         }
     }

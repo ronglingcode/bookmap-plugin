@@ -118,7 +118,7 @@ OAuth ownership in ViteApp. Tokens remain in Java memory and never enter setting
 logs, exceptions, generic message dumps, or test fixtures. Send credentials only
 when the experimental feature and authenticated protocol support are enabled.
 Ignore updates from older epochs/generations. Revoke on owner loss, profile/account
-change, feature disable, replay transition, or plugin shutdown.
+change, feature disable, or plugin shutdown.
 
 Route every button/hotkey through one plugin router before any broadcast:
 
@@ -130,9 +130,8 @@ Route every button/hotkey through one plugin router before any broadcast:
 
 Readiness includes authenticated ownership, compatible versions, Schwab/live mode,
 valid credentials, complete/current state, and no conflicting operation.
-Block live requests during both ViteApp replay and Bookmap replay/playback.
-Determine the supported Bookmap live/replay signal before enabling native mode;
-if it cannot be established, native execution stays unavailable.
+ViteApp requires a live broker profile. The plugin does not verify Bookmap
+provider identity, live/replay mode, historical loading, or the Bookmap clock.
 
 Serialize conflicting native operations by account/symbol and reserve affected
 order IDs. Coordinate ViteApp UI, automatic actions, and pending timers against
@@ -175,7 +174,7 @@ separate per repository. Initial direct execution needs no ProxyServer changes.
 ### 0. Foundation and non-executing comparison
 
 - Default-off flag, empty action allowlist, shared engine, central router.
-- Paired session/capability negotiation, token lifecycle, live/replay gating.
+- Session/capability negotiation and token lifecycle.
 - Versioned broker/config/trading-state snapshots and conflict coordination.
 - Direct Schwab HTTP adapter tested against a fake local broker.
 - Pure decision fixtures using the same normalized inputs for TS and Java.
@@ -251,7 +250,7 @@ account streaming/state ownership as a separate architecture decision.
 
 - Compare TS and Java decisions, selected orders, price/quantity rounding, payloads,
   rejection reasons, and state transitions using captured sanitized fixtures.
-- Test flag off, unsupported action/client, replay, stale state, expired/replaced
+- Test flag off, unsupported action/client, stale state, expired/replaced
   tokens, wrong account, duplicate clicks, reconnect, and conflicting Vite actions.
 - Fake-broker tests cover actual HTTP requests, empty success bodies, rejection,
   ambiguous timeout, partial completion, and post-operation reconciliation.

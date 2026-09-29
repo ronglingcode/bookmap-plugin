@@ -107,7 +107,6 @@ public class RongPlugin implements CustomModuleAdapter,
     private volatile boolean patternAutomationEnabled;
     private volatile boolean patternSnapshotComplete;
     private boolean wallLabelsDirty;
-    private volatile boolean nativeRealtime;
     private long lastWallLabelRefreshMs;
     private long lastTimestampNs;
     private TradeButtonWindow tradeButtonWindow;
@@ -212,8 +211,6 @@ public class RongPlugin implements CustomModuleAdapter,
                 IndicatorConfig.BOOKMAP_PATTERN_SIGNALS);
         indicatorConfig.addChangeListener(this);
         sharedServer.registerSymbol(cleanAlias, orderBook, info.pips);
-        sharedServer.registerNativeLiveBlockReason(cleanAlias, () ->
-                com.bookmap.plugin.rong.miniviteapp.bookmap.LiveMode.getBlockReason(api.getProvider(), nativeRealtime));
         sharedServer.registerVwapUpdateListener(cleanAlias, vwapUpdateListener);
         chartHoverHotkeyHandler.registerSymbol(cleanAlias, info.pips);
         priceZonePainter.registerInstrument(cleanAlias);
@@ -306,7 +303,6 @@ public class RongPlugin implements CustomModuleAdapter,
 
     @Override
     public void stop() {
-        nativeRealtime = false;
         if (indicatorConfig != null) {
             indicatorConfig.removeChangeListener(this);
         }
@@ -560,7 +556,6 @@ public class RongPlugin implements CustomModuleAdapter,
 
     @Override
     public void onTimestamp(long timestampNs) {
-        updateNativeLiveStatus();
         this.lastTimestampNs = timestampNs;
         flushPendingVwapPoints();
         if (shouldRunPatternAutomation()) {
@@ -592,8 +587,6 @@ public class RongPlugin implements CustomModuleAdapter,
 
     @Override
     public void onRealtimeStart() {
-        nativeRealtime = true;
-        updateNativeLiveStatus();
         patternSnapshotComplete = true;
         if (wallChangeTracker != null) {
             wallChangeTracker.markReady();
@@ -601,11 +594,6 @@ public class RongPlugin implements CustomModuleAdapter,
         if (shouldRunPatternAutomation()) {
             patternEngine.markReady();
         }
-    }
-
-    private void updateNativeLiveStatus() {
-        if (sharedServer != null && api != null) sharedServer.updateNativeLiveStatus(alias,
-                com.bookmap.plugin.rong.miniviteapp.bookmap.LiveMode.isVerifiedLive(api.getProvider(), nativeRealtime));
     }
 
     public static void resetNativeExecutionAfterBrokerReview() {
@@ -621,7 +609,6 @@ public class RongPlugin implements CustomModuleAdapter,
                     indicatorConfig.isEnabled(IndicatorConfig.EXPERIMENTAL_DIRECT_BROKER_EXECUTION),
                     indicatorConfig.isEnabled(IndicatorConfig.EXPERIMENTAL_DIRECT_EXIT_EXECUTION),
                     indicatorConfig.isEnabled(IndicatorConfig.EXPERIMENTAL_DIRECT_ENTRY_EXECUTION));
-            updateNativeLiveStatus();
             return;
         }
         if (IndicatorConfig.VWAP.equals(indicatorKey)) {
