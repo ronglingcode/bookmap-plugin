@@ -161,7 +161,9 @@ public final class MiniViteApp implements AutoCloseable {
                 operation = requestOperation;
                 accessToken = guard();
                 dispatched = true;
-                Api.Result result = api.mutate(accountHash, accessToken, request);
+                Api.Result result = plan.entry != null
+                        ? api.mutateEntry(accountHash, accessToken, request, state.symbol)
+                        : api.mutate(accountHash, accessToken, request);
                 results.add(result.toJson());
                 if (!result.outcome.equals("accepted")) {
                     outcome = result.outcome; unknown = outcome.equals("unknown");

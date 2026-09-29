@@ -1,5 +1,6 @@
 package com.bookmap.plugin.rong.miniviteapp.api.schwab;
 
+import com.bookmap.plugin.rong.PluginLog;
 import com.bookmap.plugin.rong.miniviteapp.models.Models;
 import com.bookmap.plugin.rong.miniviteapp.ExecutionDiagnostics;
 import com.bookmap.plugin.rong.miniviteapp.models.Models.*;
@@ -10,9 +11,12 @@ import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.time.Duration;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 
 /** Actual Schwab responses, not ProxyServer's synthetic JSON envelope. No retries or credential logging. */
 public final class Api {
+    private static final DateTimeFormatter ENTRY_LOG_TIME = DateTimeFormatter.ofPattern("HH:mm:ss.SSS");
     private final HttpClient client;
     private final URI base;
     public Api() { this(URI.create("https://api.schwabapi.com/trader/v1/")); }
@@ -47,13 +51,35 @@ public final class Api {
     }
     private HttpResponse<String> send(String account, String token, String path, String method, JsonObject body)
             throws Exception {
+        return send(account, token, path, method, body, null);
+    }
+    private HttpResponse<String> send(String account, String token, String path, String method, JsonObject body,
+            String timedEntrySymbol) throws Exception {
         HttpRequest.Builder builder = HttpRequest.newBuilder(base.resolve("accounts/" + account + path))
                 .timeout(Duration.ofSeconds(8)).header("Authorization", "Bearer " + token)
                 .header("Accept", "application/json");
         if (body != null) builder.header("Content-Type", "application/json");
         builder.method(method, body == null ? HttpRequest.BodyPublishers.noBody()
                 : HttpRequest.BodyPublishers.ofString(body.toString()));
-        return client.send(builder.build(), HttpResponse.BodyHandlers.ofString());
+        HttpRequest request = builder.build();
+        long startedAt = System.nanoTime();
+        if (timedEntrySymbol != null)
+            PluginLog.action(timedEntrySymbol, "Native entry POST sending to broker at " + LocalDateTime.now().format(ENTRY_LOG_TIME));
+        HttpResponse<String> response;
+        try {
+            response = client.send(request, HttpResponse.BodyHandlers.ofString());
+        } catch (Exception error) {
+            if (timedEntrySymbol != null)
+                PluginLog.action(timedEntrySymbol, "Native entry POST received no response after "
+                        + Duration.ofNanos(System.nanoTime() - startedAt).toMillis() + " ms");
+            throw error;
+        }
+        if (timedEntrySymbol != null)
+            PluginLog.action(timedEntrySymbol, "Native entry POST response received at "
+                    + LocalDateTime.now().format(ENTRY_LOG_TIME) + " after "
+                    + Duration.ofNanos(System.nanoTime() - startedAt).toMillis() + " ms (HTTP "
+                    + response.statusCode() + ")");
+        return response;
     }
     private static String httpFailure(String operation, HttpResponse<String> response, String token, String account) {
         String body = response.body();
@@ -106,5 +132,8 @@ public final class Api {
     public Result mutate(String account, String token, Request request) throws Exception {
         return new Result(request, send(account, token, "/orders" +
                 (request.orderId.isEmpty() ? "" : "/" + request.orderId), request.method, request.body), token, account);
+    }
+    public Result mutateEntry(String account, String token, Request request, String symbol) throws Exception {
+        return new Result(request, send(account, token, "/orders", "POST", request.body, symbol), token, account);
     }
 }
