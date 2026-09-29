@@ -142,23 +142,12 @@ public class IndicatorSettingsPanel extends StrategyPanel {
         add(fireKeyboardEventCheckbox, gbc);
 
         gbc.gridy++;
-        JCheckBox nativeCancel = new JCheckBox("Experimental: Direct Broker Cancel (Schwab)",
+        JCheckBox nativeExecution = new JCheckBox("Experimental: Native Broker Execution (Schwab)",
                 config.isEnabled(IndicatorConfig.EXPERIMENTAL_DIRECT_BROKER_EXECUTION));
-        nativeCancel.addActionListener(e -> config.setEnabled(
-                IndicatorConfig.EXPERIMENTAL_DIRECT_BROKER_EXECUTION, nativeCancel.isSelected()));
-        add(nativeCancel, gbc);
-        gbc.gridy++;
-        JCheckBox nativeExits = new JCheckBox("Experimental: Direct Exit Orders (requires Direct Broker Cancel)",
-                config.isEnabled(IndicatorConfig.EXPERIMENTAL_DIRECT_EXIT_EXECUTION));
-        nativeExits.addActionListener(e -> config.setEnabled(
-                IndicatorConfig.EXPERIMENTAL_DIRECT_EXIT_EXECUTION, nativeExits.isSelected()));
-        add(nativeExits, gbc);
-        gbc.gridy++;
-        JCheckBox nativeEntries = new JCheckBox("Experimental: Direct Initial Wall-Reversal Entries (requires Direct Broker Cancel)",
-                config.isEnabled(IndicatorConfig.EXPERIMENTAL_DIRECT_ENTRY_EXECUTION));
-        nativeEntries.addActionListener(e -> config.setEnabled(
-                IndicatorConfig.EXPERIMENTAL_DIRECT_ENTRY_EXECUTION, nativeEntries.isSelected()));
-        add(nativeEntries, gbc);
+        nativeExecution.setToolTipText("Use native execution for cancel, exits, and supported entries.");
+        nativeExecution.addActionListener(e -> config.setEnabled(
+                IndicatorConfig.EXPERIMENTAL_DIRECT_BROKER_EXECUTION, nativeExecution.isSelected()));
+        add(nativeExecution, gbc);
         gbc.gridy++;
         javax.swing.JButton resetNative = new javax.swing.JButton("Reset Native Execution After Broker Review");
         resetNative.setToolTipText("Use only after checking unresolved orders at the broker. Does not resend orders.");

@@ -1,7 +1,7 @@
 # Experimental direct broker execution
 
 Status: foundation, cancel, exits, and initial wall-reversal entries implemented
-behind default-off flags. Adds, pending-entry replacement, and reversals are
+behind one default-off flag. Adds, pending-entry replacement, and reversals are
 the next migration stages. See
 [setup and supported actions](direct-broker-execution.md).
 
@@ -20,8 +20,8 @@ ViteApp modules. For explicitly migrated Bookmap actions, submit broker requests
 directly from Java. Start with Schwab equities, the primary broker in this workspace.
 
 The plugin flag `experimentalDirectBrokerExecution` defaults to `false`.
-Maintain a separate action allowlist. Enabling the master flag
-does not move every action to Java. Each action becomes eligible only after its
+Maintain a supported-action allowlist. The one flag enables every migrated action.
+Each action becomes eligible only after its
 own migration, protocol negotiation, and validation.
 
 ViteApp continues to own OAuth refresh, account streaming/synchronization,
@@ -109,7 +109,7 @@ and invalidate credentials when the shared service stops.
 
 Introduce an additive, versioned protocol for:
 
-1. Native feature status and supported workflow flags.
+1. Native feature status with a single enabled flag.
 2. An access-token update: broker, account hash, token, expiry, and generation.
 3. Execution configuration and immutable state snapshots:
    state revision, and action-specific inputs.

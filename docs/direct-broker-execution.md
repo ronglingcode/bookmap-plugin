@@ -1,7 +1,7 @@
 # Experimental direct Schwab execution
 
 The Java `miniviteapp` engine mirrors ViteApp's handler, core target rules, and
-Schwab order factory. All three experimental settings default to **false**.
+Schwab order factory. One experimental setting defaults to **false**.
 ViteApp still supplies current OAuth tokens, account observations, quotes, and
 plan metadata. Native mutations go straight to Schwab without ProxyServer.
 
@@ -9,10 +9,10 @@ plan metadata. Native mutations go straight to Schwab without ProxyServer.
 
 1. Run ViteApp with a live Schwab equity profile and a successful token refresh.
    Connect it to Bookmap using the existing local WebSocket.
-2. Enable **Experimental: Direct Broker Cancel (Schwab)** in the addon settings.
-   Enable **Experimental: Direct Exit Orders** to migrate exits too.
-   Enable **Experimental: Direct Initial Wall-Reversal Entries** separately
-   for the first entry workflow. Install matching ViteApp/plugin builds;
+2. Enable **Experimental: Native Broker Execution (Schwab)** in the addon settings.
+   This single switch enables cancel, exits, and supported initial entries together.
+   The stored key remains `experimentalDirectBrokerExecution`.
+   Install matching ViteApp/plugin builds;
    the simplified integration uses execution protocol version 3.
 
 This is a personal MVP with one ViteApp, one Bookmap, and one account. ViteApp
@@ -61,11 +61,11 @@ must include a broker order ID. ViteApp initializes the corresponding trade plan
 and core-target state after acceptance. Other actions do not wait for this UI
 initialization or an account refresh. An initialization failure requires review.
 
-With the entry flag enabled, attempts on a symbol with existing exposure are
+With native execution enabled, attempts on a symbol with existing exposure are
 blocked. Same-direction adds, replacement of pending entries, opposite-position
 reversals, reload A, and swap W are future migration stages. Generic B/S actions
-without a wall-reversal chart tradebook still use ViteApp. Disable the entry
-flag to use the existing ViteApp entry workflow.
+without a wall-reversal chart tradebook still use ViteApp. Disable native execution
+to use the existing ViteApp workflows for cancel, exits, and entries together.
 
 ## Updates and reconciliation
 
@@ -102,7 +102,7 @@ Unknown broker outcomes require broker review. A WebSocket reconnect by itself
 does not require review and does not stop a running native action.
 There is no automatic retry or fallback after native dispatch. Review the actual
 broker orders and positions, then use **Reset Native Execution After Broker
-Review** in addon settings. Disabling a flag does not clear an unknown broker outcome.
+Review** in addon settings. Disabling the switch does not clear an unknown broker outcome.
 Tokens are cleared when disabling native execution or stopping the plugin, and are never written to plugin
 settings or action logs.
 
@@ -117,12 +117,12 @@ by our own code. The broker handles authorization and order payload validation.
 
 ## Checks that still block
 
-These checks apply to the native route. Turning off an action's native flag
+These checks apply to the native route. Turning off the native execution flag
 normally returns it to ViteApp; unresolved native work continues to block it.
 
 | Scope | Blocking conditions |
 | --- | --- |
-| Enabled workflow | Plugin stopped or native flags disabled; ViteApp publishes native inputs only with a live Schwab equity profile and matching protocol version. There are no session/account identity checks. |
+| Enabled workflow | Plugin stopped or native execution disabled; ViteApp publishes native inputs only with a live Schwab equity profile and matching protocol version. There are no session/account identity checks. |
 | Broker review | An uncertain broker response or entry-state initialization failure requires review. Running actions and account refreshes do not block another click. |
 | Decision inputs | Missing state needed to build the requested action. No input age or timestamp comparison blocks execution. |
 | Execution plan | Duplicate order IDs or closing quantity exceeds the position; exit legs disagree on side/quantity. These can submit duplicate closes or leave unintended exposure. |
@@ -133,7 +133,7 @@ normally returns it to ViteApp; unresolved native work continues to block it.
 | Entry rules | Missing entry context; outside regular market hours; attendance or watchlist restriction; daily loss limit reached; invalid/zero liquidity scale; missing rule inputs; opposing watch level too close; entry inside a no-trade zone. VWAP proximity and low volume reduce size rather than block by themselves. |
 | Entry sizing | Missing risk/sizing inputs or protective brackets. Buying power determines half allocation; insufficient funds and fractional legs do not block dispatch. |
 | Initial entry preflight | Initial entries require a flat broker position and no pending symbol orders; a failed or truncated entry order read cannot establish that. Exits and cancel have no broker read preflight. |
-| During dispatch | Flags disabled or plugin stopped. A broker rejection stops the remaining requests; network timeout or ambiguous acceptance requires review. Token refresh/reconnect does not interrupt execution. No automatic resend occurs. |
+| During dispatch | Native execution disabled or plugin stopped. A broker rejection stops the remaining requests; network timeout or ambiguous acceptance requires review. Token refresh/reconnect does not interrupt execution. No automatic resend occurs. |
 
 The log reports the first failed condition. Uncertain outcomes require reviewing
 the broker and using **Reset Native Execution After Broker Review**.
@@ -145,7 +145,7 @@ broker reads and mutation are separate requests; those comparisons are not atomi
 
 | Check | Mechanism |
 | --- | --- |
-| Workflow enabled | Route by supported action and its experimental flag. Flags off normally use ViteApp. Recheck flags/plugin shutdown before native dispatch. ViteApp sends inputs only with a live Schwab equity profile; its message reader requires protocol 3. |
+| Workflow enabled | Route supported actions through one experimental flag. Disabled normally uses ViteApp. Recheck this flag/plugin shutdown before native dispatch. ViteApp sends inputs only with a live Schwab equity profile; its message reader requires protocol 3. |
 | Inputs available | Require a snapshot for the requested symbol. There is no account/quote/context age check. |
 | Unknown result/review | HTTP 5xx, a network exception after mutation dispatch, or a successful entry POST missing its new order ID cannot prove the outcome. Failed entry-plan initialization also requires review. Accepted results do not create a reconciliation wait. |
 | Duplicate IDs/closing size | Reject a repeated nonempty order ID within one plan. Sum outgoing closing quantities and compare against absolute snapshot position. Flatten also checks its remaining quantity never becomes negative. |

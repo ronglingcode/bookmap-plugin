@@ -21,7 +21,7 @@ public final class MiniViteApp implements AutoCloseable {
     private final ExecutorService executor = Executors.newCachedThreadPool(task -> {
         Thread thread = new Thread(task, "bmtrader-native-execution"); thread.setDaemon(true); return thread;
     });
-    private boolean enabled, exitsEnabled, entriesEnabled, requiresReview, closed;
+    private boolean enabled, requiresReview, closed;
     private String reviewReason = "";
     private Object connection;
     private String account = "", token = "";
@@ -40,18 +40,16 @@ public final class MiniViteApp implements AutoCloseable {
     }
     public synchronized JsonObject status() {
         JsonObject json = message("execution_status");
-        json.addProperty("enabled", enabled); json.addProperty("exitsEnabled", exitsEnabled);
-        json.addProperty("entriesEnabled", entriesEnabled);
+        json.addProperty("enabled", enabled);
+        // Compatibility aliases for earlier ViteApp builds; both always mirror the one switch.
+        json.addProperty("exitsEnabled", enabled); json.addProperty("entriesEnabled", enabled);
         json.addProperty("blocked", requiresReview);
         json.addProperty("requiresReview", requiresReview);
         json.addProperty("reason", reviewReason);
         return json;
     }
-    public synchronized void setEnabled(boolean enabled, boolean exitsEnabled) {
-        setEnabled(enabled, exitsEnabled, false);
-    }
-    public synchronized void setEnabled(boolean enabled, boolean exitsEnabled, boolean entriesEnabled) {
-        this.enabled = enabled; this.exitsEnabled = exitsEnabled; this.entriesEnabled = entriesEnabled;
+    public synchronized void setEnabled(boolean enabled) {
+        this.enabled = enabled;
         if (!enabled) { token = ""; account = ""; expiresAt = 0; snapshots.clear(); marketData.clear(); }
     }
     public synchronized void unregister(String symbol) {
@@ -103,7 +101,6 @@ public final class MiniViteApp implements AutoCloseable {
         boolean entry = EntryHandler.supports(action, key);
         if (!entry && !KeyboardHandler.supports(key, shift)) return false;
         if (!enabled && !requiresReview) return false;
-        if (enabled && (entry ? !entriesEnabled : !key.equals("KeyC") && !exitsEnabled) && !requiresReview) return false;
         String symbol = SymbolUtils.cleanSymbol(Models.string(action, "symbol"));
         try {
             long now = System.currentTimeMillis();
@@ -142,10 +139,8 @@ public final class MiniViteApp implements AutoCloseable {
         }
         return true; // Migrated failures are never broadcast as executable legacy actions.
     }
-    private synchronized String guard(Plan plan) {
-        Models.require(enabled && !closed
-                && (plan.entry != null ? entriesEnabled : plan.action.equals("cancel_pending_entries") || exitsEnabled),
-                "native execution disabled before dispatch");
+    private synchronized String guard() {
+        Models.require(enabled && !closed, "native execution disabled before dispatch");
         return token;
     }
     private void execute(String accountHash,
@@ -156,13 +151,15 @@ public final class MiniViteApp implements AutoCloseable {
         String accessToken = "";
         try {
             for (var request : plan.requests) {
-                accessToken = guard(plan);
+                String requestOperation = request.method + (request.orderId.isEmpty() ? " new order" : " order " + request.orderId);
+                operation = requestOperation;
+                accessToken = guard();
                 if (plan.entry != null) {
                     operation = "initial-entry broker preflight";
                     api.validateFlatEntry(accountHash, accessToken, state.symbol);
                 }
-                operation = request.method + (request.orderId.isEmpty() ? " new order" : " order " + request.orderId);
-                accessToken = guard(plan);
+                operation = requestOperation;
+                accessToken = guard();
                 dispatched = true;
                 Api.Result result = api.mutate(accountHash, accessToken, request);
                 results.add(result.toJson());

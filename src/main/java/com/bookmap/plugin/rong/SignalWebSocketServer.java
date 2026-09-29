@@ -35,8 +35,8 @@ public class SignalWebSocketServer extends WebSocketServer {
         if (!miniViteApp.route(action)) broadcast(action.toString());
     }
 
-    public void setExperimentalDirectExecution(boolean enabled, boolean exitsEnabled, boolean entriesEnabled) {
-        miniViteApp.setEnabled(enabled, exitsEnabled, entriesEnabled);
+    public void setExperimentalDirectExecution(boolean enabled) {
+        miniViteApp.setEnabled(enabled);
         broadcast(miniViteApp.status().toString());
     }
 
