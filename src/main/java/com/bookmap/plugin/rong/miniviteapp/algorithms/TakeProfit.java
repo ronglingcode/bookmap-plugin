@@ -30,7 +30,6 @@ public final class TakeProfit {
         for (int i = 0; i < count; i++) {
             long quantity = base + (i < remainder ? 1 : 0);
             if (quantity == 0) continue;
-            Models.require(Models.positive(prices.get(i)), "invalid profit target");
             JsonObject target = new JsonObject(); target.addProperty("target", prices.get(i));
             target.addProperty("quantity", quantity); result.add(target);
         }

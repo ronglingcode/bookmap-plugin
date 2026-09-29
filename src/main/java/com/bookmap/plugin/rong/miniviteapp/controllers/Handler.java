@@ -48,11 +48,9 @@ public final class Handler {
     }
     private static void adjust(Snapshot state, Plan plan, List<ExitPair> pairs, double inputPrice, boolean stop) {
         double price = Math.round(inputPrice * 100) / 100.0; // Helper.roundPrice for equities
-        Models.require(Models.positive(price), "invalid adjustment price");
         // The TS handlers check the proposed price and OrderFlow checks the clamped price again.
         for (var pair : pairs) checkAdjustment(state, pair, price, stop);
         if (stop) price = state.netQuantity > 0 ? Math.min(price, state.bid) : Math.max(price, state.ask);
-        Models.require(Models.positive(price), "missing bid/ask for stop adjustment");
         for (var pair : pairs) {
             checkAdjustment(state, pair, price, stop);
             Broker.replaceExitPairWithNewPrice(plan, pair, price, stop);

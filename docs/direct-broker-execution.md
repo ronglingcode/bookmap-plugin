@@ -35,7 +35,7 @@ local session automatically when direct execution is enabled.
 Core target protection, equity price rounding, bid/ask stop clamping, pair
 ordering, and closing direction follow ViteApp. Native partial market exits and
 target adjustments require exits already split in ViteApp. Unsupported rules,
-order shapes, stale observations, and unmatched broker state block the action.
+stale decision inputs, and changed positions or protective orders block the action.
 ### First entry workflow
 
 Native wall-reversal buttons (1 R / 0.1 R, market / breakout) and chart B/S
@@ -48,9 +48,11 @@ Java applies the tradebook entry area, attendance and watchlist gates, daily
 loss limit, liquidity scale, opposing watch/VWAP levels, and no-trade zones.
 It computes equity risk sizing, reduced pair counts, ATR quantity caps,
 one-cent slippage, Bookmap wall targets followed by 3R targets, and even share
-splits. Fixed quantity and ViteApp's buying-power half sizing are preserved;
-fractional share legs from half sizing are rejected. A broker buying-power
-check and a regular-session gate add conservative checks for this experiment.
+splits. Fixed quantity and ViteApp's buying-power half allocation are preserved.
+If the half-sized entry still exceeds estimated buying power, native execution
+warns and sends it for the broker to decide. There is no additional balance
+preflight or whole-share validation. Entries require the regular session so a
+broker-accepted NORMAL order cannot silently become an entry in a later session.
 
 One POST contains the opening order and every protective OCO pair. The plugin
 checks the actual broker position and pending orders before posting. Acceptance
@@ -66,12 +68,16 @@ flag to use the existing ViteApp entry workflow.
 
 ## Session and reconciliation
 
-The plugin requires fresh successful broker reads and quotes (10 seconds), and
-a token with more than 30 seconds left. Bookmap provider identity, live/replay
-mode, historical loading, and the Bookmap clock are not checked for execution.
-Only Schwab equity STOP/LIMIT/MARKET orders with integral quantities are supported.
+The plugin requires fresh account inputs (10 seconds), and fresh quotes only
+for entries, partial exits, and price adjustments. Cancel and flatten do not use
+quotes. Missing or expired tokens warn without blocking; the broker determines
+authorization. Each request uses the latest token for the same session/account.
+Bookmap provider identity, live/replay mode, historical loading, and the Bookmap
+clock are not checked for execution. The engine builds Schwab equity
+STOP/LIMIT/MARKET orders and trusts broker-supplied fields and its own builders.
 
-Before mutation, Java reads the broker position and affected orders. Requests
+Before entries/exits, Java reads the broker position and, when needed, protective
+orders. Cancel sends DELETE directly without an order preflight. Requests
 execute sequentially on a worker thread. Browser mutations acquire a shared
 execution fence. An accepted action remains blocked until a later account read
 confirms the replaced/cancelled IDs disappeared. Lifecycle messages update the
@@ -84,7 +90,16 @@ Review** in addon settings. Disabling a flag does not clear unresolved execution
 Tokens are cleared on revocation/disconnect and are never written to plugin
 settings or action logs.
 
-## What can block execution
+## Principle for local execution checks
+
+Block only realistic cases where the broker could accept an order that does not
+match the intended trade. Examples are duplicate exposure, closing too many
+shares after a fill, overwriting an exit edited elsewhere, or violating an active
+trading rule. A condition that only predicts a broker rejection can at most warn.
+Do not add speculative validation of broker-provided fields or values generated
+by our own code. The broker handles authorization and order payload validation.
+
+## Checks that still block
 
 These checks apply to the native route. Turning off an action's native flag
 normally returns it to ViteApp; unresolved native work continues to block it.
@@ -93,20 +108,33 @@ normally returns it to ViteApp; unresolved native work continues to block it.
 | --- | --- |
 | Session | No connected ViteApp owner; unsupported app origin or protocol; another browser tab owns execution; ViteApp is not using a live Schwab equity profile; plugin stopped or session revoked. |
 | Concurrent work / review | Native work or a browser broker mutation is in progress; a previous native result has not reconciled; an uncertain response, interrupted operation, or entry-state initialization failure requires broker review. Browser fence acknowledgement timeout is 3 seconds. |
-| Freshness / credentials | Missing token or at most 30 seconds until expiry; session heartbeat, account observation, or quote is older than 10 seconds; account observation predates the last mutation; invalid or changed account. Quotes are required for every migrated action except cancel. |
-| Wire inputs | Malformed symbol, position, batch count, order IDs, quantities, exit pairs, or prices; unsupported order types; mismatched exit legs; missing original partial numbers; duplicate IDs in an execution plan. Only integral equity shares are supported. |
+| Decision inputs | Account observation is older than 10 seconds or predates the last mutation; missing account state or changed account. Entry/partial/adjustment quotes must be current, because they affect price, order type, or trading rules. Cancel/flatten need no quote. |
+| Execution plan | Duplicate order IDs or closing quantity exceeds the position; exit legs disagree on side/quantity. These can submit duplicate closes or leave unintended exposure. |
 | Flatten | No position; custom flatten/exit rules not mirrored in Java; exit side disagrees with position; exit quantity exceeds position. Flatten bypasses core-target protection and does not require split partials. |
-| Partial exits / adjustments | No active exit pairs or current price; unsupported exit rules; selected partial does not exist; partial exits or target adjustments need exits split in ViteApp; missing adjustment price, bid/ask, or required exit legs. |
-| Core-target protection | Earlier exits of protected partials lack an active plan, original entry price, or valid core target; proposed exit has not reached the 90% buffered core target. Applies to partial exits and adjustments, not Flatten. |
+| Partial exits / adjustments | No active exit pairs or current price; unsupported exit rules; selected partial does not exist; partial exits or target adjustments need exits split in ViteApp; required exit legs unavailable. |
+| Core-target protection | Earlier exits lack original partial identity or protected partials lack an active plan, original entry price, or valid core target; proposed exit has not reached the 90% buffered core target. Applies to partial exits and adjustments, not Flatten. |
 | Entry eligibility | Existing position or pending orders; Bookmap retest blocks entry; disabled/unavailable supported tradebook; wrong side or entry method; unsupported price units; unavailable day levels or protective stop; entry outside tradebook boundary; quotes cross the stop. |
 | Entry rules | Stale/missing entry context; outside regular market hours; attendance or watchlist restriction; daily loss limit reached; invalid/zero liquidity scale; missing rule inputs; opposing watch level too close; entry inside a no-trade zone. VWAP proximity and low volume reduce size rather than block by themselves. |
-| Entry sizing | Invalid risk/quantity/target inputs; unavailable or insufficient buying power; half sizing creates fractional share legs; missing protective brackets. |
-| Broker preflight | Broker read fails; actual position differs from snapshot; an affected order is no longer working, has partially filled, or differs in instrument, side, type, quantity, or price. Entry also checks actual buying power, flat position, absence of pending symbol orders, and that the order read is not truncated. |
-| During dispatch | Flags/session/token change during preflight; entry inputs expire during preflight; position direction or available shares change between requests; broker rejects a request; network timeout or ambiguous acceptance. No automatic resend occurs. |
+| Entry sizing | Missing risk/sizing inputs or protective brackets. Buying power determines half allocation; insufficient funds and fractional legs do not block dispatch. |
+| Broker preflight | Position or protective order fills/quantity/price changed, or a required broker read fails. Protective siblings must still be active because flatten sizing depends on their coverage. Initial entries require a flat position and no pending symbol orders; a truncated order read cannot establish that. Cancel has no preflight. |
+| During dispatch | Flags/session/account revoked; entry inputs expire during preflight; position direction or available shares change between requests. A broker rejection stops the remaining requests; network timeout or ambiguous acceptance requires review. Token refresh does not interrupt execution. No automatic resend occurs. |
 
 The log reports the first failed condition. A fresh successful account read
 clears normal reconciliation waits; uncertain outcomes require reviewing the
 broker and using **Reset Native Execution After Broker Review**.
+
+## Warnings and delegated checks
+
+- Missing/expired access token: warn, then use the supplied token; no 30-second
+  expiry margin. Schwab decides authorization.
+- Estimated buying power still insufficient after half sizing: warn, then submit
+  that half-sized protected entry. No second broker buying-power comparison.
+- Broker rejection: record the HTTP status in the native result and action log.
+
+There are no extra warnings/checks for hypothetical malformed symbols, numeric
+order IDs, whole shares, batch bounds, broker instrument/side/shape changes, or
+factory price/type validation. Trust the existing producer/calculation. Cancel
+does not fetch an order to predict whether the broker will reject its deletion.
 
 ## Verification
 

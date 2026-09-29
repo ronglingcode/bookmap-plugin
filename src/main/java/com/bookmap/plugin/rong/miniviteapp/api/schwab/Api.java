@@ -42,7 +42,6 @@ public final class Api {
     }
     private HttpResponse<String> send(String account, String token, String path, String method, JsonObject body)
             throws Exception {
-        Models.require(account.matches("[A-Za-z0-9]+"), "invalid account hash");
         HttpRequest.Builder builder = HttpRequest.newBuilder(base.resolve("accounts/" + account + path))
                 .timeout(Duration.ofSeconds(8)).header("Authorization", "Bearer " + token)
                 .header("Accept", "application/json");
@@ -64,26 +63,18 @@ public final class Api {
             JsonObject position = element.getAsJsonObject();
             if (symbol.equals(Models.string(position.getAsJsonObject("instrument"), "symbol"))) {
                 double longs = Models.number(position, "longQuantity"), shorts = Models.number(position, "shortQuantity");
-                Models.require(Double.isFinite(longs) && Double.isFinite(shorts), "invalid broker position");
                 quantity += longs - shorts;
             }
         }
         return quantity;
     }
-    public void validateOrder(String account, String token, Order expected, boolean closing) throws Exception {
+    public void validateOrder(String account, String token, Order expected) throws Exception {
         JsonObject order = read(account, token, "/orders/" + expected.id);
         String status = Models.string(order, "status");
         Models.require(status.equals("WORKING") || status.equals("QUEUED") || status.equals("ACCEPTED")
                 || status.equals("AWAITING_PARENT_ORDER"), "order is no longer working; reconcile first");
-        var legs = order.getAsJsonArray("orderLegCollection");
-        Models.require(legs != null && legs.size() == 1, "unsupported broker order legs");
-        JsonObject leg = legs.get(0).getAsJsonObject();
-        Models.require(expected.symbol.equals(Models.string(leg.getAsJsonObject("instrument"), "symbol"))
-                && "EQUITY".equals(Models.string(leg.getAsJsonObject("instrument"), "assetType")), "broker instrument changed");
-        String instruction = Models.string(leg, "instruction");
-        Models.require(instruction.equals(closing ? (expected.isBuy ? "BUY_TO_COVER" : "SELL")
-                : (expected.isBuy ? "BUY" : "SELL_SHORT")), "broker order side changed");
-        Models.require(expected.type.equals(Models.string(order, "orderType")), "broker order type changed");
+        // Trust the instrument/side/shape read from this same broker order ID.
+        // Check fills and edits that would make our cached closing plan wrong.
         // Any partial fill invalidates this snapshot. Do not submit its original full quantity again.
         double filled = Models.number(order, "filledQuantity");
         if (!Double.isFinite(filled)) filled = 0;
@@ -93,7 +84,7 @@ public final class Api {
             Models.require(Math.abs(price - expected.price) < 1e-8, "broker price changed; reconcile first");
         }
     }
-    public void validateFlatEntry(String account, String token, String symbol, JsonObject entry, double estimatedEntryPrice) throws Exception {
+    public void validateFlatEntry(String account, String token, String symbol) throws Exception {
         JsonObject data = read(account, token, "?fields=positions").getAsJsonObject("securitiesAccount");
         if (data.has("positions")) for (var element : data.getAsJsonArray("positions")) {
             JsonObject position = element.getAsJsonObject();
@@ -102,13 +93,6 @@ public final class Api {
                         "initial entry position changed");
             }
         }
-        var balances = data.getAsJsonObject("currentBalances");
-        double buyingPower = Models.number(balances, "buyingPower");
-        double dayPower = Models.number(balances, "dayTradingBuyingPower");
-        if (Double.isFinite(dayPower) && dayPower >= 0) buyingPower = Math.min(buyingPower, dayPower);
-        double quantity = Models.number(entry.getAsJsonArray("orderLegCollection").get(0).getAsJsonObject(), "quantity");
-        double estimate = entry.has("price") ? Models.number(entry, "price") : entry.has("stopPrice") ? Models.number(entry, "stopPrice") : estimatedEntryPrice;
-        Models.require(Models.positive(buyingPower) && buyingPower > quantity * estimate, "broker buying power blocks entry");
         var now = java.time.Instant.now().truncatedTo(java.time.temporal.ChronoUnit.MILLIS);
         HttpResponse<String> response = send(account, token, "/orders?maxResults=3000&fromEnteredTime=" +
                 now.minusSeconds(59L * 86400) + "&toEnteredTime=" + now, "GET", null);

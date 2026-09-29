@@ -7,6 +7,13 @@ the next migration stages. See
 
 ## Objective and initial scope
 
+Local execution checks follow this rule: block only realistic cases where a
+broker-accepted order could differ from the intended trade. Conditions that only
+predict broker rejection may warn, never block. Trust broker-provided fields and
+our own payload calculations; do not accumulate checks for hypothetical invalid
+inputs. Preserve trading rules and checks for duplicate exposure, changed
+position/protective coverage, and unintended quantities or prices.
+
 Add a small Java execution engine inside bmtrader that mirrors the relevant
 ViteApp modules. For explicitly migrated Bookmap actions, submit broker requests
 directly from Java. Start with Schwab equities, the primary broker in this workspace.
@@ -250,8 +257,9 @@ account streaming/state ownership as a separate architecture decision.
 
 - Compare TS and Java decisions, selected orders, price/quantity rounding, payloads,
   rejection reasons, and state transitions using captured sanitized fixtures.
-- Test flag off, unsupported action/client, stale state, expired/replaced
-  tokens, wrong account, duplicate clicks, reconnect, and conflicting Vite actions.
+- Test flag off, unsupported action/client, stale decision state, wrong account,
+  duplicate clicks, reconnect, and conflicting Vite actions. Verify expired tokens
+  reach the broker and refreshed tokens do not interrupt execution.
 - Fake-broker tests cover actual HTTP requests, empty success bodies, rejection,
   ambiguous timeout, partial completion, and post-operation reconciliation.
 - Verify protective-order handling and both long/short behavior where supported.

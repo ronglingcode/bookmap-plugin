@@ -31,6 +31,7 @@ class NativeExecutionTest {
         final Object owner = new Object();
         final List<JsonObject> events = new CopyOnWriteArrayList<>();
         final List<String> requests = new CopyOnWriteArrayList<>();
+        final List<String> authorizations = new CopyOnWriteArrayList<>();
         final List<JsonObject> bodies = new CopyOnWriteArrayList<>();
         final AtomicInteger mutations = new AtomicInteger();
         final HttpServer server;
@@ -48,7 +49,7 @@ class NativeExecutionTest {
             server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
             server.createContext("/accounts/hash", exchange -> {
                 try {
-                    assertEquals("Bearer fake-access-token", exchange.getRequestHeaders().getFirst("Authorization"));
+                    authorizations.add(exchange.getRequestHeaders().getFirst("Authorization"));
                     String method = exchange.getRequestMethod(), path = exchange.getRequestURI().getPath();
                     requests.add(method + " " + path);
                     if (method.equals("GET")) {
@@ -123,13 +124,19 @@ class NativeExecutionTest {
             var json = new JsonObject(); json.addProperty("type", type); json.addProperty("epoch", epoch); return json;
         }
         void token(int generation, long expiry) {
+            token(generation, expiry, "fake-access-token");
+        }
+        void token(int generation, long expiry, String accessToken) {
             var json = message("execution_token"); json.addProperty("generation", generation);
-            json.addProperty("accessToken", "fake-access-token"); json.addProperty("accountHash", "hash"); json.addProperty("expiresAt", expiry);
+            json.addProperty("accessToken", accessToken); json.addProperty("accountHash", "hash"); json.addProperty("expiresAt", expiry);
             engine.receive(owner, ORIGIN, json);
         }
         void updateState(long observedAt) {
+            updateState(observedAt, System.currentTimeMillis());
+        }
+        void updateState(long observedAt, long quoteObservedAt) {
             state.addProperty("revision", System.nanoTime()); state.addProperty("observedAt", observedAt);
-            state.addProperty("quoteObservedAt", System.currentTimeMillis());
+            state.addProperty("quoteObservedAt", quoteObservedAt);
             var json = message("execution_state"); json.addProperty("accountHash", "hash");
             var symbols = new JsonArray(); symbols.add(state.deepCopy()); json.add("symbols", symbols); engine.receive(owner, ORIGIN, json);
         }
@@ -182,15 +189,41 @@ class NativeExecutionTest {
             assertTrue(rig.engine.route(entry)); assertEquals(1, rig.mutations.get()); // Pending entry cannot become a second entry.
         }
     }
-    @Test void initialEntryPreflightBlocksPositionOrdersAndBuyingPowerChanges() throws Exception {
-        for (int scenario = 0; scenario < 4; scenario++) try (var rig = new Rig()) {
+    @Test void initialEntryPreflightBlocksPositionAndPendingOrderChanges() throws Exception {
+        for (int scenario = 0; scenario < 3; scenario++) try (var rig = new Rig()) {
             var entry = rig.connectEntry();
             if (scenario == 0) rig.brokerQuantity = 1;
             if (scenario == 1) rig.pendingSymbolOrder = true;
-            if (scenario == 2) rig.buyingPower = 1;
-            if (scenario == 3) { rig.pendingSymbolOrder = true; rig.pendingStatus = "NEW_BROKER_STATE"; }
+            if (scenario == 2) { rig.pendingSymbolOrder = true; rig.pendingStatus = "NEW_BROKER_STATE"; }
             assertTrue(rig.engine.route(entry)); assertEquals("rejected", rig.finish().get("outcome").getAsString());
             assertEquals(0, rig.mutations.get());
+        }
+    }
+    @Test void insufficientBuyingPowerReachesBrokerWithHalfSizedEntry() throws Exception {
+        try (var rig = new Rig()) {
+            var entry = rig.connectEntry(); rig.buyingPower = 1; rig.mutationStatus = 400;
+            rig.state.getAsJsonObject("entryContext").addProperty("availableBuyingPower", 1);
+            rig.updateState(System.currentTimeMillis()); rig.engine.route(entry);
+            var result = rig.finish(); assertEquals("rejected", result.get("outcome").getAsString());
+            assertEquals("broker HTTP 400", result.get("reason").getAsString());
+            assertEquals(1, rig.mutations.get());
+            assertEquals(980, rig.bodies.get(0).getAsJsonArray("orderLegCollection").get(0).getAsJsonObject().get("quantity").getAsDouble());
+            assertFalse(result.get("requiresReview").getAsBoolean());
+        }
+    }
+    @Test void fractionalHalfSizedLegsArePassedToBrokerWithoutRounding() throws Exception {
+        try (var rig = new Rig()) {
+            var entry = rig.connectEntry(); rig.mutationStatus = 400;
+            rig.state.getAsJsonObject("entryContext").addProperty("fixedQuantity", 23);
+            rig.state.getAsJsonObject("entryContext").addProperty("availableBuyingPower", 200);
+            rig.updateState(System.currentTimeMillis()); rig.engine.route(entry);
+            assertEquals("rejected", rig.finish().get("outcome").getAsString());
+            assertEquals(1, rig.mutations.get());
+            var body = rig.bodies.get(0);
+            assertEquals(11.5, body.getAsJsonArray("orderLegCollection").get(0).getAsJsonObject().get("quantity").getAsDouble());
+            assertEquals(1.5, body.getAsJsonArray("childOrderStrategies").get(0).getAsJsonObject()
+                .getAsJsonArray("childOrderStrategies").get(0).getAsJsonObject()
+                .getAsJsonArray("orderLegCollection").get(0).getAsJsonObject().get("quantity").getAsDouble());
         }
     }
     @Test void missingEntryLocationRequiresReviewWithoutResubmission() throws Exception {
@@ -225,6 +258,8 @@ class NativeExecutionTest {
             assertTrue(rig.engine.route(action("KeyC"))); rig.allowMutation.countDown();
             assertEquals("accepted", rig.finish().get("outcome").getAsString());
             assertEquals(2, rig.mutations.get());
+            assertTrue(rig.requests.stream().allMatch(request -> request.startsWith("DELETE ")));
+            assertTrue(rig.authorizations.stream().allMatch(value -> value.equals("Bearer fake-access-token")));
             assertTrue(rig.engine.route(action("KeyC"))); assertEquals(2, rig.mutations.get());
             rig.state.add("entries", new JsonArray()); rig.updateState(System.currentTimeMillis()+10);
             assertFalse(rig.engine.status().get("blocked").getAsBoolean());
@@ -247,19 +282,47 @@ class NativeExecutionTest {
     @Test void flattenExecutesWithoutBookmapProviderVerification() throws Exception {
         try (var rig = new Rig()) {
             rig.state = fixture("flatten replaces all exit pairs"); rig.connect();
+            rig.updateState(System.currentTimeMillis(), 0);
             assertTrue(rig.engine.route(action("KeyF")));
             assertEquals("accepted", rig.finish().get("outcome").getAsString());
             assertEquals(rig.state.getAsJsonArray("pairs").size(), rig.mutations.get());
             assertTrue(rig.bodies.stream().allMatch(body -> body.get("orderType").getAsString().equals("MARKET")));
         }
     }
-    @Test void expiryStalenessAndPartialFillsNeverSendMutations() throws Exception {
+    @Test void missingExpiredAndNearExpiryTokensAreLeftToBroker() throws Exception {
+        for (int scenario = 0; scenario < 3; scenario++) try (var rig = new Rig()) {
+            rig.connect(); rig.mutationStatus = 401;
+            rig.token(2, System.currentTimeMillis() + (scenario == 0 ? 1000 : -1000), scenario == 2 ? "" : "fake-access-token");
+            rig.engine.route(action("KeyC")); var result = rig.finish();
+            assertEquals("rejected", result.get("outcome").getAsString());
+            assertEquals("broker HTTP 401", result.get("reason").getAsString());
+            assertEquals(List.of("DELETE /accounts/hash/orders/101"), rig.requests);
+            assertFalse(result.get("requiresReview").getAsBoolean());
+        }
+    }
+    @Test void tokenRefreshDoesNotInterruptRunningCancel() throws Exception {
         try (var rig = new Rig()) {
-            rig.connect(); rig.token(2, System.currentTimeMillis()+1000); rig.engine.route(action("KeyC")); assertEquals(0, rig.requests.size());
-            rig.token(3, System.currentTimeMillis()+120_000); rig.updateState(System.currentTimeMillis()-20_000);
+            rig.connect(); rig.allowMutation = new CountDownLatch(1); rig.engine.route(action("KeyC"));
+            assertTrue(rig.mutationEntered.await(3, TimeUnit.SECONDS));
+            rig.token(2, System.currentTimeMillis()+120_000, "fake-refreshed-access-token");
+            rig.allowMutation.countDown(); assertEquals("accepted", rig.finish().get("outcome").getAsString());
+            assertEquals(List.of("Bearer fake-access-token", "Bearer fake-refreshed-access-token"), rig.authorizations);
+            assertEquals(2, rig.mutations.get());
+        }
+    }
+    @Test void cancelOfFinishedOrderIsLeftToBroker() throws Exception {
+        try (var rig = new Rig()) {
+            rig.connect(); rig.orderFilled = true; rig.mutationStatus = 400; rig.engine.route(action("KeyC"));
+            assertEquals("rejected", rig.finish().get("outcome").getAsString());
+            assertEquals(List.of("DELETE /accounts/hash/orders/101"), rig.requests);
+        }
+    }
+    @Test void staleStateAndPartialExitFillsStillBlockUnintendedExecutions() throws Exception {
+        try (var rig = new Rig()) {
+            rig.connect(); rig.updateState(System.currentTimeMillis()-20_000);
             rig.engine.route(action("KeyC")); assertEquals(0, rig.requests.size());
-            rig.updateState(System.currentTimeMillis());
-            rig.orderFilled = true; rig.engine.route(action("KeyC"));
+            rig.state = fixture("market out smallest first tie"); rig.updateState(System.currentTimeMillis());
+            rig.orderFilled = true; rig.engine.route(action("KeyM"));
             assertEquals("rejected", rig.finish().get("outcome").getAsString()); assertEquals(0, rig.mutations.get());
         }
     }

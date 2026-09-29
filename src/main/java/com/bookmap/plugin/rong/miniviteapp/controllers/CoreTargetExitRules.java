@@ -9,7 +9,7 @@ public final class CoreTargetExitRules {
     private CoreTargetExitRules() { }
     public static void check(Snapshot state, ExitPair pair, double price, boolean earlier) {
         if (!state.coreRuleEnabled || !earlier) return;
-        Models.require(Models.positive(price), "proposed exit price must be positive and finite");
+        Models.require(pair.originalPartial > 0, "missing original partial number for core-target protection");
         if (!state.hasPlan) {
             Models.require(pair.originalPartial <= 3, "missing active trade plan for protected partial");
             return;

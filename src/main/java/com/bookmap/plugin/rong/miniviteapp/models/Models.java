@@ -24,7 +24,6 @@ public final class Models {
         if (!condition) throw new IllegalArgumentException(reason);
     }
     public static boolean positive(double value) { return Double.isFinite(value) && value > 0; }
-    public static boolean shares(double value) { return positive(value) && value == Math.floor(value); }
 
     public static final class Order {
         public final String id, symbol, type;
@@ -37,10 +36,7 @@ public final class Models {
             quantity = number(json, "quantity");
             price = number(json, "price");
             isBuy = bool(json, "isBuy");
-            require(id.matches("[0-9]+") && shares(quantity), "invalid broker order");
-            require(SetTypes.contains(type), "unsupported order type");
         }
-        private static final List<String> SetTypes = List.of("STOP", "LIMIT", "MARKET");
     }
     public static final class ExitPair {
         public final Order limit, stop;
@@ -49,10 +45,6 @@ public final class Models {
             limit = json.has("LIMIT") ? new Order(json.getAsJsonObject("LIMIT"), symbol) : null;
             stop = json.has("STOP") ? new Order(json.getAsJsonObject("STOP"), symbol) : null;
             originalPartial = (int) number(json, "originalPartial");
-            require(limit != null || stop != null, "empty exit pair");
-            require(limit == null || limit.type.equals("LIMIT"), "invalid limit exit type");
-            require(stop == null || stop.type.equals("STOP"), "invalid stop exit type");
-            require(originalPartial > 0, "missing original partial number");
             require(limit == null || stop == null ||
                     (limit.quantity == stop.quantity && limit.isBuy == stop.isBuy), "exit legs disagree");
         }
@@ -71,17 +63,14 @@ public final class Models {
         public final Set<String> observedOrderIds = new HashSet<>();
         public Snapshot(JsonObject json) {
             symbol = string(json, "symbol");
-            require(symbol.matches("[A-Z][A-Z0-9.\\-]{0,15}"), "invalid equity symbol");
             revision = (long) number(json, "revision");
             observedAt = (long) number(json, "observedAt");
             quoteObservedAt = (long) number(json, "quoteObservedAt");
             netQuantity = number(json, "netQuantity");
-            require(Double.isFinite(netQuantity) && netQuantity == Math.rint(netQuantity), "invalid position");
             currentPrice = number(json, "currentPrice");
             bid = number(json, "bid"); ask = number(json, "ask");
             entryPrice = number(json, "entryPrice"); coreTarget = number(json, "coreTarget");
             coreCount = number(json, "coreCount"); batchCount = (int) number(json, "batchCount");
-            require(batchCount > 0 && batchCount <= 100, "invalid batch count");
             splitPartials = bool(json, "splitPartials"); hasPlan = bool(json, "hasPlan");
             coreRuleEnabled = bool(json, "coreRuleEnabled"); rulesSupported = bool(json, "rulesSupported");
             List<Order> entryList = new ArrayList<>();

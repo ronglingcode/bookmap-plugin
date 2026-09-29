@@ -8,8 +8,6 @@ import com.google.gson.JsonObject;
 public final class OrderFactory {
     private OrderFactory() { }
     public static JsonObject createSingleOrder(String symbol, String type, double quantity, double price, boolean isBuy) {
-        Models.require(Models.shares(quantity), "invalid closing quantity");
-        Models.require(type.equals("MARKET") || type.equals("STOP") || type.equals("LIMIT"), "invalid closing type");
         JsonObject instrument = new JsonObject();
         instrument.addProperty("assetType", "EQUITY"); instrument.addProperty("symbol", symbol);
         JsonObject leg = new JsonObject();
@@ -21,7 +19,6 @@ public final class OrderFactory {
         order.add("orderLegCollection", legs); order.addProperty("orderType", type);
         order.addProperty("orderStrategyType", "SINGLE");
         if (!type.equals("MARKET")) {
-            Models.require(Models.positive(price), "invalid closing price");
             order.addProperty(type.equals("STOP") ? "stopPrice" : "price", price);
         }
         return order;

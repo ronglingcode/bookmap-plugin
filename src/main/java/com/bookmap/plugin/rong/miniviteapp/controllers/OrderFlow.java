@@ -1,5 +1,6 @@
 package com.bookmap.plugin.rong.miniviteapp.controllers;
 
+import com.bookmap.plugin.rong.PluginLog;
 import com.bookmap.plugin.rong.miniviteapp.algorithms.RiskManager;
 import com.bookmap.plugin.rong.miniviteapp.algorithms.TakeProfit;
 import com.bookmap.plugin.rong.miniviteapp.api.schwab.OrderFactory;
@@ -20,21 +21,20 @@ public final class OrderFlow {
         double shares = fixed > 0 ? fixed : RiskManager.calculateTotalShares(orderEntry, riskPrice, multiplier, Models.number(context, "riskDollars"));
         double cap = Models.number(context, "maxQuantity");
         if (!(fixed > 0) && cap > 0) shares = Math.min(shares, cap);
-        Models.require(Models.shares(shares) && shares <= Integer.MAX_VALUE, "invalid entry quantity");
         JsonObject walls = action.has("orderbook") ? action.getAsJsonObject("orderbook") : null;
         var targets = TakeProfit.getEntryProfitTargets(shares, orderEntry, fixed > 0 ? orderStop : riskPrice, isLong, walls, count);
         double total = 0; for (var element : targets) total += Models.number(element.getAsJsonObject(), "quantity");
         double buyingPower = Models.number(context, "availableBuyingPower");
-        Models.require(Models.positive(buyingPower), "buying power unavailable");
+        Models.require(Double.isFinite(buyingPower), "buying-power sizing input missing");
         if (buyingPower <= orderEntry * total) {
-            Models.require(buyingPower > orderEntry * total / 2, "insufficient buying power after half sizing");
             total = 0;
-            // Preserve TS half-size behavior, but reject fractional equity legs instead of dispatching them.
+            // Preserve TS half-size allocation; Schwab validates the resulting quantities.
             for (var element : targets) {
                 var target = element.getAsJsonObject(); double quantity = Models.number(target, "quantity") / 2;
-                Models.require(Models.shares(quantity), "half buying-power sizing produces fractional shares");
                 target.addProperty("quantity", quantity); total += quantity;
             }
+            if (buyingPower <= orderEntry * total)
+                PluginLog.action(state.symbol, "Native warning: estimated buying power insufficient after half sizing; broker will decide");
         }
         Plan plan = new Plan("wall_reversal_entry");
         plan.requests.add(new Request("POST", null, OrderFactory.createOneEntryWithMultipleExits(state.symbol, isLong, type, total, orderEntry, targets, orderStop)));

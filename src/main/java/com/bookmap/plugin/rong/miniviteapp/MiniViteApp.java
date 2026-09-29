@@ -24,7 +24,7 @@ public final class MiniViteApp implements AutoCloseable {
     private boolean enabled, exitsEnabled, entriesEnabled, busy, requiresReview, closed;
     private Object owner;
     private String epoch = "", account = "", token = "";
-    private long tokenGeneration, expiresAt, lastHeartbeat, mutationBarrier;
+    private long tokenGeneration, expiresAt, mutationBarrier;
     private final Map<String, Snapshot> snapshots = new HashMap<>();
     private final Set<String> legacyOperations = new HashSet<>();
     private Pending pending;
@@ -69,7 +69,7 @@ public final class MiniViteApp implements AutoCloseable {
     private void revoke() {
         if (busy || pending != null || !legacyOperations.isEmpty()) requiresReview = true;
         owner = null; token = ""; account = ""; epoch = ""; snapshots.clear(); legacyOperations.clear();
-        expiresAt = 0; tokenGeneration = 0; lastHeartbeat = 0;
+        expiresAt = 0; tokenGeneration = 0;
     }
     public synchronized void disconnected(Object connection) { if (owner == connection) revoke(); }
     public synchronized boolean resetAfterBrokerReview() {
@@ -88,7 +88,7 @@ public final class MiniViteApp implements AutoCloseable {
                 Models.require(Models.bool(json, "live") && Models.string(json, "broker").equals("Schwab"), "live Schwab required");
                 Models.require(owner != null || (!busy && pending == null), "broker review required before reconnect");
                 if (owner == null) { owner = connection; epoch = UUID.randomUUID().toString(); }
-                lastHeartbeat = System.currentTimeMillis(); sender.accept(connection, message("execution_session"));
+                sender.accept(connection, message("execution_session"));
                 return true;
             }
             Models.require(owner != null && owner == connection && epoch.equals(Models.string(json, "epoch")), "not the execution owner");
@@ -97,13 +97,10 @@ public final class MiniViteApp implements AutoCloseable {
                 long generation = (long) Models.number(json, "generation");
                 if (generation <= tokenGeneration) return true;
                 String nextAccount = Models.string(json, "accountHash");
-                Models.require(nextAccount.matches("[A-Za-z0-9]+"), "invalid execution account");
                 if (!account.isEmpty() && !account.equals(nextAccount)) { revoke(); return true; }
                 account = nextAccount; token = Models.string(json, "accessToken");
                 expiresAt = (long) Models.number(json, "expiresAt"); tokenGeneration = generation;
-                Models.require(!token.isEmpty() && expiresAt > System.currentTimeMillis(), "expired execution token");
             } else if (type.equals("execution_state")) {
-                lastHeartbeat = System.currentTimeMillis();
                 Models.require(Models.string(json, "accountHash").equals(account), "execution state account mismatch");
                 for (var element : json.getAsJsonArray("symbols")) {
                     Snapshot state = new Snapshot(element.getAsJsonObject());
@@ -156,12 +153,10 @@ public final class MiniViteApp implements AutoCloseable {
             long now = System.currentTimeMillis();
             Models.require(enabled && owner != null && !closed, "native execution is not connected");
             Models.require(!busy && pending == null && !requiresReview && legacyOperations.isEmpty(), "execution awaiting reconciliation or broker review");
-            Models.require(now - lastHeartbeat <= ExecutionConfig.MAX_STATE_AGE_MS, "execution session is stale");
-            Models.require(expiresAt - now > ExecutionConfig.TOKEN_MARGIN_MS && !token.isEmpty(), "execution token expired or missing");
             Snapshot state = snapshots.get(symbol);
             Models.require(state != null && now - state.observedAt <= ExecutionConfig.MAX_STATE_AGE_MS
                     && state.observedAt > mutationBarrier && state.observedAt <= now + 1000, "broker state is stale");
-            if (!key.equals("KeyC")) Models.require(now - state.quoteObservedAt <= ExecutionConfig.MAX_QUOTE_AGE_MS
+            if (!key.equals("KeyC") && !key.equals("KeyF")) Models.require(now - state.quoteObservedAt <= ExecutionConfig.MAX_QUOTE_AGE_MS
                     && state.quoteObservedAt > 0 && state.quoteObservedAt <= now + 1000, "market quote is stale");
             if (entry) {
                 Models.require(entriesEnabled && state.entryContext != null &&
@@ -183,14 +178,16 @@ public final class MiniViteApp implements AutoCloseable {
             for (var request : plan.requests) Models.require(request.orderId.isEmpty() || unique.add(request.orderId), "duplicate order in execution plan");
             String actionId = UUID.randomUUID().toString();
             busy = true; pending = new Pending(symbol, plan.requests, actionId, entry);
-            Object capturedOwner = owner; String capturedEpoch = epoch, capturedAccount = account, capturedToken = token;
+            Object capturedOwner = owner; String capturedEpoch = epoch, capturedAccount = account;
+            if (token.isEmpty() || expiresAt <= now)
+                PluginLog.action(symbol, "Native warning: access token missing or expired; broker will decide");
             JsonObject started = message("execution_started"); started.addProperty("actionId", actionId);
             started.addProperty("symbol", symbol); started.addProperty("action", plan.action);
             started.addProperty("buttonName", Models.string(action, "button_name"));
             if (entry) started.addProperty("entryIsLong", Models.bool(plan.entry, "isLong"));
             started.addProperty("clearPending", plan.clearPending); started.addProperty("revision", state.revision);
             sender.accept(owner, started);
-            executor.execute(() -> execute(capturedOwner, capturedEpoch, capturedAccount, capturedToken, actionId, state, plan));
+            executor.execute(() -> execute(capturedOwner, capturedEpoch, capturedAccount, actionId, state, plan));
         } catch (IllegalArgumentException error) {
             PluginLog.action(symbol, "Native blocked: " + error.getMessage());
         } catch (RuntimeException error) {
@@ -198,19 +195,18 @@ public final class MiniViteApp implements AutoCloseable {
         }
         return true; // Migrated failures are never broadcast as executable legacy actions.
     }
-    private synchronized void guard(Object connection, String capturedEpoch, String capturedToken, String symbol, Plan plan) {
+    private synchronized String guard(Object connection, String capturedEpoch, Plan plan) {
         Models.require(enabled && owner == connection && epoch.equals(capturedEpoch) && !closed
-                && (plan.entry != null ? entriesEnabled : plan.action.equals("cancel_pending_entries") || exitsEnabled)
-                && token.equals(capturedToken)
-                && expiresAt - System.currentTimeMillis() > ExecutionConfig.TOKEN_MARGIN_MS,
+                && (plan.entry != null ? entriesEnabled : plan.action.equals("cancel_pending_entries") || exitsEnabled),
                 "execution session revoked before dispatch");
+        return token;
     }
-    private void execute(Object connection, String capturedEpoch, String accountHash, String accessToken,
+    private void execute(Object connection, String capturedEpoch, String accountHash,
             String actionId, Snapshot state, Plan plan) {
         JsonArray results = new JsonArray(); boolean dispatched = false, unknown = false;
         String outcome = "accepted", reason = "";
         try {
-            guard(connection, capturedEpoch, accessToken, state.symbol, plan);
+            String accessToken = guard(connection, capturedEpoch, plan);
             if (plan.entry == null && !plan.action.equals("cancel_pending_entries")) {
                 Models.require(api.getPosition(accountHash, accessToken, state.symbol) == state.netQuantity,
                         "position changed; refresh and retry");
@@ -220,16 +216,16 @@ public final class MiniViteApp implements AutoCloseable {
                             pair.limit != null && pair.limit.id.equals(request.orderId)
                             || pair.stop != null && pair.stop.id.equals(request.orderId));
                     if (!selected) continue;
-                    if (pair.limit != null) api.validateOrder(accountHash, accessToken, pair.limit, true);
-                    if (pair.stop != null) api.validateOrder(accountHash, accessToken, pair.stop, true);
+                    if (pair.limit != null) api.validateOrder(accountHash, accessToken, pair.limit);
+                    if (pair.stop != null) api.validateOrder(accountHash, accessToken, pair.stop);
                 }
             }
             for (var request : plan.requests) {
-                guard(connection, capturedEpoch, accessToken, state.symbol, plan);
-                if (request.original != null) api.validateOrder(accountHash, accessToken, request.original,
-                        !request.method.equals("DELETE"));
+                accessToken = guard(connection, capturedEpoch, plan);
+                if (request.original != null && !request.method.equals("DELETE"))
+                    api.validateOrder(accountHash, accessToken, request.original);
                 if (plan.entry != null) {
-                    api.validateFlatEntry(accountHash, accessToken, state.symbol, request.body, Models.number(plan.entry, "entryPrice"));
+                    api.validateFlatEntry(accountHash, accessToken, state.symbol);
                     Models.require(System.currentTimeMillis() - state.observedAt <= ExecutionConfig.MAX_STATE_AGE_MS
                         && System.currentTimeMillis() - state.quoteObservedAt <= ExecutionConfig.MAX_QUOTE_AGE_MS,
                         "entry inputs expired during broker preflight");
@@ -239,11 +235,14 @@ public final class MiniViteApp implements AutoCloseable {
                     Models.require(Math.signum(liveQuantity) == Math.signum(state.netQuantity) && Math.abs(liveQuantity) >= quantity,
                             "position changed during execution; reconcile first");
                 }
-                guard(connection, capturedEpoch, accessToken, state.symbol, plan);
+                accessToken = guard(connection, capturedEpoch, plan);
                 dispatched = true;
                 Api.Result result = api.mutate(accountHash, accessToken, request);
                 results.add(result.toJson());
-                if (!result.outcome.equals("accepted")) { outcome = result.outcome; unknown = outcome.equals("unknown"); break; }
+                if (!result.outcome.equals("accepted")) {
+                    outcome = result.outcome; unknown = outcome.equals("unknown");
+                    reason = "broker HTTP " + result.status; break;
+                }
             }
         } catch (IllegalArgumentException error) {
             outcome = dispatched ? "partial" : "rejected"; reason = error.getMessage();
