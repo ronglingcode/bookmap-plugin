@@ -39,6 +39,9 @@ class NativeExecutionTest {
         JsonObject state = fixture("cancel all entries below threshold");
         volatile int mutationStatus = 204;
         volatile boolean orderFilled;
+        volatile boolean omitLocation, pendingSymbolOrder;
+        volatile String pendingStatus = "QUEUED";
+        volatile double brokerQuantity = Double.NaN, buyingPower = 1_000_000;
         final CountDownLatch mutationEntered = new CountDownLatch(1);
         volatile CountDownLatch allowMutation;
         String epoch;
@@ -52,10 +55,17 @@ class NativeExecutionTest {
                     if (method.equals("GET")) {
                         JsonObject response;
                         if (path.equals("/accounts/hash")) {
-                            double quantity = state.get("netQuantity").getAsDouble();
+                            double quantity = Double.isFinite(brokerQuantity) ? brokerQuantity : state.get("netQuantity").getAsDouble();
                             response = json("{\"securitiesAccount\":{\"positions\":[{\"instrument\":{\"symbol\":\"AAPL\"},\"longQuantity\":0,\"shortQuantity\":0}]}}");
                             var position = response.getAsJsonObject("securitiesAccount").getAsJsonArray("positions").get(0).getAsJsonObject();
                             position.addProperty("longQuantity", Math.max(0, quantity)); position.addProperty("shortQuantity", Math.max(0, -quantity));
+                            var balances = new JsonObject(); balances.addProperty("buyingPower", buyingPower);
+                            response.getAsJsonObject("securitiesAccount").add("currentBalances", balances);
+                        } else if (path.equals("/accounts/hash/orders")) {
+                            String body = pendingSymbolOrder ? "[{\"status\":\"" + pendingStatus + "\",\"orderLegCollection\":[{\"instrument\":{\"symbol\":\"AAPL\"}}]}]" : "[]";
+                            byte[] bytes = body.getBytes(StandardCharsets.UTF_8);
+                            exchange.sendResponseHeaders(200, bytes.length); exchange.getResponseBody().write(bytes);
+                            return;
                         } else {
                             String id = path.substring(path.lastIndexOf('/') + 1);
                             JsonObject expected = findOrder(id);
@@ -77,7 +87,7 @@ class NativeExecutionTest {
                         mutations.incrementAndGet(); mutationEntered.countDown();
                         if (allowMutation != null) allowMutation.await(3, TimeUnit.SECONDS);
                         if (!method.equals("DELETE")) bodies.add(json(new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8)));
-                        if (!method.equals("DELETE")) exchange.getResponseHeaders().add("Location", "/accounts/hash/orders/999");
+                        if (!method.equals("DELETE") && !omitLocation) exchange.getResponseHeaders().add("Location", "/accounts/hash/orders/999");
                         exchange.sendResponseHeaders(mutationStatus, -1); // Success with no JSON body.
                     }
                 } catch (Exception error) { throw new RuntimeException(error); }
@@ -97,10 +107,18 @@ class NativeExecutionTest {
         }
         void connect() {
             engine.setEnabled(true, true); engine.setLive("AAPL", true);
-            engine.receive(owner, ORIGIN, json("{\"type\":\"execution_hello\",\"version\":1,\"live\":true,\"broker\":\"Schwab\",\"pairingKey\":\"" + KEY + "\"}"));
+            engine.receive(owner, ORIGIN, json("{\"type\":\"execution_hello\",\"version\":2,\"live\":true,\"broker\":\"Schwab\",\"pairingKey\":\"" + KEY + "\"}"));
             epoch = events.get(events.size()-1).get("epoch").getAsString();
             token(1, System.currentTimeMillis() + 120_000);
             updateState(System.currentTimeMillis()-1);
+        }
+        JsonObject connectEntry() {
+            var stream = NativeExecutionTest.class.getResourceAsStream("/direct-entry-fixtures.json");
+            var fixture = JsonParser.parseReader(new java.io.InputStreamReader(stream, StandardCharsets.UTF_8)).getAsJsonArray().get(0).getAsJsonObject();
+            state = fixture.getAsJsonObject("state").deepCopy();
+            state.getAsJsonObject("entryContext").addProperty("observedAt", System.currentTimeMillis());
+            connect(); engine.setEnabled(true, true, true);
+            return fixture.getAsJsonObject("action").deepCopy();
         }
         JsonObject message(String type) {
             var json = new JsonObject(); json.addProperty("type", type); json.addProperty("epoch", epoch); return json;
@@ -130,11 +148,85 @@ class NativeExecutionTest {
         var config = new IndicatorConfig();
         assertFalse(config.isEnabled(IndicatorConfig.EXPERIMENTAL_DIRECT_BROKER_EXECUTION));
         assertFalse(config.isEnabled(IndicatorConfig.EXPERIMENTAL_DIRECT_EXIT_EXECUTION));
+        assertFalse(config.isEnabled(IndicatorConfig.EXPERIMENTAL_DIRECT_ENTRY_EXECUTION));
         try (var rig = new Rig()) {
             assertFalse(rig.engine.route(action("KeyC"))); rig.connect();
             for (var key : new String[]{"KeyB", "KeyS", "KeyA", "KeyW"}) assertFalse(rig.engine.route(action(key)));
             rig.engine.setEnabled(true, false); assertFalse(rig.engine.route(action("KeyM")));
             assertEquals(0, rig.mutations.get());
+        }
+    }
+    @Test void initialEntryPostsOneProtectedBracketAndWaitsForNewOrderObservation() throws Exception {
+        try (var rig = new Rig()) {
+            var entry = rig.connectEntry(); rig.engine.setEnabled(true, true, false);
+            assertFalse(rig.engine.route(entry)); assertEquals(0, rig.mutations.get());
+            rig.engine.setEnabled(true, true, true);
+            assertTrue(rig.engine.route(entry));
+            var result = rig.finish(); assertEquals("accepted", result.get("outcome").getAsString());
+            assertEquals("wall_reversal_entry", result.get("action").getAsString());
+            assertEquals(1, rig.mutations.get());
+            assertEquals("TRIGGER", rig.bodies.get(0).get("orderStrategyType").getAsString());
+            assertEquals(10, rig.bodies.get(0).getAsJsonArray("childOrderStrategies").size());
+            assertEquals("RangeBoundBidReversal", result.getAsJsonObject("entry").getAsJsonObject("submitEntryResult").get("tradeBookID").getAsString());
+            rig.updateState(System.currentTimeMillis()+1);
+            assertTrue(rig.engine.status().get("blocked").getAsBoolean());
+            assertTrue(rig.engine.route(entry)); assertEquals(1, rig.mutations.get());
+            rig.state.add("observedOrderIds", JsonParser.parseString("[\"999\"]"));
+            rig.state.getAsJsonArray("entries").add(json("{\"orderID\":\"999\",\"orderType\":\"STOP\",\"quantity\":1960,\"price\":10.01,\"isBuy\":true}"));
+            rig.updateState(System.currentTimeMillis()+2);
+            assertTrue(rig.engine.status().get("blocked").getAsBoolean()); // Trade state must also be registered in ViteApp.
+            var acknowledgement = rig.message("execution_entry_state");
+            acknowledgement.add("actionId", result.get("actionId")); acknowledgement.addProperty("initialized", true);
+            rig.engine.receive(rig.owner, ORIGIN, acknowledgement);
+            rig.updateState(System.currentTimeMillis()+3);
+            assertFalse(rig.engine.status().get("blocked").getAsBoolean());
+            assertTrue(rig.engine.route(entry)); assertEquals(1, rig.mutations.get()); // Pending entry cannot become a second entry.
+        }
+    }
+    @Test void initialEntryPreflightBlocksPositionOrdersAndBuyingPowerChanges() throws Exception {
+        for (int scenario = 0; scenario < 4; scenario++) try (var rig = new Rig()) {
+            var entry = rig.connectEntry();
+            if (scenario == 0) rig.brokerQuantity = 1;
+            if (scenario == 1) rig.pendingSymbolOrder = true;
+            if (scenario == 2) rig.buyingPower = 1;
+            if (scenario == 3) { rig.pendingSymbolOrder = true; rig.pendingStatus = "NEW_BROKER_STATE"; }
+            assertTrue(rig.engine.route(entry)); assertEquals("rejected", rig.finish().get("outcome").getAsString());
+            assertEquals(0, rig.mutations.get());
+        }
+    }
+    @Test void missingEntryLocationRequiresReviewWithoutResubmission() throws Exception {
+        try (var rig = new Rig()) {
+            var entry = rig.connectEntry(); rig.omitLocation = true;
+            rig.engine.route(entry); var result = rig.finish();
+            assertEquals("unknown", result.get("outcome").getAsString());
+            assertTrue(result.get("requiresReview").getAsBoolean()); assertFalse(result.has("entry"));
+            rig.engine.setEnabled(false, false, false); assertTrue(rig.engine.route(entry));
+            assertEquals(1, rig.mutations.get());
+        }
+    }
+    @Test void entryStateFailureAndStaleEntryContextBlockFurtherExecution() throws Exception {
+        try (var rig = new Rig()) {
+            var entry = rig.connectEntry();
+            rig.state.getAsJsonObject("entryContext").addProperty("observedAt", System.currentTimeMillis()-15_000);
+            rig.updateState(System.currentTimeMillis()-1); assertTrue(rig.engine.route(entry));
+            assertEquals(0, rig.mutations.get());
+            rig.state.getAsJsonObject("entryContext").addProperty("observedAt", System.currentTimeMillis());
+            rig.updateState(System.currentTimeMillis()-1); rig.engine.route(entry); var result = rig.finish();
+            var acknowledgement = rig.message("execution_entry_state"); acknowledgement.add("actionId", result.get("actionId"));
+            acknowledgement.addProperty("initialized", false); rig.engine.receive(rig.owner, ORIGIN, acknowledgement);
+            assertTrue(rig.engine.status().get("requiresReview").getAsBoolean());
+            assertTrue(rig.engine.route(entry)); assertEquals(1, rig.mutations.get());
+        }
+    }
+    @Test void liveProviderIsRecheckedAtActionTimeWithoutWaitingForAnotherTimestamp() throws Exception {
+        try (var rig = new Rig()) {
+            var entry = rig.connectEntry();
+            var live = new java.util.concurrent.atomic.AtomicBoolean(true);
+            rig.engine.setLiveVerifier("AAPL", live::get);
+            live.set(false); // Replay/paused provider can change without another quote callback.
+            assertTrue(rig.engine.route(entry)); assertEquals(0, rig.mutations.get());
+            live.set(true); rig.engine.route(entry);
+            assertEquals("accepted", rig.finish().get("outcome").getAsString());
         }
     }
     @Test void directCancelHandlesEmptySuccessAndDoesNotRepeatWhileAwaitingReconciliation() throws Exception {
@@ -198,7 +290,7 @@ class NativeExecutionTest {
     @Test void unpairedConnectionsCannotUpdateCredentialsAndSecondTabCannotOwnSession() throws Exception {
         try (var rig = new Rig()) {
             rig.engine.setEnabled(true, true);
-            var hello = json("{\"type\":\"execution_hello\",\"version\":1,\"live\":true,\"broker\":\"Schwab\",\"pairingKey\":\""+KEY+"\"}");
+            var hello = json("{\"type\":\"execution_hello\",\"version\":2,\"live\":true,\"broker\":\"Schwab\",\"pairingKey\":\""+KEY+"\"}");
             rig.engine.receive(rig.owner, "https://untrusted.example", hello);
             assertEquals("execution_rejected", rig.events.get(0).get("type").getAsString());
             rig.connect(); Object secondTab = new Object(); rig.engine.receive(secondTab, ORIGIN, hello);

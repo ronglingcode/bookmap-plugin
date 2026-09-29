@@ -24,6 +24,7 @@ public class IndicatorConfig {
     public static final String VWAP = "vwap";
     public static final String EXPERIMENTAL_DIRECT_BROKER_EXECUTION = "experimentalDirectBrokerExecution";
     public static final String EXPERIMENTAL_DIRECT_EXIT_EXECUTION = "experimentalDirectExitExecution";
+    public static final String EXPERIMENTAL_DIRECT_ENTRY_EXECUTION = "experimentalDirectEntryExecution";
 
     private final Map<String, Boolean> enabled = new ConcurrentHashMap<>();
 
@@ -48,6 +49,7 @@ public class IndicatorConfig {
         enabled.put(VWAP, true);
         enabled.put(EXPERIMENTAL_DIRECT_BROKER_EXECUTION, false);
         enabled.put(EXPERIMENTAL_DIRECT_EXIT_EXECUTION, false);
+        enabled.put(EXPERIMENTAL_DIRECT_ENTRY_EXECUTION, false);
     }
 
     public boolean isEnabled(String indicatorKey) {

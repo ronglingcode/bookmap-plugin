@@ -5,6 +5,8 @@ import com.google.gson.JsonObject;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.HashSet;
+import java.util.Set;
 
 /** Explicit wire parsing survives release obfuscation; never deserialize fields reflectively. */
 public final class Models {
@@ -65,6 +67,8 @@ public final class Models {
         public final boolean splitPartials, hasPlan, coreRuleEnabled, rulesSupported;
         public final List<Order> entries;
         public final List<ExitPair> pairs;
+        public final JsonObject entryContext;
+        public final Set<String> observedOrderIds = new HashSet<>();
         public Snapshot(JsonObject json) {
             symbol = string(json, "symbol");
             require(symbol.matches("[A-Z][A-Z0-9.\\-]{0,15}"), "invalid equity symbol");
@@ -86,6 +90,8 @@ public final class Models {
             List<ExitPair> pairList = new ArrayList<>();
             for (var pair : json.getAsJsonArray("pairs")) pairList.add(new ExitPair(pair.getAsJsonObject(), symbol));
             pairs = Collections.unmodifiableList(pairList);
+            entryContext = json.has("entryContext") && !json.get("entryContext").isJsonNull() ? json.getAsJsonObject("entryContext").deepCopy() : null;
+            if (json.has("observedOrderIds")) for (var id : json.getAsJsonArray("observedOrderIds")) observedOrderIds.add(id.getAsString());
         }
     }
     public static final class Request {
@@ -107,6 +113,7 @@ public final class Models {
         public final String action;
         public final List<Request> requests = new ArrayList<>();
         public boolean clearPending;
+        public JsonObject entry;
         public Plan(String action) { this.action = action; }
         public JsonArray toJson() {
             JsonArray result = new JsonArray();

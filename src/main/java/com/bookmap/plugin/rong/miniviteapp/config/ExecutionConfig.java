@@ -4,7 +4,7 @@ import java.util.Set;
 
 /** Native coverage is deliberately limited to cancel and closing actions. */
 public final class ExecutionConfig {
-    public static final int PROTOCOL_VERSION = 1;
+    public static final int PROTOCOL_VERSION = 2;
     public static final long MAX_STATE_AGE_MS = 10_000;
     public static final long MAX_QUOTE_AGE_MS = 10_000;
     public static final long TOKEN_MARGIN_MS = 30_000;

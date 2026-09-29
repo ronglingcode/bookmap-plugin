@@ -203,6 +203,28 @@ class ReleaseJarTest {
         assertEquals(expected, requests);
     }
 
+    @Test
+    void nativeBracketedEntryPlansSurviveObfuscation() throws Exception {
+        Class<?> parser = Class.forName("com.bookmap.plugin.shaded.gson.JsonParser");
+        Class<?> jsonObject = Class.forName("com.bookmap.plugin.shaded.gson.JsonObject");
+        Object array = parser.getMethod("parseString", String.class).invoke(null,
+                Files.readString(Path.of(System.getProperty("entry.fixtures"))));
+        Object fixtures = array.getClass().getMethod("getAsJsonArray").invoke(array);
+        Object fixture = fixtures.getClass().getMethod("get", int.class).invoke(fixtures, 0);
+        Object json = fixture.getClass().getMethod("getAsJsonObject").invoke(fixture);
+        Object stateJson = jsonObject.getMethod("getAsJsonObject", String.class).invoke(json, "state");
+        Object actionJson = jsonObject.getMethod("getAsJsonObject", String.class).invoke(json, "action");
+        String stateName = "com.bookmap.plugin.rong.miniviteapp.models.Models$Snapshot";
+        Object state = mappedClass(stateName).getConstructor(jsonObject).newInstance(stateJson);
+        String handlerName = "com.bookmap.plugin.rong.miniviteapp.controllers.EntryHandler";
+        String planName = "com.bookmap.plugin.rong.miniviteapp.models.Models$Plan";
+        Object plan = mappedMethod(handlerName, planName + " handleEntry(" + stateName
+                + ",com.bookmap.plugin.shaded.gson.JsonObject,java.lang.String)", mappedClass(stateName), jsonObject, String.class)
+                .invoke(null, state, actionJson, "");
+        Object requests = mappedMethod(planName, "com.bookmap.plugin.shaded.gson.JsonArray toJson()").invoke(plan);
+        assertEquals(jsonObject.getMethod("getAsJsonArray", String.class).invoke(json, "requests"), requests);
+    }
+
     private static boolean isImplementation(String name) {
         return name.endsWith(".class") && (name.startsWith("bmtrader/internal/")
                 || name.startsWith("com/bookmap/plugin/rong/"));

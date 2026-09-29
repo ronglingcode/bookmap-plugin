@@ -154,6 +154,12 @@ public class IndicatorSettingsPanel extends StrategyPanel {
                 IndicatorConfig.EXPERIMENTAL_DIRECT_EXIT_EXECUTION, nativeExits.isSelected()));
         add(nativeExits, gbc);
         gbc.gridy++;
+        JCheckBox nativeEntries = new JCheckBox("Experimental: Direct Initial Wall-Reversal Entries (requires Direct Broker Cancel)",
+                config.isEnabled(IndicatorConfig.EXPERIMENTAL_DIRECT_ENTRY_EXECUTION));
+        nativeEntries.addActionListener(e -> config.setEnabled(
+                IndicatorConfig.EXPERIMENTAL_DIRECT_ENTRY_EXECUTION, nativeEntries.isSelected()));
+        add(nativeEntries, gbc);
+        gbc.gridy++;
         javax.swing.JButton resetNative = new javax.swing.JButton("Reset Native Execution After Broker Review");
         resetNative.setToolTipText("Use only after checking unresolved orders at the broker. Does not resend orders.");
         resetNative.addActionListener(e -> RongPlugin.resetNativeExecutionAfterBrokerReview());

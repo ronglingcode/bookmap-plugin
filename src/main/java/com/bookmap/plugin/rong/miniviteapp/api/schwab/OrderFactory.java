@@ -4,7 +4,7 @@ import com.bookmap.plugin.rong.miniviteapp.models.Models;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
 
-/** Closing-only mirror of api/schwab/orderFactory.ts#createSingleOrder. */
+/** Equity mirror of api/schwab/orderFactory.ts. */
 public final class OrderFactory {
     private OrderFactory() { }
     public static JsonObject createSingleOrder(String symbol, String type, double quantity, double price, boolean isBuy) {
@@ -25,5 +25,21 @@ public final class OrderFactory {
             order.addProperty(type.equals("STOP") ? "stopPrice" : "price", price);
         }
         return order;
+    }
+    public static JsonObject createOneEntryWithMultipleExits(String symbol, boolean isLong, String type,
+            double quantity, double price, JsonArray targets, double stop) {
+        JsonObject entry = createSingleOrder(symbol, type, quantity, price, !isLong);
+        entry.getAsJsonArray("orderLegCollection").get(0).getAsJsonObject().addProperty("instruction", isLong ? "BUY" : "SELL_SHORT");
+        entry.addProperty("orderStrategyType", "TRIGGER"); JsonArray children = new JsonArray();
+        for (var element : targets) {
+            var target = element.getAsJsonObject(); double shares = Models.number(target, "quantity");
+            JsonObject oco = new JsonObject(); oco.addProperty("orderStrategyType", "OCO");
+            JsonArray legs = new JsonArray();
+            legs.add(createSingleOrder(symbol, "STOP", shares, stop, !isLong));
+            legs.add(createSingleOrder(symbol, "LIMIT", shares, Models.number(target, "target"), !isLong));
+            oco.add("childOrderStrategies", legs); children.add(oco);
+        }
+        Models.require(!children.isEmpty(), "entry requires protective brackets");
+        entry.add("childOrderStrategies", children); return entry;
     }
 }

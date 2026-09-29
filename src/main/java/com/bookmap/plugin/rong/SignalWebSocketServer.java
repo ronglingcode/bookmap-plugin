@@ -36,12 +36,15 @@ public class SignalWebSocketServer extends WebSocketServer {
         if (!miniViteApp.route(action)) broadcast(action.toString());
     }
 
-    public void setExperimentalDirectExecution(boolean enabled, boolean exitsEnabled) {
-        miniViteApp.setEnabled(enabled, exitsEnabled);
+    public void setExperimentalDirectExecution(boolean enabled, boolean exitsEnabled, boolean entriesEnabled) {
+        miniViteApp.setEnabled(enabled, exitsEnabled, entriesEnabled);
         broadcast(miniViteApp.status().toString());
     }
 
     public void updateNativeLiveStatus(String symbol, boolean live) { miniViteApp.setLive(symbol, live); }
+    public void registerNativeLiveVerifier(String symbol, java.util.function.BooleanSupplier verifier) {
+        miniViteApp.setLiveVerifier(symbol, verifier);
+    }
 
     public void resetNativeExecutionAfterBrokerReview() {
         if (miniViteApp.resetAfterBrokerReview()) broadcast(miniViteApp.status().toString());

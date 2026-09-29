@@ -93,6 +93,38 @@ public final class Api {
             Models.require(Math.abs(price - expected.price) < 1e-8, "broker price changed; reconcile first");
         }
     }
+    public void validateFlatEntry(String account, String token, String symbol, JsonObject entry, double estimatedEntryPrice) throws Exception {
+        JsonObject data = read(account, token, "?fields=positions").getAsJsonObject("securitiesAccount");
+        if (data.has("positions")) for (var element : data.getAsJsonArray("positions")) {
+            JsonObject position = element.getAsJsonObject();
+            if (symbol.equals(Models.string(position.getAsJsonObject("instrument"), "symbol"))) {
+                Models.require(Models.number(position, "longQuantity") == 0 && Models.number(position, "shortQuantity") == 0,
+                        "initial entry position changed");
+            }
+        }
+        var balances = data.getAsJsonObject("currentBalances");
+        double buyingPower = Models.number(balances, "buyingPower");
+        double dayPower = Models.number(balances, "dayTradingBuyingPower");
+        if (Double.isFinite(dayPower) && dayPower >= 0) buyingPower = Math.min(buyingPower, dayPower);
+        double quantity = Models.number(entry.getAsJsonArray("orderLegCollection").get(0).getAsJsonObject(), "quantity");
+        double estimate = entry.has("price") ? Models.number(entry, "price") : entry.has("stopPrice") ? Models.number(entry, "stopPrice") : estimatedEntryPrice;
+        Models.require(Models.positive(buyingPower) && buyingPower > quantity * estimate, "broker buying power blocks entry");
+        var now = java.time.Instant.now().truncatedTo(java.time.temporal.ChronoUnit.MILLIS);
+        HttpResponse<String> response = send(account, token, "/orders?maxResults=3000&fromEnteredTime=" +
+                now.minusSeconds(59L * 86400) + "&toEnteredTime=" + now, "GET", null);
+        Models.require(response.statusCode() == 200, "entry orders preflight failed");
+        var list = JsonParser.parseString(response.body()).getAsJsonArray();
+        Models.require(list.size() < 3000, "entry order read may be truncated; reconcile first");
+        for (var element : list) requireNoSymbolOrders(element.getAsJsonObject(), symbol);
+    }
+    private void requireNoSymbolOrders(JsonObject order, String symbol) {
+        String status = Models.string(order, "status");
+        boolean working = !(status.equals("FILLED") || status.equals("CANCELED") || status.equals("REJECTED")
+            || status.equals("EXPIRED") || status.equals("REPLACED"));
+        if (working && order.has("orderLegCollection")) for (var leg : order.getAsJsonArray("orderLegCollection"))
+            Models.require(!symbol.equals(Models.string(leg.getAsJsonObject().getAsJsonObject("instrument"), "symbol")), "broker has pending symbol orders");
+        if (order.has("childOrderStrategies")) for (var child : order.getAsJsonArray("childOrderStrategies")) requireNoSymbolOrders(child.getAsJsonObject(), symbol);
+    }
     public Result mutate(String account, String token, Request request) throws Exception {
         return new Result(request, send(account, token, "/orders" +
                 (request.orderId.isEmpty() ? "" : "/" + request.orderId), request.method, request.body));

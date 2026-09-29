@@ -107,7 +107,7 @@ public class RongPlugin implements CustomModuleAdapter,
     private volatile boolean patternAutomationEnabled;
     private volatile boolean patternSnapshotComplete;
     private boolean wallLabelsDirty;
-    private boolean nativeRealtime;
+    private volatile boolean nativeRealtime;
     private long lastWallLabelRefreshMs;
     private long lastTimestampNs;
     private TradeButtonWindow tradeButtonWindow;
@@ -212,6 +212,8 @@ public class RongPlugin implements CustomModuleAdapter,
                 IndicatorConfig.BOOKMAP_PATTERN_SIGNALS);
         indicatorConfig.addChangeListener(this);
         sharedServer.registerSymbol(cleanAlias, orderBook, info.pips);
+        sharedServer.registerNativeLiveVerifier(cleanAlias, () -> nativeRealtime
+                && com.bookmap.plugin.rong.miniviteapp.bookmap.LiveMode.isVerifiedLive(api.getProvider()));
         sharedServer.registerVwapUpdateListener(cleanAlias, vwapUpdateListener);
         chartHoverHotkeyHandler.registerSymbol(cleanAlias, info.pips);
         priceZonePainter.registerInstrument(cleanAlias);
@@ -613,10 +615,12 @@ public class RongPlugin implements CustomModuleAdapter,
     @Override
     public void onIndicatorConfigChanged(String indicatorKey, boolean enabled) {
         if (IndicatorConfig.EXPERIMENTAL_DIRECT_BROKER_EXECUTION.equals(indicatorKey)
-                || IndicatorConfig.EXPERIMENTAL_DIRECT_EXIT_EXECUTION.equals(indicatorKey)) {
+                || IndicatorConfig.EXPERIMENTAL_DIRECT_EXIT_EXECUTION.equals(indicatorKey)
+                || IndicatorConfig.EXPERIMENTAL_DIRECT_ENTRY_EXECUTION.equals(indicatorKey)) {
             if (sharedServer != null) sharedServer.setExperimentalDirectExecution(
                     indicatorConfig.isEnabled(IndicatorConfig.EXPERIMENTAL_DIRECT_BROKER_EXECUTION),
-                    indicatorConfig.isEnabled(IndicatorConfig.EXPERIMENTAL_DIRECT_EXIT_EXECUTION));
+                    indicatorConfig.isEnabled(IndicatorConfig.EXPERIMENTAL_DIRECT_EXIT_EXECUTION),
+                    indicatorConfig.isEnabled(IndicatorConfig.EXPERIMENTAL_DIRECT_ENTRY_EXECUTION));
             updateNativeLiveStatus();
             return;
         }

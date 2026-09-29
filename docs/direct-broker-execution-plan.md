@@ -1,7 +1,8 @@
 # Experimental direct broker execution
 
-Status: foundation, cancel, and exit execution implemented behind default-off
-flags. Entry workflows are the next migration stage. See
+Status: foundation, cancel, exits, and initial wall-reversal entries implemented
+behind default-off flags. Adds, pending-entry replacement, and reversals are
+the next migration stages. See
 [setup and supported actions](direct-broker-execution.md).
 
 ## Objective and initial scope
