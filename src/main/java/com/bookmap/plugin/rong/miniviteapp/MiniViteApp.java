@@ -14,6 +14,7 @@ import java.util.*;
 import java.util.concurrent.*;
 import java.util.function.BiConsumer;
 import java.util.function.BooleanSupplier;
+import java.util.function.Supplier;
 
 /** Session-wide executor. All session/state transitions use this monitor; I/O runs outside it. */
 public final class MiniViteApp implements AutoCloseable {
@@ -28,7 +29,7 @@ public final class MiniViteApp implements AutoCloseable {
     private long tokenGeneration, expiresAt, lastHeartbeat, mutationBarrier;
     private final Map<String, Snapshot> snapshots = new HashMap<>();
     private final Map<String, Boolean> liveSymbols = new HashMap<>();
-    private final Map<String, BooleanSupplier> liveVerifiers = new HashMap<>();
+    private final Map<String, Supplier<String>> liveVerifiers = new HashMap<>();
     private final Set<String> legacyOperations = new HashSet<>();
     private Pending pending;
     private static final class Pending {
@@ -67,11 +68,19 @@ public final class MiniViteApp implements AutoCloseable {
         if (!enabled) revoke();
     }
     public synchronized void setLive(String symbol, boolean live) { liveSymbols.put(SymbolUtils.cleanSymbol(symbol), live); }
-    public synchronized void setLiveVerifier(String symbol, BooleanSupplier verifier) { liveVerifiers.put(SymbolUtils.cleanSymbol(symbol), verifier); }
-    private boolean verifiedLive(String symbol) {
-        BooleanSupplier verifier = liveVerifiers.get(symbol);
-        if (verifier == null) return liveSymbols.getOrDefault(symbol, false);
-        try { return verifier.getAsBoolean(); } catch (RuntimeException error) { return false; }
+    public synchronized void setLiveVerifier(String symbol, BooleanSupplier verifier) {
+        setLiveBlockReasonProvider(symbol, () -> verifier.getAsBoolean() ? "" : "Bookmap live data has not been verified");
+    }
+    public synchronized void setLiveBlockReasonProvider(String symbol, Supplier<String> verifier) {
+        liveVerifiers.put(SymbolUtils.cleanSymbol(symbol), verifier);
+    }
+    private String liveBlockReason(String symbol) {
+        Supplier<String> verifier = liveVerifiers.get(symbol);
+        if (verifier == null) return liveSymbols.getOrDefault(symbol, false) ? "" : "Bookmap live data has not been verified";
+        try {
+            String reason = verifier.get();
+            return reason == null ? "Bookmap provider live status could not be read" : reason;
+        } catch (RuntimeException error) { return "Bookmap provider live status could not be read"; }
     }
     public synchronized void unregister(String symbol) {
         liveSymbols.remove(SymbolUtils.cleanSymbol(symbol)); liveVerifiers.remove(SymbolUtils.cleanSymbol(symbol));
@@ -167,7 +176,8 @@ public final class MiniViteApp implements AutoCloseable {
             Models.require(enabled && owner != null && !closed, "native execution is not connected");
             Models.require(!busy && pending == null && !requiresReview && legacyOperations.isEmpty(), "execution awaiting reconciliation or broker review");
             Models.require(now - lastHeartbeat <= ExecutionConfig.MAX_STATE_AGE_MS, "execution session is stale");
-            Models.require(verifiedLive(symbol), "Bookmap live data has not been verified");
+            String liveReason = liveBlockReason(symbol);
+            Models.require(liveReason.isEmpty(), liveReason);
             Models.require(expiresAt - now > ExecutionConfig.TOKEN_MARGIN_MS && !token.isEmpty(), "execution token expired or missing");
             Snapshot state = snapshots.get(symbol);
             Models.require(state != null && now - state.observedAt <= ExecutionConfig.MAX_STATE_AGE_MS
@@ -212,9 +222,11 @@ public final class MiniViteApp implements AutoCloseable {
     private synchronized void guard(Object connection, String capturedEpoch, String capturedToken, String symbol, Plan plan) {
         Models.require(enabled && owner == connection && epoch.equals(capturedEpoch) && !closed
                 && (plan.entry != null ? entriesEnabled : plan.action.equals("cancel_pending_entries") || exitsEnabled)
-                && token.equals(capturedToken) && verifiedLive(symbol)
+                && token.equals(capturedToken)
                 && expiresAt - System.currentTimeMillis() > ExecutionConfig.TOKEN_MARGIN_MS,
                 "execution session revoked before dispatch");
+        String liveReason = liveBlockReason(symbol);
+        Models.require(liveReason.isEmpty(), liveReason);
     }
     private void execute(Object connection, String capturedEpoch, String accountHash, String accessToken,
             String actionId, Snapshot state, Plan plan) {

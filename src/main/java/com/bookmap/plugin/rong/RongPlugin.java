@@ -212,8 +212,8 @@ public class RongPlugin implements CustomModuleAdapter,
                 IndicatorConfig.BOOKMAP_PATTERN_SIGNALS);
         indicatorConfig.addChangeListener(this);
         sharedServer.registerSymbol(cleanAlias, orderBook, info.pips);
-        sharedServer.registerNativeLiveVerifier(cleanAlias, () -> nativeRealtime
-                && com.bookmap.plugin.rong.miniviteapp.bookmap.LiveMode.isVerifiedLive(api.getProvider()));
+        sharedServer.registerNativeLiveBlockReason(cleanAlias, () ->
+                com.bookmap.plugin.rong.miniviteapp.bookmap.LiveMode.getBlockReason(api.getProvider(), nativeRealtime));
         sharedServer.registerVwapUpdateListener(cleanAlias, vwapUpdateListener);
         chartHoverHotkeyHandler.registerSymbol(cleanAlias, info.pips);
         priceZonePainter.registerInstrument(cleanAlias);
@@ -605,7 +605,7 @@ public class RongPlugin implements CustomModuleAdapter,
 
     private void updateNativeLiveStatus() {
         if (sharedServer != null && api != null) sharedServer.updateNativeLiveStatus(alias,
-                nativeRealtime && com.bookmap.plugin.rong.miniviteapp.bookmap.LiveMode.isVerifiedLive(api.getProvider()));
+                com.bookmap.plugin.rong.miniviteapp.bookmap.LiveMode.isVerifiedLive(api.getProvider(), nativeRealtime));
     }
 
     public static void resetNativeExecutionAfterBrokerReview() {

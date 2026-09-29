@@ -255,6 +255,24 @@ class NativeExecutionTest {
             assertEquals("SELL", rig.bodies.get(0).getAsJsonArray("orderLegCollection").get(0).getAsJsonObject().get("instruction").getAsString());
         }
     }
+    @Test void flattenAcceptsUnmarkedWrappedRealtimeProviderButBlocksHistoryAndStaleClock() throws Exception {
+        try (var rig = new Rig()) {
+            rig.state = fixture("flatten replaces all exit pairs"); rig.connect();
+            var provider = new LiveModeTest.UnmarkedProvider();
+            var wrapped = new LiveModeTest.WrappedProvider(provider);
+            var realtime = new java.util.concurrent.atomic.AtomicBoolean(false);
+            rig.engine.setLiveBlockReasonProvider("AAPL", () ->
+                    com.bookmap.plugin.rong.miniviteapp.bookmap.LiveMode.getBlockReason(wrapped, realtime.get()));
+            assertTrue(rig.engine.route(action("KeyF"))); assertEquals(0, rig.requests.size());
+            realtime.set(true); provider.clockOffsetMs = -60_000;
+            assertTrue(rig.engine.route(action("KeyF"))); assertEquals(0, rig.requests.size());
+            provider.clockOffsetMs = 0;
+            assertTrue(rig.engine.route(action("KeyF")));
+            assertEquals("accepted", rig.finish().get("outcome").getAsString());
+            assertEquals(rig.state.getAsJsonArray("pairs").size(), rig.mutations.get());
+            assertTrue(rig.bodies.stream().allMatch(body -> body.get("orderType").getAsString().equals("MARKET")));
+        }
+    }
     @Test void expiryStalenessReplayAndPartialFillsNeverSendMutations() throws Exception {
         try (var rig = new Rig()) {
             rig.connect(); rig.token(2, System.currentTimeMillis()+1000); rig.engine.route(action("KeyC")); assertEquals(0, rig.requests.size());

@@ -42,8 +42,8 @@ public class SignalWebSocketServer extends WebSocketServer {
     }
 
     public void updateNativeLiveStatus(String symbol, boolean live) { miniViteApp.setLive(symbol, live); }
-    public void registerNativeLiveVerifier(String symbol, java.util.function.BooleanSupplier verifier) {
-        miniViteApp.setLiveVerifier(symbol, verifier);
+    public void registerNativeLiveBlockReason(String symbol, java.util.function.Supplier<String> verifier) {
+        miniViteApp.setLiveBlockReasonProvider(symbol, verifier);
     }
 
     public void resetNativeExecutionAfterBrokerReview() {
