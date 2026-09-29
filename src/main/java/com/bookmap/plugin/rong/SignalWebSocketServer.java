@@ -23,7 +23,6 @@ import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 
 public class SignalWebSocketServer extends WebSocketServer {
-    private final Map<WebSocket, String> executionOrigins = new ConcurrentHashMap<>();
     private final com.bookmap.plugin.rong.miniviteapp.MiniViteApp miniViteApp =
             new com.bookmap.plugin.rong.miniviteapp.MiniViteApp((connection, json) -> {
                 if (connection instanceof WebSocket && ((WebSocket) connection).isOpen()) {
@@ -528,14 +527,11 @@ public class SignalWebSocketServer extends WebSocketServer {
 
     @Override
     public void onOpen(WebSocket conn, ClientHandshake handshake) {
-        executionOrigins.put(conn, handshake.getFieldValue("Origin"));
         conn.send(miniViteApp.status().toString());
     }
 
     @Override
     public void onClose(WebSocket conn, int code, String reason, boolean remote) {
-        executionOrigins.remove(conn);
-        miniViteApp.disconnected(conn);
     }
 
     @Override
@@ -544,7 +540,7 @@ public class SignalWebSocketServer extends WebSocketServer {
         JsonObject json = parseJsonObject(trimmed);
         if (json != null) {
             String type = getString(json, "type");
-            if (miniViteApp.receive(conn, conn == null ? "" : executionOrigins.getOrDefault(conn, ""), json)) return;
+            if (miniViteApp.receive(conn, json)) return;
             if (isPriceBearingMessageType(type)
                     && !BookmapPriceNormalizer.isSupportedWirePriceUnit(
                             getString(json, BookmapPriceNormalizer.WIRE_PRICE_UNIT_FIELD))) {

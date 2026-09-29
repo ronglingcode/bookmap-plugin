@@ -55,35 +55,6 @@ public final class Api {
         Models.require(response.statusCode() == 200, "broker read failed; reconcile account");
         return JsonParser.parseString(response.body()).getAsJsonObject();
     }
-    public double getPosition(String account, String token, String symbol) throws Exception {
-        JsonObject wrapper = read(account, token, "?fields=positions");
-        JsonObject data = wrapper.getAsJsonObject("securitiesAccount");
-        double quantity = 0;
-        if (data.has("positions")) for (var element : data.getAsJsonArray("positions")) {
-            JsonObject position = element.getAsJsonObject();
-            if (symbol.equals(Models.string(position.getAsJsonObject("instrument"), "symbol"))) {
-                double longs = Models.number(position, "longQuantity"), shorts = Models.number(position, "shortQuantity");
-                quantity += longs - shorts;
-            }
-        }
-        return quantity;
-    }
-    public void validateOrder(String account, String token, Order expected) throws Exception {
-        JsonObject order = read(account, token, "/orders/" + expected.id);
-        String status = Models.string(order, "status");
-        Models.require(status.equals("WORKING") || status.equals("QUEUED") || status.equals("ACCEPTED")
-                || status.equals("AWAITING_PARENT_ORDER"), "order is no longer working; reconcile first");
-        // Trust the instrument/side/shape read from this same broker order ID.
-        // Check fills and edits that would make our cached closing plan wrong.
-        // Any partial fill invalidates this snapshot. Do not submit its original full quantity again.
-        double filled = Models.number(order, "filledQuantity");
-        if (!Double.isFinite(filled)) filled = 0;
-        Models.require(filled == 0 && Models.number(order, "quantity") == expected.quantity, "order quantity changed; reconcile first");
-        if (!expected.type.equals("MARKET")) {
-            double price = Models.number(order, expected.type.equals("STOP") ? "stopPrice" : "price");
-            Models.require(Math.abs(price - expected.price) < 1e-8, "broker price changed; reconcile first");
-        }
-    }
     public void validateFlatEntry(String account, String token, String symbol) throws Exception {
         JsonObject data = read(account, token, "?fields=positions").getAsJsonObject("securitiesAccount");
         if (data.has("positions")) for (var element : data.getAsJsonArray("positions")) {

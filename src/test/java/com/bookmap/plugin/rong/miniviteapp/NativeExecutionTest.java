@@ -14,7 +14,6 @@ import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.*;
 
 class NativeExecutionTest {
-    private static final String ORIGIN = "http://localhost:5173";
     private static JsonObject json(String contents) { return JsonParser.parseString(contents).getAsJsonObject(); }
     private static JsonObject action(String key) {
         JsonObject json = new JsonObject(); json.addProperty("keyCode", key); json.addProperty("symbol", "AAPL"); return json;
@@ -28,8 +27,9 @@ class NativeExecutionTest {
         throw new AssertionError(name);
     }
     private static final class Rig implements AutoCloseable {
-        final Object owner = new Object();
+        final Object connection = new Object();
         final List<JsonObject> events = new CopyOnWriteArrayList<>();
+        final List<Object> eventConnections = new CopyOnWriteArrayList<>();
         final List<String> requests = new CopyOnWriteArrayList<>();
         final List<String> authorizations = new CopyOnWriteArrayList<>();
         final List<JsonObject> bodies = new CopyOnWriteArrayList<>();
@@ -38,21 +38,22 @@ class NativeExecutionTest {
         final MiniViteApp engine;
         JsonObject state = fixture("cancel all entries below threshold");
         volatile int mutationStatus = 204;
+        volatile int readStatus = 200;
         volatile boolean orderFilled;
         volatile boolean omitLocation, pendingSymbolOrder;
         volatile String pendingStatus = "QUEUED";
         volatile double brokerQuantity = Double.NaN, buyingPower = 1_000_000;
         final CountDownLatch mutationEntered = new CountDownLatch(1);
         volatile CountDownLatch allowMutation;
-        String epoch;
         Rig() throws Exception {
             server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
-            server.createContext("/accounts/hash", exchange -> {
+            server.createContext("/accounts/", exchange -> {
                 try {
                     authorizations.add(exchange.getRequestHeaders().getFirst("Authorization"));
                     String method = exchange.getRequestMethod(), path = exchange.getRequestURI().getPath();
                     requests.add(method + " " + path);
                     if (method.equals("GET")) {
+                        if (readStatus != 200) { exchange.sendResponseHeaders(readStatus, -1); return; }
                         JsonObject response;
                         if (path.equals("/accounts/hash")) {
                             double quantity = Double.isFinite(brokerQuantity) ? brokerQuantity : state.get("netQuantity").getAsDouble();
@@ -95,7 +96,7 @@ class NativeExecutionTest {
             });
             server.start();
             engine = new MiniViteApp(new Api(URI.create("http://127.0.0.1:" + server.getAddress().getPort() + "/")),
-                    (connection, event) -> events.add(event.deepCopy()));
+                    (client, event) -> { eventConnections.add(client); events.add(event.deepCopy()); });
         }
         JsonObject findOrder(String id) {
             for (var value : state.getAsJsonArray("entries")) if (value.getAsJsonObject().get("orderID").getAsString().equals(id)) return value.getAsJsonObject();
@@ -107,8 +108,6 @@ class NativeExecutionTest {
         }
         void connect() {
             engine.setEnabled(true, true);
-            engine.receive(owner, ORIGIN, json("{\"type\":\"execution_hello\",\"version\":2,\"live\":true,\"broker\":\"Schwab\"}"));
-            epoch = events.get(events.size()-1).get("epoch").getAsString();
             token(1, System.currentTimeMillis() + 120_000);
             updateState(System.currentTimeMillis()-1);
         }
@@ -121,7 +120,7 @@ class NativeExecutionTest {
             return fixture.getAsJsonObject("action").deepCopy();
         }
         JsonObject message(String type) {
-            var json = new JsonObject(); json.addProperty("type", type); json.addProperty("epoch", epoch); return json;
+            var json = new JsonObject(); json.addProperty("type", type); return json;
         }
         void token(int generation, long expiry) {
             token(generation, expiry, "fake-access-token");
@@ -129,7 +128,7 @@ class NativeExecutionTest {
         void token(int generation, long expiry, String accessToken) {
             var json = message("execution_token"); json.addProperty("generation", generation);
             json.addProperty("accessToken", accessToken); json.addProperty("accountHash", "hash"); json.addProperty("expiresAt", expiry);
-            engine.receive(owner, ORIGIN, json);
+            engine.receive(connection, json);
         }
         void updateState(long observedAt) {
             updateState(observedAt, System.currentTimeMillis());
@@ -138,12 +137,16 @@ class NativeExecutionTest {
             state.addProperty("revision", System.nanoTime()); state.addProperty("observedAt", observedAt);
             state.addProperty("quoteObservedAt", quoteObservedAt);
             var json = message("execution_state"); json.addProperty("accountHash", "hash");
-            var symbols = new JsonArray(); symbols.add(state.deepCopy()); json.add("symbols", symbols); engine.receive(owner, ORIGIN, json);
+            var symbols = new JsonArray(); symbols.add(state.deepCopy()); json.add("symbols", symbols); engine.receive(connection, json);
         }
         JsonObject finish() throws Exception {
+            return finish(1);
+        }
+        JsonObject finish(int resultCount) throws Exception {
             long limit = System.nanoTime() + TimeUnit.SECONDS.toNanos(5);
             while (System.nanoTime() < limit) {
-                for (var event : events) if (event.get("type").getAsString().equals("execution_result")) return event;
+                int count = 0;
+                for (var event : events) if (event.get("type").getAsString().equals("execution_result") && ++count == resultCount) return event;
                 Thread.sleep(10);
             }
             throw new AssertionError("native result timeout");
@@ -162,7 +165,7 @@ class NativeExecutionTest {
             assertEquals(0, rig.mutations.get());
         }
     }
-    @Test void initialEntryPostsOneProtectedBracketAndWaitsForNewOrderObservation() throws Exception {
+    @Test void initialEntryPostsProtectedBracketWithoutWaitingForUiOrAccountReconciliation() throws Exception {
         try (var rig = new Rig()) {
             var entry = rig.connectEntry(); rig.engine.setEnabled(true, true, false);
             assertFalse(rig.engine.route(entry)); assertEquals(0, rig.mutations.get());
@@ -174,19 +177,7 @@ class NativeExecutionTest {
             assertEquals("TRIGGER", rig.bodies.get(0).get("orderStrategyType").getAsString());
             assertEquals(10, rig.bodies.get(0).getAsJsonArray("childOrderStrategies").size());
             assertEquals("RangeBoundBidReversal", result.getAsJsonObject("entry").getAsJsonObject("submitEntryResult").get("tradeBookID").getAsString());
-            rig.updateState(System.currentTimeMillis()+1);
-            assertTrue(rig.engine.status().get("blocked").getAsBoolean());
-            assertTrue(rig.engine.route(entry)); assertEquals(1, rig.mutations.get());
-            rig.state.add("observedOrderIds", JsonParser.parseString("[\"999\"]"));
-            rig.state.getAsJsonArray("entries").add(json("{\"orderID\":\"999\",\"orderType\":\"STOP\",\"quantity\":1960,\"price\":10.01,\"isBuy\":true}"));
-            rig.updateState(System.currentTimeMillis()+2);
-            assertTrue(rig.engine.status().get("blocked").getAsBoolean()); // Trade state must also be registered in ViteApp.
-            var acknowledgement = rig.message("execution_entry_state");
-            acknowledgement.add("actionId", result.get("actionId")); acknowledgement.addProperty("initialized", true);
-            rig.engine.receive(rig.owner, ORIGIN, acknowledgement);
-            rig.updateState(System.currentTimeMillis()+3);
             assertFalse(rig.engine.status().get("blocked").getAsBoolean());
-            assertTrue(rig.engine.route(entry)); assertEquals(1, rig.mutations.get()); // Pending entry cannot become a second entry.
         }
     }
     @Test void initialEntryPreflightBlocksPositionAndPendingOrderChanges() throws Exception {
@@ -236,45 +227,43 @@ class NativeExecutionTest {
             assertEquals(1, rig.mutations.get());
         }
     }
-    @Test void entryStateFailureAndStaleEntryContextBlockFurtherExecution() throws Exception {
+    @Test void entryStateFailureBlocksFurtherExecution() throws Exception {
         try (var rig = new Rig()) {
             var entry = rig.connectEntry();
-            rig.state.getAsJsonObject("entryContext").addProperty("observedAt", System.currentTimeMillis()-15_000);
-            rig.updateState(System.currentTimeMillis()-1); assertTrue(rig.engine.route(entry));
-            assertEquals(0, rig.mutations.get());
-            rig.state.getAsJsonObject("entryContext").addProperty("observedAt", System.currentTimeMillis());
             rig.updateState(System.currentTimeMillis()-1); rig.engine.route(entry); var result = rig.finish();
             var acknowledgement = rig.message("execution_entry_state"); acknowledgement.add("actionId", result.get("actionId"));
-            acknowledgement.addProperty("initialized", false); rig.engine.receive(rig.owner, ORIGIN, acknowledgement);
+            acknowledgement.addProperty("initialized", false); rig.engine.receive(rig.connection, acknowledgement);
             assertTrue(rig.engine.status().get("requiresReview").getAsBoolean());
             assertTrue(rig.engine.route(entry)); assertEquals(1, rig.mutations.get());
         }
     }
-    @Test void directCancelHandlesEmptySuccessAndDoesNotRepeatWhileAwaitingReconciliation() throws Exception {
+    @Test void directCancelHandlesEmptySuccessAndAcceptsRepeatedClicksWithoutReconciliation() throws Exception {
         try (var rig = new Rig()) {
             rig.connect(); rig.allowMutation = new CountDownLatch(1);
             assertTrue(rig.engine.route(action("KeyC")));
             assertTrue(rig.mutationEntered.await(3, TimeUnit.SECONDS));
             assertTrue(rig.engine.route(action("KeyC"))); rig.allowMutation.countDown();
-            assertEquals("accepted", rig.finish().get("outcome").getAsString());
-            assertEquals(2, rig.mutations.get());
+            assertEquals("accepted", rig.finish(2).get("outcome").getAsString());
+            assertEquals(4, rig.mutations.get());
             assertTrue(rig.requests.stream().allMatch(request -> request.startsWith("DELETE ")));
             assertTrue(rig.authorizations.stream().allMatch(value -> value.equals("Bearer fake-access-token")));
-            assertTrue(rig.engine.route(action("KeyC"))); assertEquals(2, rig.mutations.get());
-            rig.state.add("entries", new JsonArray()); rig.updateState(System.currentTimeMillis()+10);
             assertFalse(rig.engine.status().get("blocked").getAsBoolean());
+            assertTrue(rig.engine.route(action("KeyC")));
+            assertEquals("accepted", rig.finish(3).get("outcome").getAsString());
+            assertEquals(6, rig.mutations.get());
             assertTrue(rig.events.stream().noneMatch(event -> event.toString().contains("fake-access-token")));
         }
     }
-    @Test void nativeExitUsesClosingPutAndRefusesConcurrentBrowserMutation() throws Exception {
+    @Test void nativeExitUsesClosingPutAndDoesNotBlockAnotherClickWhileRunning() throws Exception {
         try (var rig = new Rig()) {
             rig.state = fixture("market out smallest first tie"); rig.connect();
             rig.allowMutation = new CountDownLatch(1);
             assertTrue(rig.engine.route(action("KeyM"))); assertTrue(rig.mutationEntered.await(3, TimeUnit.SECONDS));
-            var legacy = rig.message("execution_legacy_begin"); legacy.addProperty("requestId", "browser"); rig.engine.receive(rig.owner, ORIGIN, legacy);
-            assertFalse(rig.events.get(rig.events.size()-1).get("allowed").getAsBoolean());
-            rig.allowMutation.countDown(); assertEquals("accepted", rig.finish().get("outcome").getAsString());
-            assertEquals(1, rig.mutations.get());
+            assertFalse(rig.engine.status().get("blocked").getAsBoolean());
+            assertTrue(rig.engine.route(action("KeyM")));
+            assertEquals(2, rig.events.stream().filter(event -> event.get("type").getAsString().equals("execution_started")).count());
+            rig.allowMutation.countDown(); assertEquals("accepted", rig.finish(2).get("outcome").getAsString());
+            assertEquals(2, rig.mutations.get());
             assertTrue(rig.requests.contains("PUT /accounts/hash/orders/202"));
             assertEquals("SELL", rig.bodies.get(0).getAsJsonArray("orderLegCollection").get(0).getAsJsonObject().get("instruction").getAsString());
         }
@@ -317,13 +306,70 @@ class NativeExecutionTest {
             assertEquals(List.of("DELETE /accounts/hash/orders/101"), rig.requests);
         }
     }
-    @Test void staleStateAndPartialExitFillsStillBlockUnintendedExecutions() throws Exception {
+    @Test void oldAccountQuotesAndEntryContextDoNotBlockDispatch() throws Exception {
         try (var rig = new Rig()) {
-            rig.connect(); rig.updateState(System.currentTimeMillis()-20_000);
-            rig.engine.route(action("KeyC")); assertEquals(0, rig.requests.size());
-            rig.state = fixture("market out smallest first tie"); rig.updateState(System.currentTimeMillis());
-            rig.orderFilled = true; rig.engine.route(action("KeyM"));
-            assertEquals("rejected", rig.finish().get("outcome").getAsString()); assertEquals(0, rig.mutations.get());
+            rig.connect(); rig.updateState(System.currentTimeMillis()-60_000, 0);
+            rig.engine.route(action("KeyC")); assertEquals("accepted", rig.finish().get("outcome").getAsString());
+            assertEquals(2, rig.mutations.get());
+        }
+        try (var rig = new Rig()) {
+            var entry = rig.connectEntry();
+            rig.state.getAsJsonObject("entryContext").addProperty("observedAt", System.currentTimeMillis()-60_000);
+            rig.updateState(System.currentTimeMillis()-60_000, 0);
+            rig.engine.route(entry); assertEquals("accepted", rig.finish().get("outcome").getAsString());
+            assertEquals(1, rig.mutations.get());
+        }
+    }
+    @Test void exitsSubmitWithoutPositionProtectiveOrderOrReadPreflight() throws Exception {
+        for (String key : new String[]{"KeyM", "KeyF", "Digit1", "KeyT"}) {
+            for (int readStatus : new int[]{200, 503}) try (var rig = new Rig()) {
+                rig.state = fixture("flatten replaces all exit pairs");
+                rig.state.addProperty("coreRuleEnabled", false); rig.state.addProperty("splitPartials", true);
+                rig.connect(); rig.brokerQuantity = -1; rig.orderFilled = true; rig.readStatus = readStatus;
+                var command = action(key); command.addProperty("price", 99);
+                rig.engine.route(command);
+                assertEquals("accepted", rig.finish().get("outcome").getAsString(), key);
+                assertTrue(rig.mutations.get() > 0, key);
+                assertTrue(rig.requests.stream().noneMatch(request -> request.startsWith("GET ")), key);
+            }
+        }
+    }
+    @Test void streamingEntryPricesAndDayRangeOverrideLaterAccountSnapshots() throws Exception {
+        try (var rig = new Rig()) {
+            var entry = rig.connectEntry();
+            // Streaming data may arrive before the next account snapshot.
+            var market = rig.message("execution_market_data"); market.addProperty("symbol", "AAPL");
+            market.addProperty("currentPrice", 10.25); market.addProperty("bid", 10.2); market.addProperty("ask", 10.3);
+            market.addProperty("highOfDay", 10.2); market.addProperty("lowOfDay", 9.4);
+            rig.engine.receive(rig.connection, market);
+            rig.updateState(System.currentTimeMillis()); // Still has the old price/quote/day levels.
+            var otherSymbol = market.deepCopy(); otherSymbol.addProperty("symbol", "MSFT");
+            otherSymbol.addProperty("ask", 100); rig.engine.receive(rig.connection, otherSymbol);
+            rig.engine.route(entry); var result = rig.finish();
+            assertEquals("accepted", result.get("outcome").getAsString());
+            assertEquals(10.3, result.getAsJsonObject("entry").get("entryPrice").getAsDouble());
+            assertEquals(10.2, result.getAsJsonObject("entry").get("highOfDay").getAsDouble());
+            assertEquals(9.4, result.getAsJsonObject("entry").get("lowOfDay").getAsDouble());
+            assertEquals(10.31, rig.bodies.get(0).get("stopPrice").getAsDouble());
+        }
+        try (var rig = new Rig()) {
+            var entry = rig.connectEntry(); entry.addProperty("use_market_order", true);
+            var market = json("{\"type\":\"execution_market_data\",\"symbol\":\"AAPL\",\"currentPrice\":10.25,\"bid\":10.2,\"ask\":10.3,\"highOfDay\":10.3,\"lowOfDay\":9.4}");
+            rig.engine.receive(rig.connection, market); rig.engine.route(entry);
+            assertEquals(10.25, rig.finish().getAsJsonObject("entry").get("entryPrice").getAsDouble());
+            assertEquals("MARKET", rig.bodies.get(0).get("orderType").getAsString());
+        }
+    }
+    @Test void streamingBidClampsExitStopWithoutWaitingForAccountRefresh() throws Exception {
+        try (var rig = new Rig()) {
+            rig.state = fixture("flatten replaces all exit pairs"); rig.state.addProperty("coreRuleEnabled", false);
+            rig.connect();
+            var market = json("{\"type\":\"execution_market_data\",\"symbol\":\"AAPL\",\"currentPrice\":100,\"bid\":97,\"ask\":101,\"highOfDay\":101,\"lowOfDay\":90}");
+            rig.engine.receive(rig.connection, market); rig.updateState(System.currentTimeMillis());
+            var command = action("Digit1"); command.addProperty("price", 99); rig.engine.route(command);
+            assertEquals("accepted", rig.finish().get("outcome").getAsString());
+            assertEquals(97, rig.bodies.get(0).get("stopPrice").getAsDouble());
+            assertTrue(rig.requests.stream().noneMatch(request -> request.startsWith("GET ")));
         }
     }
     @Test void ambiguousBrokerFailureHoldsExecutionUntilExplicitReview() throws Exception {
@@ -336,26 +382,36 @@ class NativeExecutionTest {
             assertTrue(rig.engine.resetAfterBrokerReview()); assertFalse(rig.engine.route(action("KeyC")));
         }
     }
-    @Test void legacyFenceInvalidatesSnapshotsAndUnknownLegacyOutcomeRequiresReview() throws Exception {
+    @Test void updatesExecuteWithoutHandshakeSessionIdOrAccountMatching() throws Exception {
         try (var rig = new Rig()) {
-            rig.connect(); var begin = rig.message("execution_legacy_begin"); begin.addProperty("requestId", "legacy");
-            rig.engine.receive(rig.owner, ORIGIN, begin); assertTrue(rig.events.get(rig.events.size()-1).get("allowed").getAsBoolean());
-            rig.engine.route(action("KeyC")); assertEquals(0, rig.requests.size());
-            var end = rig.message("execution_legacy_end"); end.addProperty("requestId", "legacy"); end.addProperty("outcome", "unknown");
-            rig.engine.receive(rig.owner, ORIGIN, end); rig.updateState(System.currentTimeMillis()+10);
-            assertTrue(rig.engine.status().get("requiresReview").getAsBoolean()); rig.engine.route(action("KeyC")); assertEquals(0, rig.requests.size());
+            rig.connect();
+            var token = rig.message("execution_token"); token.addProperty("accountHash", "updated-hash");
+            token.addProperty("accessToken", "fake-refreshed-access-token"); token.addProperty("expiresAt", System.currentTimeMillis()+120_000);
+            rig.engine.receive(rig.connection, token);
+            // A restarted app can send a lower revision; state need not carry an account or session ID.
+            rig.state.addProperty("revision", 1);
+            var state = rig.message("execution_state"); var symbols = new JsonArray(); symbols.add(rig.state.deepCopy());
+            state.add("symbols", symbols); rig.engine.receive(rig.connection, state);
+            rig.engine.route(action("KeyC")); assertEquals("accepted", rig.finish().get("outcome").getAsString());
+            assertEquals(List.of("DELETE /accounts/updated-hash/orders/101", "DELETE /accounts/updated-hash/orders/102"), rig.requests);
+            assertTrue(rig.authorizations.stream().allMatch(value -> value.equals("Bearer fake-refreshed-access-token")));
+            assertFalse(rig.engine.status().has("epoch"));
+            assertTrue(rig.events.stream().noneMatch(event -> event.get("type").getAsString().equals("execution_session")));
         }
     }
-    @Test void untrustedOriginsCannotUpdateCredentialsAndSecondTabCannotOwnSession() throws Exception {
+    @Test void reconnectReceivesRunningResultWithoutSessionReview() throws Exception {
         try (var rig = new Rig()) {
-            rig.engine.setEnabled(true, true);
-            var hello = json("{\"type\":\"execution_hello\",\"version\":2,\"live\":true,\"broker\":\"Schwab\"}");
-            rig.engine.receive(rig.owner, "https://untrusted.example", hello);
-            assertEquals("execution_rejected", rig.events.get(0).get("type").getAsString());
-            rig.connect(); Object secondTab = new Object(); rig.engine.receive(secondTab, ORIGIN, hello);
-            assertEquals("execution_rejected", rig.events.get(rig.events.size()-1).get("type").getAsString());
-            rig.token(0, 1); // Older credential generations cannot overwrite a valid token.
-            rig.engine.route(action("KeyC")); assertEquals("accepted", rig.finish().get("outcome").getAsString());
+            rig.connect(); rig.allowMutation = new CountDownLatch(1); rig.engine.route(action("KeyC"));
+            assertTrue(rig.mutationEntered.await(3, TimeUnit.SECONDS));
+            Object reconnected = new Object();
+            var state = rig.message("execution_state"); var symbols = new JsonArray(); symbols.add(rig.state.deepCopy());
+            state.add("symbols", symbols); rig.engine.receive(reconnected, state);
+            rig.allowMutation.countDown(); var result = rig.finish();
+            assertEquals("accepted", result.get("outcome").getAsString());
+            assertFalse(result.get("requiresReview").getAsBoolean()); assertEquals(2, rig.mutations.get());
+            assertSame(reconnected, rig.eventConnections.get(rig.eventConnections.size()-1));
+            rig.state.add("entries", new JsonArray()); rig.updateState(System.currentTimeMillis()+10);
+            assertFalse(rig.engine.status().get("blocked").getAsBoolean());
         }
     }
 }

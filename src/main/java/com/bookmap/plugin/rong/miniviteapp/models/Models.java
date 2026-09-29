@@ -5,8 +5,6 @@ import com.google.gson.JsonObject;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
-import java.util.HashSet;
-import java.util.Set;
 
 /** Explicit wire parsing survives release obfuscation; never deserialize fields reflectively. */
 public final class Models {
@@ -53,19 +51,16 @@ public final class Models {
     }
     public static final class Snapshot {
         public final String symbol;
-        public final long revision, observedAt, quoteObservedAt;
+        public final long revision;
         public final double netQuantity, currentPrice, bid, ask, entryPrice, coreTarget, coreCount;
         public final int batchCount;
         public final boolean splitPartials, hasPlan, coreRuleEnabled, rulesSupported;
         public final List<Order> entries;
         public final List<ExitPair> pairs;
         public final JsonObject entryContext;
-        public final Set<String> observedOrderIds = new HashSet<>();
         public Snapshot(JsonObject json) {
             symbol = string(json, "symbol");
             revision = (long) number(json, "revision");
-            observedAt = (long) number(json, "observedAt");
-            quoteObservedAt = (long) number(json, "quoteObservedAt");
             netQuantity = number(json, "netQuantity");
             currentPrice = number(json, "currentPrice");
             bid = number(json, "bid"); ask = number(json, "ask");
@@ -80,7 +75,21 @@ public final class Models {
             for (var pair : json.getAsJsonArray("pairs")) pairList.add(new ExitPair(pair.getAsJsonObject(), symbol));
             pairs = Collections.unmodifiableList(pairList);
             entryContext = json.has("entryContext") && !json.get("entryContext").isJsonNull() ? json.getAsJsonObject("entryContext").deepCopy() : null;
-            if (json.has("observedOrderIds")) for (var id : json.getAsJsonArray("observedOrderIds")) observedOrderIds.add(id.getAsString());
+        }
+        /** Overlay streaming prices without replacing account/plan inputs or an in-flight action. */
+        public Snapshot(Snapshot state, JsonObject marketData) {
+            symbol = state.symbol; revision = state.revision; netQuantity = state.netQuantity;
+            currentPrice = number(marketData, "currentPrice");
+            bid = number(marketData, "bid"); ask = number(marketData, "ask");
+            entryPrice = state.entryPrice; coreTarget = state.coreTarget; coreCount = state.coreCount;
+            batchCount = state.batchCount; splitPartials = state.splitPartials; hasPlan = state.hasPlan;
+            coreRuleEnabled = state.coreRuleEnabled; rulesSupported = state.rulesSupported;
+            entries = state.entries; pairs = state.pairs;
+            entryContext = state.entryContext == null ? null : state.entryContext.deepCopy();
+            if (entryContext != null) {
+                entryContext.add("highOfDay", marketData.get("highOfDay"));
+                entryContext.add("lowOfDay", marketData.get("lowOfDay"));
+            }
         }
     }
     public static final class Request {

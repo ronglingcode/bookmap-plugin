@@ -11,8 +11,9 @@ Local execution checks follow this rule: block only realistic cases where a
 broker-accepted order could differ from the intended trade. Conditions that only
 predict broker rejection may warn, never block. Trust broker-provided fields and
 our own payload calculations; do not accumulate checks for hypothetical invalid
-inputs. Preserve trading rules and checks for duplicate exposure, changed
-position/protective coverage, and unintended quantities or prices.
+inputs. Preserve trading rules and initial-entry exposure checks. Exit position
+and protective-order preflight comparisons were removed by user request; exits
+use supplied account inputs and send directly without broker GETs.
 
 Add a small Java execution engine inside bmtrader that mirrors the relevant
 ViteApp modules. For explicitly migrated Bookmap actions, submit broker requests
@@ -27,7 +28,10 @@ ViteApp continues to own OAuth refresh, account streaming/synchronization,
 configuration, and trading state during the initial rollout. It pushes those
 inputs ahead of time; a migrated action does not wait for ViteApp to build or
 approve its order at click time. Initially, native execution requires a connected,
-authenticated ViteApp session with current inputs. Browser-independent operation
+ViteApp supplying current inputs. This is a personal MVP with one app and one
+account; no session ownership, IDs, origin allowlists, account matching, input-age
+cutoffs, execution fences, or waits for another action/account reconciliation.
+Browser-independent operation
 would require a later migration of account updates and state ownership.
 
 ## Original execution path (before this migration)
@@ -53,9 +57,8 @@ would require a later migration of account updates and state ownership.
 - ViteApp refreshes access tokens through `api/broker.ts`; the Schwab refresh
   helper currently returns only the access-token string. Preserve expiry metadata
   from successful OAuth responses when adding synchronization.
-- The plugin WebSocket server binds to `127.0.0.1`, serves multiple connections,
-  and has no execution-owner authentication today. A loopback binding alone is
-  insufficient authorization for credential or execution-state updates.
+- The plugin WebSocket server binds to `127.0.0.1`. This MVP assumes the user's
+  single ViteApp connection supplies the token and execution inputs.
 
 ## Mirrored Java structure
 
@@ -97,7 +100,7 @@ treat a rounded display price, display ordering, or formatted risk label as an
 authoritative execution input. Match existing price rounding and share allocation
 with fixtures before choosing Java numeric representations.
 
-One engine/session per shared plugin server, with per-symbol state. Execute HTTP
+One engine per shared plugin server, with per-symbol state. Execute HTTP
 work on a bounded executor using Java 11 HttpClient; never block Swing, Bookmap
 market-data callbacks, or the WebSocket message thread. Shut down engine resources
 and invalidate credentials when the shared service stops.
@@ -106,26 +109,23 @@ and invalidate credentials when the shared service stops.
 
 Introduce an additive, versioned protocol for:
 
-1. Capabilities, authenticated ownership, and a session epoch.
+1. Native feature status and supported workflow flags.
 2. An access-token update: broker, account hash, token, expiry, and generation.
-3. Execution configuration and immutable state snapshots: broker-observed time,
-   state revision, account/session identity, and action-specific inputs.
-4. Action lifecycle events: action ID, owner, action name, symbol, state revision,
+3. Execution configuration and immutable state snapshots:
+   state revision, and action-specific inputs.
+4. Action lifecycle events: action ID, action name, symbol, state revision,
    affected order IDs, and per-request result.
-5. Reconciliation requests/results and session revocation.
+5. Reconciliation results.
 
-Use an Origin policy and single-owner session for credential/state
-messages; accept them only from one elected ViteApp connection. Do not broadcast
-credentials to WebSocket clients. Multiple browser tabs must not become competing
-execution owners. Agree exact schemas and timeout values in the foundation change.
+Use the existing local WebSocket. Receive the latest ViteApp inputs without
+an ownership handshake or identity checks. Do not broadcast credentials.
 
-Send the short-lived access token and account hash on authenticated connection and
+Send the short-lived access token and account hash on connection and
 after successful refresh/account changes. Keep refresh tokens, client secrets, and
 OAuth ownership in ViteApp. Tokens remain in Java memory and never enter settings,
 logs, exceptions, generic message dumps, or test fixtures. Send credentials only
-when the experimental feature and authenticated protocol support are enabled.
-Ignore updates from older epochs/generations. Revoke on owner loss, profile/account
-change, feature disable, or plugin shutdown.
+when the experimental feature is enabled. Clear credentials on feature disable
+or plugin shutdown. Reconnects do not revoke execution or require review.
 
 Route every button/hotkey through one plugin router before any broadcast:
 
@@ -135,17 +135,14 @@ Route every button/hotkey through one plugin router before any broadcast:
 - Migrated but not ready: reject visibly. Do not silently change executor.
 - Older clients cannot negotiate native execution and continue the legacy path.
 
-Readiness includes authenticated ownership, compatible versions, Schwab/live mode,
-valid credentials, complete/current state, and no conflicting operation.
+Readiness includes compatible versions and supplied decision inputs, without
+age cutoffs or in-progress/reconciliation waits. Token authorization is delegated to the broker.
 ViteApp requires a live broker profile. The plugin does not verify Bookmap
 provider identity, live/replay mode, historical loading, or the Bookmap clock.
 
-Serialize conflicting native operations by account/symbol and reserve affected
-order IDs. Coordinate ViteApp UI, automatic actions, and pending timers against
-the same ownership/operation state; suppress or defer conflicts and refresh before
-resuming. Mirror non-broker side effects through explicit events without invoking
-the ViteApp broker methods again. Any required side effect must be synchronized
-before native dispatch or explicitly made independent of click-time timing.
+Each click submits independently. Requests within an action execute sequentially.
+ViteApp broker mutations require no native acknowledgement. Mirror non-broker
+side effects through explicit events without invoking ViteApp broker methods again.
 
 ## Results, reconciliation, and rollback
 
@@ -155,20 +152,18 @@ status and relevant headers, handle empty bodies, and report sanitized errors.
 Confirm exact success semantics against the current broker contract when building
 the adapter.
 
-Action IDs and reservations suppress local duplicates; they cannot guarantee
-exactly-once broker execution. Never automatically resubmit or forward an action
-after a mutation may have reached Schwab. On timeout/disconnect/unknown outcome,
-hold conflicting actions and reconcile orders/positions before permitting another
-operation. Track partial success separately for multi-request actions. A restart
-also requires fresh broker reconciliation before native readiness.
+Action IDs identify lifecycle messages. Never automatically resubmit or forward an action
+after a mutation may have reached Schwab. On a broker timeout or unknown outcome,
+require broker review before further native execution. Track partial success
+separately for multi-request actions. Accepted results do not create a
+reconciliation wait.
 
 ViteApp receives results, performs its account refresh, updates trading state and
-existing UI/Firestore reporting, and publishes a new versioned snapshot. Reject
-late snapshots that predate native changes. Update in-flight reservations from
-observed broker state, not solely from an HTTP response.
+existing UI/Firestore reporting, and publishes the latest snapshot. Other clicks
+do not wait for those side effects.
 
-Turning the flag off routes future actions through ViteApp after in-flight native
-operations are reconciled. It does not replay an unresolved native action. Retain
+Turning the flag off routes future actions through ViteApp unless an unknown
+native outcome still requires review. It does not replay a native action. Retain
 the existing UI-only plugin logging policy; show native readiness, blocked reasons,
 sanitized results, and timing without introducing credential-bearing session logs.
 
@@ -181,8 +176,8 @@ separate per repository. Initial direct execution needs no ProxyServer changes.
 ### 0. Foundation and non-executing comparison
 
 - Default-off flag, empty action allowlist, shared engine, central router.
-- Session/capability negotiation and token lifecycle.
-- Versioned broker/config/trading-state snapshots and conflict coordination.
+- Native feature status and token updates over the existing WebSocket.
+- Versioned broker/config/trading-state snapshots without age or conflict gating.
 - Direct Schwab HTTP adapter tested against a fake local broker.
 - Pure decision fixtures using the same normalized inputs for TS and Java.
 - Optional comparison mode computes Java decisions and compares them with the
@@ -204,13 +199,13 @@ Preserve the current selection exactly:
 - Preserve protective exit orders and clear the pending-order timer.
 
 The snapshot must include the authoritative exit-pair count, batch count, entry
-order IDs/types, account identity, and broker-observed revision. Define timer/state
-coordination in this slice. Refresh/reconcile each attempted cancellation and show
+order IDs/types and state revision. Clear the pending-entry timer. Refresh after
+each attempted cancellation and show
 individual results. Cover floating Cancel and chart C through the same router.
 
 Deliverable: enable only `cancel_pending_entries`; Java sends the selected DELETE
 requests directly, and ViteApp applies the state/UI side effects without sending
-duplicate cancellations.
+the broker's cancellation response, without blocking repeated clicks.
 
 ### 2. Market Out 1 / M / Numpad1
 
@@ -222,7 +217,7 @@ Start with existing split pairs; unsplit configurations remain explicitly outsid
 the action capability until their split behavior is ported and verified.
 
 Required extra inputs include tradebook state/identity, original partial numbering,
-active plan, quote freshness, and rule settings. Existing display snapshots alone
+active plan, bid/ask values, and rule settings. Existing display snapshots alone
 are insufficient. Add remaining Numpad selections one at a time after this slice.
 
 ### 3. One hovered stop/target adjustment
@@ -257,11 +252,11 @@ account streaming/state ownership as a separate architecture decision.
 
 - Compare TS and Java decisions, selected orders, price/quantity rounding, payloads,
   rejection reasons, and state transitions using captured sanitized fixtures.
-- Test flag off, unsupported action/client, stale decision state, wrong account,
-  duplicate clicks, reconnect, and conflicting Vite actions. Verify expired tokens
-  reach the broker and refreshed tokens do not interrupt execution.
+- Test flag off, unsupported actions, independent repeated clicks, reconnect,
+  and inputs without age limits. Verify expired tokens reach the broker and
+  refreshed tokens do not interrupt execution.
 - Fake-broker tests cover actual HTTP requests, empty success bodies, rejection,
-  ambiguous timeout, partial completion, and post-operation reconciliation.
+  ambiguous timeout and partial completion.
 - Verify protective-order handling and both long/short behavior where supported.
 - Run ViteApp type checking/build and focused protocol/decision tests; run plugin
   unit tests and its build/release checks against the obfuscated JAR.

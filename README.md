@@ -2,6 +2,17 @@
 
 A Bookmap addon that draws chart indicators and liquidity-wall signals, and forwards manual trading actions and exit-plan updates via WebSocket.
 
+## Development scope
+
+This is a personal MVP: assume one Bookmap, one ViteApp, and one brokerage account.
+Keep the implementation small. Native execution uses the latest ViteApp inputs;
+do not add session ownership, session IDs, origin allowlists, or account-matching
+machinery, input-age cutoffs, execution coordination fences, or waits for another
+action/account reconciliation. Local order blockers should prevent realistic unintended trades that
+the broker would accept. Leave broker rejection decisions to the broker.
+Exits submit without broker position/protective-order preflight reads. Streaming
+ViteApp market bundles update execution prices independently of account polling.
+
 This repository builds the bmtrader trading addon:
 
 | Plugin   | JAR                | Description                   |
