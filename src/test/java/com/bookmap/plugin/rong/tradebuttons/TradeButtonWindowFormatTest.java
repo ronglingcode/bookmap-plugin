@@ -5,6 +5,8 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import java.util.Arrays;
 import java.util.Collections;
 
+import javax.swing.JButton;
+
 import org.junit.jupiter.api.Test;
 
 import com.bookmap.plugin.rong.SignalWebSocketServer;
@@ -17,6 +19,13 @@ class TradeButtonWindowFormatTest {
                 "1.2M/250K/9.5K",
                 TradeButtonWindow.formatLargestSizes(Arrays.asList(1_200_000, 250_000, 9_500)));
         assertEquals("n/a", TradeButtonWindow.formatLargestSizes(Collections.emptyList()));
+    }
+
+    @Test
+    void trackedShiftStateKeepsMarketModeAcrossWindowFocusTransfer() {
+        JButton button = new JButton("1 R");
+        assertEquals(true, TradeButtonWindow.isMarketOrderAction(null, button, true));
+        assertEquals(false, TradeButtonWindow.isMarketOrderAction(null, button, false));
     }
 
     @Test

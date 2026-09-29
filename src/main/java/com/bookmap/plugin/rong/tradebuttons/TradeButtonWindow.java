@@ -136,11 +136,6 @@ public class TradeButtonWindow {
             public void windowGainedFocus(WindowEvent e) {
                 updateModeLabel(shiftPressed);
             }
-
-            @Override
-            public void windowLostFocus(WindowEvent e) {
-                clearShiftState();
-            }
         });
 
         buttonPanel = new JPanel();
@@ -782,8 +777,13 @@ public class TradeButtonWindow {
     }
 
     private static boolean isMarketOrderAction(ActionEvent event, JButton button) {
+        return isMarketOrderAction(event, button, shiftPressed);
+    }
+
+    static boolean isMarketOrderAction(ActionEvent event, JButton button, boolean trackedShiftPressed) {
         return isShiftModified(event)
-                || Boolean.TRUE.equals(button.getClientProperty(SHIFT_DOWN_CLIENT_PROPERTY));
+                || Boolean.TRUE.equals(button.getClientProperty(SHIFT_DOWN_CLIENT_PROPERTY))
+                || trackedShiftPressed;
     }
 
     private void updateModeLabel(boolean marketMode) {
@@ -886,11 +886,6 @@ public class TradeButtonWindow {
 
     private static String shiftKeyId(KeyEvent event) {
         return event.getKeyCode() + ":" + event.getKeyLocation();
-    }
-
-    private static void clearShiftState() {
-        PRESSED_SHIFT_KEYS.clear();
-        setShiftPressed(false);
     }
 
     private static void setShiftPressed(boolean pressed) {
