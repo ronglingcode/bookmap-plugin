@@ -41,11 +41,11 @@ public class IndicatorConfig {
         enabled.put(ORDER_WALL_CHANGE_ALERTS, true);
         enabled.put(ORDER_WALL_BREAKOUT_SIGNALS, false);
         enabled.put(ORDER_WALL_CHANGE_SOUND, true);
-        enabled.put(FIRE_KEYBOARD_EVENT, false);
+        enabled.put(FIRE_KEYBOARD_EVENT, true);
         enabled.put(FILLED_EXECUTION_MARKERS, true);
         enabled.put(BOOKMAP_PATTERN_SIGNALS, false);
         enabled.put(VWAP, true);
-        enabled.put(EXPERIMENTAL_DIRECT_BROKER_EXECUTION, false);
+        enabled.put(EXPERIMENTAL_DIRECT_BROKER_EXECUTION, true);
     }
 
     public boolean isEnabled(String indicatorKey) {

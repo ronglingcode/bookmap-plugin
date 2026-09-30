@@ -18,6 +18,14 @@ class IndicatorConfigTest {
     }
 
     @Test
+    void keyboardHotkeysAndNativeBrokerExecutionAreEnabledByDefault() {
+        IndicatorConfig config = new IndicatorConfig();
+
+        assertTrue(config.isEnabled(IndicatorConfig.FIRE_KEYBOARD_EVENT));
+        assertTrue(config.isEnabled(IndicatorConfig.EXPERIMENTAL_DIRECT_BROKER_EXECUTION));
+    }
+
+    @Test
     void globalOrderChangeSwitchDisablesSoundWithoutLosingSoundPreference() {
         IndicatorConfig config = new IndicatorConfig();
 

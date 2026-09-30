@@ -1,7 +1,7 @@
 # Experimental direct broker execution
 
 Status: foundation, cancel, exits, and initial wall-reversal entries implemented
-behind one default-off flag. Adds, pending-entry replacement, and reversals are
+behind one default-on flag. Adds, pending-entry replacement, and reversals are
 the next migration stages. See
 [setup and supported actions](direct-broker-execution.md).
 
@@ -19,7 +19,7 @@ Add a small Java execution engine inside bmtrader that mirrors the relevant
 ViteApp modules. For explicitly migrated Bookmap actions, submit broker requests
 directly from Java. Start with Schwab equities, the primary broker in this workspace.
 
-The plugin flag `experimentalDirectBrokerExecution` defaults to `false`.
+The plugin flag `experimentalDirectBrokerExecution` defaults to `true`.
 Maintain a supported-action allowlist. The one flag enables every migrated action.
 Each action becomes eligible only after its
 own migration, protocol negotiation, and validation.

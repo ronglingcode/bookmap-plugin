@@ -324,7 +324,7 @@ Market levels are client-owned. In live or replay mode, the plugin draws the lat
 ## Configuration
 
 Experimental direct Schwab cancellation, exits, and initial wall-reversal entries
-use one default-off **Experimental: Native Broker Execution (Schwab)** setting. See
+use one default-on **Experimental: Native Broker Execution (Schwab)** setting. See
 [setup, supported actions, and reconciliation](docs/direct-broker-execution.md).
 
 The following parameters are plugin defaults unless noted as configurable:

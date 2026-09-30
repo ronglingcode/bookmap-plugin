@@ -1,7 +1,7 @@
 # Experimental direct Schwab execution
 
 The Java `miniviteapp` engine mirrors ViteApp's handler, core target rules, and
-Schwab order factory. One experimental setting defaults to **false**.
+Schwab order factory. One experimental setting defaults to **true**.
 ViteApp still supplies current OAuth tokens, account observations, quotes, and
 plan metadata. Native mutations go straight to Schwab without ProxyServer.
 
@@ -9,7 +9,7 @@ plan metadata. Native mutations go straight to Schwab without ProxyServer.
 
 1. Run ViteApp with a live Schwab equity profile and a successful token refresh.
    Connect it to Bookmap using the existing local WebSocket.
-2. Enable **Experimental: Native Broker Execution (Schwab)** in the addon settings.
+2. Verify **Experimental: Native Broker Execution (Schwab)** is enabled in the addon settings.
    This single switch enables cancel, exits, and supported initial entries together.
    The stored key remains `experimentalDirectBrokerExecution`.
    Install matching ViteApp/plugin builds;

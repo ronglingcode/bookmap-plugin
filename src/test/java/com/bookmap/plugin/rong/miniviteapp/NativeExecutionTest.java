@@ -166,9 +166,9 @@ class NativeExecutionTest {
         }
         @Override public void close() { engine.close(); server.stop(0); }
     }
-    @Test void singleNativeFlagDefaultsOffAndPreservesLegacyRouting() throws Exception {
+    @Test void nativeExecutionEngineRemainsInactiveUntilConfigured() throws Exception {
         var config = new IndicatorConfig();
-        assertFalse(config.isEnabled(IndicatorConfig.EXPERIMENTAL_DIRECT_BROKER_EXECUTION));
+        assertTrue(config.isEnabled(IndicatorConfig.EXPERIMENTAL_DIRECT_BROKER_EXECUTION));
         try (var rig = new Rig()) {
             assertFalse(rig.engine.status().get("enabled").getAsBoolean());
             assertFalse(rig.engine.route(action("KeyC"))); rig.connect();
