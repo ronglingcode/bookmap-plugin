@@ -225,6 +225,31 @@ class ReleaseJarTest {
         assertEquals(jsonObject.getMethod("getAsJsonArray", String.class).invoke(json, "requests"), requests);
     }
 
+    @Test
+    void extendedReloadAndSwapPlansSurviveObfuscation() throws Exception {
+        Class<?> parser = Class.forName("com.bookmap.plugin.shaded.gson.JsonParser");
+        Class<?> jsonObject = Class.forName("com.bookmap.plugin.shaded.gson.JsonObject");
+        Object array = parser.getMethod("parseString", String.class).invoke(null,
+                Files.readString(Path.of(System.getProperty("extended.fixtures"))));
+        Object fixtures = array.getClass().getMethod("getAsJsonArray").invoke(array);
+        String stateName = "com.bookmap.plugin.rong.miniviteapp.models.Models$Snapshot";
+        String handlerName = "com.bookmap.plugin.rong.miniviteapp.controllers.ExtendedHandler";
+        String planName = "com.bookmap.plugin.rong.miniviteapp.models.Models$Plan";
+        for (int index : new int[]{0, 15}) {
+            Object element = fixtures.getClass().getMethod("get", int.class).invoke(fixtures, index);
+            Object fixture = element.getClass().getMethod("getAsJsonObject").invoke(element);
+            Object stateJson = jsonObject.getMethod("getAsJsonObject", String.class).invoke(fixture, "state");
+            Object state = mappedClass(stateName).getConstructor(jsonObject).newInstance(stateJson);
+            Object plan = index == 0
+                    ? mappedMethod(handlerName, planName + " reload(" + stateName + ",boolean,double)", mappedClass(stateName), boolean.class, double.class)
+                        .invoke(null, state, true, 10.0)
+                    : mappedMethod(handlerName, planName + " swap(" + stateName + ")", mappedClass(stateName)).invoke(null, state);
+            Object requests = mappedMethod(planName, "com.bookmap.plugin.shaded.gson.JsonArray toJson()").invoke(plan);
+            Object expected = jsonObject.getMethod("getAsJsonArray", String.class).invoke(fixture, "requests");
+            assertEquals(expected, requests);
+        }
+    }
+
     private static boolean isImplementation(String name) {
         return name.endsWith(".class") && (name.startsWith("bmtrader/internal/")
                 || name.startsWith("com/bookmap/plugin/rong/"));

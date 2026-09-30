@@ -39,4 +39,10 @@ public final class OrderFactory {
         Models.require(!children.isEmpty(), "entry requires protective brackets");
         entry.add("childOrderStrategies", children); return entry;
     }
+    public static JsonObject createOneEntryWithTwoExits(String symbol, boolean isLong, String type,
+            double quantity, double price, double target, double stop) {
+        JsonObject profit = new JsonObject(); profit.addProperty("target", target); profit.addProperty("quantity", quantity);
+        JsonArray targets = new JsonArray(); targets.add(profit);
+        return createOneEntryWithMultipleExits(symbol, isLong, type, quantity, price, targets, stop);
+    }
 }

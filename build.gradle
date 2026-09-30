@@ -139,11 +139,13 @@ tasks.register('releaseTest', Test) {
     inputs.file(obfuscationMapping)
     inputs.file('src/test/resources/direct-execution-fixtures.json')
     inputs.file('src/test/resources/direct-entry-fixtures.json')
+    inputs.file('src/test/resources/extended-execution-fixtures.json')
     systemProperty 'release.jar', releaseJar.get().asFile.absolutePath
     systemProperty 'release.mapping', obfuscationMapping.get().asFile.absolutePath
     systemProperty 'release.version', project.version.toString()
     systemProperty 'execution.fixtures', file('src/test/resources/direct-execution-fixtures.json').absolutePath
     systemProperty 'entry.fixtures', file('src/test/resources/direct-entry-fixtures.json').absolutePath
+    systemProperty 'extended.fixtures', file('src/test/resources/extended-execution-fixtures.json').absolutePath
     systemProperty 'java.awt.headless', 'true'
     jvmArgs '-Xverify:all'
     useJUnitPlatform()

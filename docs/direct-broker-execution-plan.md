@@ -1,8 +1,10 @@
-# Experimental direct broker execution
+# Native broker execution plan
 
-Status: foundation, cancel, exits, and initial wall-reversal entries implemented
-behind one default-on flag. Adds, pending-entry replacement, and reversals are
-the next migration stages. See
+Status: established cancel, exits, adjustments, and standard flat initial entries
+always execute natively. Add Partial, Swap, entries with exposure/pending orders,
+generic directional B/S, and additional risk methods are implemented behind the
+default-off `experimentalDirectBrokerExecution` flag. Off forwards only these
+extended workflows to ViteApp; on executes them natively. See
 [setup and supported actions](direct-broker-execution.md).
 
 ## Objective and initial scope
@@ -19,8 +21,8 @@ Add a small Java execution engine inside bmtrader that mirrors the relevant
 ViteApp modules. For explicitly migrated Bookmap actions, submit broker requests
 directly from Java. Start with Schwab equities, the primary broker in this workspace.
 
-The plugin flag `experimentalDirectBrokerExecution` defaults to `true`.
-Maintain a supported-action allowlist. The one flag enables every migrated action.
+Maintain separate established and extended action groups. The experimental flag
+only controls the extended group; tokens/inputs and established execution remain active.
 Each action becomes eligible only after its
 own migration, protocol negotiation, and validation.
 
@@ -109,7 +111,7 @@ and invalidate credentials when the shared service stops.
 
 Introduce an additive, versioned protocol for:
 
-1. Native feature status with a single enabled flag.
+1. Native executor status, reporting enabled while the plugin runs.
 2. An access-token update: broker, account hash, token, expiry, and generation.
 3. Execution configuration and immutable state snapshots:
    state revision, and action-specific inputs.
@@ -124,16 +126,18 @@ Send the short-lived access token and account hash on connection and
 after successful refresh/account changes. Keep refresh tokens, client secrets, and
 OAuth ownership in ViteApp. Tokens remain in Java memory and never enter settings,
 logs, exceptions, generic message dumps, or test fixtures. Send credentials only
-when the experimental feature is enabled. Clear credentials on feature disable
-or plugin shutdown. Reconnects do not revoke execution or require review.
+while connected to the native executor. Clear credentials on plugin shutdown.
+Reconnects do not revoke execution or require review.
 
-Route every button/hotkey through one plugin router before any broadcast:
+Route every button/hotkey through one native plugin router:
 
-- Flag off or action not migrated: existing `custom_button_click` path.
-- Migrated and ready: Java owns execution; send informational lifecycle events
-  to ViteApp instead of an executable legacy message.
-- Migrated but not ready: reject visibly. Do not silently change executor.
-- Older clients cannot negotiate native execution and continue the legacy path.
+- Supported and ready: Java owns execution; send informational lifecycle events
+  to ViteApp without repeating the broker mutation.
+- Extended flag off: preserve the ViteApp `custom_button_click` route for extended
+  operations. This never changes the established native group.
+- Unsupported or missing inputs: reject visibly through `execution_blocked`.
+- Clients must supply compatible native execution inputs. Native failures never
+  fall back, and unresolved broker review blocks both routes for those actions.
 
 Readiness includes compatible versions and supplied decision inputs, without
 age cutoffs or in-progress/reconciliation waits. Token authorization is delegated to the broker.
@@ -162,29 +166,31 @@ ViteApp receives results, performs its account refresh, updates trading state an
 existing UI/Firestore reporting, and publishes the latest snapshot. Other clicks
 do not wait for those side effects.
 
-Turning the flag off routes future actions through ViteApp unless an unknown
-native outcome still requires review. It does not replay a native action. Retain
+Native failures and unknown native outcomes never fall back to ViteApp.
+Do not replay a native action. Retain
 the existing UI-only plugin logging policy; show native readiness, blocked reasons,
 sanitized results, and timing without introducing credential-bearing session logs.
 
-## Implementation sequence
+## Historical implementation sequence
+
+The sequence below records the original staged migration. Stages 0–5 and the
+remaining currently exposed Add Partial/Swap/exposure workflows are implemented.
+The routing policy above supersedes the original per-stage enablement plan.
 
 Each numbered step is a separate reviewable change in the affected repositories.
 Coordinate protocol changes across ViteApp and bookmap-plugin; commits remain
 separate per repository. Initial direct execution needs no ProxyServer changes.
 
-### 0. Foundation and non-executing comparison
+### 0. Foundation
 
-- Default-off flag, empty action allowlist, shared engine, central router.
+- Supported-action allowlist, shared engine, central native router.
 - Native feature status and token updates over the existing WebSocket.
 - Versioned broker/config/trading-state snapshots without age or conflict gating.
 - Direct Schwab HTTP adapter tested against a fake local broker.
 - Pure decision fixtures using the same normalized inputs for TS and Java.
-- Optional comparison mode computes Java decisions and compares them with the
-  legacy path while only ViteApp executes. No native mutation in this mode.
 
-Deliverable: the original path works unchanged by default; native infrastructure
-can be inspected and tested without sending orders.
+Deliverable: native infrastructure can be inspected and tested with fixtures and
+a fake broker without sending live orders.
 
 ### 1. Cancel / C: first migrated action
 
@@ -252,7 +258,7 @@ account streaming/state ownership as a separate architecture decision.
 
 - Compare TS and Java decisions, selected orders, price/quantity rounding, payloads,
   rejection reasons, and state transitions using captured sanitized fixtures.
-- Test flag off, unsupported actions, independent repeated clicks, reconnect,
+- Test plugin shutdown, both extended-flag settings, unsupported actions, independent repeated clicks, reconnect,
   and inputs without age limits. Verify expired tokens reach the broker and
   refreshed tokens do not interrupt execution.
 - Fake-broker tests cover actual HTTP requests, empty success bodies, rejection,
@@ -267,6 +273,6 @@ account streaming/state ownership as a separate architecture decision.
 
 ## First implementation milestone
 
-Complete foundation plus Cancel / C with `experimentalDirectBrokerExecution=false`
-and an explicit cancel-only capability. Review its fixtures, failure behavior,
+Complete foundation plus Cancel / C with an explicit cancel-only capability.
+Review its fixtures, failure behavior,
 and mirrored structure before beginning the next execution migration.

@@ -25,7 +25,7 @@ public final class Models {
 
     public static final class Order {
         public final String id, symbol, type;
-        public final double quantity, price;
+        public final double quantity, price, exitStopPrice;
         public final boolean isBuy;
         public Order(JsonObject json, String symbol) {
             this.symbol = symbol;
@@ -33,6 +33,7 @@ public final class Models {
             type = string(json, "orderType");
             quantity = number(json, "quantity");
             price = number(json, "price");
+            exitStopPrice = number(json, "exitStopPrice");
             isBuy = bool(json, "isBuy");
         }
     }
@@ -52,7 +53,7 @@ public final class Models {
     public static final class Snapshot {
         public final String symbol;
         public final long revision;
-        public final double netQuantity, currentPrice, bid, ask, entryPrice, coreTarget, coreCount;
+        public final double netQuantity, currentPrice, bid, ask, entryPrice, coreTarget, coreCount, averagePrice;
         public final int batchCount;
         public final boolean splitPartials, hasPlan, coreRuleEnabled, rulesSupported;
         public final List<Order> entries;
@@ -62,6 +63,7 @@ public final class Models {
             symbol = string(json, "symbol");
             revision = (long) number(json, "revision");
             netQuantity = number(json, "netQuantity");
+            averagePrice = number(json, "averagePrice");
             currentPrice = number(json, "currentPrice");
             bid = number(json, "bid"); ask = number(json, "ask");
             entryPrice = number(json, "entryPrice"); coreTarget = number(json, "coreTarget");
@@ -79,6 +81,7 @@ public final class Models {
         /** Overlay streaming prices without replacing account/plan inputs or an in-flight action. */
         public Snapshot(Snapshot state, JsonObject marketData) {
             symbol = state.symbol; revision = state.revision; netQuantity = state.netQuantity;
+            averagePrice = state.averagePrice;
             currentPrice = number(marketData, "currentPrice");
             bid = number(marketData, "bid"); ask = number(marketData, "ask");
             entryPrice = state.entryPrice; coreTarget = state.coreTarget; coreCount = state.coreCount;
@@ -96,6 +99,7 @@ public final class Models {
         public final String method, orderId;
         public final JsonObject body;
         public final Order original;
+        public long delayBeforeMs;
         public Request(String method, Order original, JsonObject body) {
             this.method = method; this.original = original;
             this.orderId = original == null ? "" : original.id; this.body = body;
@@ -112,6 +116,7 @@ public final class Models {
         public final List<Request> requests = new ArrayList<>();
         public boolean clearPending;
         public JsonObject entry;
+        public boolean experimental, requireFlatEntry;
         public Plan(String action) { this.action = action; }
         public JsonArray toJson() {
             JsonArray result = new JsonArray();

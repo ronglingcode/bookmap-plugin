@@ -1,6 +1,6 @@
 # Bookmap Plugin
 
-A Bookmap addon that draws chart indicators and liquidity-wall signals, and forwards manual trading actions and exit-plan updates via WebSocket.
+A Bookmap addon that draws chart indicators and liquidity-wall signals, executes manual trading actions directly through Schwab, and exchanges display inputs and exit-plan updates with ViteApp via WebSocket.
 
 ## Development scope
 
@@ -24,7 +24,7 @@ This repository builds the bmtrader trading addon:
 1. Receives instrument-specific VWAP, market levels, key levels, and zones from ViteApp and draws them in Bookmap.
 2. Labels large liquidity walls directly on the heatmap using compact growth paths like `5→7→10`.
 3. Displays wall-change alerts and pattern badges inside Bookmap.
-4. Forwards trade-button and chart-hotkey actions to ViteApp, and allows editing the active exit plan.
+4. Executes supported trade-button and chart-hotkey actions directly through Schwab, and allows editing the active exit plan in ViteApp.
 5. Uses Bookmap's data coordinates so lines and labels track through scroll and zoom.
 
 ## Features
@@ -33,7 +33,7 @@ This repository builds the bmtrader trading addon:
 - **Order wall signals** — displays active bid/offer size changes at their price on Bookmap's right edge
 - **Auto-drawn indicators** — ViteApp VWAP, premarket high/low, and Camarilla Pivot levels drawn automatically
 - **WebSocket key levels/zones** — instrument-specific price levels and zones pushed by an external app
-- **WebSocket API** — manual trading actions, exit-plan updates, and incoming display configurations
+- **WebSocket API** — native execution inputs/results, exit-plan updates, and incoming display configurations
 - **Live exit-plan editor** — the floating trade window edits ViteApp's active `coreTarget`/`coreCount` plan and reminds after the third completed partial
 - **Settings panel** — enable/disable indicators
 
@@ -107,8 +107,10 @@ const ws = new WebSocket('ws://localhost:8765');
 ws.onmessage = (event) => {
   const data = JSON.parse(event.data);
 
-  if (data.type === 'custom_button_click') {
-    // Handle a trade-button or chart-hotkey action for data.symbol.
+  if (data.type === 'execution_result') {
+    // Refresh UI/trade state for data.symbol; the plugin already sent the order.
+  } else if (data.type === 'custom_button_click') {
+    // Execute an extended workflow forwarded while the experimental flag is off.
   } else if (data.type === 'core_plan_update') {
     // Validate and save the requested exit-plan update, then acknowledge it.
   }
@@ -117,7 +119,7 @@ ws.onmessage = (event) => {
 
 ## WebSocket API Reference
 
-The plugin exposes a WebSocket server on `ws://localhost:8765`. Clients receive manual trading actions and exit-plan updates, and send display configurations to draw.
+The plugin exposes a WebSocket server on `ws://localhost:8765`. Clients supply native execution inputs and display configurations, and receive execution lifecycle results and exit-plan updates.
 
 Every price-bearing message uses the canonical wire-price contract:
 
@@ -130,10 +132,13 @@ Every price-bearing message uses the canonical wire-price contract:
 
 | Type | Description | Frequency |
 | ---- | ----------- | --------- |
-| `custom_button_click` | Manual trade-button or chart-hotkey action | On user action |
+| `execution_status` | Native executor status (protocol 3; enabled while running) | On connection or broker-review reset |
+| `execution_started` / `execution_result` | Native action lifecycle; clients refresh state without repeating the mutation | On native execution |
+| `execution_blocked` / `execution_rejected` | Action-plan failure or rejected execution-input update | On error |
+| `custom_button_click` | Extended action forwarded to ViteApp when its native flag is off | On extended user action |
 | `core_plan_update` | Requested exit-plan target/count change | On user action |
 
-Both message types include a `symbol` field identifying the instrument. Trade actions may include Bookmap session high/low, an estimated market-entry price, or a hovered chart price. The plugin does not send order-book snapshots or wall levels. ViteApp still accepts optional `orderbook` context from compatible clients; without it, initial profit targets use the standard 3R fallback.
+Action lifecycle and exit-plan messages include a `symbol` field identifying the instrument. Local trade actions may use Bookmap session high/low, an estimated market-entry price, or a hovered chart price. Cancel, exits, adjustments, and standard flat initial wall entries always execute natively. Extended operations follow the experimental flag: off forwards to ViteApp, on executes natively. Native plan/dispatch failures never fall back to ViteApp. The plugin does not send order-book snapshots or wall levels; initial profit targets without wall context use the standard 3R fallback.
 
 ### Send key levels and zones (client → server)
 
@@ -323,8 +328,22 @@ Market levels are client-owned. In live or replay mode, the plugin draws the lat
 
 ## Configuration
 
-Experimental direct Schwab cancellation, exits, and initial wall-reversal entries
-use one default-on **Experimental: Native Broker Execution (Schwab)** setting. See
+Direct Schwab cancellation, exits, and initial wall-reversal entries
+always use native broker execution. **Experimental: Extended Native Execution (Schwab)**
+controls only the new workflows and defaults to **off**. Its stored key remains
+`experimentalDirectBrokerExecution`.
+
+| Operations | Flag off | Flag on |
+| --- | --- | --- |
+| Cancel C, Flatten F, Market Out M/numpad, digit adjustments, G/H/T batch adjustments | Native | Native |
+| Flat initial wall-reversal button/chart B/S entries using default, 1 R, or 0.1 R, with no pending orders | Native | Native |
+| Add Partial/reload A or Shift+A; Swap W | ViteApp | Native |
+| Entries with existing positions or pending orders, including same-direction adds and opposite-position entries | ViteApp | Native |
+| Generic non-chart B/S selecting one enabled directional tradebook; other parsed risk methods such as 0.25 R | ViteApp | Native |
+
+Current ViteApp tradebooks all use the mirrored Bookmap wall-reversal family.
+Chart B/S requires a matching wall-reversal definition. Broker review still blocks
+unresolved native actions after turning the flag off. See
 [setup, supported actions, and reconciliation](docs/direct-broker-execution.md).
 
 The following parameters are plugin defaults unless noted as configurable:

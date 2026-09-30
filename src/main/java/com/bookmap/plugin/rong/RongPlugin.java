@@ -603,8 +603,7 @@ public class RongPlugin implements CustomModuleAdapter,
     @Override
     public void onIndicatorConfigChanged(String indicatorKey, boolean enabled) {
         if (IndicatorConfig.EXPERIMENTAL_DIRECT_BROKER_EXECUTION.equals(indicatorKey)) {
-            if (sharedServer != null) sharedServer.setExperimentalDirectExecution(
-                    indicatorConfig.isEnabled(IndicatorConfig.EXPERIMENTAL_DIRECT_BROKER_EXECUTION));
+            if (sharedServer != null) sharedServer.setExperimentalDirectExecution(enabled);
             return;
         }
         if (IndicatorConfig.VWAP.equals(indicatorKey)) {

@@ -1,0 +1,5413 @@
+[
+  {
+    "name": "long market reload",
+    "state": {
+      "symbol": "AAPL",
+      "revision": 1,
+      "observedAt": 1,
+      "quoteObservedAt": 1,
+      "netQuantity": 1000,
+      "currentPrice": 10,
+      "bid": 10,
+      "ask": 10,
+      "batchCount": 10,
+      "splitPartials": false,
+      "hasPlan": false,
+      "coreRuleEnabled": true,
+      "rulesSupported": true,
+      "entries": [],
+      "pairs": [
+        {
+          "LIMIT": {
+            "orderID": "201",
+            "quantity": 250,
+            "orderType": "LIMIT",
+            "price": 12,
+            "isBuy": false
+          },
+          "STOP": {
+            "orderID": "202",
+            "quantity": 250,
+            "orderType": "STOP",
+            "price": 9.5,
+            "isBuy": false
+          },
+          "originalPartial": 1
+        },
+        {
+          "LIMIT": {
+            "orderID": "203",
+            "quantity": 250,
+            "orderType": "LIMIT",
+            "price": 13,
+            "isBuy": false
+          },
+          "STOP": {
+            "orderID": "204",
+            "quantity": 250,
+            "orderType": "STOP",
+            "price": 9.5,
+            "isBuy": false
+          },
+          "originalPartial": 2
+        },
+        {
+          "LIMIT": {
+            "orderID": "205",
+            "quantity": 250,
+            "orderType": "LIMIT",
+            "price": 14,
+            "isBuy": false
+          },
+          "STOP": {
+            "orderID": "206",
+            "quantity": 250,
+            "orderType": "STOP",
+            "price": 9.5,
+            "isBuy": false
+          },
+          "originalPartial": 3
+        },
+        {
+          "LIMIT": {
+            "orderID": "207",
+            "quantity": 250,
+            "orderType": "LIMIT",
+            "price": 15,
+            "isBuy": false
+          },
+          "STOP": {
+            "orderID": "208",
+            "quantity": 250,
+            "orderType": "STOP",
+            "price": 9.5,
+            "isBuy": false
+          },
+          "originalPartial": 4
+        }
+      ],
+      "entryContext": {
+        "observedAt": 1,
+        "definitions": [
+          {
+            "tradebookID": "RangeBoundBidReversal",
+            "isLong": true,
+            "enabled": true,
+            "basePlan": {
+              "planConfigs": {
+                "sizingCount": 10
+              },
+              "coreTarget": 12,
+              "coreCount": 3
+            },
+            "entryArea": {
+              "low": 9,
+              "high": 11
+            }
+          },
+          {
+            "tradebookID": "RangeBoundOfferReversal",
+            "isLong": false,
+            "enabled": true,
+            "basePlan": {
+              "planConfigs": {
+                "sizingCount": 10
+              },
+              "coreTarget": 12,
+              "coreCount": 3
+            },
+            "entryArea": {
+              "low": 9,
+              "high": 11
+            }
+          }
+        ],
+        "attendanceAllowed": true,
+        "watchlistBlockReason": "",
+        "realizedPnl": 0,
+        "dailyMaxLoss": 4000,
+        "riskDollars": 1000,
+        "liquidityScale": 1,
+        "secondsSinceMarketOpen": 300,
+        "openPrice": 10,
+        "vwap": 10,
+        "atr": 1,
+        "maxQuantity": 0,
+        "watchAreas": [],
+        "noTradeZones": [],
+        "volumes": [
+          500000,
+          300000,
+          250000
+        ],
+        "highOfDay": 10.5,
+        "lowOfDay": 9.5,
+        "customEntryPrice": 0,
+        "customStopLong": 9.5,
+        "customStopShort": 10.5,
+        "fixedQuantity": 0,
+        "availableBuyingPower": 1000000,
+        "reloadIsLong": true,
+        "lastExitSize": 0,
+        "crosshairPrice": 10,
+        "todayRange": 1,
+        "allowAddIfBelow": 1000,
+        "maxRiskMultipleWithExistingPosition": 1.2,
+        "activeBasePlan": {
+          "planConfigs": {
+            "sizingCount": 10
+          },
+          "coreTarget": 12,
+          "coreCount": 3
+        },
+        "addTargetLong": 20,
+        "addTargetShort": 1,
+        "isGappedUp": true,
+        "premarketHigh": 11,
+        "premarketLow": 9,
+        "longState": {
+          "initialQuantity": 1000,
+          "partialsCount": 10,
+          "addCount": 0,
+          "tradebookID": "RangeBoundBidReversal",
+          "stopTightenPhase": "idle"
+        },
+        "shortState": {
+          "initialQuantity": 1000,
+          "partialsCount": 10,
+          "addCount": 0,
+          "tradebookID": "RangeBoundOfferReversal",
+          "stopTightenPhase": "idle"
+        },
+        "premktHigh": 11,
+        "premktLow": 9
+      },
+      "averagePrice": 10
+    },
+    "action": {
+      "symbol": "AAPL",
+      "keyCode": "KeyA",
+      "shiftKey": true,
+      "price": 10
+    },
+    "requests": [
+      {
+        "method": "POST",
+        "orderId": "",
+        "body": {
+          "session": "NORMAL",
+          "duration": "DAY",
+          "orderLegCollection": [
+            {
+              "orderLegType": "EQUITY",
+              "instrument": {
+                "assetType": "EQUITY",
+                "symbol": "AAPL"
+              },
+              "instruction": "BUY",
+              "quantity": 100
+            }
+          ],
+          "orderType": "MARKET",
+          "orderStrategyType": "TRIGGER",
+          "childOrderStrategies": [
+            {
+              "orderStrategyType": "OCO",
+              "childOrderStrategies": [
+                {
+                  "session": "NORMAL",
+                  "duration": "DAY",
+                  "orderLegCollection": [
+                    {
+                      "orderLegType": "EQUITY",
+                      "instrument": {
+                        "assetType": "EQUITY",
+                        "symbol": "AAPL"
+                      },
+                      "instruction": "SELL",
+                      "quantity": 100
+                    }
+                  ],
+                  "orderType": "STOP",
+                  "orderStrategyType": "SINGLE",
+                  "stopPrice": 9.5
+                },
+                {
+                  "session": "NORMAL",
+                  "duration": "DAY",
+                  "orderLegCollection": [
+                    {
+                      "orderLegType": "EQUITY",
+                      "instrument": {
+                        "assetType": "EQUITY",
+                        "symbol": "AAPL"
+                      },
+                      "instruction": "SELL",
+                      "quantity": 100
+                    }
+                  ],
+                  "orderType": "LIMIT",
+                  "orderStrategyType": "SINGLE",
+                  "price": 12
+                }
+              ]
+            }
+          ]
+        }
+      }
+    ],
+    "error": false,
+    "messages": [
+      "undefined",
+      "allow add because current position risk 500 (0.5R) is below 1000",
+      "add back partial for AAPL"
+    ]
+  },
+  {
+    "name": "long limit reload",
+    "state": {
+      "symbol": "AAPL",
+      "revision": 1,
+      "observedAt": 1,
+      "quoteObservedAt": 1,
+      "netQuantity": 1000,
+      "currentPrice": 10,
+      "bid": 10,
+      "ask": 10,
+      "batchCount": 10,
+      "splitPartials": false,
+      "hasPlan": false,
+      "coreRuleEnabled": true,
+      "rulesSupported": true,
+      "entries": [],
+      "pairs": [
+        {
+          "LIMIT": {
+            "orderID": "201",
+            "quantity": 250,
+            "orderType": "LIMIT",
+            "price": 12,
+            "isBuy": false
+          },
+          "STOP": {
+            "orderID": "202",
+            "quantity": 250,
+            "orderType": "STOP",
+            "price": 9.5,
+            "isBuy": false
+          },
+          "originalPartial": 1
+        },
+        {
+          "LIMIT": {
+            "orderID": "203",
+            "quantity": 250,
+            "orderType": "LIMIT",
+            "price": 13,
+            "isBuy": false
+          },
+          "STOP": {
+            "orderID": "204",
+            "quantity": 250,
+            "orderType": "STOP",
+            "price": 9.5,
+            "isBuy": false
+          },
+          "originalPartial": 2
+        },
+        {
+          "LIMIT": {
+            "orderID": "205",
+            "quantity": 250,
+            "orderType": "LIMIT",
+            "price": 14,
+            "isBuy": false
+          },
+          "STOP": {
+            "orderID": "206",
+            "quantity": 250,
+            "orderType": "STOP",
+            "price": 9.5,
+            "isBuy": false
+          },
+          "originalPartial": 3
+        },
+        {
+          "LIMIT": {
+            "orderID": "207",
+            "quantity": 250,
+            "orderType": "LIMIT",
+            "price": 15,
+            "isBuy": false
+          },
+          "STOP": {
+            "orderID": "208",
+            "quantity": 250,
+            "orderType": "STOP",
+            "price": 9.5,
+            "isBuy": false
+          },
+          "originalPartial": 4
+        }
+      ],
+      "entryContext": {
+        "observedAt": 1,
+        "definitions": [
+          {
+            "tradebookID": "RangeBoundBidReversal",
+            "isLong": true,
+            "enabled": true,
+            "basePlan": {
+              "planConfigs": {
+                "sizingCount": 10
+              },
+              "coreTarget": 12,
+              "coreCount": 3
+            },
+            "entryArea": {
+              "low": 9,
+              "high": 11
+            }
+          },
+          {
+            "tradebookID": "RangeBoundOfferReversal",
+            "isLong": false,
+            "enabled": true,
+            "basePlan": {
+              "planConfigs": {
+                "sizingCount": 10
+              },
+              "coreTarget": 12,
+              "coreCount": 3
+            },
+            "entryArea": {
+              "low": 9,
+              "high": 11
+            }
+          }
+        ],
+        "attendanceAllowed": true,
+        "watchlistBlockReason": "",
+        "realizedPnl": 0,
+        "dailyMaxLoss": 4000,
+        "riskDollars": 1000,
+        "liquidityScale": 1,
+        "secondsSinceMarketOpen": 300,
+        "openPrice": 10,
+        "vwap": 10,
+        "atr": 1,
+        "maxQuantity": 0,
+        "watchAreas": [],
+        "noTradeZones": [],
+        "volumes": [
+          500000,
+          300000,
+          250000
+        ],
+        "highOfDay": 10.5,
+        "lowOfDay": 9.5,
+        "customEntryPrice": 0,
+        "customStopLong": 9.5,
+        "customStopShort": 10.5,
+        "fixedQuantity": 0,
+        "availableBuyingPower": 1000000,
+        "reloadIsLong": true,
+        "lastExitSize": 0,
+        "crosshairPrice": 10,
+        "todayRange": 1,
+        "allowAddIfBelow": 1000,
+        "maxRiskMultipleWithExistingPosition": 1.2,
+        "activeBasePlan": {
+          "planConfigs": {
+            "sizingCount": 10
+          },
+          "coreTarget": 12,
+          "coreCount": 3
+        },
+        "addTargetLong": 20,
+        "addTargetShort": 1,
+        "isGappedUp": true,
+        "premarketHigh": 11,
+        "premarketLow": 9,
+        "longState": {
+          "initialQuantity": 1000,
+          "partialsCount": 10,
+          "addCount": 0,
+          "tradebookID": "RangeBoundBidReversal",
+          "stopTightenPhase": "idle"
+        },
+        "shortState": {
+          "initialQuantity": 1000,
+          "partialsCount": 10,
+          "addCount": 0,
+          "tradebookID": "RangeBoundOfferReversal",
+          "stopTightenPhase": "idle"
+        },
+        "premktHigh": 11,
+        "premktLow": 9
+      },
+      "averagePrice": 10
+    },
+    "action": {
+      "symbol": "AAPL",
+      "keyCode": "KeyA",
+      "shiftKey": false,
+      "price": 9.8
+    },
+    "requests": [
+      {
+        "method": "POST",
+        "orderId": "",
+        "body": {
+          "session": "NORMAL",
+          "duration": "DAY",
+          "orderLegCollection": [
+            {
+              "orderLegType": "EQUITY",
+              "instrument": {
+                "assetType": "EQUITY",
+                "symbol": "AAPL"
+              },
+              "instruction": "BUY",
+              "quantity": 100
+            }
+          ],
+          "orderType": "LIMIT",
+          "orderStrategyType": "TRIGGER",
+          "price": 9.8,
+          "childOrderStrategies": [
+            {
+              "orderStrategyType": "OCO",
+              "childOrderStrategies": [
+                {
+                  "session": "NORMAL",
+                  "duration": "DAY",
+                  "orderLegCollection": [
+                    {
+                      "orderLegType": "EQUITY",
+                      "instrument": {
+                        "assetType": "EQUITY",
+                        "symbol": "AAPL"
+                      },
+                      "instruction": "SELL",
+                      "quantity": 100
+                    }
+                  ],
+                  "orderType": "STOP",
+                  "orderStrategyType": "SINGLE",
+                  "stopPrice": 9.5
+                },
+                {
+                  "session": "NORMAL",
+                  "duration": "DAY",
+                  "orderLegCollection": [
+                    {
+                      "orderLegType": "EQUITY",
+                      "instrument": {
+                        "assetType": "EQUITY",
+                        "symbol": "AAPL"
+                      },
+                      "instruction": "SELL",
+                      "quantity": 100
+                    }
+                  ],
+                  "orderType": "LIMIT",
+                  "orderStrategyType": "SINGLE",
+                  "price": 12
+                }
+              ]
+            }
+          ]
+        }
+      }
+    ],
+    "error": false,
+    "messages": [
+      "undefined",
+      "allow add because current position risk 500 (0.5R) is below 1000",
+      "add back partial for AAPL"
+    ]
+  },
+  {
+    "name": "long stop reload",
+    "state": {
+      "symbol": "AAPL",
+      "revision": 1,
+      "observedAt": 1,
+      "quoteObservedAt": 1,
+      "netQuantity": 1000,
+      "currentPrice": 10,
+      "bid": 10,
+      "ask": 10,
+      "batchCount": 10,
+      "splitPartials": false,
+      "hasPlan": false,
+      "coreRuleEnabled": true,
+      "rulesSupported": true,
+      "entries": [],
+      "pairs": [
+        {
+          "LIMIT": {
+            "orderID": "201",
+            "quantity": 250,
+            "orderType": "LIMIT",
+            "price": 12,
+            "isBuy": false
+          },
+          "STOP": {
+            "orderID": "202",
+            "quantity": 250,
+            "orderType": "STOP",
+            "price": 9.5,
+            "isBuy": false
+          },
+          "originalPartial": 1
+        },
+        {
+          "LIMIT": {
+            "orderID": "203",
+            "quantity": 250,
+            "orderType": "LIMIT",
+            "price": 13,
+            "isBuy": false
+          },
+          "STOP": {
+            "orderID": "204",
+            "quantity": 250,
+            "orderType": "STOP",
+            "price": 9.5,
+            "isBuy": false
+          },
+          "originalPartial": 2
+        },
+        {
+          "LIMIT": {
+            "orderID": "205",
+            "quantity": 250,
+            "orderType": "LIMIT",
+            "price": 14,
+            "isBuy": false
+          },
+          "STOP": {
+            "orderID": "206",
+            "quantity": 250,
+            "orderType": "STOP",
+            "price": 9.5,
+            "isBuy": false
+          },
+          "originalPartial": 3
+        },
+        {
+          "LIMIT": {
+            "orderID": "207",
+            "quantity": 250,
+            "orderType": "LIMIT",
+            "price": 15,
+            "isBuy": false
+          },
+          "STOP": {
+            "orderID": "208",
+            "quantity": 250,
+            "orderType": "STOP",
+            "price": 9.5,
+            "isBuy": false
+          },
+          "originalPartial": 4
+        }
+      ],
+      "entryContext": {
+        "observedAt": 1,
+        "definitions": [
+          {
+            "tradebookID": "RangeBoundBidReversal",
+            "isLong": true,
+            "enabled": true,
+            "basePlan": {
+              "planConfigs": {
+                "sizingCount": 10
+              },
+              "coreTarget": 12,
+              "coreCount": 3
+            },
+            "entryArea": {
+              "low": 9,
+              "high": 11
+            }
+          },
+          {
+            "tradebookID": "RangeBoundOfferReversal",
+            "isLong": false,
+            "enabled": true,
+            "basePlan": {
+              "planConfigs": {
+                "sizingCount": 10
+              },
+              "coreTarget": 12,
+              "coreCount": 3
+            },
+            "entryArea": {
+              "low": 9,
+              "high": 11
+            }
+          }
+        ],
+        "attendanceAllowed": true,
+        "watchlistBlockReason": "",
+        "realizedPnl": 0,
+        "dailyMaxLoss": 4000,
+        "riskDollars": 1000,
+        "liquidityScale": 1,
+        "secondsSinceMarketOpen": 300,
+        "openPrice": 10,
+        "vwap": 10,
+        "atr": 1,
+        "maxQuantity": 0,
+        "watchAreas": [],
+        "noTradeZones": [],
+        "volumes": [
+          500000,
+          300000,
+          250000
+        ],
+        "highOfDay": 10.5,
+        "lowOfDay": 9.5,
+        "customEntryPrice": 0,
+        "customStopLong": 9.5,
+        "customStopShort": 10.5,
+        "fixedQuantity": 0,
+        "availableBuyingPower": 1000000,
+        "reloadIsLong": true,
+        "lastExitSize": 0,
+        "crosshairPrice": 10,
+        "todayRange": 1,
+        "allowAddIfBelow": 1000,
+        "maxRiskMultipleWithExistingPosition": 1.2,
+        "activeBasePlan": {
+          "planConfigs": {
+            "sizingCount": 10
+          },
+          "coreTarget": 12,
+          "coreCount": 3
+        },
+        "addTargetLong": 20,
+        "addTargetShort": 1,
+        "isGappedUp": true,
+        "premarketHigh": 11,
+        "premarketLow": 9,
+        "longState": {
+          "initialQuantity": 1000,
+          "partialsCount": 10,
+          "addCount": 0,
+          "tradebookID": "RangeBoundBidReversal",
+          "stopTightenPhase": "idle"
+        },
+        "shortState": {
+          "initialQuantity": 1000,
+          "partialsCount": 10,
+          "addCount": 0,
+          "tradebookID": "RangeBoundOfferReversal",
+          "stopTightenPhase": "idle"
+        },
+        "premktHigh": 11,
+        "premktLow": 9
+      },
+      "averagePrice": 10
+    },
+    "action": {
+      "symbol": "AAPL",
+      "keyCode": "KeyA",
+      "shiftKey": false,
+      "price": 10.2
+    },
+    "requests": [
+      {
+        "method": "POST",
+        "orderId": "",
+        "body": {
+          "session": "NORMAL",
+          "duration": "DAY",
+          "orderLegCollection": [
+            {
+              "orderLegType": "EQUITY",
+              "instrument": {
+                "assetType": "EQUITY",
+                "symbol": "AAPL"
+              },
+              "instruction": "BUY",
+              "quantity": 100
+            }
+          ],
+          "orderType": "STOP",
+          "orderStrategyType": "TRIGGER",
+          "stopPrice": 10.2,
+          "childOrderStrategies": [
+            {
+              "orderStrategyType": "OCO",
+              "childOrderStrategies": [
+                {
+                  "session": "NORMAL",
+                  "duration": "DAY",
+                  "orderLegCollection": [
+                    {
+                      "orderLegType": "EQUITY",
+                      "instrument": {
+                        "assetType": "EQUITY",
+                        "symbol": "AAPL"
+                      },
+                      "instruction": "SELL",
+                      "quantity": 100
+                    }
+                  ],
+                  "orderType": "STOP",
+                  "orderStrategyType": "SINGLE",
+                  "stopPrice": 9.5
+                },
+                {
+                  "session": "NORMAL",
+                  "duration": "DAY",
+                  "orderLegCollection": [
+                    {
+                      "orderLegType": "EQUITY",
+                      "instrument": {
+                        "assetType": "EQUITY",
+                        "symbol": "AAPL"
+                      },
+                      "instruction": "SELL",
+                      "quantity": 100
+                    }
+                  ],
+                  "orderType": "LIMIT",
+                  "orderStrategyType": "SINGLE",
+                  "price": 12
+                }
+              ]
+            }
+          ]
+        }
+      }
+    ],
+    "error": false,
+    "messages": [
+      "undefined",
+      "allow add because current position risk 500 (0.5R) is below 1000",
+      "add back partial for AAPL"
+    ]
+  },
+  {
+    "name": "short market reload",
+    "state": {
+      "symbol": "AAPL",
+      "revision": 1,
+      "observedAt": 1,
+      "quoteObservedAt": 1,
+      "netQuantity": -1000,
+      "currentPrice": 10,
+      "bid": 10,
+      "ask": 10,
+      "batchCount": 10,
+      "splitPartials": false,
+      "hasPlan": false,
+      "coreRuleEnabled": true,
+      "rulesSupported": true,
+      "entries": [],
+      "pairs": [
+        {
+          "LIMIT": {
+            "orderID": "201",
+            "quantity": 250,
+            "orderType": "LIMIT",
+            "price": 8,
+            "isBuy": true
+          },
+          "STOP": {
+            "orderID": "202",
+            "quantity": 250,
+            "orderType": "STOP",
+            "price": 10.5,
+            "isBuy": true
+          },
+          "originalPartial": 1
+        },
+        {
+          "LIMIT": {
+            "orderID": "203",
+            "quantity": 250,
+            "orderType": "LIMIT",
+            "price": 8,
+            "isBuy": true
+          },
+          "STOP": {
+            "orderID": "204",
+            "quantity": 250,
+            "orderType": "STOP",
+            "price": 10.5,
+            "isBuy": true
+          },
+          "originalPartial": 2
+        },
+        {
+          "LIMIT": {
+            "orderID": "205",
+            "quantity": 250,
+            "orderType": "LIMIT",
+            "price": 8,
+            "isBuy": true
+          },
+          "STOP": {
+            "orderID": "206",
+            "quantity": 250,
+            "orderType": "STOP",
+            "price": 10.5,
+            "isBuy": true
+          },
+          "originalPartial": 3
+        },
+        {
+          "LIMIT": {
+            "orderID": "207",
+            "quantity": 250,
+            "orderType": "LIMIT",
+            "price": 8,
+            "isBuy": true
+          },
+          "STOP": {
+            "orderID": "208",
+            "quantity": 250,
+            "orderType": "STOP",
+            "price": 10.5,
+            "isBuy": true
+          },
+          "originalPartial": 4
+        }
+      ],
+      "entryContext": {
+        "observedAt": 1,
+        "definitions": [
+          {
+            "tradebookID": "RangeBoundBidReversal",
+            "isLong": true,
+            "enabled": true,
+            "basePlan": {
+              "planConfigs": {
+                "sizingCount": 10
+              },
+              "coreTarget": 12,
+              "coreCount": 3
+            },
+            "entryArea": {
+              "low": 9,
+              "high": 11
+            }
+          },
+          {
+            "tradebookID": "RangeBoundOfferReversal",
+            "isLong": false,
+            "enabled": true,
+            "basePlan": {
+              "planConfigs": {
+                "sizingCount": 10
+              },
+              "coreTarget": 12,
+              "coreCount": 3
+            },
+            "entryArea": {
+              "low": 9,
+              "high": 11
+            }
+          }
+        ],
+        "attendanceAllowed": true,
+        "watchlistBlockReason": "",
+        "realizedPnl": 0,
+        "dailyMaxLoss": 4000,
+        "riskDollars": 1000,
+        "liquidityScale": 1,
+        "secondsSinceMarketOpen": 300,
+        "openPrice": 10,
+        "vwap": 10,
+        "atr": 1,
+        "maxQuantity": 0,
+        "watchAreas": [],
+        "noTradeZones": [],
+        "volumes": [
+          500000,
+          300000,
+          250000
+        ],
+        "highOfDay": 10.5,
+        "lowOfDay": 9.5,
+        "customEntryPrice": 0,
+        "customStopLong": 9.5,
+        "customStopShort": 10.5,
+        "fixedQuantity": 0,
+        "availableBuyingPower": 1000000,
+        "reloadIsLong": false,
+        "lastExitSize": 0,
+        "crosshairPrice": 10,
+        "todayRange": 1,
+        "allowAddIfBelow": 1000,
+        "maxRiskMultipleWithExistingPosition": 1.2,
+        "activeBasePlan": {
+          "planConfigs": {
+            "sizingCount": 10
+          },
+          "coreTarget": 12,
+          "coreCount": 3
+        },
+        "addTargetLong": 20,
+        "addTargetShort": 1,
+        "isGappedUp": true,
+        "premarketHigh": 11,
+        "premarketLow": 9,
+        "longState": {
+          "initialQuantity": 1000,
+          "partialsCount": 10,
+          "addCount": 0,
+          "tradebookID": "RangeBoundBidReversal",
+          "stopTightenPhase": "idle"
+        },
+        "shortState": {
+          "initialQuantity": 1000,
+          "partialsCount": 10,
+          "addCount": 0,
+          "tradebookID": "RangeBoundOfferReversal",
+          "stopTightenPhase": "idle"
+        },
+        "premktHigh": 11,
+        "premktLow": 9
+      },
+      "averagePrice": 10
+    },
+    "action": {
+      "symbol": "AAPL",
+      "keyCode": "KeyA",
+      "shiftKey": true,
+      "price": 10
+    },
+    "requests": [
+      {
+        "method": "POST",
+        "orderId": "",
+        "body": {
+          "session": "NORMAL",
+          "duration": "DAY",
+          "orderLegCollection": [
+            {
+              "orderLegType": "EQUITY",
+              "instrument": {
+                "assetType": "EQUITY",
+                "symbol": "AAPL"
+              },
+              "instruction": "SELL_SHORT",
+              "quantity": 100
+            }
+          ],
+          "orderType": "MARKET",
+          "orderStrategyType": "TRIGGER",
+          "childOrderStrategies": [
+            {
+              "orderStrategyType": "OCO",
+              "childOrderStrategies": [
+                {
+                  "session": "NORMAL",
+                  "duration": "DAY",
+                  "orderLegCollection": [
+                    {
+                      "orderLegType": "EQUITY",
+                      "instrument": {
+                        "assetType": "EQUITY",
+                        "symbol": "AAPL"
+                      },
+                      "instruction": "BUY_TO_COVER",
+                      "quantity": 100
+                    }
+                  ],
+                  "orderType": "STOP",
+                  "orderStrategyType": "SINGLE",
+                  "stopPrice": 10.5
+                },
+                {
+                  "session": "NORMAL",
+                  "duration": "DAY",
+                  "orderLegCollection": [
+                    {
+                      "orderLegType": "EQUITY",
+                      "instrument": {
+                        "assetType": "EQUITY",
+                        "symbol": "AAPL"
+                      },
+                      "instruction": "BUY_TO_COVER",
+                      "quantity": 100
+                    }
+                  ],
+                  "orderType": "LIMIT",
+                  "orderStrategyType": "SINGLE",
+                  "price": 8
+                }
+              ]
+            }
+          ]
+        }
+      }
+    ],
+    "error": false,
+    "messages": [
+      "undefined",
+      "allow add because current position risk 500 (0.5R) is below 1000",
+      "add back partial for AAPL"
+    ]
+  },
+  {
+    "name": "reload cancels earliest when four entries exist",
+    "state": {
+      "symbol": "AAPL",
+      "revision": 1,
+      "observedAt": 1,
+      "quoteObservedAt": 1,
+      "netQuantity": 1000,
+      "currentPrice": 10,
+      "bid": 10,
+      "ask": 10,
+      "batchCount": 10,
+      "splitPartials": false,
+      "hasPlan": false,
+      "coreRuleEnabled": true,
+      "rulesSupported": true,
+      "entries": [
+        {
+          "orderID": "1",
+          "orderType": "LIMIT",
+          "quantity": 10,
+          "price": 9.8,
+          "exitStopPrice": 9.5,
+          "isBuy": true
+        },
+        {
+          "orderID": "2",
+          "orderType": "LIMIT",
+          "quantity": 10,
+          "price": 9.8,
+          "exitStopPrice": 9.5,
+          "isBuy": true
+        },
+        {
+          "orderID": "3",
+          "orderType": "LIMIT",
+          "quantity": 10,
+          "price": 9.8,
+          "exitStopPrice": 9.5,
+          "isBuy": true
+        },
+        {
+          "orderID": "4",
+          "orderType": "LIMIT",
+          "quantity": 10,
+          "price": 9.8,
+          "exitStopPrice": 9.5,
+          "isBuy": true
+        }
+      ],
+      "pairs": [
+        {
+          "LIMIT": {
+            "orderID": "201",
+            "quantity": 250,
+            "orderType": "LIMIT",
+            "price": 12,
+            "isBuy": false
+          },
+          "STOP": {
+            "orderID": "202",
+            "quantity": 250,
+            "orderType": "STOP",
+            "price": 9.5,
+            "isBuy": false
+          },
+          "originalPartial": 1
+        },
+        {
+          "LIMIT": {
+            "orderID": "203",
+            "quantity": 250,
+            "orderType": "LIMIT",
+            "price": 13,
+            "isBuy": false
+          },
+          "STOP": {
+            "orderID": "204",
+            "quantity": 250,
+            "orderType": "STOP",
+            "price": 9.5,
+            "isBuy": false
+          },
+          "originalPartial": 2
+        },
+        {
+          "LIMIT": {
+            "orderID": "205",
+            "quantity": 250,
+            "orderType": "LIMIT",
+            "price": 14,
+            "isBuy": false
+          },
+          "STOP": {
+            "orderID": "206",
+            "quantity": 250,
+            "orderType": "STOP",
+            "price": 9.5,
+            "isBuy": false
+          },
+          "originalPartial": 3
+        },
+        {
+          "LIMIT": {
+            "orderID": "207",
+            "quantity": 250,
+            "orderType": "LIMIT",
+            "price": 15,
+            "isBuy": false
+          },
+          "STOP": {
+            "orderID": "208",
+            "quantity": 250,
+            "orderType": "STOP",
+            "price": 9.5,
+            "isBuy": false
+          },
+          "originalPartial": 4
+        }
+      ],
+      "entryContext": {
+        "observedAt": 1,
+        "definitions": [
+          {
+            "tradebookID": "RangeBoundBidReversal",
+            "isLong": true,
+            "enabled": true,
+            "basePlan": {
+              "planConfigs": {
+                "sizingCount": 10
+              },
+              "coreTarget": 12,
+              "coreCount": 3
+            },
+            "entryArea": {
+              "low": 9,
+              "high": 11
+            }
+          },
+          {
+            "tradebookID": "RangeBoundOfferReversal",
+            "isLong": false,
+            "enabled": true,
+            "basePlan": {
+              "planConfigs": {
+                "sizingCount": 10
+              },
+              "coreTarget": 12,
+              "coreCount": 3
+            },
+            "entryArea": {
+              "low": 9,
+              "high": 11
+            }
+          }
+        ],
+        "attendanceAllowed": true,
+        "watchlistBlockReason": "",
+        "realizedPnl": 0,
+        "dailyMaxLoss": 4000,
+        "riskDollars": 1000,
+        "liquidityScale": 1,
+        "secondsSinceMarketOpen": 300,
+        "openPrice": 10,
+        "vwap": 10,
+        "atr": 1,
+        "maxQuantity": 0,
+        "watchAreas": [],
+        "noTradeZones": [],
+        "volumes": [
+          500000,
+          300000,
+          250000
+        ],
+        "highOfDay": 10.5,
+        "lowOfDay": 9.5,
+        "customEntryPrice": 0,
+        "customStopLong": 9.5,
+        "customStopShort": 10.5,
+        "fixedQuantity": 0,
+        "availableBuyingPower": 1000000,
+        "reloadIsLong": true,
+        "lastExitSize": 0,
+        "crosshairPrice": 10,
+        "todayRange": 1,
+        "allowAddIfBelow": 1000,
+        "maxRiskMultipleWithExistingPosition": 1.2,
+        "activeBasePlan": {
+          "planConfigs": {
+            "sizingCount": 10
+          },
+          "coreTarget": 12,
+          "coreCount": 3
+        },
+        "addTargetLong": 20,
+        "addTargetShort": 1,
+        "isGappedUp": true,
+        "premarketHigh": 11,
+        "premarketLow": 9,
+        "longState": {
+          "initialQuantity": 1000,
+          "partialsCount": 10,
+          "addCount": 0,
+          "tradebookID": "RangeBoundBidReversal",
+          "stopTightenPhase": "idle"
+        },
+        "shortState": {
+          "initialQuantity": 1000,
+          "partialsCount": 10,
+          "addCount": 0,
+          "tradebookID": "RangeBoundOfferReversal",
+          "stopTightenPhase": "idle"
+        },
+        "premktHigh": 11,
+        "premktLow": 9
+      },
+      "averagePrice": 10
+    },
+    "action": {
+      "symbol": "AAPL",
+      "keyCode": "KeyA",
+      "shiftKey": true,
+      "price": 10
+    },
+    "requests": [
+      {
+        "method": "DELETE",
+        "orderId": "1"
+      },
+      {
+        "method": "POST",
+        "orderId": "",
+        "body": {
+          "session": "NORMAL",
+          "duration": "DAY",
+          "orderLegCollection": [
+            {
+              "orderLegType": "EQUITY",
+              "instrument": {
+                "assetType": "EQUITY",
+                "symbol": "AAPL"
+              },
+              "instruction": "BUY",
+              "quantity": 100
+            }
+          ],
+          "orderType": "MARKET",
+          "orderStrategyType": "TRIGGER",
+          "childOrderStrategies": [
+            {
+              "orderStrategyType": "OCO",
+              "childOrderStrategies": [
+                {
+                  "session": "NORMAL",
+                  "duration": "DAY",
+                  "orderLegCollection": [
+                    {
+                      "orderLegType": "EQUITY",
+                      "instrument": {
+                        "assetType": "EQUITY",
+                        "symbol": "AAPL"
+                      },
+                      "instruction": "SELL",
+                      "quantity": 100
+                    }
+                  ],
+                  "orderType": "STOP",
+                  "orderStrategyType": "SINGLE",
+                  "stopPrice": 9.5
+                },
+                {
+                  "session": "NORMAL",
+                  "duration": "DAY",
+                  "orderLegCollection": [
+                    {
+                      "orderLegType": "EQUITY",
+                      "instrument": {
+                        "assetType": "EQUITY",
+                        "symbol": "AAPL"
+                      },
+                      "instruction": "SELL",
+                      "quantity": 100
+                    }
+                  ],
+                  "orderType": "LIMIT",
+                  "orderStrategyType": "SINGLE",
+                  "price": 12
+                }
+              ]
+            }
+          ]
+        }
+      }
+    ],
+    "error": false,
+    "messages": [
+      "undefined",
+      "allow add because current position risk 500 (0.5R) is below 1000",
+      "add back partial for AAPL"
+    ]
+  },
+  {
+    "name": "reload boundary blocks low risk override",
+    "state": {
+      "symbol": "AAPL",
+      "revision": 1,
+      "observedAt": 1,
+      "quoteObservedAt": 1,
+      "netQuantity": 1000,
+      "currentPrice": 10,
+      "bid": 10,
+      "ask": 10,
+      "batchCount": 10,
+      "splitPartials": false,
+      "hasPlan": false,
+      "coreRuleEnabled": true,
+      "rulesSupported": true,
+      "entries": [],
+      "pairs": [
+        {
+          "LIMIT": {
+            "orderID": "201",
+            "quantity": 250,
+            "orderType": "LIMIT",
+            "price": 12,
+            "isBuy": false
+          },
+          "STOP": {
+            "orderID": "202",
+            "quantity": 250,
+            "orderType": "STOP",
+            "price": 9.5,
+            "isBuy": false
+          },
+          "originalPartial": 1
+        },
+        {
+          "LIMIT": {
+            "orderID": "203",
+            "quantity": 250,
+            "orderType": "LIMIT",
+            "price": 13,
+            "isBuy": false
+          },
+          "STOP": {
+            "orderID": "204",
+            "quantity": 250,
+            "orderType": "STOP",
+            "price": 9.5,
+            "isBuy": false
+          },
+          "originalPartial": 2
+        },
+        {
+          "LIMIT": {
+            "orderID": "205",
+            "quantity": 250,
+            "orderType": "LIMIT",
+            "price": 14,
+            "isBuy": false
+          },
+          "STOP": {
+            "orderID": "206",
+            "quantity": 250,
+            "orderType": "STOP",
+            "price": 9.5,
+            "isBuy": false
+          },
+          "originalPartial": 3
+        },
+        {
+          "LIMIT": {
+            "orderID": "207",
+            "quantity": 250,
+            "orderType": "LIMIT",
+            "price": 15,
+            "isBuy": false
+          },
+          "STOP": {
+            "orderID": "208",
+            "quantity": 250,
+            "orderType": "STOP",
+            "price": 9.5,
+            "isBuy": false
+          },
+          "originalPartial": 4
+        }
+      ],
+      "entryContext": {
+        "observedAt": 1,
+        "definitions": [
+          {
+            "tradebookID": "RangeBoundBidReversal",
+            "isLong": true,
+            "enabled": true,
+            "basePlan": {
+              "planConfigs": {
+                "sizingCount": 10
+              },
+              "coreTarget": 12,
+              "coreCount": 3
+            },
+            "entryArea": {
+              "low": 11,
+              "high": 11
+            }
+          },
+          {
+            "tradebookID": "RangeBoundOfferReversal",
+            "isLong": false,
+            "enabled": true,
+            "basePlan": {
+              "planConfigs": {
+                "sizingCount": 10
+              },
+              "coreTarget": 12,
+              "coreCount": 3
+            },
+            "entryArea": {
+              "low": 9,
+              "high": 11
+            }
+          }
+        ],
+        "attendanceAllowed": true,
+        "watchlistBlockReason": "",
+        "realizedPnl": 0,
+        "dailyMaxLoss": 4000,
+        "riskDollars": 1000,
+        "liquidityScale": 1,
+        "secondsSinceMarketOpen": 300,
+        "openPrice": 10,
+        "vwap": 10,
+        "atr": 1,
+        "maxQuantity": 0,
+        "watchAreas": [],
+        "noTradeZones": [],
+        "volumes": [
+          500000,
+          300000,
+          250000
+        ],
+        "highOfDay": 10.5,
+        "lowOfDay": 9.5,
+        "customEntryPrice": 0,
+        "customStopLong": 9.5,
+        "customStopShort": 10.5,
+        "fixedQuantity": 0,
+        "availableBuyingPower": 1000000,
+        "reloadIsLong": true,
+        "lastExitSize": 0,
+        "crosshairPrice": 10,
+        "todayRange": 1,
+        "allowAddIfBelow": 1000,
+        "maxRiskMultipleWithExistingPosition": 1.2,
+        "activeBasePlan": {
+          "planConfigs": {
+            "sizingCount": 10
+          },
+          "coreTarget": 12,
+          "coreCount": 3
+        },
+        "addTargetLong": 20,
+        "addTargetShort": 1,
+        "isGappedUp": true,
+        "premarketHigh": 11,
+        "premarketLow": 9,
+        "longState": {
+          "initialQuantity": 1000,
+          "partialsCount": 10,
+          "addCount": 0,
+          "tradebookID": "RangeBoundBidReversal",
+          "stopTightenPhase": "idle"
+        },
+        "shortState": {
+          "initialQuantity": 1000,
+          "partialsCount": 10,
+          "addCount": 0,
+          "tradebookID": "RangeBoundOfferReversal",
+          "stopTightenPhase": "idle"
+        },
+        "premktHigh": 11,
+        "premktLow": 9
+      },
+      "averagePrice": 10
+    },
+    "action": {
+      "symbol": "AAPL",
+      "keyCode": "KeyA",
+      "shiftKey": true,
+      "price": 10
+    },
+    "requests": [],
+    "error": true,
+    "messages": [
+      "undefined",
+      "Cannot add to AAPL: entry boundary"
+    ]
+  },
+  {
+    "name": "reload low risk overrides tighten discipline",
+    "state": {
+      "symbol": "AAPL",
+      "revision": 1,
+      "observedAt": 1,
+      "quoteObservedAt": 1,
+      "netQuantity": 1000,
+      "currentPrice": 10,
+      "bid": 10,
+      "ask": 10,
+      "batchCount": 10,
+      "splitPartials": false,
+      "hasPlan": false,
+      "coreRuleEnabled": true,
+      "rulesSupported": true,
+      "entries": [],
+      "pairs": [
+        {
+          "LIMIT": {
+            "orderID": "201",
+            "quantity": 250,
+            "orderType": "LIMIT",
+            "price": 12,
+            "isBuy": false
+          },
+          "STOP": {
+            "orderID": "202",
+            "quantity": 250,
+            "orderType": "STOP",
+            "price": 9.5,
+            "isBuy": false
+          },
+          "originalPartial": 1
+        },
+        {
+          "LIMIT": {
+            "orderID": "203",
+            "quantity": 250,
+            "orderType": "LIMIT",
+            "price": 13,
+            "isBuy": false
+          },
+          "STOP": {
+            "orderID": "204",
+            "quantity": 250,
+            "orderType": "STOP",
+            "price": 9.5,
+            "isBuy": false
+          },
+          "originalPartial": 2
+        },
+        {
+          "LIMIT": {
+            "orderID": "205",
+            "quantity": 250,
+            "orderType": "LIMIT",
+            "price": 14,
+            "isBuy": false
+          },
+          "STOP": {
+            "orderID": "206",
+            "quantity": 250,
+            "orderType": "STOP",
+            "price": 9.5,
+            "isBuy": false
+          },
+          "originalPartial": 3
+        },
+        {
+          "LIMIT": {
+            "orderID": "207",
+            "quantity": 250,
+            "orderType": "LIMIT",
+            "price": 15,
+            "isBuy": false
+          },
+          "STOP": {
+            "orderID": "208",
+            "quantity": 250,
+            "orderType": "STOP",
+            "price": 9.5,
+            "isBuy": false
+          },
+          "originalPartial": 4
+        }
+      ],
+      "entryContext": {
+        "observedAt": 1,
+        "definitions": [
+          {
+            "tradebookID": "RangeBoundBidReversal",
+            "isLong": true,
+            "enabled": true,
+            "basePlan": {
+              "planConfigs": {
+                "sizingCount": 10
+              },
+              "coreTarget": 12,
+              "coreCount": 3
+            },
+            "entryArea": {
+              "low": 9,
+              "high": 11
+            }
+          },
+          {
+            "tradebookID": "RangeBoundOfferReversal",
+            "isLong": false,
+            "enabled": true,
+            "basePlan": {
+              "planConfigs": {
+                "sizingCount": 10
+              },
+              "coreTarget": 12,
+              "coreCount": 3
+            },
+            "entryArea": {
+              "low": 9,
+              "high": 11
+            }
+          }
+        ],
+        "attendanceAllowed": true,
+        "watchlistBlockReason": "",
+        "realizedPnl": 0,
+        "dailyMaxLoss": 4000,
+        "riskDollars": 1000,
+        "liquidityScale": 1,
+        "secondsSinceMarketOpen": 300,
+        "openPrice": 10,
+        "vwap": 10,
+        "atr": 1,
+        "maxQuantity": 0,
+        "watchAreas": [],
+        "noTradeZones": [],
+        "volumes": [
+          500000,
+          300000,
+          250000
+        ],
+        "highOfDay": 10.5,
+        "lowOfDay": 9.5,
+        "customEntryPrice": 0,
+        "customStopLong": 9.5,
+        "customStopShort": 10.5,
+        "fixedQuantity": 0,
+        "availableBuyingPower": 1000000,
+        "reloadIsLong": true,
+        "lastExitSize": 0,
+        "crosshairPrice": 10,
+        "todayRange": 1,
+        "allowAddIfBelow": 1000,
+        "maxRiskMultipleWithExistingPosition": 1.2,
+        "activeBasePlan": {
+          "planConfigs": {
+            "sizingCount": 10
+          },
+          "coreTarget": 12,
+          "coreCount": 3
+        },
+        "addTargetLong": 20,
+        "addTargetShort": 1,
+        "isGappedUp": true,
+        "premarketHigh": 11,
+        "premarketLow": 9,
+        "longState": {
+          "initialQuantity": 1000,
+          "partialsCount": 10,
+          "addCount": 0,
+          "tradebookID": "RangeBoundBidReversal",
+          "stopTightenPhase": "needs_tighten"
+        },
+        "shortState": {
+          "initialQuantity": 1000,
+          "partialsCount": 10,
+          "addCount": 0,
+          "tradebookID": "RangeBoundOfferReversal",
+          "stopTightenPhase": "idle"
+        },
+        "premktHigh": 11,
+        "premktLow": 9
+      },
+      "averagePrice": 10
+    },
+    "action": {
+      "symbol": "AAPL",
+      "keyCode": "KeyA",
+      "shiftKey": true,
+      "price": 10
+    },
+    "requests": [
+      {
+        "method": "POST",
+        "orderId": "",
+        "body": {
+          "session": "NORMAL",
+          "duration": "DAY",
+          "orderLegCollection": [
+            {
+              "orderLegType": "EQUITY",
+              "instrument": {
+                "assetType": "EQUITY",
+                "symbol": "AAPL"
+              },
+              "instruction": "BUY",
+              "quantity": 100
+            }
+          ],
+          "orderType": "MARKET",
+          "orderStrategyType": "TRIGGER",
+          "childOrderStrategies": [
+            {
+              "orderStrategyType": "OCO",
+              "childOrderStrategies": [
+                {
+                  "session": "NORMAL",
+                  "duration": "DAY",
+                  "orderLegCollection": [
+                    {
+                      "orderLegType": "EQUITY",
+                      "instrument": {
+                        "assetType": "EQUITY",
+                        "symbol": "AAPL"
+                      },
+                      "instruction": "SELL",
+                      "quantity": 100
+                    }
+                  ],
+                  "orderType": "STOP",
+                  "orderStrategyType": "SINGLE",
+                  "stopPrice": 9.5
+                },
+                {
+                  "session": "NORMAL",
+                  "duration": "DAY",
+                  "orderLegCollection": [
+                    {
+                      "orderLegType": "EQUITY",
+                      "instrument": {
+                        "assetType": "EQUITY",
+                        "symbol": "AAPL"
+                      },
+                      "instruction": "SELL",
+                      "quantity": 100
+                    }
+                  ],
+                  "orderType": "LIMIT",
+                  "orderStrategyType": "SINGLE",
+                  "price": 12
+                }
+              ]
+            }
+          ]
+        }
+      }
+    ],
+    "error": false,
+    "messages": [
+      "undefined",
+      "allow add because current position risk 500 (0.5R) is below 1000",
+      "add back partial for AAPL"
+    ]
+  },
+  {
+    "name": "reload high risk requires tightening",
+    "state": {
+      "symbol": "AAPL",
+      "revision": 1,
+      "observedAt": 1,
+      "quoteObservedAt": 1,
+      "netQuantity": 1000,
+      "currentPrice": 10,
+      "bid": 10,
+      "ask": 10,
+      "batchCount": 10,
+      "splitPartials": false,
+      "hasPlan": false,
+      "coreRuleEnabled": true,
+      "rulesSupported": true,
+      "entries": [],
+      "pairs": [
+        {
+          "LIMIT": {
+            "orderID": "201",
+            "quantity": 250,
+            "orderType": "LIMIT",
+            "price": 12,
+            "isBuy": false
+          },
+          "STOP": {
+            "orderID": "202",
+            "quantity": 250,
+            "orderType": "STOP",
+            "price": 8.9,
+            "isBuy": false
+          },
+          "originalPartial": 1
+        },
+        {
+          "LIMIT": {
+            "orderID": "203",
+            "quantity": 250,
+            "orderType": "LIMIT",
+            "price": 13,
+            "isBuy": false
+          },
+          "STOP": {
+            "orderID": "204",
+            "quantity": 250,
+            "orderType": "STOP",
+            "price": 8.9,
+            "isBuy": false
+          },
+          "originalPartial": 2
+        },
+        {
+          "LIMIT": {
+            "orderID": "205",
+            "quantity": 250,
+            "orderType": "LIMIT",
+            "price": 14,
+            "isBuy": false
+          },
+          "STOP": {
+            "orderID": "206",
+            "quantity": 250,
+            "orderType": "STOP",
+            "price": 8.9,
+            "isBuy": false
+          },
+          "originalPartial": 3
+        },
+        {
+          "LIMIT": {
+            "orderID": "207",
+            "quantity": 250,
+            "orderType": "LIMIT",
+            "price": 15,
+            "isBuy": false
+          },
+          "STOP": {
+            "orderID": "208",
+            "quantity": 250,
+            "orderType": "STOP",
+            "price": 8.9,
+            "isBuy": false
+          },
+          "originalPartial": 4
+        }
+      ],
+      "entryContext": {
+        "observedAt": 1,
+        "definitions": [
+          {
+            "tradebookID": "RangeBoundBidReversal",
+            "isLong": true,
+            "enabled": true,
+            "basePlan": {
+              "planConfigs": {
+                "sizingCount": 10
+              },
+              "coreTarget": 12,
+              "coreCount": 3
+            },
+            "entryArea": {
+              "low": 9,
+              "high": 11
+            }
+          },
+          {
+            "tradebookID": "RangeBoundOfferReversal",
+            "isLong": false,
+            "enabled": true,
+            "basePlan": {
+              "planConfigs": {
+                "sizingCount": 10
+              },
+              "coreTarget": 12,
+              "coreCount": 3
+            },
+            "entryArea": {
+              "low": 9,
+              "high": 11
+            }
+          }
+        ],
+        "attendanceAllowed": true,
+        "watchlistBlockReason": "",
+        "realizedPnl": 0,
+        "dailyMaxLoss": 4000,
+        "riskDollars": 1000,
+        "liquidityScale": 1,
+        "secondsSinceMarketOpen": 300,
+        "openPrice": 10,
+        "vwap": 10,
+        "atr": 1,
+        "maxQuantity": 0,
+        "watchAreas": [],
+        "noTradeZones": [],
+        "volumes": [
+          500000,
+          300000,
+          250000
+        ],
+        "highOfDay": 10.5,
+        "lowOfDay": 9.5,
+        "customEntryPrice": 0,
+        "customStopLong": 9.5,
+        "customStopShort": 10.5,
+        "fixedQuantity": 0,
+        "availableBuyingPower": 1000000,
+        "reloadIsLong": true,
+        "lastExitSize": 0,
+        "crosshairPrice": 10,
+        "todayRange": 1,
+        "allowAddIfBelow": 1000,
+        "maxRiskMultipleWithExistingPosition": 1.2,
+        "activeBasePlan": {
+          "planConfigs": {
+            "sizingCount": 10
+          },
+          "coreTarget": 12,
+          "coreCount": 3
+        },
+        "addTargetLong": 20,
+        "addTargetShort": 1,
+        "isGappedUp": true,
+        "premarketHigh": 11,
+        "premarketLow": 9,
+        "longState": {
+          "initialQuantity": 1000,
+          "partialsCount": 10,
+          "addCount": 0,
+          "tradebookID": "RangeBoundBidReversal",
+          "stopTightenPhase": "needs_tighten"
+        },
+        "shortState": {
+          "initialQuantity": 1000,
+          "partialsCount": 10,
+          "addCount": 0,
+          "tradebookID": "RangeBoundOfferReversal",
+          "stopTightenPhase": "idle"
+        },
+        "premktHigh": 11,
+        "premktLow": 9
+      },
+      "averagePrice": 10
+    },
+    "action": {
+      "symbol": "AAPL",
+      "keyCode": "KeyA",
+      "shiftKey": true,
+      "price": 10
+    },
+    "requests": [],
+    "error": true,
+    "messages": [
+      "undefined",
+      "Cannot add to AAPL: tighten stop first"
+    ]
+  },
+  {
+    "name": "reload attendance blocks even low risk override",
+    "state": {
+      "symbol": "AAPL",
+      "revision": 1,
+      "observedAt": 1,
+      "quoteObservedAt": 1,
+      "netQuantity": 1000,
+      "currentPrice": 10,
+      "bid": 10,
+      "ask": 10,
+      "batchCount": 10,
+      "splitPartials": false,
+      "hasPlan": false,
+      "coreRuleEnabled": true,
+      "rulesSupported": true,
+      "entries": [],
+      "pairs": [
+        {
+          "LIMIT": {
+            "orderID": "201",
+            "quantity": 250,
+            "orderType": "LIMIT",
+            "price": 12,
+            "isBuy": false
+          },
+          "STOP": {
+            "orderID": "202",
+            "quantity": 250,
+            "orderType": "STOP",
+            "price": 9.5,
+            "isBuy": false
+          },
+          "originalPartial": 1
+        },
+        {
+          "LIMIT": {
+            "orderID": "203",
+            "quantity": 250,
+            "orderType": "LIMIT",
+            "price": 13,
+            "isBuy": false
+          },
+          "STOP": {
+            "orderID": "204",
+            "quantity": 250,
+            "orderType": "STOP",
+            "price": 9.5,
+            "isBuy": false
+          },
+          "originalPartial": 2
+        },
+        {
+          "LIMIT": {
+            "orderID": "205",
+            "quantity": 250,
+            "orderType": "LIMIT",
+            "price": 14,
+            "isBuy": false
+          },
+          "STOP": {
+            "orderID": "206",
+            "quantity": 250,
+            "orderType": "STOP",
+            "price": 9.5,
+            "isBuy": false
+          },
+          "originalPartial": 3
+        },
+        {
+          "LIMIT": {
+            "orderID": "207",
+            "quantity": 250,
+            "orderType": "LIMIT",
+            "price": 15,
+            "isBuy": false
+          },
+          "STOP": {
+            "orderID": "208",
+            "quantity": 250,
+            "orderType": "STOP",
+            "price": 9.5,
+            "isBuy": false
+          },
+          "originalPartial": 4
+        }
+      ],
+      "entryContext": {
+        "observedAt": 1,
+        "definitions": [
+          {
+            "tradebookID": "RangeBoundBidReversal",
+            "isLong": true,
+            "enabled": true,
+            "basePlan": {
+              "planConfigs": {
+                "sizingCount": 10
+              },
+              "coreTarget": 12,
+              "coreCount": 3
+            },
+            "entryArea": {
+              "low": 9,
+              "high": 11
+            }
+          },
+          {
+            "tradebookID": "RangeBoundOfferReversal",
+            "isLong": false,
+            "enabled": true,
+            "basePlan": {
+              "planConfigs": {
+                "sizingCount": 10
+              },
+              "coreTarget": 12,
+              "coreCount": 3
+            },
+            "entryArea": {
+              "low": 9,
+              "high": 11
+            }
+          }
+        ],
+        "attendanceAllowed": false,
+        "watchlistBlockReason": "",
+        "realizedPnl": 0,
+        "dailyMaxLoss": 4000,
+        "riskDollars": 1000,
+        "liquidityScale": 1,
+        "secondsSinceMarketOpen": 300,
+        "openPrice": 10,
+        "vwap": 10,
+        "atr": 1,
+        "maxQuantity": 0,
+        "watchAreas": [],
+        "noTradeZones": [],
+        "volumes": [
+          500000,
+          300000,
+          250000
+        ],
+        "highOfDay": 10.5,
+        "lowOfDay": 9.5,
+        "customEntryPrice": 0,
+        "customStopLong": 9.5,
+        "customStopShort": 10.5,
+        "fixedQuantity": 0,
+        "availableBuyingPower": 1000000,
+        "reloadIsLong": true,
+        "lastExitSize": 0,
+        "crosshairPrice": 10,
+        "todayRange": 1,
+        "allowAddIfBelow": 1000,
+        "maxRiskMultipleWithExistingPosition": 1.2,
+        "activeBasePlan": {
+          "planConfigs": {
+            "sizingCount": 10
+          },
+          "coreTarget": 12,
+          "coreCount": 3
+        },
+        "addTargetLong": 20,
+        "addTargetShort": 1,
+        "isGappedUp": true,
+        "premarketHigh": 11,
+        "premarketLow": 9,
+        "longState": {
+          "initialQuantity": 1000,
+          "partialsCount": 10,
+          "addCount": 0,
+          "tradebookID": "RangeBoundBidReversal",
+          "stopTightenPhase": "idle"
+        },
+        "shortState": {
+          "initialQuantity": 1000,
+          "partialsCount": 10,
+          "addCount": 0,
+          "tradebookID": "RangeBoundOfferReversal",
+          "stopTightenPhase": "idle"
+        },
+        "premktHigh": 11,
+        "premktLow": 9
+      },
+      "averagePrice": 10
+    },
+    "action": {
+      "symbol": "AAPL",
+      "keyCode": "KeyA",
+      "shiftKey": true,
+      "price": 10
+    },
+    "requests": [],
+    "error": true,
+    "messages": [
+      "undefined",
+      "allow add because current position risk 500 (0.5R) is below 1000",
+      "add back partial for AAPL"
+    ]
+  },
+  {
+    "name": "reload watchlist blocks high risk add",
+    "state": {
+      "symbol": "AAPL",
+      "revision": 1,
+      "observedAt": 1,
+      "quoteObservedAt": 1,
+      "netQuantity": 1000,
+      "currentPrice": 10,
+      "bid": 10,
+      "ask": 10,
+      "batchCount": 10,
+      "splitPartials": false,
+      "hasPlan": false,
+      "coreRuleEnabled": true,
+      "rulesSupported": true,
+      "entries": [],
+      "pairs": [
+        {
+          "LIMIT": {
+            "orderID": "201",
+            "quantity": 250,
+            "orderType": "LIMIT",
+            "price": 12,
+            "isBuy": false
+          },
+          "STOP": {
+            "orderID": "202",
+            "quantity": 250,
+            "orderType": "STOP",
+            "price": 8.9,
+            "isBuy": false
+          },
+          "originalPartial": 1
+        },
+        {
+          "LIMIT": {
+            "orderID": "203",
+            "quantity": 250,
+            "orderType": "LIMIT",
+            "price": 13,
+            "isBuy": false
+          },
+          "STOP": {
+            "orderID": "204",
+            "quantity": 250,
+            "orderType": "STOP",
+            "price": 8.9,
+            "isBuy": false
+          },
+          "originalPartial": 2
+        },
+        {
+          "LIMIT": {
+            "orderID": "205",
+            "quantity": 250,
+            "orderType": "LIMIT",
+            "price": 14,
+            "isBuy": false
+          },
+          "STOP": {
+            "orderID": "206",
+            "quantity": 250,
+            "orderType": "STOP",
+            "price": 8.9,
+            "isBuy": false
+          },
+          "originalPartial": 3
+        },
+        {
+          "LIMIT": {
+            "orderID": "207",
+            "quantity": 250,
+            "orderType": "LIMIT",
+            "price": 15,
+            "isBuy": false
+          },
+          "STOP": {
+            "orderID": "208",
+            "quantity": 250,
+            "orderType": "STOP",
+            "price": 8.9,
+            "isBuy": false
+          },
+          "originalPartial": 4
+        }
+      ],
+      "entryContext": {
+        "observedAt": 1,
+        "definitions": [
+          {
+            "tradebookID": "RangeBoundBidReversal",
+            "isLong": true,
+            "enabled": true,
+            "basePlan": {
+              "planConfigs": {
+                "sizingCount": 10
+              },
+              "coreTarget": 12,
+              "coreCount": 3
+            },
+            "entryArea": {
+              "low": 9,
+              "high": 11
+            }
+          },
+          {
+            "tradebookID": "RangeBoundOfferReversal",
+            "isLong": false,
+            "enabled": true,
+            "basePlan": {
+              "planConfigs": {
+                "sizingCount": 10
+              },
+              "coreTarget": 12,
+              "coreCount": 3
+            },
+            "entryArea": {
+              "low": 9,
+              "high": 11
+            }
+          }
+        ],
+        "attendanceAllowed": true,
+        "watchlistBlockReason": "watchlist limit",
+        "realizedPnl": 0,
+        "dailyMaxLoss": 4000,
+        "riskDollars": 1000,
+        "liquidityScale": 1,
+        "secondsSinceMarketOpen": 300,
+        "openPrice": 10,
+        "vwap": 10,
+        "atr": 1,
+        "maxQuantity": 0,
+        "watchAreas": [],
+        "noTradeZones": [],
+        "volumes": [
+          500000,
+          300000,
+          250000
+        ],
+        "highOfDay": 10.5,
+        "lowOfDay": 9.5,
+        "customEntryPrice": 0,
+        "customStopLong": 9.5,
+        "customStopShort": 10.5,
+        "fixedQuantity": 0,
+        "availableBuyingPower": 1000000,
+        "reloadIsLong": true,
+        "lastExitSize": 0,
+        "crosshairPrice": 10,
+        "todayRange": 1,
+        "allowAddIfBelow": 1000,
+        "maxRiskMultipleWithExistingPosition": 1.2,
+        "activeBasePlan": {
+          "planConfigs": {
+            "sizingCount": 10
+          },
+          "coreTarget": 12,
+          "coreCount": 3
+        },
+        "addTargetLong": 20,
+        "addTargetShort": 1,
+        "isGappedUp": true,
+        "premarketHigh": 11,
+        "premarketLow": 9,
+        "longState": {
+          "initialQuantity": 1000,
+          "partialsCount": 10,
+          "addCount": 0,
+          "tradebookID": "RangeBoundBidReversal",
+          "stopTightenPhase": "idle"
+        },
+        "shortState": {
+          "initialQuantity": 1000,
+          "partialsCount": 10,
+          "addCount": 0,
+          "tradebookID": "RangeBoundOfferReversal",
+          "stopTightenPhase": "idle"
+        },
+        "premktHigh": 11,
+        "premktLow": 9
+      },
+      "averagePrice": 10
+    },
+    "action": {
+      "symbol": "AAPL",
+      "keyCode": "KeyA",
+      "shiftKey": true,
+      "price": 10
+    },
+    "requests": [],
+    "error": true,
+    "messages": [
+      "undefined",
+      "checkRule: watchlist limit"
+    ]
+  },
+  {
+    "name": "reload daily loss includes existing position risk",
+    "state": {
+      "symbol": "AAPL",
+      "revision": 1,
+      "observedAt": 1,
+      "quoteObservedAt": 1,
+      "netQuantity": 1000,
+      "currentPrice": 10,
+      "bid": 10,
+      "ask": 10,
+      "batchCount": 10,
+      "splitPartials": false,
+      "hasPlan": false,
+      "coreRuleEnabled": true,
+      "rulesSupported": true,
+      "entries": [],
+      "pairs": [
+        {
+          "LIMIT": {
+            "orderID": "201",
+            "quantity": 250,
+            "orderType": "LIMIT",
+            "price": 12,
+            "isBuy": false
+          },
+          "STOP": {
+            "orderID": "202",
+            "quantity": 250,
+            "orderType": "STOP",
+            "price": 8.9,
+            "isBuy": false
+          },
+          "originalPartial": 1
+        },
+        {
+          "LIMIT": {
+            "orderID": "203",
+            "quantity": 250,
+            "orderType": "LIMIT",
+            "price": 13,
+            "isBuy": false
+          },
+          "STOP": {
+            "orderID": "204",
+            "quantity": 250,
+            "orderType": "STOP",
+            "price": 8.9,
+            "isBuy": false
+          },
+          "originalPartial": 2
+        },
+        {
+          "LIMIT": {
+            "orderID": "205",
+            "quantity": 250,
+            "orderType": "LIMIT",
+            "price": 14,
+            "isBuy": false
+          },
+          "STOP": {
+            "orderID": "206",
+            "quantity": 250,
+            "orderType": "STOP",
+            "price": 8.9,
+            "isBuy": false
+          },
+          "originalPartial": 3
+        },
+        {
+          "LIMIT": {
+            "orderID": "207",
+            "quantity": 250,
+            "orderType": "LIMIT",
+            "price": 15,
+            "isBuy": false
+          },
+          "STOP": {
+            "orderID": "208",
+            "quantity": 250,
+            "orderType": "STOP",
+            "price": 8.9,
+            "isBuy": false
+          },
+          "originalPartial": 4
+        }
+      ],
+      "entryContext": {
+        "observedAt": 1,
+        "definitions": [
+          {
+            "tradebookID": "RangeBoundBidReversal",
+            "isLong": true,
+            "enabled": true,
+            "basePlan": {
+              "planConfigs": {
+                "sizingCount": 10
+              },
+              "coreTarget": 12,
+              "coreCount": 3
+            },
+            "entryArea": {
+              "low": 9,
+              "high": 11
+            }
+          },
+          {
+            "tradebookID": "RangeBoundOfferReversal",
+            "isLong": false,
+            "enabled": true,
+            "basePlan": {
+              "planConfigs": {
+                "sizingCount": 10
+              },
+              "coreTarget": 12,
+              "coreCount": 3
+            },
+            "entryArea": {
+              "low": 9,
+              "high": 11
+            }
+          }
+        ],
+        "attendanceAllowed": true,
+        "watchlistBlockReason": "",
+        "realizedPnl": -3100,
+        "dailyMaxLoss": 4000,
+        "riskDollars": 1000,
+        "liquidityScale": 1,
+        "secondsSinceMarketOpen": 300,
+        "openPrice": 10,
+        "vwap": 10,
+        "atr": 1,
+        "maxQuantity": 0,
+        "watchAreas": [],
+        "noTradeZones": [],
+        "volumes": [
+          500000,
+          300000,
+          250000
+        ],
+        "highOfDay": 10.5,
+        "lowOfDay": 9.5,
+        "customEntryPrice": 0,
+        "customStopLong": 9.5,
+        "customStopShort": 10.5,
+        "fixedQuantity": 0,
+        "availableBuyingPower": 1000000,
+        "reloadIsLong": true,
+        "lastExitSize": 0,
+        "crosshairPrice": 10,
+        "todayRange": 1,
+        "allowAddIfBelow": 1000,
+        "maxRiskMultipleWithExistingPosition": 1.2,
+        "activeBasePlan": {
+          "planConfigs": {
+            "sizingCount": 10
+          },
+          "coreTarget": 12,
+          "coreCount": 3
+        },
+        "addTargetLong": 20,
+        "addTargetShort": 1,
+        "isGappedUp": true,
+        "premarketHigh": 11,
+        "premarketLow": 9,
+        "longState": {
+          "initialQuantity": 1000,
+          "partialsCount": 10,
+          "addCount": 0,
+          "tradebookID": "RangeBoundBidReversal",
+          "stopTightenPhase": "idle"
+        },
+        "shortState": {
+          "initialQuantity": 1000,
+          "partialsCount": 10,
+          "addCount": 0,
+          "tradebookID": "RangeBoundOfferReversal",
+          "stopTightenPhase": "idle"
+        },
+        "premktHigh": 11,
+        "premktLow": 9
+      },
+      "averagePrice": 10
+    },
+    "action": {
+      "symbol": "AAPL",
+      "keyCode": "KeyA",
+      "shiftKey": true,
+      "price": 10
+    },
+    "requests": [],
+    "error": true,
+    "messages": [
+      "undefined",
+      "exceeded daily max loss: current pnl - risk = -3100 - 1099.9999999999995 = -4200 > 4000"
+    ]
+  },
+  {
+    "name": "reload new risk includes pending entries",
+    "state": {
+      "symbol": "AAPL",
+      "revision": 1,
+      "observedAt": 1,
+      "quoteObservedAt": 1,
+      "netQuantity": 1000,
+      "currentPrice": 10,
+      "bid": 10,
+      "ask": 10,
+      "batchCount": 10,
+      "splitPartials": false,
+      "hasPlan": false,
+      "coreRuleEnabled": true,
+      "rulesSupported": true,
+      "entries": [
+        {
+          "orderID": "101",
+          "orderType": "LIMIT",
+          "quantity": 500,
+          "price": 10,
+          "exitStopPrice": 9.5,
+          "isBuy": true
+        }
+      ],
+      "pairs": [
+        {
+          "LIMIT": {
+            "orderID": "201",
+            "quantity": 250,
+            "orderType": "LIMIT",
+            "price": 12,
+            "isBuy": false
+          },
+          "STOP": {
+            "orderID": "202",
+            "quantity": 250,
+            "orderType": "STOP",
+            "price": 8.9,
+            "isBuy": false
+          },
+          "originalPartial": 1
+        },
+        {
+          "LIMIT": {
+            "orderID": "203",
+            "quantity": 250,
+            "orderType": "LIMIT",
+            "price": 13,
+            "isBuy": false
+          },
+          "STOP": {
+            "orderID": "204",
+            "quantity": 250,
+            "orderType": "STOP",
+            "price": 8.9,
+            "isBuy": false
+          },
+          "originalPartial": 2
+        },
+        {
+          "LIMIT": {
+            "orderID": "205",
+            "quantity": 250,
+            "orderType": "LIMIT",
+            "price": 14,
+            "isBuy": false
+          },
+          "STOP": {
+            "orderID": "206",
+            "quantity": 250,
+            "orderType": "STOP",
+            "price": 8.9,
+            "isBuy": false
+          },
+          "originalPartial": 3
+        },
+        {
+          "LIMIT": {
+            "orderID": "207",
+            "quantity": 250,
+            "orderType": "LIMIT",
+            "price": 15,
+            "isBuy": false
+          },
+          "STOP": {
+            "orderID": "208",
+            "quantity": 250,
+            "orderType": "STOP",
+            "price": 8.9,
+            "isBuy": false
+          },
+          "originalPartial": 4
+        }
+      ],
+      "entryContext": {
+        "observedAt": 1,
+        "definitions": [
+          {
+            "tradebookID": "RangeBoundBidReversal",
+            "isLong": true,
+            "enabled": true,
+            "basePlan": {
+              "planConfigs": {
+                "sizingCount": 10
+              },
+              "coreTarget": 12,
+              "coreCount": 3
+            },
+            "entryArea": {
+              "low": 9,
+              "high": 11
+            }
+          },
+          {
+            "tradebookID": "RangeBoundOfferReversal",
+            "isLong": false,
+            "enabled": true,
+            "basePlan": {
+              "planConfigs": {
+                "sizingCount": 10
+              },
+              "coreTarget": 12,
+              "coreCount": 3
+            },
+            "entryArea": {
+              "low": 9,
+              "high": 11
+            }
+          }
+        ],
+        "attendanceAllowed": true,
+        "watchlistBlockReason": "",
+        "realizedPnl": -2800,
+        "dailyMaxLoss": 4000,
+        "riskDollars": 1000,
+        "liquidityScale": 1,
+        "secondsSinceMarketOpen": 300,
+        "openPrice": 10,
+        "vwap": 10,
+        "atr": 1,
+        "maxQuantity": 0,
+        "watchAreas": [],
+        "noTradeZones": [],
+        "volumes": [
+          500000,
+          300000,
+          250000
+        ],
+        "highOfDay": 10.5,
+        "lowOfDay": 9.5,
+        "customEntryPrice": 0,
+        "customStopLong": 9.5,
+        "customStopShort": 10.5,
+        "fixedQuantity": 0,
+        "availableBuyingPower": 1000000,
+        "reloadIsLong": true,
+        "lastExitSize": 0,
+        "crosshairPrice": 10,
+        "todayRange": 1,
+        "allowAddIfBelow": 1000,
+        "maxRiskMultipleWithExistingPosition": 1.2,
+        "activeBasePlan": {
+          "planConfigs": {
+            "sizingCount": 10
+          },
+          "coreTarget": 12,
+          "coreCount": 3
+        },
+        "addTargetLong": 20,
+        "addTargetShort": 1,
+        "isGappedUp": true,
+        "premarketHigh": 11,
+        "premarketLow": 9,
+        "longState": {
+          "initialQuantity": 1000,
+          "partialsCount": 10,
+          "addCount": 0,
+          "tradebookID": "RangeBoundBidReversal",
+          "stopTightenPhase": "idle"
+        },
+        "shortState": {
+          "initialQuantity": 1000,
+          "partialsCount": 10,
+          "addCount": 0,
+          "tradebookID": "RangeBoundOfferReversal",
+          "stopTightenPhase": "idle"
+        },
+        "premktHigh": 11,
+        "premktLow": 9
+      },
+      "averagePrice": 10
+    },
+    "action": {
+      "symbol": "AAPL",
+      "keyCode": "KeyA",
+      "shiftKey": true,
+      "price": 10
+    },
+    "requests": [],
+    "error": true,
+    "messages": [
+      "undefined",
+      "adding will exceed daily max loss limit to 4200"
+    ]
+  },
+  {
+    "name": "reload respects 52 percent risk budget",
+    "state": {
+      "symbol": "AAPL",
+      "revision": 1,
+      "observedAt": 1,
+      "quoteObservedAt": 1,
+      "netQuantity": 1000,
+      "currentPrice": 10,
+      "bid": 10,
+      "ask": 10,
+      "batchCount": 10,
+      "splitPartials": false,
+      "hasPlan": false,
+      "coreRuleEnabled": true,
+      "rulesSupported": true,
+      "entries": [],
+      "pairs": [
+        {
+          "LIMIT": {
+            "orderID": "201",
+            "quantity": 250,
+            "orderType": "LIMIT",
+            "price": 12,
+            "isBuy": false
+          },
+          "STOP": {
+            "orderID": "202",
+            "quantity": 250,
+            "orderType": "STOP",
+            "price": 7.9,
+            "isBuy": false
+          },
+          "originalPartial": 1
+        },
+        {
+          "LIMIT": {
+            "orderID": "203",
+            "quantity": 250,
+            "orderType": "LIMIT",
+            "price": 13,
+            "isBuy": false
+          },
+          "STOP": {
+            "orderID": "204",
+            "quantity": 250,
+            "orderType": "STOP",
+            "price": 7.9,
+            "isBuy": false
+          },
+          "originalPartial": 2
+        },
+        {
+          "LIMIT": {
+            "orderID": "205",
+            "quantity": 250,
+            "orderType": "LIMIT",
+            "price": 14,
+            "isBuy": false
+          },
+          "STOP": {
+            "orderID": "206",
+            "quantity": 250,
+            "orderType": "STOP",
+            "price": 7.9,
+            "isBuy": false
+          },
+          "originalPartial": 3
+        },
+        {
+          "LIMIT": {
+            "orderID": "207",
+            "quantity": 250,
+            "orderType": "LIMIT",
+            "price": 15,
+            "isBuy": false
+          },
+          "STOP": {
+            "orderID": "208",
+            "quantity": 250,
+            "orderType": "STOP",
+            "price": 7.9,
+            "isBuy": false
+          },
+          "originalPartial": 4
+        }
+      ],
+      "entryContext": {
+        "observedAt": 1,
+        "definitions": [
+          {
+            "tradebookID": "RangeBoundBidReversal",
+            "isLong": true,
+            "enabled": true,
+            "basePlan": {
+              "planConfigs": {
+                "sizingCount": 10
+              },
+              "coreTarget": 12,
+              "coreCount": 3
+            },
+            "entryArea": {
+              "low": 9,
+              "high": 11
+            }
+          },
+          {
+            "tradebookID": "RangeBoundOfferReversal",
+            "isLong": false,
+            "enabled": true,
+            "basePlan": {
+              "planConfigs": {
+                "sizingCount": 10
+              },
+              "coreTarget": 12,
+              "coreCount": 3
+            },
+            "entryArea": {
+              "low": 9,
+              "high": 11
+            }
+          }
+        ],
+        "attendanceAllowed": true,
+        "watchlistBlockReason": "",
+        "realizedPnl": 0,
+        "dailyMaxLoss": 4000,
+        "riskDollars": 1000,
+        "liquidityScale": 1,
+        "secondsSinceMarketOpen": 300,
+        "openPrice": 10,
+        "vwap": 10,
+        "atr": 1,
+        "maxQuantity": 0,
+        "watchAreas": [],
+        "noTradeZones": [],
+        "volumes": [
+          500000,
+          300000,
+          250000
+        ],
+        "highOfDay": 10.5,
+        "lowOfDay": 9.5,
+        "customEntryPrice": 0,
+        "customStopLong": 9.5,
+        "customStopShort": 10.5,
+        "fixedQuantity": 0,
+        "availableBuyingPower": 1000000,
+        "reloadIsLong": true,
+        "lastExitSize": 0,
+        "crosshairPrice": 10,
+        "todayRange": 1,
+        "allowAddIfBelow": 1000,
+        "maxRiskMultipleWithExistingPosition": 1.2,
+        "activeBasePlan": {
+          "planConfigs": {
+            "sizingCount": 10
+          },
+          "coreTarget": 12,
+          "coreCount": 3
+        },
+        "addTargetLong": 20,
+        "addTargetShort": 1,
+        "isGappedUp": true,
+        "premarketHigh": 11,
+        "premarketLow": 9,
+        "longState": {
+          "initialQuantity": 1000,
+          "partialsCount": 10,
+          "addCount": 0,
+          "tradebookID": "RangeBoundBidReversal",
+          "stopTightenPhase": "idle"
+        },
+        "shortState": {
+          "initialQuantity": 1000,
+          "partialsCount": 10,
+          "addCount": 0,
+          "tradebookID": "RangeBoundOfferReversal",
+          "stopTightenPhase": "idle"
+        },
+        "premktHigh": 11,
+        "premktLow": 9
+      },
+      "averagePrice": 10
+    },
+    "action": {
+      "symbol": "AAPL",
+      "keyCode": "KeyA",
+      "shiftKey": true,
+      "price": 10
+    },
+    "requests": [],
+    "error": true,
+    "messages": [
+      "undefined",
+      "already full position, new ratio will be 0.5374999999999999"
+    ]
+  },
+  {
+    "name": "reload after third add respects half daily range",
+    "state": {
+      "symbol": "AAPL",
+      "revision": 1,
+      "observedAt": 1,
+      "quoteObservedAt": 1,
+      "netQuantity": 1000,
+      "currentPrice": 10,
+      "bid": 10,
+      "ask": 10,
+      "batchCount": 10,
+      "splitPartials": false,
+      "hasPlan": false,
+      "coreRuleEnabled": true,
+      "rulesSupported": true,
+      "entries": [],
+      "pairs": [
+        {
+          "LIMIT": {
+            "orderID": "201",
+            "quantity": 250,
+            "orderType": "LIMIT",
+            "price": 12,
+            "isBuy": false
+          },
+          "STOP": {
+            "orderID": "202",
+            "quantity": 250,
+            "orderType": "STOP",
+            "price": 8.9,
+            "isBuy": false
+          },
+          "originalPartial": 1
+        },
+        {
+          "LIMIT": {
+            "orderID": "203",
+            "quantity": 250,
+            "orderType": "LIMIT",
+            "price": 13,
+            "isBuy": false
+          },
+          "STOP": {
+            "orderID": "204",
+            "quantity": 250,
+            "orderType": "STOP",
+            "price": 8.9,
+            "isBuy": false
+          },
+          "originalPartial": 2
+        },
+        {
+          "LIMIT": {
+            "orderID": "205",
+            "quantity": 250,
+            "orderType": "LIMIT",
+            "price": 14,
+            "isBuy": false
+          },
+          "STOP": {
+            "orderID": "206",
+            "quantity": 250,
+            "orderType": "STOP",
+            "price": 8.9,
+            "isBuy": false
+          },
+          "originalPartial": 3
+        },
+        {
+          "LIMIT": {
+            "orderID": "207",
+            "quantity": 250,
+            "orderType": "LIMIT",
+            "price": 15,
+            "isBuy": false
+          },
+          "STOP": {
+            "orderID": "208",
+            "quantity": 250,
+            "orderType": "STOP",
+            "price": 8.9,
+            "isBuy": false
+          },
+          "originalPartial": 4
+        }
+      ],
+      "entryContext": {
+        "observedAt": 1,
+        "definitions": [
+          {
+            "tradebookID": "RangeBoundBidReversal",
+            "isLong": true,
+            "enabled": true,
+            "basePlan": {
+              "planConfigs": {
+                "sizingCount": 10
+              },
+              "coreTarget": 12,
+              "coreCount": 3
+            },
+            "entryArea": {
+              "low": 9,
+              "high": 11
+            }
+          },
+          {
+            "tradebookID": "RangeBoundOfferReversal",
+            "isLong": false,
+            "enabled": true,
+            "basePlan": {
+              "planConfigs": {
+                "sizingCount": 10
+              },
+              "coreTarget": 12,
+              "coreCount": 3
+            },
+            "entryArea": {
+              "low": 9,
+              "high": 11
+            }
+          }
+        ],
+        "attendanceAllowed": true,
+        "watchlistBlockReason": "",
+        "realizedPnl": 0,
+        "dailyMaxLoss": 4000,
+        "riskDollars": 1000,
+        "liquidityScale": 1,
+        "secondsSinceMarketOpen": 300,
+        "openPrice": 10,
+        "vwap": 10,
+        "atr": 1,
+        "maxQuantity": 0,
+        "watchAreas": [],
+        "noTradeZones": [],
+        "volumes": [
+          500000,
+          300000,
+          250000
+        ],
+        "highOfDay": 10.5,
+        "lowOfDay": 9.5,
+        "customEntryPrice": 0,
+        "customStopLong": 9.5,
+        "customStopShort": 10.5,
+        "fixedQuantity": 0,
+        "availableBuyingPower": 1000000,
+        "reloadIsLong": true,
+        "lastExitSize": 0,
+        "crosshairPrice": 10,
+        "todayRange": 1,
+        "allowAddIfBelow": 1000,
+        "maxRiskMultipleWithExistingPosition": 1.2,
+        "activeBasePlan": {
+          "planConfigs": {
+            "sizingCount": 10
+          },
+          "coreTarget": 12,
+          "coreCount": 3
+        },
+        "addTargetLong": 20,
+        "addTargetShort": 1,
+        "isGappedUp": true,
+        "premarketHigh": 11,
+        "premarketLow": 9,
+        "longState": {
+          "initialQuantity": 1000,
+          "partialsCount": 10,
+          "addCount": 3,
+          "tradebookID": "RangeBoundBidReversal",
+          "stopTightenPhase": "idle"
+        },
+        "shortState": {
+          "initialQuantity": 1000,
+          "partialsCount": 10,
+          "addCount": 0,
+          "tradebookID": "RangeBoundOfferReversal",
+          "stopTightenPhase": "idle"
+        },
+        "premktHigh": 11,
+        "premktLow": 9
+      },
+      "averagePrice": 10
+    },
+    "action": {
+      "symbol": "AAPL",
+      "keyCode": "KeyA",
+      "shiftKey": true,
+      "price": 10
+    },
+    "requests": [],
+    "error": true,
+    "messages": [
+      "undefined"
+    ]
+  },
+  {
+    "name": "reload flat last trade uses one risk target",
+    "state": {
+      "symbol": "AAPL",
+      "revision": 1,
+      "observedAt": 1,
+      "quoteObservedAt": 1,
+      "netQuantity": 0,
+      "currentPrice": 10,
+      "bid": 10,
+      "ask": 10,
+      "batchCount": 10,
+      "splitPartials": false,
+      "hasPlan": false,
+      "coreRuleEnabled": true,
+      "rulesSupported": true,
+      "entries": [],
+      "pairs": [],
+      "entryContext": {
+        "observedAt": 1,
+        "definitions": [
+          {
+            "tradebookID": "RangeBoundBidReversal",
+            "isLong": true,
+            "enabled": true,
+            "basePlan": {
+              "planConfigs": {
+                "sizingCount": 10
+              },
+              "coreTarget": 12,
+              "coreCount": 3
+            },
+            "entryArea": {
+              "low": 9,
+              "high": 11
+            }
+          },
+          {
+            "tradebookID": "RangeBoundOfferReversal",
+            "isLong": false,
+            "enabled": true,
+            "basePlan": {
+              "planConfigs": {
+                "sizingCount": 10
+              },
+              "coreTarget": 12,
+              "coreCount": 3
+            },
+            "entryArea": {
+              "low": 9,
+              "high": 11
+            }
+          }
+        ],
+        "attendanceAllowed": true,
+        "watchlistBlockReason": "",
+        "realizedPnl": 0,
+        "dailyMaxLoss": 4000,
+        "riskDollars": 1000,
+        "liquidityScale": 1,
+        "secondsSinceMarketOpen": 300,
+        "openPrice": 10,
+        "vwap": 10,
+        "atr": 1,
+        "maxQuantity": 0,
+        "watchAreas": [],
+        "noTradeZones": [],
+        "volumes": [
+          500000,
+          300000,
+          250000
+        ],
+        "highOfDay": 10.5,
+        "lowOfDay": 9.5,
+        "customEntryPrice": 0,
+        "customStopLong": 9.5,
+        "customStopShort": 10.5,
+        "fixedQuantity": 0,
+        "availableBuyingPower": 1000000,
+        "reloadIsLong": true,
+        "lastExitSize": 0,
+        "crosshairPrice": 10,
+        "todayRange": 1,
+        "allowAddIfBelow": 1000,
+        "maxRiskMultipleWithExistingPosition": 1.2,
+        "activeBasePlan": {
+          "planConfigs": {
+            "sizingCount": 10
+          },
+          "coreTarget": 12,
+          "coreCount": 3
+        },
+        "addTargetLong": 20,
+        "addTargetShort": 1,
+        "isGappedUp": true,
+        "premarketHigh": 11,
+        "premarketLow": 9,
+        "longState": {
+          "initialQuantity": 1000,
+          "partialsCount": 10,
+          "addCount": 0,
+          "tradebookID": "RangeBoundBidReversal",
+          "stopTightenPhase": "idle"
+        },
+        "shortState": {
+          "initialQuantity": 1000,
+          "partialsCount": 10,
+          "addCount": 0,
+          "tradebookID": "RangeBoundOfferReversal",
+          "stopTightenPhase": "idle"
+        },
+        "premktHigh": 11,
+        "premktLow": 9
+      },
+      "averagePrice": 10
+    },
+    "action": {
+      "symbol": "AAPL",
+      "keyCode": "KeyA",
+      "shiftKey": true,
+      "price": 10
+    },
+    "requests": [
+      {
+        "method": "POST",
+        "orderId": "",
+        "body": {
+          "session": "NORMAL",
+          "duration": "DAY",
+          "orderLegCollection": [
+            {
+              "orderLegType": "EQUITY",
+              "instrument": {
+                "assetType": "EQUITY",
+                "symbol": "AAPL"
+              },
+              "instruction": "BUY",
+              "quantity": 100
+            }
+          ],
+          "orderType": "MARKET",
+          "orderStrategyType": "TRIGGER",
+          "childOrderStrategies": [
+            {
+              "orderStrategyType": "OCO",
+              "childOrderStrategies": [
+                {
+                  "session": "NORMAL",
+                  "duration": "DAY",
+                  "orderLegCollection": [
+                    {
+                      "orderLegType": "EQUITY",
+                      "instrument": {
+                        "assetType": "EQUITY",
+                        "symbol": "AAPL"
+                      },
+                      "instruction": "SELL",
+                      "quantity": 100
+                    }
+                  ],
+                  "orderType": "STOP",
+                  "orderStrategyType": "SINGLE",
+                  "stopPrice": 9.5
+                },
+                {
+                  "session": "NORMAL",
+                  "duration": "DAY",
+                  "orderLegCollection": [
+                    {
+                      "orderLegType": "EQUITY",
+                      "instrument": {
+                        "assetType": "EQUITY",
+                        "symbol": "AAPL"
+                      },
+                      "instruction": "SELL",
+                      "quantity": 100
+                    }
+                  ],
+                  "orderType": "LIMIT",
+                  "orderStrategyType": "SINGLE",
+                  "price": 10.5
+                }
+              ]
+            }
+          ]
+        }
+      }
+    ],
+    "error": false,
+    "messages": [
+      "undefined",
+      "add back partial for AAPL"
+    ]
+  },
+  {
+    "name": "swap closes and reenters original long direction",
+    "state": {
+      "symbol": "AAPL",
+      "revision": 1,
+      "observedAt": 1,
+      "quoteObservedAt": 1,
+      "netQuantity": 1000,
+      "currentPrice": 10,
+      "bid": 10,
+      "ask": 10,
+      "batchCount": 10,
+      "splitPartials": false,
+      "hasPlan": false,
+      "coreRuleEnabled": true,
+      "rulesSupported": true,
+      "entries": [],
+      "pairs": [
+        {
+          "LIMIT": {
+            "orderID": "201",
+            "quantity": 250,
+            "orderType": "LIMIT",
+            "price": 12,
+            "isBuy": false
+          },
+          "STOP": {
+            "orderID": "202",
+            "quantity": 250,
+            "orderType": "STOP",
+            "price": 9.5,
+            "isBuy": false
+          },
+          "originalPartial": 1
+        },
+        {
+          "LIMIT": {
+            "orderID": "203",
+            "quantity": 250,
+            "orderType": "LIMIT",
+            "price": 13,
+            "isBuy": false
+          },
+          "STOP": {
+            "orderID": "204",
+            "quantity": 250,
+            "orderType": "STOP",
+            "price": 9.5,
+            "isBuy": false
+          },
+          "originalPartial": 2
+        },
+        {
+          "LIMIT": {
+            "orderID": "205",
+            "quantity": 250,
+            "orderType": "LIMIT",
+            "price": 14,
+            "isBuy": false
+          },
+          "STOP": {
+            "orderID": "206",
+            "quantity": 250,
+            "orderType": "STOP",
+            "price": 9.5,
+            "isBuy": false
+          },
+          "originalPartial": 3
+        },
+        {
+          "LIMIT": {
+            "orderID": "207",
+            "quantity": 250,
+            "orderType": "LIMIT",
+            "price": 15,
+            "isBuy": false
+          },
+          "STOP": {
+            "orderID": "208",
+            "quantity": 250,
+            "orderType": "STOP",
+            "price": 9.5,
+            "isBuy": false
+          },
+          "originalPartial": 4
+        }
+      ],
+      "entryContext": {
+        "observedAt": 1,
+        "definitions": [
+          {
+            "tradebookID": "RangeBoundBidReversal",
+            "isLong": true,
+            "enabled": true,
+            "basePlan": {
+              "planConfigs": {
+                "sizingCount": 10
+              },
+              "coreTarget": 12,
+              "coreCount": 3
+            },
+            "entryArea": {
+              "low": 9,
+              "high": 11
+            }
+          },
+          {
+            "tradebookID": "RangeBoundOfferReversal",
+            "isLong": false,
+            "enabled": true,
+            "basePlan": {
+              "planConfigs": {
+                "sizingCount": 10
+              },
+              "coreTarget": 12,
+              "coreCount": 3
+            },
+            "entryArea": {
+              "low": 9,
+              "high": 11
+            }
+          }
+        ],
+        "attendanceAllowed": true,
+        "watchlistBlockReason": "",
+        "realizedPnl": 0,
+        "dailyMaxLoss": 4000,
+        "riskDollars": 1000,
+        "liquidityScale": 1,
+        "secondsSinceMarketOpen": 300,
+        "openPrice": 10,
+        "vwap": 10,
+        "atr": 1,
+        "maxQuantity": 0,
+        "watchAreas": [],
+        "noTradeZones": [],
+        "volumes": [
+          500000,
+          300000,
+          250000
+        ],
+        "highOfDay": 10.5,
+        "lowOfDay": 9.5,
+        "customEntryPrice": 0,
+        "customStopLong": 9.5,
+        "customStopShort": 10.5,
+        "fixedQuantity": 0,
+        "availableBuyingPower": 1000000,
+        "reloadIsLong": true,
+        "lastExitSize": 0,
+        "crosshairPrice": 10,
+        "todayRange": 1,
+        "allowAddIfBelow": 1000,
+        "maxRiskMultipleWithExistingPosition": 1.2,
+        "activeBasePlan": {
+          "planConfigs": {
+            "sizingCount": 10
+          },
+          "coreTarget": 12,
+          "coreCount": 3
+        },
+        "addTargetLong": 20,
+        "addTargetShort": 1,
+        "isGappedUp": true,
+        "premarketHigh": 11,
+        "premarketLow": 9,
+        "longState": {
+          "initialQuantity": 1000,
+          "partialsCount": 10,
+          "addCount": 0,
+          "tradebookID": "RangeBoundBidReversal",
+          "stopTightenPhase": "idle"
+        },
+        "shortState": {
+          "initialQuantity": 1000,
+          "partialsCount": 10,
+          "addCount": 0,
+          "tradebookID": "RangeBoundOfferReversal",
+          "stopTightenPhase": "idle"
+        },
+        "premktHigh": 11,
+        "premktLow": 9
+      },
+      "averagePrice": 10
+    },
+    "action": {
+      "symbol": "AAPL",
+      "keyCode": "KeyW",
+      "shiftKey": false,
+      "price": 10
+    },
+    "requests": [
+      {
+        "method": "PUT",
+        "orderId": "201",
+        "body": {
+          "session": "NORMAL",
+          "duration": "DAY",
+          "orderLegCollection": [
+            {
+              "orderLegType": "EQUITY",
+              "instrument": {
+                "assetType": "EQUITY",
+                "symbol": "AAPL"
+              },
+              "instruction": "SELL",
+              "quantity": 250
+            }
+          ],
+          "orderType": "MARKET",
+          "orderStrategyType": "SINGLE"
+        }
+      },
+      {
+        "method": "PUT",
+        "orderId": "203",
+        "body": {
+          "session": "NORMAL",
+          "duration": "DAY",
+          "orderLegCollection": [
+            {
+              "orderLegType": "EQUITY",
+              "instrument": {
+                "assetType": "EQUITY",
+                "symbol": "AAPL"
+              },
+              "instruction": "SELL",
+              "quantity": 250
+            }
+          ],
+          "orderType": "MARKET",
+          "orderStrategyType": "SINGLE"
+        }
+      },
+      {
+        "method": "PUT",
+        "orderId": "205",
+        "body": {
+          "session": "NORMAL",
+          "duration": "DAY",
+          "orderLegCollection": [
+            {
+              "orderLegType": "EQUITY",
+              "instrument": {
+                "assetType": "EQUITY",
+                "symbol": "AAPL"
+              },
+              "instruction": "SELL",
+              "quantity": 250
+            }
+          ],
+          "orderType": "MARKET",
+          "orderStrategyType": "SINGLE"
+        }
+      },
+      {
+        "method": "PUT",
+        "orderId": "207",
+        "body": {
+          "session": "NORMAL",
+          "duration": "DAY",
+          "orderLegCollection": [
+            {
+              "orderLegType": "EQUITY",
+              "instrument": {
+                "assetType": "EQUITY",
+                "symbol": "AAPL"
+              },
+              "instruction": "SELL",
+              "quantity": 250
+            }
+          ],
+          "orderType": "MARKET",
+          "orderStrategyType": "SINGLE"
+        }
+      },
+      {
+        "method": "POST",
+        "orderId": "",
+        "body": {
+          "session": "NORMAL",
+          "duration": "DAY",
+          "orderLegCollection": [
+            {
+              "orderLegType": "EQUITY",
+              "instrument": {
+                "assetType": "EQUITY",
+                "symbol": "AAPL"
+              },
+              "instruction": "BUY",
+              "quantity": 990
+            }
+          ],
+          "orderType": "STOP",
+          "orderStrategyType": "TRIGGER",
+          "stopPrice": 10.51,
+          "childOrderStrategies": [
+            {
+              "orderStrategyType": "OCO",
+              "childOrderStrategies": [
+                {
+                  "session": "NORMAL",
+                  "duration": "DAY",
+                  "orderLegCollection": [
+                    {
+                      "orderLegType": "EQUITY",
+                      "instrument": {
+                        "assetType": "EQUITY",
+                        "symbol": "AAPL"
+                      },
+                      "instruction": "SELL",
+                      "quantity": 99
+                    }
+                  ],
+                  "orderType": "STOP",
+                  "orderStrategyType": "SINGLE",
+                  "stopPrice": 9.49
+                },
+                {
+                  "session": "NORMAL",
+                  "duration": "DAY",
+                  "orderLegCollection": [
+                    {
+                      "orderLegType": "EQUITY",
+                      "instrument": {
+                        "assetType": "EQUITY",
+                        "symbol": "AAPL"
+                      },
+                      "instruction": "SELL",
+                      "quantity": 99
+                    }
+                  ],
+                  "orderType": "LIMIT",
+                  "orderStrategyType": "SINGLE",
+                  "price": 13.54
+                }
+              ]
+            },
+            {
+              "orderStrategyType": "OCO",
+              "childOrderStrategies": [
+                {
+                  "session": "NORMAL",
+                  "duration": "DAY",
+                  "orderLegCollection": [
+                    {
+                      "orderLegType": "EQUITY",
+                      "instrument": {
+                        "assetType": "EQUITY",
+                        "symbol": "AAPL"
+                      },
+                      "instruction": "SELL",
+                      "quantity": 99
+                    }
+                  ],
+                  "orderType": "STOP",
+                  "orderStrategyType": "SINGLE",
+                  "stopPrice": 9.49
+                },
+                {
+                  "session": "NORMAL",
+                  "duration": "DAY",
+                  "orderLegCollection": [
+                    {
+                      "orderLegType": "EQUITY",
+                      "instrument": {
+                        "assetType": "EQUITY",
+                        "symbol": "AAPL"
+                      },
+                      "instruction": "SELL",
+                      "quantity": 99
+                    }
+                  ],
+                  "orderType": "LIMIT",
+                  "orderStrategyType": "SINGLE",
+                  "price": 13.54
+                }
+              ]
+            },
+            {
+              "orderStrategyType": "OCO",
+              "childOrderStrategies": [
+                {
+                  "session": "NORMAL",
+                  "duration": "DAY",
+                  "orderLegCollection": [
+                    {
+                      "orderLegType": "EQUITY",
+                      "instrument": {
+                        "assetType": "EQUITY",
+                        "symbol": "AAPL"
+                      },
+                      "instruction": "SELL",
+                      "quantity": 99
+                    }
+                  ],
+                  "orderType": "STOP",
+                  "orderStrategyType": "SINGLE",
+                  "stopPrice": 9.49
+                },
+                {
+                  "session": "NORMAL",
+                  "duration": "DAY",
+                  "orderLegCollection": [
+                    {
+                      "orderLegType": "EQUITY",
+                      "instrument": {
+                        "assetType": "EQUITY",
+                        "symbol": "AAPL"
+                      },
+                      "instruction": "SELL",
+                      "quantity": 99
+                    }
+                  ],
+                  "orderType": "LIMIT",
+                  "orderStrategyType": "SINGLE",
+                  "price": 13.54
+                }
+              ]
+            },
+            {
+              "orderStrategyType": "OCO",
+              "childOrderStrategies": [
+                {
+                  "session": "NORMAL",
+                  "duration": "DAY",
+                  "orderLegCollection": [
+                    {
+                      "orderLegType": "EQUITY",
+                      "instrument": {
+                        "assetType": "EQUITY",
+                        "symbol": "AAPL"
+                      },
+                      "instruction": "SELL",
+                      "quantity": 99
+                    }
+                  ],
+                  "orderType": "STOP",
+                  "orderStrategyType": "SINGLE",
+                  "stopPrice": 9.49
+                },
+                {
+                  "session": "NORMAL",
+                  "duration": "DAY",
+                  "orderLegCollection": [
+                    {
+                      "orderLegType": "EQUITY",
+                      "instrument": {
+                        "assetType": "EQUITY",
+                        "symbol": "AAPL"
+                      },
+                      "instruction": "SELL",
+                      "quantity": 99
+                    }
+                  ],
+                  "orderType": "LIMIT",
+                  "orderStrategyType": "SINGLE",
+                  "price": 13.54
+                }
+              ]
+            },
+            {
+              "orderStrategyType": "OCO",
+              "childOrderStrategies": [
+                {
+                  "session": "NORMAL",
+                  "duration": "DAY",
+                  "orderLegCollection": [
+                    {
+                      "orderLegType": "EQUITY",
+                      "instrument": {
+                        "assetType": "EQUITY",
+                        "symbol": "AAPL"
+                      },
+                      "instruction": "SELL",
+                      "quantity": 99
+                    }
+                  ],
+                  "orderType": "STOP",
+                  "orderStrategyType": "SINGLE",
+                  "stopPrice": 9.49
+                },
+                {
+                  "session": "NORMAL",
+                  "duration": "DAY",
+                  "orderLegCollection": [
+                    {
+                      "orderLegType": "EQUITY",
+                      "instrument": {
+                        "assetType": "EQUITY",
+                        "symbol": "AAPL"
+                      },
+                      "instruction": "SELL",
+                      "quantity": 99
+                    }
+                  ],
+                  "orderType": "LIMIT",
+                  "orderStrategyType": "SINGLE",
+                  "price": 13.54
+                }
+              ]
+            },
+            {
+              "orderStrategyType": "OCO",
+              "childOrderStrategies": [
+                {
+                  "session": "NORMAL",
+                  "duration": "DAY",
+                  "orderLegCollection": [
+                    {
+                      "orderLegType": "EQUITY",
+                      "instrument": {
+                        "assetType": "EQUITY",
+                        "symbol": "AAPL"
+                      },
+                      "instruction": "SELL",
+                      "quantity": 99
+                    }
+                  ],
+                  "orderType": "STOP",
+                  "orderStrategyType": "SINGLE",
+                  "stopPrice": 9.49
+                },
+                {
+                  "session": "NORMAL",
+                  "duration": "DAY",
+                  "orderLegCollection": [
+                    {
+                      "orderLegType": "EQUITY",
+                      "instrument": {
+                        "assetType": "EQUITY",
+                        "symbol": "AAPL"
+                      },
+                      "instruction": "SELL",
+                      "quantity": 99
+                    }
+                  ],
+                  "orderType": "LIMIT",
+                  "orderStrategyType": "SINGLE",
+                  "price": 13.54
+                }
+              ]
+            },
+            {
+              "orderStrategyType": "OCO",
+              "childOrderStrategies": [
+                {
+                  "session": "NORMAL",
+                  "duration": "DAY",
+                  "orderLegCollection": [
+                    {
+                      "orderLegType": "EQUITY",
+                      "instrument": {
+                        "assetType": "EQUITY",
+                        "symbol": "AAPL"
+                      },
+                      "instruction": "SELL",
+                      "quantity": 99
+                    }
+                  ],
+                  "orderType": "STOP",
+                  "orderStrategyType": "SINGLE",
+                  "stopPrice": 9.49
+                },
+                {
+                  "session": "NORMAL",
+                  "duration": "DAY",
+                  "orderLegCollection": [
+                    {
+                      "orderLegType": "EQUITY",
+                      "instrument": {
+                        "assetType": "EQUITY",
+                        "symbol": "AAPL"
+                      },
+                      "instruction": "SELL",
+                      "quantity": 99
+                    }
+                  ],
+                  "orderType": "LIMIT",
+                  "orderStrategyType": "SINGLE",
+                  "price": 13.54
+                }
+              ]
+            },
+            {
+              "orderStrategyType": "OCO",
+              "childOrderStrategies": [
+                {
+                  "session": "NORMAL",
+                  "duration": "DAY",
+                  "orderLegCollection": [
+                    {
+                      "orderLegType": "EQUITY",
+                      "instrument": {
+                        "assetType": "EQUITY",
+                        "symbol": "AAPL"
+                      },
+                      "instruction": "SELL",
+                      "quantity": 99
+                    }
+                  ],
+                  "orderType": "STOP",
+                  "orderStrategyType": "SINGLE",
+                  "stopPrice": 9.49
+                },
+                {
+                  "session": "NORMAL",
+                  "duration": "DAY",
+                  "orderLegCollection": [
+                    {
+                      "orderLegType": "EQUITY",
+                      "instrument": {
+                        "assetType": "EQUITY",
+                        "symbol": "AAPL"
+                      },
+                      "instruction": "SELL",
+                      "quantity": 99
+                    }
+                  ],
+                  "orderType": "LIMIT",
+                  "orderStrategyType": "SINGLE",
+                  "price": 13.54
+                }
+              ]
+            },
+            {
+              "orderStrategyType": "OCO",
+              "childOrderStrategies": [
+                {
+                  "session": "NORMAL",
+                  "duration": "DAY",
+                  "orderLegCollection": [
+                    {
+                      "orderLegType": "EQUITY",
+                      "instrument": {
+                        "assetType": "EQUITY",
+                        "symbol": "AAPL"
+                      },
+                      "instruction": "SELL",
+                      "quantity": 99
+                    }
+                  ],
+                  "orderType": "STOP",
+                  "orderStrategyType": "SINGLE",
+                  "stopPrice": 9.49
+                },
+                {
+                  "session": "NORMAL",
+                  "duration": "DAY",
+                  "orderLegCollection": [
+                    {
+                      "orderLegType": "EQUITY",
+                      "instrument": {
+                        "assetType": "EQUITY",
+                        "symbol": "AAPL"
+                      },
+                      "instruction": "SELL",
+                      "quantity": 99
+                    }
+                  ],
+                  "orderType": "LIMIT",
+                  "orderStrategyType": "SINGLE",
+                  "price": 13.54
+                }
+              ]
+            },
+            {
+              "orderStrategyType": "OCO",
+              "childOrderStrategies": [
+                {
+                  "session": "NORMAL",
+                  "duration": "DAY",
+                  "orderLegCollection": [
+                    {
+                      "orderLegType": "EQUITY",
+                      "instrument": {
+                        "assetType": "EQUITY",
+                        "symbol": "AAPL"
+                      },
+                      "instruction": "SELL",
+                      "quantity": 99
+                    }
+                  ],
+                  "orderType": "STOP",
+                  "orderStrategyType": "SINGLE",
+                  "stopPrice": 9.49
+                },
+                {
+                  "session": "NORMAL",
+                  "duration": "DAY",
+                  "orderLegCollection": [
+                    {
+                      "orderLegType": "EQUITY",
+                      "instrument": {
+                        "assetType": "EQUITY",
+                        "symbol": "AAPL"
+                      },
+                      "instruction": "SELL",
+                      "quantity": 99
+                    }
+                  ],
+                  "orderType": "LIMIT",
+                  "orderStrategyType": "SINGLE",
+                  "price": 13.54
+                }
+              ]
+            }
+          ]
+        }
+      }
+    ],
+    "error": false,
+    "messages": [
+      "undefined",
+      "loss greater than 35% as 0.5, too wide for swap",
+      "buy stop 10.5, stop&risk: 9.5,size: 1",
+      "Submitting breakout orders!!! submitBreakoutOrders()",
+      "entry with quantity 990"
+    ]
+  },
+  {
+    "name": "swap closes and reenters original short direction",
+    "state": {
+      "symbol": "AAPL",
+      "revision": 1,
+      "observedAt": 1,
+      "quoteObservedAt": 1,
+      "netQuantity": -1000,
+      "currentPrice": 10,
+      "bid": 10,
+      "ask": 10,
+      "batchCount": 10,
+      "splitPartials": false,
+      "hasPlan": false,
+      "coreRuleEnabled": true,
+      "rulesSupported": true,
+      "entries": [],
+      "pairs": [
+        {
+          "LIMIT": {
+            "orderID": "201",
+            "quantity": 250,
+            "orderType": "LIMIT",
+            "price": 12,
+            "isBuy": true
+          },
+          "STOP": {
+            "orderID": "202",
+            "quantity": 250,
+            "orderType": "STOP",
+            "price": 9.5,
+            "isBuy": true
+          },
+          "originalPartial": 1
+        },
+        {
+          "LIMIT": {
+            "orderID": "203",
+            "quantity": 250,
+            "orderType": "LIMIT",
+            "price": 13,
+            "isBuy": true
+          },
+          "STOP": {
+            "orderID": "204",
+            "quantity": 250,
+            "orderType": "STOP",
+            "price": 9.5,
+            "isBuy": true
+          },
+          "originalPartial": 2
+        },
+        {
+          "LIMIT": {
+            "orderID": "205",
+            "quantity": 250,
+            "orderType": "LIMIT",
+            "price": 14,
+            "isBuy": true
+          },
+          "STOP": {
+            "orderID": "206",
+            "quantity": 250,
+            "orderType": "STOP",
+            "price": 9.5,
+            "isBuy": true
+          },
+          "originalPartial": 3
+        },
+        {
+          "LIMIT": {
+            "orderID": "207",
+            "quantity": 250,
+            "orderType": "LIMIT",
+            "price": 15,
+            "isBuy": true
+          },
+          "STOP": {
+            "orderID": "208",
+            "quantity": 250,
+            "orderType": "STOP",
+            "price": 9.5,
+            "isBuy": true
+          },
+          "originalPartial": 4
+        }
+      ],
+      "entryContext": {
+        "observedAt": 1,
+        "definitions": [
+          {
+            "tradebookID": "RangeBoundBidReversal",
+            "isLong": true,
+            "enabled": true,
+            "basePlan": {
+              "planConfigs": {
+                "sizingCount": 10
+              },
+              "coreTarget": 12,
+              "coreCount": 3
+            },
+            "entryArea": {
+              "low": 9,
+              "high": 11
+            }
+          },
+          {
+            "tradebookID": "RangeBoundOfferReversal",
+            "isLong": false,
+            "enabled": true,
+            "basePlan": {
+              "planConfigs": {
+                "sizingCount": 10
+              },
+              "coreTarget": 12,
+              "coreCount": 3
+            },
+            "entryArea": {
+              "low": 9,
+              "high": 11
+            }
+          }
+        ],
+        "attendanceAllowed": true,
+        "watchlistBlockReason": "",
+        "realizedPnl": 0,
+        "dailyMaxLoss": 4000,
+        "riskDollars": 1000,
+        "liquidityScale": 1,
+        "secondsSinceMarketOpen": 300,
+        "openPrice": 10,
+        "vwap": 10,
+        "atr": 1,
+        "maxQuantity": 0,
+        "watchAreas": [],
+        "noTradeZones": [],
+        "volumes": [
+          500000,
+          300000,
+          250000
+        ],
+        "highOfDay": 10.5,
+        "lowOfDay": 9.5,
+        "customEntryPrice": 0,
+        "customStopLong": 9.5,
+        "customStopShort": 10.5,
+        "fixedQuantity": 0,
+        "availableBuyingPower": 1000000,
+        "reloadIsLong": true,
+        "lastExitSize": 0,
+        "crosshairPrice": 10,
+        "todayRange": 1,
+        "allowAddIfBelow": 1000,
+        "maxRiskMultipleWithExistingPosition": 1.2,
+        "activeBasePlan": {
+          "planConfigs": {
+            "sizingCount": 10
+          },
+          "coreTarget": 12,
+          "coreCount": 3
+        },
+        "addTargetLong": 20,
+        "addTargetShort": 1,
+        "isGappedUp": true,
+        "premarketHigh": 11,
+        "premarketLow": 9,
+        "longState": {
+          "initialQuantity": 1000,
+          "partialsCount": 10,
+          "addCount": 0,
+          "tradebookID": "RangeBoundBidReversal",
+          "stopTightenPhase": "idle"
+        },
+        "shortState": {
+          "initialQuantity": 1000,
+          "partialsCount": 10,
+          "addCount": 0,
+          "tradebookID": "RangeBoundOfferReversal",
+          "stopTightenPhase": "idle"
+        },
+        "premktHigh": 11,
+        "premktLow": 9
+      },
+      "averagePrice": 10
+    },
+    "action": {
+      "symbol": "AAPL",
+      "keyCode": "KeyW",
+      "shiftKey": false,
+      "price": 10
+    },
+    "requests": [
+      {
+        "method": "PUT",
+        "orderId": "201",
+        "body": {
+          "session": "NORMAL",
+          "duration": "DAY",
+          "orderLegCollection": [
+            {
+              "orderLegType": "EQUITY",
+              "instrument": {
+                "assetType": "EQUITY",
+                "symbol": "AAPL"
+              },
+              "instruction": "BUY_TO_COVER",
+              "quantity": 250
+            }
+          ],
+          "orderType": "MARKET",
+          "orderStrategyType": "SINGLE"
+        }
+      },
+      {
+        "method": "PUT",
+        "orderId": "203",
+        "body": {
+          "session": "NORMAL",
+          "duration": "DAY",
+          "orderLegCollection": [
+            {
+              "orderLegType": "EQUITY",
+              "instrument": {
+                "assetType": "EQUITY",
+                "symbol": "AAPL"
+              },
+              "instruction": "BUY_TO_COVER",
+              "quantity": 250
+            }
+          ],
+          "orderType": "MARKET",
+          "orderStrategyType": "SINGLE"
+        }
+      },
+      {
+        "method": "PUT",
+        "orderId": "205",
+        "body": {
+          "session": "NORMAL",
+          "duration": "DAY",
+          "orderLegCollection": [
+            {
+              "orderLegType": "EQUITY",
+              "instrument": {
+                "assetType": "EQUITY",
+                "symbol": "AAPL"
+              },
+              "instruction": "BUY_TO_COVER",
+              "quantity": 250
+            }
+          ],
+          "orderType": "MARKET",
+          "orderStrategyType": "SINGLE"
+        }
+      },
+      {
+        "method": "PUT",
+        "orderId": "207",
+        "body": {
+          "session": "NORMAL",
+          "duration": "DAY",
+          "orderLegCollection": [
+            {
+              "orderLegType": "EQUITY",
+              "instrument": {
+                "assetType": "EQUITY",
+                "symbol": "AAPL"
+              },
+              "instruction": "BUY_TO_COVER",
+              "quantity": 250
+            }
+          ],
+          "orderType": "MARKET",
+          "orderStrategyType": "SINGLE"
+        }
+      },
+      {
+        "method": "POST",
+        "orderId": "",
+        "body": {
+          "session": "NORMAL",
+          "duration": "DAY",
+          "orderLegCollection": [
+            {
+              "orderLegType": "EQUITY",
+              "instrument": {
+                "assetType": "EQUITY",
+                "symbol": "AAPL"
+              },
+              "instruction": "SELL_SHORT",
+              "quantity": 990
+            }
+          ],
+          "orderType": "STOP",
+          "orderStrategyType": "TRIGGER",
+          "stopPrice": 9.49,
+          "childOrderStrategies": [
+            {
+              "orderStrategyType": "OCO",
+              "childOrderStrategies": [
+                {
+                  "session": "NORMAL",
+                  "duration": "DAY",
+                  "orderLegCollection": [
+                    {
+                      "orderLegType": "EQUITY",
+                      "instrument": {
+                        "assetType": "EQUITY",
+                        "symbol": "AAPL"
+                      },
+                      "instruction": "BUY_TO_COVER",
+                      "quantity": 99
+                    }
+                  ],
+                  "orderType": "STOP",
+                  "orderStrategyType": "SINGLE",
+                  "stopPrice": 10.51
+                },
+                {
+                  "session": "NORMAL",
+                  "duration": "DAY",
+                  "orderLegCollection": [
+                    {
+                      "orderLegType": "EQUITY",
+                      "instrument": {
+                        "assetType": "EQUITY",
+                        "symbol": "AAPL"
+                      },
+                      "instruction": "BUY_TO_COVER",
+                      "quantity": 99
+                    }
+                  ],
+                  "orderType": "LIMIT",
+                  "orderStrategyType": "SINGLE",
+                  "price": 6.46
+                }
+              ]
+            },
+            {
+              "orderStrategyType": "OCO",
+              "childOrderStrategies": [
+                {
+                  "session": "NORMAL",
+                  "duration": "DAY",
+                  "orderLegCollection": [
+                    {
+                      "orderLegType": "EQUITY",
+                      "instrument": {
+                        "assetType": "EQUITY",
+                        "symbol": "AAPL"
+                      },
+                      "instruction": "BUY_TO_COVER",
+                      "quantity": 99
+                    }
+                  ],
+                  "orderType": "STOP",
+                  "orderStrategyType": "SINGLE",
+                  "stopPrice": 10.51
+                },
+                {
+                  "session": "NORMAL",
+                  "duration": "DAY",
+                  "orderLegCollection": [
+                    {
+                      "orderLegType": "EQUITY",
+                      "instrument": {
+                        "assetType": "EQUITY",
+                        "symbol": "AAPL"
+                      },
+                      "instruction": "BUY_TO_COVER",
+                      "quantity": 99
+                    }
+                  ],
+                  "orderType": "LIMIT",
+                  "orderStrategyType": "SINGLE",
+                  "price": 6.46
+                }
+              ]
+            },
+            {
+              "orderStrategyType": "OCO",
+              "childOrderStrategies": [
+                {
+                  "session": "NORMAL",
+                  "duration": "DAY",
+                  "orderLegCollection": [
+                    {
+                      "orderLegType": "EQUITY",
+                      "instrument": {
+                        "assetType": "EQUITY",
+                        "symbol": "AAPL"
+                      },
+                      "instruction": "BUY_TO_COVER",
+                      "quantity": 99
+                    }
+                  ],
+                  "orderType": "STOP",
+                  "orderStrategyType": "SINGLE",
+                  "stopPrice": 10.51
+                },
+                {
+                  "session": "NORMAL",
+                  "duration": "DAY",
+                  "orderLegCollection": [
+                    {
+                      "orderLegType": "EQUITY",
+                      "instrument": {
+                        "assetType": "EQUITY",
+                        "symbol": "AAPL"
+                      },
+                      "instruction": "BUY_TO_COVER",
+                      "quantity": 99
+                    }
+                  ],
+                  "orderType": "LIMIT",
+                  "orderStrategyType": "SINGLE",
+                  "price": 6.46
+                }
+              ]
+            },
+            {
+              "orderStrategyType": "OCO",
+              "childOrderStrategies": [
+                {
+                  "session": "NORMAL",
+                  "duration": "DAY",
+                  "orderLegCollection": [
+                    {
+                      "orderLegType": "EQUITY",
+                      "instrument": {
+                        "assetType": "EQUITY",
+                        "symbol": "AAPL"
+                      },
+                      "instruction": "BUY_TO_COVER",
+                      "quantity": 99
+                    }
+                  ],
+                  "orderType": "STOP",
+                  "orderStrategyType": "SINGLE",
+                  "stopPrice": 10.51
+                },
+                {
+                  "session": "NORMAL",
+                  "duration": "DAY",
+                  "orderLegCollection": [
+                    {
+                      "orderLegType": "EQUITY",
+                      "instrument": {
+                        "assetType": "EQUITY",
+                        "symbol": "AAPL"
+                      },
+                      "instruction": "BUY_TO_COVER",
+                      "quantity": 99
+                    }
+                  ],
+                  "orderType": "LIMIT",
+                  "orderStrategyType": "SINGLE",
+                  "price": 6.46
+                }
+              ]
+            },
+            {
+              "orderStrategyType": "OCO",
+              "childOrderStrategies": [
+                {
+                  "session": "NORMAL",
+                  "duration": "DAY",
+                  "orderLegCollection": [
+                    {
+                      "orderLegType": "EQUITY",
+                      "instrument": {
+                        "assetType": "EQUITY",
+                        "symbol": "AAPL"
+                      },
+                      "instruction": "BUY_TO_COVER",
+                      "quantity": 99
+                    }
+                  ],
+                  "orderType": "STOP",
+                  "orderStrategyType": "SINGLE",
+                  "stopPrice": 10.51
+                },
+                {
+                  "session": "NORMAL",
+                  "duration": "DAY",
+                  "orderLegCollection": [
+                    {
+                      "orderLegType": "EQUITY",
+                      "instrument": {
+                        "assetType": "EQUITY",
+                        "symbol": "AAPL"
+                      },
+                      "instruction": "BUY_TO_COVER",
+                      "quantity": 99
+                    }
+                  ],
+                  "orderType": "LIMIT",
+                  "orderStrategyType": "SINGLE",
+                  "price": 6.46
+                }
+              ]
+            },
+            {
+              "orderStrategyType": "OCO",
+              "childOrderStrategies": [
+                {
+                  "session": "NORMAL",
+                  "duration": "DAY",
+                  "orderLegCollection": [
+                    {
+                      "orderLegType": "EQUITY",
+                      "instrument": {
+                        "assetType": "EQUITY",
+                        "symbol": "AAPL"
+                      },
+                      "instruction": "BUY_TO_COVER",
+                      "quantity": 99
+                    }
+                  ],
+                  "orderType": "STOP",
+                  "orderStrategyType": "SINGLE",
+                  "stopPrice": 10.51
+                },
+                {
+                  "session": "NORMAL",
+                  "duration": "DAY",
+                  "orderLegCollection": [
+                    {
+                      "orderLegType": "EQUITY",
+                      "instrument": {
+                        "assetType": "EQUITY",
+                        "symbol": "AAPL"
+                      },
+                      "instruction": "BUY_TO_COVER",
+                      "quantity": 99
+                    }
+                  ],
+                  "orderType": "LIMIT",
+                  "orderStrategyType": "SINGLE",
+                  "price": 6.46
+                }
+              ]
+            },
+            {
+              "orderStrategyType": "OCO",
+              "childOrderStrategies": [
+                {
+                  "session": "NORMAL",
+                  "duration": "DAY",
+                  "orderLegCollection": [
+                    {
+                      "orderLegType": "EQUITY",
+                      "instrument": {
+                        "assetType": "EQUITY",
+                        "symbol": "AAPL"
+                      },
+                      "instruction": "BUY_TO_COVER",
+                      "quantity": 99
+                    }
+                  ],
+                  "orderType": "STOP",
+                  "orderStrategyType": "SINGLE",
+                  "stopPrice": 10.51
+                },
+                {
+                  "session": "NORMAL",
+                  "duration": "DAY",
+                  "orderLegCollection": [
+                    {
+                      "orderLegType": "EQUITY",
+                      "instrument": {
+                        "assetType": "EQUITY",
+                        "symbol": "AAPL"
+                      },
+                      "instruction": "BUY_TO_COVER",
+                      "quantity": 99
+                    }
+                  ],
+                  "orderType": "LIMIT",
+                  "orderStrategyType": "SINGLE",
+                  "price": 6.46
+                }
+              ]
+            },
+            {
+              "orderStrategyType": "OCO",
+              "childOrderStrategies": [
+                {
+                  "session": "NORMAL",
+                  "duration": "DAY",
+                  "orderLegCollection": [
+                    {
+                      "orderLegType": "EQUITY",
+                      "instrument": {
+                        "assetType": "EQUITY",
+                        "symbol": "AAPL"
+                      },
+                      "instruction": "BUY_TO_COVER",
+                      "quantity": 99
+                    }
+                  ],
+                  "orderType": "STOP",
+                  "orderStrategyType": "SINGLE",
+                  "stopPrice": 10.51
+                },
+                {
+                  "session": "NORMAL",
+                  "duration": "DAY",
+                  "orderLegCollection": [
+                    {
+                      "orderLegType": "EQUITY",
+                      "instrument": {
+                        "assetType": "EQUITY",
+                        "symbol": "AAPL"
+                      },
+                      "instruction": "BUY_TO_COVER",
+                      "quantity": 99
+                    }
+                  ],
+                  "orderType": "LIMIT",
+                  "orderStrategyType": "SINGLE",
+                  "price": 6.46
+                }
+              ]
+            },
+            {
+              "orderStrategyType": "OCO",
+              "childOrderStrategies": [
+                {
+                  "session": "NORMAL",
+                  "duration": "DAY",
+                  "orderLegCollection": [
+                    {
+                      "orderLegType": "EQUITY",
+                      "instrument": {
+                        "assetType": "EQUITY",
+                        "symbol": "AAPL"
+                      },
+                      "instruction": "BUY_TO_COVER",
+                      "quantity": 99
+                    }
+                  ],
+                  "orderType": "STOP",
+                  "orderStrategyType": "SINGLE",
+                  "stopPrice": 10.51
+                },
+                {
+                  "session": "NORMAL",
+                  "duration": "DAY",
+                  "orderLegCollection": [
+                    {
+                      "orderLegType": "EQUITY",
+                      "instrument": {
+                        "assetType": "EQUITY",
+                        "symbol": "AAPL"
+                      },
+                      "instruction": "BUY_TO_COVER",
+                      "quantity": 99
+                    }
+                  ],
+                  "orderType": "LIMIT",
+                  "orderStrategyType": "SINGLE",
+                  "price": 6.46
+                }
+              ]
+            },
+            {
+              "orderStrategyType": "OCO",
+              "childOrderStrategies": [
+                {
+                  "session": "NORMAL",
+                  "duration": "DAY",
+                  "orderLegCollection": [
+                    {
+                      "orderLegType": "EQUITY",
+                      "instrument": {
+                        "assetType": "EQUITY",
+                        "symbol": "AAPL"
+                      },
+                      "instruction": "BUY_TO_COVER",
+                      "quantity": 99
+                    }
+                  ],
+                  "orderType": "STOP",
+                  "orderStrategyType": "SINGLE",
+                  "stopPrice": 10.51
+                },
+                {
+                  "session": "NORMAL",
+                  "duration": "DAY",
+                  "orderLegCollection": [
+                    {
+                      "orderLegType": "EQUITY",
+                      "instrument": {
+                        "assetType": "EQUITY",
+                        "symbol": "AAPL"
+                      },
+                      "instruction": "BUY_TO_COVER",
+                      "quantity": 99
+                    }
+                  ],
+                  "orderType": "LIMIT",
+                  "orderStrategyType": "SINGLE",
+                  "price": 6.46
+                }
+              ]
+            }
+          ]
+        }
+      }
+    ],
+    "error": false,
+    "messages": [
+      "undefined",
+      "loss greater than 35% as 0.5, too wide for swap",
+      "sell stop 9.5, stop&risk: 10.5,size: 1",
+      "Submitting breakout orders!!! submitBreakoutOrders()",
+      "entry with quantity 990"
+    ]
+  },
+  {
+    "name": "swap pending entry keeps final pair",
+    "state": {
+      "symbol": "AAPL",
+      "revision": 1,
+      "observedAt": 1,
+      "quoteObservedAt": 1,
+      "netQuantity": 1000,
+      "currentPrice": 10,
+      "bid": 10,
+      "ask": 10,
+      "batchCount": 10,
+      "splitPartials": false,
+      "hasPlan": false,
+      "coreRuleEnabled": true,
+      "rulesSupported": true,
+      "entries": [
+        {
+          "orderID": "101",
+          "orderType": "STOP",
+          "quantity": 100,
+          "price": 10.5,
+          "isBuy": true
+        }
+      ],
+      "pairs": [
+        {
+          "LIMIT": {
+            "orderID": "201",
+            "quantity": 250,
+            "orderType": "LIMIT",
+            "price": 12,
+            "isBuy": false
+          },
+          "STOP": {
+            "orderID": "202",
+            "quantity": 250,
+            "orderType": "STOP",
+            "price": 9.5,
+            "isBuy": false
+          },
+          "originalPartial": 1
+        },
+        {
+          "LIMIT": {
+            "orderID": "203",
+            "quantity": 250,
+            "orderType": "LIMIT",
+            "price": 13,
+            "isBuy": false
+          },
+          "STOP": {
+            "orderID": "204",
+            "quantity": 250,
+            "orderType": "STOP",
+            "price": 9.5,
+            "isBuy": false
+          },
+          "originalPartial": 2
+        },
+        {
+          "LIMIT": {
+            "orderID": "205",
+            "quantity": 250,
+            "orderType": "LIMIT",
+            "price": 14,
+            "isBuy": false
+          },
+          "STOP": {
+            "orderID": "206",
+            "quantity": 250,
+            "orderType": "STOP",
+            "price": 9.5,
+            "isBuy": false
+          },
+          "originalPartial": 3
+        },
+        {
+          "LIMIT": {
+            "orderID": "207",
+            "quantity": 250,
+            "orderType": "LIMIT",
+            "price": 15,
+            "isBuy": false
+          },
+          "STOP": {
+            "orderID": "208",
+            "quantity": 250,
+            "orderType": "STOP",
+            "price": 9.5,
+            "isBuy": false
+          },
+          "originalPartial": 4
+        }
+      ],
+      "entryContext": {
+        "observedAt": 1,
+        "definitions": [
+          {
+            "tradebookID": "RangeBoundBidReversal",
+            "isLong": true,
+            "enabled": true,
+            "basePlan": {
+              "planConfigs": {
+                "sizingCount": 10
+              },
+              "coreTarget": 12,
+              "coreCount": 3
+            },
+            "entryArea": {
+              "low": 9,
+              "high": 11
+            }
+          },
+          {
+            "tradebookID": "RangeBoundOfferReversal",
+            "isLong": false,
+            "enabled": true,
+            "basePlan": {
+              "planConfigs": {
+                "sizingCount": 10
+              },
+              "coreTarget": 12,
+              "coreCount": 3
+            },
+            "entryArea": {
+              "low": 9,
+              "high": 11
+            }
+          }
+        ],
+        "attendanceAllowed": true,
+        "watchlistBlockReason": "",
+        "realizedPnl": 0,
+        "dailyMaxLoss": 4000,
+        "riskDollars": 1000,
+        "liquidityScale": 1,
+        "secondsSinceMarketOpen": 300,
+        "openPrice": 10,
+        "vwap": 10,
+        "atr": 1,
+        "maxQuantity": 0,
+        "watchAreas": [],
+        "noTradeZones": [],
+        "volumes": [
+          500000,
+          300000,
+          250000
+        ],
+        "highOfDay": 10.5,
+        "lowOfDay": 9.5,
+        "customEntryPrice": 0,
+        "customStopLong": 9.5,
+        "customStopShort": 10.5,
+        "fixedQuantity": 0,
+        "availableBuyingPower": 1000000,
+        "reloadIsLong": true,
+        "lastExitSize": 0,
+        "crosshairPrice": 10,
+        "todayRange": 1,
+        "allowAddIfBelow": 1000,
+        "maxRiskMultipleWithExistingPosition": 1.2,
+        "activeBasePlan": {
+          "planConfigs": {
+            "sizingCount": 10
+          },
+          "coreTarget": 12,
+          "coreCount": 3
+        },
+        "addTargetLong": 20,
+        "addTargetShort": 1,
+        "isGappedUp": true,
+        "premarketHigh": 11,
+        "premarketLow": 9,
+        "longState": {
+          "initialQuantity": 1000,
+          "partialsCount": 10,
+          "addCount": 0,
+          "tradebookID": "RangeBoundBidReversal",
+          "stopTightenPhase": "idle"
+        },
+        "shortState": {
+          "initialQuantity": 1000,
+          "partialsCount": 10,
+          "addCount": 0,
+          "tradebookID": "RangeBoundOfferReversal",
+          "stopTightenPhase": "idle"
+        },
+        "premktHigh": 11,
+        "premktLow": 9
+      },
+      "averagePrice": 10
+    },
+    "action": {
+      "symbol": "AAPL",
+      "keyCode": "KeyW",
+      "shiftKey": false,
+      "price": 10
+    },
+    "requests": [
+      {
+        "method": "DELETE",
+        "orderId": "201"
+      },
+      {
+        "method": "DELETE",
+        "orderId": "203"
+      },
+      {
+        "method": "DELETE",
+        "orderId": "205"
+      },
+      {
+        "method": "POST",
+        "orderId": "",
+        "body": {
+          "session": "NORMAL",
+          "duration": "DAY",
+          "orderLegCollection": [
+            {
+              "orderLegType": "EQUITY",
+              "instrument": {
+                "assetType": "EQUITY",
+                "symbol": "AAPL"
+              },
+              "instruction": "SELL",
+              "quantity": 750
+            }
+          ],
+          "orderType": "MARKET",
+          "orderStrategyType": "SINGLE"
+        }
+      }
+    ],
+    "error": false,
+    "messages": [
+      "undefined",
+      "loss greater than 35% as 0.5, too wide for swap"
+    ]
+  },
+  {
+    "name": "swap requires active plan",
+    "state": {
+      "symbol": "AAPL",
+      "revision": 1,
+      "observedAt": 1,
+      "quoteObservedAt": 1,
+      "netQuantity": 1000,
+      "currentPrice": 10,
+      "bid": 10,
+      "ask": 10,
+      "batchCount": 10,
+      "splitPartials": false,
+      "hasPlan": false,
+      "coreRuleEnabled": true,
+      "rulesSupported": true,
+      "entries": [],
+      "pairs": [
+        {
+          "LIMIT": {
+            "orderID": "201",
+            "quantity": 250,
+            "orderType": "LIMIT",
+            "price": 12,
+            "isBuy": false
+          },
+          "STOP": {
+            "orderID": "202",
+            "quantity": 250,
+            "orderType": "STOP",
+            "price": 9.5,
+            "isBuy": false
+          },
+          "originalPartial": 1
+        },
+        {
+          "LIMIT": {
+            "orderID": "203",
+            "quantity": 250,
+            "orderType": "LIMIT",
+            "price": 13,
+            "isBuy": false
+          },
+          "STOP": {
+            "orderID": "204",
+            "quantity": 250,
+            "orderType": "STOP",
+            "price": 9.5,
+            "isBuy": false
+          },
+          "originalPartial": 2
+        },
+        {
+          "LIMIT": {
+            "orderID": "205",
+            "quantity": 250,
+            "orderType": "LIMIT",
+            "price": 14,
+            "isBuy": false
+          },
+          "STOP": {
+            "orderID": "206",
+            "quantity": 250,
+            "orderType": "STOP",
+            "price": 9.5,
+            "isBuy": false
+          },
+          "originalPartial": 3
+        },
+        {
+          "LIMIT": {
+            "orderID": "207",
+            "quantity": 250,
+            "orderType": "LIMIT",
+            "price": 15,
+            "isBuy": false
+          },
+          "STOP": {
+            "orderID": "208",
+            "quantity": 250,
+            "orderType": "STOP",
+            "price": 9.5,
+            "isBuy": false
+          },
+          "originalPartial": 4
+        }
+      ],
+      "entryContext": {
+        "observedAt": 1,
+        "definitions": [
+          {
+            "tradebookID": "RangeBoundBidReversal",
+            "isLong": true,
+            "enabled": true,
+            "basePlan": {
+              "planConfigs": {
+                "sizingCount": 10
+              },
+              "coreTarget": 12,
+              "coreCount": 3
+            },
+            "entryArea": {
+              "low": 9,
+              "high": 11
+            }
+          },
+          {
+            "tradebookID": "RangeBoundOfferReversal",
+            "isLong": false,
+            "enabled": true,
+            "basePlan": {
+              "planConfigs": {
+                "sizingCount": 10
+              },
+              "coreTarget": 12,
+              "coreCount": 3
+            },
+            "entryArea": {
+              "low": 9,
+              "high": 11
+            }
+          }
+        ],
+        "attendanceAllowed": true,
+        "watchlistBlockReason": "",
+        "realizedPnl": 0,
+        "dailyMaxLoss": 4000,
+        "riskDollars": 1000,
+        "liquidityScale": 1,
+        "secondsSinceMarketOpen": 300,
+        "openPrice": 10,
+        "vwap": 10,
+        "atr": 1,
+        "maxQuantity": 0,
+        "watchAreas": [],
+        "noTradeZones": [],
+        "volumes": [
+          500000,
+          300000,
+          250000
+        ],
+        "highOfDay": 10.5,
+        "lowOfDay": 9.5,
+        "customEntryPrice": 0,
+        "customStopLong": 9.5,
+        "customStopShort": 10.5,
+        "fixedQuantity": 0,
+        "availableBuyingPower": 1000000,
+        "reloadIsLong": true,
+        "lastExitSize": 0,
+        "crosshairPrice": 10,
+        "todayRange": 1,
+        "allowAddIfBelow": 1000,
+        "maxRiskMultipleWithExistingPosition": 1.2,
+        "addTargetLong": 20,
+        "addTargetShort": 1,
+        "isGappedUp": true,
+        "premarketHigh": 11,
+        "premarketLow": 9,
+        "longState": {
+          "initialQuantity": 1000,
+          "partialsCount": 10,
+          "addCount": 0,
+          "tradebookID": "RangeBoundBidReversal",
+          "stopTightenPhase": "idle"
+        },
+        "shortState": {
+          "initialQuantity": 1000,
+          "partialsCount": 10,
+          "addCount": 0,
+          "tradebookID": "RangeBoundOfferReversal",
+          "stopTightenPhase": "idle"
+        },
+        "premktHigh": 11,
+        "premktLow": 9
+      },
+      "averagePrice": 10
+    },
+    "action": {
+      "symbol": "AAPL",
+      "keyCode": "KeyW",
+      "shiftKey": false,
+      "price": 10
+    },
+    "requests": [],
+    "error": true,
+    "messages": [
+      "undefined",
+      "loss greater than 35% as 0.5, too wide for swap",
+      "cannot swap due to missing active base plan"
+    ]
+  },
+  {
+    "name": "swap requires position",
+    "state": {
+      "symbol": "AAPL",
+      "revision": 1,
+      "observedAt": 1,
+      "quoteObservedAt": 1,
+      "netQuantity": 0,
+      "currentPrice": 10,
+      "bid": 10,
+      "ask": 10,
+      "batchCount": 10,
+      "splitPartials": false,
+      "hasPlan": false,
+      "coreRuleEnabled": true,
+      "rulesSupported": true,
+      "entries": [],
+      "pairs": [],
+      "entryContext": {
+        "observedAt": 1,
+        "definitions": [
+          {
+            "tradebookID": "RangeBoundBidReversal",
+            "isLong": true,
+            "enabled": true,
+            "basePlan": {
+              "planConfigs": {
+                "sizingCount": 10
+              },
+              "coreTarget": 12,
+              "coreCount": 3
+            },
+            "entryArea": {
+              "low": 9,
+              "high": 11
+            }
+          },
+          {
+            "tradebookID": "RangeBoundOfferReversal",
+            "isLong": false,
+            "enabled": true,
+            "basePlan": {
+              "planConfigs": {
+                "sizingCount": 10
+              },
+              "coreTarget": 12,
+              "coreCount": 3
+            },
+            "entryArea": {
+              "low": 9,
+              "high": 11
+            }
+          }
+        ],
+        "attendanceAllowed": true,
+        "watchlistBlockReason": "",
+        "realizedPnl": 0,
+        "dailyMaxLoss": 4000,
+        "riskDollars": 1000,
+        "liquidityScale": 1,
+        "secondsSinceMarketOpen": 300,
+        "openPrice": 10,
+        "vwap": 10,
+        "atr": 1,
+        "maxQuantity": 0,
+        "watchAreas": [],
+        "noTradeZones": [],
+        "volumes": [
+          500000,
+          300000,
+          250000
+        ],
+        "highOfDay": 10.5,
+        "lowOfDay": 9.5,
+        "customEntryPrice": 0,
+        "customStopLong": 9.5,
+        "customStopShort": 10.5,
+        "fixedQuantity": 0,
+        "availableBuyingPower": 1000000,
+        "reloadIsLong": true,
+        "lastExitSize": 0,
+        "crosshairPrice": 10,
+        "todayRange": 1,
+        "allowAddIfBelow": 1000,
+        "maxRiskMultipleWithExistingPosition": 1.2,
+        "activeBasePlan": {
+          "planConfigs": {
+            "sizingCount": 10
+          },
+          "coreTarget": 12,
+          "coreCount": 3
+        },
+        "addTargetLong": 20,
+        "addTargetShort": 1,
+        "isGappedUp": true,
+        "premarketHigh": 11,
+        "premarketLow": 9,
+        "longState": {
+          "initialQuantity": 1000,
+          "partialsCount": 10,
+          "addCount": 0,
+          "tradebookID": "RangeBoundBidReversal",
+          "stopTightenPhase": "idle"
+        },
+        "shortState": {
+          "initialQuantity": 1000,
+          "partialsCount": 10,
+          "addCount": 0,
+          "tradebookID": "RangeBoundOfferReversal",
+          "stopTightenPhase": "idle"
+        },
+        "premktHigh": 11,
+        "premktLow": 9
+      },
+      "averagePrice": 10
+    },
+    "action": {
+      "symbol": "AAPL",
+      "keyCode": "KeyW",
+      "shiftKey": false,
+      "price": 10
+    },
+    "requests": [],
+    "error": true,
+    "messages": [
+      "undefined",
+      "no position for AAPL"
+    ]
+  }
+]

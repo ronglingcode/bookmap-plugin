@@ -45,7 +45,7 @@ public class IndicatorConfig {
         enabled.put(FILLED_EXECUTION_MARKERS, true);
         enabled.put(BOOKMAP_PATTERN_SIGNALS, false);
         enabled.put(VWAP, true);
-        enabled.put(EXPERIMENTAL_DIRECT_BROKER_EXECUTION, true);
+        enabled.put(EXPERIMENTAL_DIRECT_BROKER_EXECUTION, false);
     }
 
     public boolean isEnabled(String indicatorKey) {

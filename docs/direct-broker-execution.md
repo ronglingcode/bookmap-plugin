@@ -1,7 +1,7 @@
-# Experimental direct Schwab execution
+# Native Schwab execution
 
 The Java `miniviteapp` engine mirrors ViteApp's handler, core target rules, and
-Schwab order factory. One experimental setting defaults to **true**.
+Schwab order factory. Native execution is always active while the plugin runs.
 ViteApp still supplies current OAuth tokens, account observations, quotes, and
 plan metadata. Native mutations go straight to Schwab without ProxyServer.
 
@@ -9,18 +9,23 @@ plan metadata. Native mutations go straight to Schwab without ProxyServer.
 
 1. Run ViteApp with a live Schwab equity profile and a successful token refresh.
    Connect it to Bookmap using the existing local WebSocket.
-2. Verify **Experimental: Native Broker Execution (Schwab)** is enabled in the addon settings.
-   This single switch enables cancel, exits, and supported initial entries together.
-   The stored key remains `experimentalDirectBrokerExecution`.
-   Install matching ViteApp/plugin builds;
-   the simplified integration uses execution protocol version 3.
+2. Install matching ViteApp/plugin builds using execution protocol version 3.
+   Cancel, exits, and standard flat initial entries always execute natively. No addon
+   setting can switch them to ViteApp. The protocol's enabled status fields remain
+   true while running so existing ViteApp clients continue publishing inputs.
+3. **Experimental: Extended Native Execution (Schwab)** defaults to **off**.
+   The key remains `experimentalDirectBrokerExecution`. Enable it to run the newly
+   migrated workflows natively; leave it off to forward those workflows to ViteApp.
+   This flag never disables the established native workflows or clears tokens.
 
 This is a personal MVP with one ViteApp, one Bookmap, and one account. ViteApp
-pushes inputs when direct execution is enabled. There is no ownership handshake,
+pushes inputs when connected to the native executor. There is no ownership handshake,
 session ID, origin allowlist, or account-matching check. Full ViteApp and Lite both
 publish the latest account and quote values without an execution fence.
 
 ## Migrated actions
+
+### Always native, regardless of the flag
 
 | Action | Native behavior |
 | --- | --- |
@@ -31,6 +36,7 @@ publish the latest account and quote values without an execution fence.
 | Digit keys at chart price | Adjust the selected STOP or LIMIT leg. |
 | G / H / T at chart price | Adjust half / all exit pairs. |
 | F / flatten | Preserve ViteApp's uncovered-shares branch; otherwise market out the exit pairs and any remainder. |
+| Standard initial wall-reversal entry | Market/breakout buttons or matching chart B/S, default/1 R/0.1 R, while flat with no pending entry or exit orders. |
 
 Core target protection, equity price rounding, bid/ask stop clamping, pair
 ordering, and closing direction follow ViteApp. Native partial market exits and
@@ -61,11 +67,41 @@ must include a broker order ID. ViteApp initializes the corresponding trade plan
 and core-target state after acceptance. Other actions do not wait for this UI
 initialization or an account refresh. An initialization failure requires review.
 
-With native execution enabled, attempts on a symbol with existing exposure are
-blocked. Same-direction adds, replacement of pending entries, opposite-position
-reversals, reload A, and swap W are future migration stages. Generic B/S actions
-without a wall-reversal chart tradebook still use ViteApp. Disable native execution
-to use the existing ViteApp workflows for cancel, exits, and entries together.
+### Operations controlled by the experimental flag
+
+| Operation | Flag off | Flag on |
+| --- | --- | --- |
+| Add Partial / reload, A / Shift+A | ViteApp | Native protected partial entry at hovered/crosshair price or market. |
+| Swap, W | ViteApp | Native close-and-reentry in the original direction; a pending same-direction entry instead closes all but the last exit pair. |
+| Same-direction full entry with a position | ViteApp | Native existing-risk sizing with active trade/core state preserved. |
+| Entry with pending orders | ViteApp | Native protected entry followed by cancellation of old same-direction entries. |
+| Opposite-position market entry | ViteApp | Native market replacement of old exit pairs before submitting the new protected entry. |
+| Opposite-position breakout entry | ViteApp | Native adjustment of old protective stops to the new entry price, then submission of the new protected entry. |
+| Non-chart B/S without an explicit tradebook | ViteApp | Native selection of exactly one enabled tradebook in the requested direction; zero/multiple matches block. |
+| Other risk-method labels | ViteApp | Native ViteApp-compatible numeric R parsing and partial-count selection; unparsed labels use ViteApp's default multiplier. |
+
+All tradebooks currently constructed by ViteApp belong to the mirrored wall-reversal
+family. There is no additional non-wall strategy family in the current app.
+Chart B/S without a matching wall-reversal tradebook remains invalid in both routes.
+
+Reload mirrors the hard entry boundary before the low-risk override. That override
+bypasses add-budget/stop-tightening checks; attendance is still required by the
+protected-entry submission. Otherwise the daily-loss, position-plus-pending-entry
+risk budgets, add count/half-day-range rule, and stop-tightening phase apply.
+It uses original quantity divided by actual partial count, then last exit size,
+then current position quantity as fallbacks. Targets use the closest existing
+limit target, or one risk unit when there are no exit pairs. More than three
+pending entries causes the earliest to be cancelled before the reload.
+
+Swap preserves ViteApp's same-direction behavior, its active-plan/initial-quantity
+sizing, and its own 500 ms close/reentry or 750 ms cancel/close delay. These are
+delays within that action, with no wait for other actions or reconciliation.
+
+Extended entries use supplied position, average-price, protective-stop, pending-entry,
+and directional trade-state observations. They do not apply a flat-only preflight
+to existing exposure. An actually flat entry without orders still gets the initial
+entry preflight. Native failures never resend through ViteApp. An accepted protected
+entry is sent to ViteApp even if a later old-entry cancellation fails.
 
 ## Updates and reconciliation
 
@@ -81,7 +117,7 @@ Each click overlays the latest price, bid/ask, and entry day range while buildin
 its action. A subsequent account snapshot cannot replace the streaming values;
 already-built actions keep their captured inputs. Account/plan updates still run
 about every three seconds and after account events. Market data does not wait
-for that polling cycle. Enabling native execution also sends the current bundle.
+for that polling cycle. Connecting to the native executor also sends the current bundle.
 
 The plugin uses the latest supplied inputs with no age cutoff. It does not wait
 for another action or broker reconciliation, and ViteApp mutations do not acquire
@@ -102,8 +138,8 @@ Unknown broker outcomes require broker review. A WebSocket reconnect by itself
 does not require review and does not stop a running native action.
 There is no automatic retry or fallback after native dispatch. Review the actual
 broker orders and positions, then use **Reset Native Execution After Broker
-Review** in addon settings. Disabling the switch does not clear an unknown broker outcome.
-Tokens are cleared when disabling native execution or stopping the plugin, and are never written to plugin
+Review** in addon settings.
+Tokens are cleared when stopping the plugin, and are never written to plugin
 settings or action logs.
 
 ## Principle for local execution checks
@@ -117,23 +153,24 @@ by our own code. The broker handles authorization and order payload validation.
 
 ## Checks that still block
 
-These checks apply to the native route. Turning off the native execution flag
-normally returns it to ViteApp; unresolved native work continues to block it.
+Established actions always use the native route. Extended actions use ViteApp when
+the flag is off and native execution when on. Unresolved native work requires broker
+review and cannot bypass that review by turning the flag off.
 
 | Scope | Blocking conditions |
 | --- | --- |
-| Enabled workflow | Plugin stopped or native execution disabled; ViteApp publishes native inputs only with a live Schwab equity profile and matching protocol version. There are no session/account identity checks. |
+| Running workflow | Plugin stopped, experimental flag disabled during an extended action, or action unsupported; ViteApp publishes native inputs only with a live Schwab equity profile and matching protocol version. There are no session/account identity checks. |
 | Broker review | An uncertain broker response or entry-state initialization failure requires review. Running actions and account refreshes do not block another click. |
 | Decision inputs | Missing state needed to build the requested action. No input age or timestamp comparison blocks execution. |
 | Execution plan | Duplicate order IDs or closing quantity exceeds the position; exit legs disagree on side/quantity. These can submit duplicate closes or leave unintended exposure. |
 | Flatten | No position; custom flatten/exit rules not mirrored in Java; exit side disagrees with position; exit quantity exceeds position. Flatten bypasses core-target protection and does not require split partials. |
 | Partial exits / adjustments | No active exit pairs or current price; unsupported exit rules; selected partial does not exist; partial exits or target adjustments need exits split in ViteApp; required exit legs unavailable. |
 | Core-target protection | Earlier exits lack original partial identity or protected partials lack an active plan, original entry price, or valid core target; proposed exit has not reached the 90% buffered core target. Applies to partial exits and adjustments, not Flatten. |
-| Entry eligibility | Existing position or pending orders; Bookmap retest blocks entry; disabled/unavailable supported tradebook; wrong side or entry method; unsupported price units; unavailable day levels or protective stop; entry outside tradebook boundary; quotes cross the stop. |
+| Entry eligibility | Flat-only workflow has existing position/orders; Bookmap retest blocks entry; disabled/unavailable supported tradebook; wrong side; unsupported price units; unavailable day levels or protective stop; entry outside tradebook boundary; quotes cross the stop. Extended exposure workflows require the flag. |
 | Entry rules | Missing entry context; outside regular market hours; attendance or watchlist restriction; daily loss limit reached; invalid/zero liquidity scale; missing rule inputs; opposing watch level too close; entry inside a no-trade zone. VWAP proximity and low volume reduce size rather than block by themselves. |
 | Entry sizing | Missing risk/sizing inputs or protective brackets. Buying power determines half allocation; insufficient funds and fractional legs do not block dispatch. |
 | Initial entry preflight | Initial entries require a flat broker position and no pending symbol orders; a failed or truncated entry order read cannot establish that. Exits and cancel have no broker read preflight. |
-| During dispatch | Native execution disabled or plugin stopped. A broker rejection stops the remaining requests; network timeout or ambiguous acceptance requires review. Token refresh/reconnect does not interrupt execution. No automatic resend occurs. |
+| During dispatch | Plugin stopped or extended flag turned off for that action. A broker rejection stops the remaining requests; network timeout or ambiguous acceptance requires review. Token refresh/reconnect does not interrupt execution. No automatic resend occurs. |
 
 The log reports the first failed condition. Uncertain outcomes require reviewing
 the broker and using **Reset Native Execution After Broker Review**.
@@ -145,7 +182,7 @@ broker reads and mutation are separate requests; those comparisons are not atomi
 
 | Check | Mechanism |
 | --- | --- |
-| Workflow enabled | Route supported actions through one experimental flag. Disabled normally uses ViteApp. Recheck this flag/plugin shutdown before native dispatch. ViteApp sends inputs only with a live Schwab equity profile; its message reader requires protocol 3. |
+| Running workflow | Central router keeps established actions native and uses the flag for extended actions. Check shutdown and the extended flag before each applicable dispatch. ViteApp sends inputs only with a live Schwab equity profile; its message reader requires protocol 3. |
 | Inputs available | Require a snapshot for the requested symbol. There is no account/quote/context age check. |
 | Unknown result/review | HTTP 5xx, a network exception after mutation dispatch, or a successful entry POST missing its new order ID cannot prove the outcome. Failed entry-plan initialization also requires review. Accepted results do not create a reconciliation wait. |
 | Duplicate IDs/closing size | Reject a repeated nonempty order ID within one plan. Sum outgoing closing quantities and compare against absolute snapshot position. Flatten also checks its remaining quantity never becomes negative. |
@@ -153,7 +190,7 @@ broker reads and mutation are separate requests; those comparisons are not atomi
 | Exit selection/shape | Require position, requested pair/index, current price where rules need it, matching closing side, and matching side/quantity across paired legs. Partial market exits and target adjustments require split pairs; price adjustments require both legs and an existing leg price. |
 | Mirrored exit rules | ViteApp checks that relevant tradebook exit methods are the ported base/Bookmap methods. Java blocks unsupported custom methods rather than silently skip the strategy's rules. |
 | Core-target rule | For an earlier exit with this rule enabled, use original partial number and core count to select protected partials. Require their active plan, positive entry/target on the profitable side, and proposed exit at least `entry + 0.9 * (target - entry)` for longs (at most for shorts). Missing original partial identity blocks this rule. Flatten skips core protection. |
-| Entry tradebook/action | Look up a supported enabled definition with the requested side. Require B/S hover direction to agree, method to be 1 R/0.1 R/default, real price units, and no Bookmap retest-block flag. |
+| Entry tradebook/action | Look up a supported enabled definition with the requested side. Require B/S hover direction to agree, real price units, and no Bookmap retest-block flag. Default/1 R/0.1 R initial entries are always native; additional risk methods require the extended flag. |
 | Entry prices/boundary | Require available ordered day high/low, positive entry/stop, stop below a long entry or above a short entry, including after quote/estimate adjustment. Compare entry with the definition's boundary: inside its range when requested, otherwise above the long lower bound/below the short upper bound. Boundary inputs and range flag must be usable. |
 | Regular session | Require ViteApp's supplied seconds since market open between 0 and 23,400. No Bookmap replay-clock or input-age check is involved. |
 | Entry discipline | Require ViteApp's attendance permission and empty watchlist block reason. Compare realized P&L against negative daily loss limit; require liquidity multiplier in `(0, 1]`. These are supplied strategy inputs, not independent broker validations. |
@@ -199,12 +236,17 @@ does not fetch an order to predict whether the broker will reject its deletion.
 
 ## Verification
 
-Run `npm run build` and `npm run test:direct-execution` in ViteApp, and
+Run `npm run build`, `npm run test:direct-execution`, and `npm run test:extended-execution` in ViteApp, and
 `./gradlew.bat build` in the plugin. Shared sanitized fixtures cover order
 payload parity; fake local HTTP tests cover independent clicks, inputs without
 age limits, immediate market overlays, exits without GETs, initial-entry exposure,
 and ambiguous responses. Release tests exercise the obfuscated JAR.
 Entry fixtures can be regenerated in ViteApp with
 `node --experimental-strip-types scripts/generateDirectEntryFixtures.mjs`.
+Extended fixtures are recorded from actual ViteApp reload/swap handlers with an
+in-memory account/UI and recording broker using
+`node --experimental-strip-types scripts/generateExtendedExecutionFixtures.mjs`.
+The extended test command verifies the two repositories' fixture copies and
+checks that accepted adds preserve the existing core plan and trade state.
 No live order was used to verify this implementation. The broker's actual OCO
 replacement lifecycle still needs observation in the running application.

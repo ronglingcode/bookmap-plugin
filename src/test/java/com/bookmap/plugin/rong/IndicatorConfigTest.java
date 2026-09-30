@@ -18,11 +18,11 @@ class IndicatorConfigTest {
     }
 
     @Test
-    void keyboardHotkeysAndNativeBrokerExecutionAreEnabledByDefault() {
+    void keyboardHotkeysAreEnabledByDefault() {
         IndicatorConfig config = new IndicatorConfig();
 
         assertTrue(config.isEnabled(IndicatorConfig.FIRE_KEYBOARD_EVENT));
-        assertTrue(config.isEnabled(IndicatorConfig.EXPERIMENTAL_DIRECT_BROKER_EXECUTION));
+        assertFalse(config.isEnabled(IndicatorConfig.EXPERIMENTAL_DIRECT_BROKER_EXECUTION));
     }
 
     @Test

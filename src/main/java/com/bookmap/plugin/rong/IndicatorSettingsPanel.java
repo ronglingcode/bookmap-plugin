@@ -142,9 +142,9 @@ public class IndicatorSettingsPanel extends StrategyPanel {
         add(fireKeyboardEventCheckbox, gbc);
 
         gbc.gridy++;
-        JCheckBox nativeExecution = new JCheckBox("Experimental: Native Broker Execution (Schwab)",
+        JCheckBox nativeExecution = new JCheckBox("Experimental: Extended Native Execution (Schwab)",
                 config.isEnabled(IndicatorConfig.EXPERIMENTAL_DIRECT_BROKER_EXECUTION));
-        nativeExecution.setToolTipText("Use native execution for cancel, exits, and supported entries.");
+        nativeExecution.setToolTipText("Native Add Partial, Swap, and entries with exposure/pending orders. Cancel, exits, and initial wall entries always execute natively.");
         nativeExecution.addActionListener(e -> config.setEnabled(
                 IndicatorConfig.EXPERIMENTAL_DIRECT_BROKER_EXECUTION, nativeExecution.isSelected()));
         add(nativeExecution, gbc);

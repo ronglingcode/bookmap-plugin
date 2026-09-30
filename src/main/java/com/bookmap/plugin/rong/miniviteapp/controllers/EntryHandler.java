@@ -5,10 +5,17 @@ import com.bookmap.plugin.rong.miniviteapp.models.Models;
 import com.bookmap.plugin.rong.miniviteapp.models.Models.*;
 import com.bookmap.plugin.rong.miniviteapp.tradebooks.BookmapWallReversal;
 import com.google.gson.JsonObject;
+import com.bookmap.plugin.rong.miniviteapp.api.Broker;
+import java.util.regex.Pattern;
 
 /** First migration: wall-reversal buttons and chart B/S, with no existing symbol exposure. */
 public final class EntryHandler {
     private EntryHandler() { }
+    private static final Pattern RISK_METHOD = Pattern.compile("(?:^|\\s)(\\d+(?:\\.\\d+)?)\\s*R$", Pattern.CASE_INSENSITIVE);
+    public static boolean standardMethod(JsonObject action) {
+        String method = field(action, "entry_method", "entryMethod");
+        return method.isEmpty() || method.equals("1 R") || method.equals("0.1 R");
+    }
     private static String field(JsonObject action, String first, String second) {
         String value = Models.string(action, first); return value.isEmpty() ? Models.string(action, second) : value;
     }
@@ -19,7 +26,11 @@ public final class EntryHandler {
         return BookmapWallReversal.supports(id) && (key.isEmpty() || hover);
     }
     public static Plan handleEntry(Snapshot state, JsonObject action, String key) {
-        Models.require(state.netQuantity == 0 && state.entries.isEmpty() && state.pairs.isEmpty(), "initial native entry requires flat symbol with no pending orders");
+        return handleEntry(state, action, key, false);
+    }
+    public static Plan handleEntry(Snapshot state, JsonObject action, String key, boolean extended) {
+        boolean flat = state.netQuantity == 0 && state.entries.isEmpty() && state.pairs.isEmpty();
+        Models.require(extended || flat, "initial native entry requires flat symbol with no pending orders");
         Models.require(!Models.bool(action, "retest_blocked") && !Models.bool(action, "retestBlocked"), "Bookmap retest blocks entry");
         Models.require(!action.has("priceUnit") || Models.string(action, "priceUnit").equals("real"), "unsupported entry price unit");
         JsonObject context = state.entryContext;
@@ -50,9 +61,21 @@ public final class EntryHandler {
         Models.require(Models.positive(entry) && Models.positive(stop) && (isLong ? stop < entry : stop > entry), "invalid entry or protective stop");
         BookmapWallReversal.checkEntryPrice(definition, entry, isLong);
         String method = field(action, "entry_method", "entryMethod");
-        Models.require(method.isEmpty() || method.equals("1 R") || method.equals("0.1 R"), "unsupported entry method");
-        double multiplier = EntryRulesChecker.checkBasicGlobalEntryRules(context, isLong, entry) * (method.equals("0.1 R") ? 0.1 : 1);
-        int count = method.equals("0.1 R") ? 1 : state.batchCount;
+        Models.require(extended || standardMethod(action), "unsupported entry method");
+        double methodMultiplier = 1;
+        var match = RISK_METHOD.matcher(method.trim());
+        if (match.find()) {
+            double parsed = Double.parseDouble(match.group(1));
+            if (Models.positive(parsed)) methodMultiplier = parsed;
+        }
+        JsonObject ruleContext = context;
+        if (extended) {
+            ruleContext = context.deepCopy();
+            ruleContext.addProperty("liquidityScale", Models.number(context, "liquidityScale")
+                    * ExtendedEntryRules.nextEntryMultiplier(state, isLong, entry));
+        }
+        double multiplier = EntryRulesChecker.checkBasicGlobalEntryRules(ruleContext, isLong, entry) * methodMultiplier;
+        int count = methodMultiplier == 0.1 ? 1 : state.batchCount;
         if (market) {
             double estimate = Models.number(action, "estimated_entry_price");
             if (!Models.positive(estimate)) estimate = Models.number(action, "estimatedEntryPrice");
@@ -60,7 +83,38 @@ public final class EntryHandler {
         } else entry = isLong ? Math.max(entry, state.ask) : Math.min(entry, state.bid);
         Models.require(Models.positive(entry) && (isLong ? stop < entry : stop > entry), "quote crosses protective stop");
         Plan plan = OrderFlow.submitEntry(state, context, definition, action, isLong, market, entry, stop, multiplier, count, method);
+        plan.requireFlatEntry = flat;
+        plan.entry.addProperty("preserveExistingTrade", state.netQuantity != 0 && (state.netQuantity > 0) == isLong);
+        if (extended) {
+            var opening = plan.requests.remove(0);
+            if (state.netQuantity != 0 && (state.netQuantity > 0) != isLong) for (var pair : state.pairs) {
+                Models.require(pair.marketLeg().isBuy == isLong, "exit side disagrees with opposite position");
+                if (market) Broker.instantOutOneExitPair(plan, pair);
+                else Broker.replaceExitPairWithNewPrice(plan, pair, entry, true);
+            }
+            plan.requests.add(opening);
+            // ViteApp submits the new protected entry before cancelling old same-direction entries.
+            for (var pending : state.entries) if (pending.isBuy == isLong) Broker.cancelOrders(plan, pending);
+        }
         plan.entry.addProperty("highOfDay", high); plan.entry.addProperty("lowOfDay", low);
         return plan;
+    }
+    public static Plan handleDirectionalEntry(Snapshot state, JsonObject action, String key) {
+        Models.require(!Models.string(action, "source").equals("bookmap_chart_hotkey")
+                && !Models.string(action, "button_id").startsWith("chart_hotkey:"), "chart B/S requires a wall-reversal tradebook");
+        Models.require(state.entryContext != null, "entry context unavailable");
+        JsonObject chosen = null;
+        for (var element : state.entryContext.getAsJsonArray("definitions")) {
+            var definition = element.getAsJsonObject();
+            if (Models.bool(definition, "enabled") && Models.bool(definition, "isLong") == key.equals("KeyB")) {
+                Models.require(chosen == null, "multiple tradebooks; use button instead");
+                chosen = definition;
+            }
+        }
+        Models.require(chosen != null, "no enabled entry tradebook");
+        JsonObject selected = action.deepCopy();
+        selected.addProperty("tradebook_id", Models.string(chosen, "tradebookID"));
+        selected.addProperty("use_market_order", Models.bool(action, "shiftKey") || Models.bool(action, "shift_key"));
+        return handleEntry(state, selected, "", true);
     }
 }

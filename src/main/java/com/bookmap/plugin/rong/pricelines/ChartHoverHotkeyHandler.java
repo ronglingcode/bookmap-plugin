@@ -46,11 +46,11 @@ import velox.api.layer1.layers.strategies.interfaces.ScreenSpacePainterAdapter;
 import velox.api.layer1.layers.strategies.interfaces.ScreenSpacePainterFactory;
 
 /**
- * Forwards supported keyboard actions with the currently hovered Bookmap chart price.
+ * Dispatches keyboard actions to the native executor with the currently hovered Bookmap chart price.
  *
  * Uses ScreenSpacePainterAdapter to receive chart coordinate mappings,
  * a global AWT mouse-motion listener to track the current chart price, and a
- * keyboard listener to broadcast supported hotkeys via WebSocket.
+ * keyboard listener to dispatch chart hotkeys through the native action router.
  *
  * NOTE: The ScreenSpacePainterFactory creates one painter per chart. Bookmap supplies both the
  * indicator name and the alias of the chart receiving the painter. Each coordinate mapping is
@@ -77,7 +77,7 @@ public class ChartHoverHotkeyHandler implements ScreenSpacePainterFactory {
     private static final Map<Component, String> componentToInstrument =
             Collections.synchronizedMap(new WeakHashMap<>());
 
-    /** Chart hotkeys forwarded to ViteApp from the currently hovered Bookmap chart. */
+    /** Chart hotkeys dispatched from the currently hovered Bookmap chart. */
     private static final Set<String> CHART_HOTKEYS =
             Set.of(
                     "a", "b", "c", "f", "g", "s", "t", "w",
