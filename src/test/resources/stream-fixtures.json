@@ -1,0 +1,449 @@
+[
+  {
+    "name": "schwab login",
+    "kind": "schwab",
+    "method": "loginRequest",
+    "args": [
+      {
+        "streamerSocketUrl": "wss://fake.invalid",
+        "schwabClientCustomerId": "customer",
+        "schwabClientCorrelId": "correl",
+        "schwabClientChannel": "channel",
+        "schwabClientFunctionId": "function"
+      },
+      "fake-token"
+    ],
+    "result": {
+      "service": "ADMIN",
+      "requestid": "1",
+      "command": "LOGIN",
+      "SchwabClientCustomerId": "customer",
+      "SchwabClientCorrelId": "correl",
+      "parameters": {
+        "Authorization": "fake-token",
+        "SchwabClientChannel": "channel",
+        "SchwabClientFunctionId": "function"
+      }
+    }
+  },
+  {
+    "name": "quotes subscribe",
+    "kind": "schwab",
+    "method": "quoteSubscribeRequest",
+    "args": [
+      {
+        "streamerSocketUrl": "wss://fake.invalid",
+        "schwabClientCustomerId": "customer",
+        "schwabClientCorrelId": "correl",
+        "schwabClientChannel": "channel",
+        "schwabClientFunctionId": "function"
+      },
+      [
+        "AAPL",
+        "TSLA"
+      ]
+    ],
+    "result": {
+      "service": "LEVELONE_EQUITIES",
+      "requestid": "2",
+      "command": "SUBS",
+      "SchwabClientCustomerId": "customer",
+      "SchwabClientCorrelId": "correl",
+      "parameters": {
+        "keys": "AAPL,TSLA",
+        "fields": "0,1,2,4,5"
+      }
+    }
+  },
+  {
+    "name": "activity subscribe",
+    "kind": "schwab",
+    "method": "activitySubscribeRequest",
+    "args": [
+      {
+        "streamerSocketUrl": "wss://fake.invalid",
+        "schwabClientCustomerId": "customer",
+        "schwabClientCorrelId": "correl",
+        "schwabClientChannel": "channel",
+        "schwabClientFunctionId": "function"
+      }
+    ],
+    "result": {
+      "service": "ACCT_ACTIVITY",
+      "requestid": "3",
+      "command": "SUBS",
+      "SchwabClientCustomerId": "customer",
+      "SchwabClientCorrelId": "correl",
+      "parameters": {
+        "keys": "Account Activity",
+        "fields": "0,1,2,3"
+      }
+    }
+  },
+  {
+    "name": "quote zero size and partial fields",
+    "kind": "schwab",
+    "method": "mapQuote",
+    "args": [
+      {
+        "1": 10,
+        "4": 0,
+        "key": "AAPL"
+      }
+    ],
+    "result": {
+      "symbol": "AAPL",
+      "bidPrice": 10,
+      "bidSize": 0
+    }
+  },
+  {
+    "name": "invalid quote field omitted",
+    "kind": "schwab",
+    "method": "mapQuote",
+    "args": [
+      {
+        "2": "11",
+        "5": null,
+        "key": "AAPL"
+      }
+    ],
+    "result": {
+      "symbol": "AAPL"
+    }
+  },
+  {
+    "name": "heartbeat",
+    "kind": "schwab",
+    "method": "parseStreamMessage",
+    "args": [
+      {
+        "notify": [
+          {
+            "heartbeat": "0"
+          }
+        ]
+      }
+    ],
+    "result": {
+      "quotes": [],
+      "activities": []
+    }
+  },
+  {
+    "name": "successful login",
+    "kind": "schwab",
+    "method": "parseStreamMessage",
+    "args": [
+      {
+        "response": [
+          {
+            "service": "ADMIN",
+            "command": "LOGIN",
+            "content": {
+              "code": 0
+            }
+          }
+        ]
+      }
+    ],
+    "result": {
+      "login": "success",
+      "quotes": [],
+      "activities": []
+    }
+  },
+  {
+    "name": "failed login",
+    "kind": "schwab",
+    "method": "parseStreamMessage",
+    "args": [
+      {
+        "response": [
+          {
+            "service": "ADMIN",
+            "command": "LOGIN",
+            "content": {
+              "code": 3
+            }
+          }
+        ]
+      }
+    ],
+    "result": {
+      "login": "failed",
+      "quotes": [],
+      "activities": []
+    }
+  },
+  {
+    "name": "missing code is failed login",
+    "kind": "schwab",
+    "method": "parseStreamMessage",
+    "args": [
+      {
+        "response": [
+          {
+            "service": "ADMIN",
+            "command": "LOGIN"
+          }
+        ]
+      }
+    ],
+    "result": {
+      "login": "failed",
+      "quotes": [],
+      "activities": []
+    }
+  },
+  {
+    "name": "mixed quote and activity",
+    "kind": "schwab",
+    "method": "parseStreamMessage",
+    "args": [
+      {
+        "data": [
+          {
+            "service": "LEVELONE_EQUITIES",
+            "command": "SUBS",
+            "content": [
+              {
+                "1": 10,
+                "2": 11,
+                "key": "AAPL"
+              },
+              {
+                "4": 0,
+                "key": "TSLA"
+              }
+            ]
+          },
+          {
+            "service": "ACCT_ACTIVITY",
+            "command": "SUBS",
+            "content": [
+              {
+                "2": "OrderAccepted",
+                "key": "account"
+              }
+            ]
+          }
+        ]
+      }
+    ],
+    "result": {
+      "quotes": [
+        {
+          "symbol": "AAPL",
+          "bidPrice": 10,
+          "askPrice": 11
+        },
+        {
+          "symbol": "TSLA",
+          "bidSize": 0
+        }
+      ],
+      "activities": [
+        {
+          "2": "OrderAccepted",
+          "key": "account"
+        }
+      ]
+    }
+  },
+  {
+    "name": "massive login",
+    "kind": "massive",
+    "method": "loginRequest",
+    "args": [
+      "fake-key"
+    ],
+    "result": {
+      "action": "auth",
+      "params": "fake-key"
+    }
+  },
+  {
+    "name": "massive subscribe",
+    "kind": "massive",
+    "method": "subscribeRequest",
+    "args": [
+      [
+        "AAPL",
+        "TSLA"
+      ]
+    ],
+    "result": {
+      "action": "subscribe",
+      "params": "T.AAPL,T.TSLA"
+    }
+  },
+  {
+    "name": "massive connected is not authenticated",
+    "kind": "massive",
+    "method": "parseStreamMessage",
+    "args": [
+      [
+        {
+          "ev": "status",
+          "status": "connected"
+        }
+      ]
+    ],
+    "result": {
+      "trades": []
+    }
+  },
+  {
+    "name": "massive login success",
+    "kind": "massive",
+    "method": "parseStreamMessage",
+    "args": [
+      [
+        {
+          "ev": "status",
+          "status": "auth_success"
+        }
+      ]
+    ],
+    "result": {
+      "login": "success",
+      "trades": []
+    }
+  },
+  {
+    "name": "massive login failure",
+    "kind": "massive",
+    "method": "parseStreamMessage",
+    "args": [
+      [
+        {
+          "ev": "status",
+          "status": "auth_failed"
+        }
+      ]
+    ],
+    "result": {
+      "login": "failed",
+      "trades": []
+    }
+  },
+  {
+    "name": "massive prints and conditions",
+    "kind": "massive",
+    "method": "parseStreamMessage",
+    "args": [
+      [
+        {
+          "ev": "T",
+          "sym": "AAPL",
+          "p": 10,
+          "s": 100,
+          "t": 1790861400000,
+          "q": 1,
+          "i": "large-id",
+          "x": 2
+        },
+        {
+          "ev": "T",
+          "sym": "AAPL",
+          "p": 99,
+          "s": 100,
+          "t": 1790861400000,
+          "c": [
+            37
+          ]
+        }
+      ]
+    ],
+    "result": {
+      "trades": [
+        {
+          "symbol": "AAPL",
+          "timestamp": 1790861400000,
+          "price": 10,
+          "size": 100,
+          "sequence": "1",
+          "id": "large-id",
+          "exchange": 2,
+          "conditions": []
+        }
+      ]
+    }
+  },
+  {
+    "name": "premarket condition permitted",
+    "kind": "massive",
+    "method": "parseStreamMessage",
+    "args": [
+      [
+        {
+          "ev": "T",
+          "sym": "AAPL",
+          "p": 10,
+          "s": 100,
+          "t": 1790861399999,
+          "c": [
+            37
+          ]
+        }
+      ]
+    ],
+    "result": {
+      "trades": [
+        {
+          "symbol": "AAPL",
+          "timestamp": 1790861399999,
+          "price": 10,
+          "size": 100,
+          "conditions": [
+            37
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "name": "null identifiers and malformed prints",
+    "kind": "massive",
+    "method": "parseStreamMessage",
+    "args": [
+      [
+        {
+          "ev": "T",
+          "sym": "AAPL",
+          "p": 10,
+          "s": 100,
+          "t": 1790861400000,
+          "q": null,
+          "i": null
+        },
+        {
+          "ev": "T",
+          "sym": null,
+          "p": 10,
+          "s": 100,
+          "t": 1790861400000
+        },
+        {
+          "ev": "T",
+          "sym": "AAPL",
+          "p": 0,
+          "s": 100,
+          "t": 1790861400000
+        }
+      ]
+    ],
+    "result": {
+      "trades": [
+        {
+          "symbol": "AAPL",
+          "timestamp": 1790861400000,
+          "price": 10,
+          "size": 100,
+          "conditions": []
+        }
+      ]
+    }
+  }
+]

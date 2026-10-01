@@ -25,7 +25,7 @@ Updated: 2026-10-01. Design: [standalone-native-trading-plan.md](standalone-nati
 | 2. Mirrored module extraction | In progress | Extracted TS pure sizing/target/entry/core-target/exit-selection helpers and Schwab payload builders into `src/trading`; compatibility exports retained. Reorganized all Java decisions under `core` and existing broker code under `libraries/broker`. Other browser handlers still mix globals/UI. |
 | 3. Secrets, Firestore, OAuth | In progress | Matching OAuth, credential ports, Firestore REST codecs/config/state/log operations complete. Java local-file store and blank template added. Browser uses libraries. Java startup, periodic refresh and local authorization controls remain part of runtime/adapter phases. |
 | 4. Massive/history/market state | In progress | Matching REST clients and history/live loader, headless candles/VWAP/session levels, Camarilla, liquidity and eligibility implemented. Browser DB now renders headless state and preserves every worker-batched print. Java stream/runtime wiring remains. |
-| 5. Account/streams/runtime | Pending | Java mutation client exists; ongoing account sync and vendor streams still depend on ViteApp. |
+| 5. Account/streams/runtime | In progress | Mirrored Schwab reads/account projection, vendor stream protocols and reconnecting two-stream runtime implemented. Java JDK socket adapter added. Wiring configuration/account cache/periodic refresh into the plugin lifecycle remains. |
 | 6. State/workflow completion | Pending | Four extended routes already implemented but flagged; state ownership/additional commands/jobs missing. |
 | 7. Bookmap adapter | Pending | Runtime currently owned by WebSocket server; UI/config updates still come from ViteApp. |
 | 8. Remove bridge/flag, final verification | Pending | Must verify browser and proxy closed, token expiry, restore/reconnect, and obfuscated JAR. |
@@ -36,6 +36,8 @@ Updated: 2026-10-01. Design: [standalone-native-trading-plan.md](standalone-nati
 - Cleanup commit: ViteApp `d4686b5`; plan/progress commit: bookmap-plugin `62e71f5`.
 - First library/Massive checkpoint: ViteApp `61b9006`; bookmap-plugin `570bb7a`.
 - Services checkpoint: ViteApp `a6e0bf6`; bookmap-plugin `bde33bd`.
+- Market core: ViteApp `339c99e`; bookmap-plugin `8b48a65`.
+- Market loader/browser adoption: ViteApp `b3e7341`; bookmap-plugin `a3b503f`.
 - Browser extraction: production build, direct execution (6 tests), extended execution
   (19 handler fixtures plus accepted-add state test), core-target exits (6 tests),
   and Massive (22 scenarios) passed.
@@ -55,6 +57,9 @@ Updated: 2026-10-01. Design: [standalone-native-trading-plan.md](standalone-nati
   regression, loader overlap test and worker batching passed. Browser production
   build and direct/extended execution checks passed. Full Java build passed,
   including loader overlap test, native-only compile and released JAR checks.
+- Account/stream checkpoint: 23 shared read/projection scenarios, 18 stream scenarios
+  and TS/Java fake-socket lifecycle passed. Browser build, direct/extended execution,
+  services and Massive checks passed. Full Java build and released JAR checks passed.
 - Native Java target remains 11. Gradle builds use per-command
   `JAVA_HOME=C:\Users\lingr\trading\.tools\jdk-21.0.12.1+1`.
 - Browser validation: `npm run build`, relevant Node test scripts in package.json.
@@ -83,13 +88,49 @@ between the history promise and chart readiness; reload resets UI-derived arrays
 Matching history/live loaders now seed complete minute bars + individual-trade
 backfill + buffered stream prints, with concurrent loads coalesced. Native I/O runs
 on an injected executor; close prevents a pending read from reinstalling state.
-Next: broker account/order projection, direct account reads and vendor streams/local runtime.
+Schwab read/projection and stream libraries are now implemented (details below).
+Next: configuration/watchlist and execution-input construction, shared account cache,
+periodic token/account scheduling and local persisted trade state. Then wire the
+native runtime into Bookmap lifecycle and replace bridge-fed views/actions.
 Native OAuth needs periodic startup/runtime scheduling; clients alone do not start
 background work. Do not remove the bridge/flag
 yet: Bookmap still obtains tokens, account snapshots, execution context and views
 from ViteApp. The Java Massive client is verified independently but not wired into
 the plugin lifecycle. Keep implementing through phase 8; this checkpoint is not
 completion of the standalone migration.
+
+## Account and stream checkpoint
+
+- `libraries/broker/schwab/ReadApi` reads account positions/balance, validated
+  streamer preferences and daily orders. Default is one daily order request;
+  capped results subdivide by hour, ten minutes, then minute. Optional time-window
+  mode preserves five-minute windows for the first 30 minutes after the open,
+  with historical Eastern DST. A capped minute fails explicitly rather than
+  silently returning incomplete account state. Boundary order IDs are deduplicated.
+- Browser Schwab account reads now use this library and `AccountProjection`,
+  through `adapters/browserAccount` for UI dates/enums. Existing observation
+  ordering, mutation diagnostics and no-mutation-retry behavior are preserved.
+- Projection includes EXECUTION/FILL activities on partial, canceled and replaced
+  orders, rather than requiring final FILLED status. This corrects lost fills/P&L.
+  Pending quantities subtract already-filled shares. Partially filled OCO pairs
+  use the smaller remaining leg quantity while sibling updates propagate.
+  These are explicit corrections, covered by shared scenarios.
+- Matching `StreamingProtocol` modules build login/subscription messages and parse
+  partial quotes (including zero sizes), account events and filtered trade prints.
+  LOGIN requires numeric success code 0 before subscription; the existing browser
+  worker/nonworker paths now check it. Vendor messages are not logged as errors.
+- `runtime/ManagedSocket`/`MarketStreams` reconnect with delays bounded at 30s,
+  rebuild Schwab credentials/preferences each time and cancel retries on close.
+  Java uses JDK WebSocket transport under `adapters/JdkSockets`; consumers are
+  called outside lifecycle monitors. No Bookmap API is referenced by these modules.
+- Shared suites: 23 broker read/projection scenarios, 18 stream protocol scenarios;
+  TS/Java fake-socket tests verify failed login, fresh reconnect token, no subscription
+  after failed login, print filtering, zero sizes and teardown. Native plugin startup
+  has not adopted these new streams yet. Browser worker still owns its existing
+  sockets; it uses the new quote parser/login check but not the reconnect manager yet.
+- Native account/trade/P&L grouping, periodic refresh and startup composition remain
+  unfinished. No live broker read/write, socket login or Firestore mutation was used
+  during this checkpoint's tests.
 
 ## Market checkpoint details
 
