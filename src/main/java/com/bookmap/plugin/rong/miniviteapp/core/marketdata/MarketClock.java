@@ -1,4 +1,4 @@
-package com.bookmap.plugin.rong.miniviteapp.runtime;
+package com.bookmap.plugin.rong.miniviteapp.core.marketdata;
 
 import java.time.Instant;
 import java.time.LocalDate;

@@ -4,7 +4,7 @@ import com.bookmap.plugin.rong.miniviteapp.core.marketdata.PremarketVolume;
 import com.bookmap.plugin.rong.miniviteapp.libraries.massive.Api;
 import com.bookmap.plugin.rong.miniviteapp.models.Candle;
 import com.bookmap.plugin.rong.miniviteapp.ports.HttpPort;
-import com.bookmap.plugin.rong.miniviteapp.runtime.MarketClock;
+import com.bookmap.plugin.rong.miniviteapp.core.marketdata.MarketClock;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;

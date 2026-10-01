@@ -1,7 +1,7 @@
 package com.bookmap.plugin.rong.miniviteapp.core.marketdata;
 
 import com.bookmap.plugin.rong.miniviteapp.models.Candle;
-import com.bookmap.plugin.rong.miniviteapp.runtime.MarketClock;
+import com.bookmap.plugin.rong.miniviteapp.core.marketdata.MarketClock;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
 import java.util.ArrayList;

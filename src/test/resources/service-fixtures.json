@@ -1,0 +1,938 @@
+[
+  {
+    "name": "existing nested configuration document",
+    "kind": "codec",
+    "method": "decodeFields",
+    "args": [
+      {
+        "activeProfileName": {
+          "stringValue": "schwab"
+        },
+        "timestamp": {
+          "timestampValue": "2026-10-01T13:00:00.123456789Z"
+        },
+        "plans": {
+          "arrayValue": {
+            "values": [
+              {
+                "mapValue": {
+                  "fields": {
+                    "symbol": {
+                      "stringValue": "AAPL"
+                    },
+                    "atr": {
+                      "doubleValue": 0.55
+                    }
+                  }
+                }
+              }
+            ]
+          }
+        },
+        "tradingSettings": {
+          "mapValue": {
+            "fields": {
+              "risk": {
+                "integerValue": "100"
+              },
+              "enabled": {
+                "booleanValue": true
+              }
+            }
+          }
+        }
+      }
+    ],
+    "result": {
+      "activeProfileName": "schwab",
+      "timestamp": {
+        "seconds": 1790859600,
+        "nanoseconds": 123456789
+      },
+      "plans": [
+        {
+          "symbol": "AAPL",
+          "atr": 0.55
+        }
+      ],
+      "tradingSettings": {
+        "risk": 100,
+        "enabled": true
+      }
+    }
+  },
+  {
+    "name": "state payload matches Firebase Web SDK map schema",
+    "kind": "codec",
+    "method": "encodeFields",
+    "args": [
+      {
+        "date": "2026-10-01",
+        "initialBalance": 10000.5,
+        "stateBySymbol": {
+          "AAPL": {
+            "long": {
+              "initialQuantity": 1000,
+              "partialsCount": 10,
+              "stopTightenPhase": "needs_tighten"
+            },
+            "short": null
+          }
+        },
+        "readOnlyStateBySymbol": {}
+      }
+    ],
+    "result": {
+      "date": {
+        "stringValue": "2026-10-01"
+      },
+      "initialBalance": {
+        "doubleValue": 10000.5
+      },
+      "stateBySymbol": {
+        "mapValue": {
+          "fields": {
+            "AAPL": {
+              "mapValue": {
+                "fields": {
+                  "long": {
+                    "mapValue": {
+                      "fields": {
+                        "initialQuantity": {
+                          "integerValue": "1000"
+                        },
+                        "partialsCount": {
+                          "integerValue": "10"
+                        },
+                        "stopTightenPhase": {
+                          "stringValue": "needs_tighten"
+                        }
+                      }
+                    }
+                  },
+                  "short": {
+                    "nullValue": null
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "readOnlyStateBySymbol": {
+        "mapValue": {
+          "fields": {}
+        }
+      }
+    }
+  },
+  {
+    "name": "encode SDK timestamp with full nanoseconds",
+    "kind": "codec",
+    "method": "encodeFields",
+    "args": [
+      {
+        "timestamp": {
+          "seconds": 1790859600,
+          "nanoseconds": 123456789
+        }
+      }
+    ],
+    "result": {
+      "timestamp": {
+        "timestampValue": "2026-10-01T13:00:00.123456789Z"
+      }
+    }
+  },
+  {
+    "name": "empty array and map decode without fields",
+    "kind": "codec",
+    "method": "decodeFields",
+    "args": [
+      {
+        "list": {
+          "arrayValue": {}
+        },
+        "map": {
+          "mapValue": {}
+        }
+      }
+    ],
+    "result": {
+      "list": [],
+      "map": {}
+    }
+  },
+  {
+    "kind": "firestore",
+    "name": "query only latest configuration snapshot",
+    "method": "fetchConfigData",
+    "args": [],
+    "pages": [
+      {
+        "status": 200,
+        "body": "[{\"readTime\":\"2026-10-01T14:00:00Z\"},{\"document\":{\"fields\":{\"activeProfileName\":{\"stringValue\":\"schwab\"},\"timestamp\":{\"timestampValue\":\"2026-10-01T13:00:00.123456789Z\"},\"plans\":{\"arrayValue\":{\"values\":[{\"mapValue\":{\"fields\":{\"symbol\":{\"stringValue\":\"AAPL\"},\"atr\":{\"doubleValue\":0.55}}}}]}},\"tradingSettings\":{\"mapValue\":{\"fields\":{\"risk\":{\"integerValue\":\"100\"},\"enabled\":{\"booleanValue\":true}}}}}}}]"
+      }
+    ],
+    "requests": [
+      {
+        "path": "/v1/projects/test-project/databases/(default)/documents:runQuery",
+        "method": "POST",
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "body": {
+          "structuredQuery": {
+            "from": [
+              {
+                "collectionId": "configDataSnapshot"
+              }
+            ],
+            "orderBy": [
+              {
+                "field": {
+                  "fieldPath": "timestamp"
+                },
+                "direction": "DESCENDING"
+              }
+            ],
+            "limit": 1
+          }
+        }
+      }
+    ],
+    "result": {
+      "activeProfileName": "schwab",
+      "timestamp": {
+        "seconds": 1790859600,
+        "nanoseconds": 123456789
+      },
+      "plans": [
+        {
+          "symbol": "AAPL",
+          "atr": 0.55
+        }
+      ],
+      "tradingSettings": {
+        "risk": 100,
+        "enabled": true
+      }
+    }
+  },
+  {
+    "kind": "firestore",
+    "name": "missing trading-state document returns null",
+    "method": "getTradingState",
+    "args": [
+      "schwab"
+    ],
+    "pages": [
+      {
+        "status": 404,
+        "body": "{}"
+      }
+    ],
+    "requests": [
+      {
+        "path": "/v1/projects/test-project/databases/(default)/documents/state-schwab/tradingState",
+        "method": "GET",
+        "headers": {
+          "Content-Type": "application/json"
+        }
+      }
+    ],
+    "result": null
+  },
+  {
+    "kind": "firestore",
+    "name": "restore old trading-state maps",
+    "method": "getTradingState",
+    "args": [
+      "schwab"
+    ],
+    "pages": [
+      {
+        "status": 200,
+        "body": "{\"fields\":{\"date\":{\"stringValue\":\"2026-10-01\"},\"initialBalance\":{\"doubleValue\":10000.5},\"stateBySymbol\":{\"mapValue\":{\"fields\":{\"AAPL\":{\"mapValue\":{\"fields\":{\"long\":{\"mapValue\":{\"fields\":{\"initialQuantity\":{\"integerValue\":\"1000\"},\"partialsCount\":{\"integerValue\":\"10\"},\"stopTightenPhase\":{\"stringValue\":\"needs_tighten\"}}}},\"short\":{\"nullValue\":null}}}}}}},\"readOnlyStateBySymbol\":{\"mapValue\":{\"fields\":{}}}}}"
+      }
+    ],
+    "requests": [
+      {
+        "path": "/v1/projects/test-project/databases/(default)/documents/state-schwab/tradingState",
+        "method": "GET",
+        "headers": {
+          "Content-Type": "application/json"
+        }
+      }
+    ],
+    "result": {
+      "date": "2026-10-01",
+      "initialBalance": 10000.5,
+      "stateBySymbol": {
+        "AAPL": {
+          "long": {
+            "initialQuantity": 1000,
+            "partialsCount": 10,
+            "stopTightenPhase": "needs_tighten"
+          },
+          "short": null
+        }
+      },
+      "readOnlyStateBySymbol": {}
+    }
+  },
+  {
+    "kind": "firestore",
+    "name": "save complete state as existing setDoc behavior",
+    "method": "setTradingState",
+    "args": [
+      "schwab",
+      {
+        "date": "2026-10-01",
+        "initialBalance": 10000.5,
+        "stateBySymbol": {
+          "AAPL": {
+            "long": {
+              "initialQuantity": 1000,
+              "partialsCount": 10,
+              "stopTightenPhase": "needs_tighten"
+            },
+            "short": null
+          }
+        },
+        "readOnlyStateBySymbol": {}
+      }
+    ],
+    "pages": [
+      {
+        "status": 200,
+        "body": "{\"fields\":{}}"
+      }
+    ],
+    "requests": [
+      {
+        "path": "/v1/projects/test-project/databases/(default)/documents/state-schwab/tradingState",
+        "method": "PATCH",
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "body": {
+          "fields": {
+            "date": {
+              "stringValue": "2026-10-01"
+            },
+            "initialBalance": {
+              "doubleValue": 10000.5
+            },
+            "stateBySymbol": {
+              "mapValue": {
+                "fields": {
+                  "AAPL": {
+                    "mapValue": {
+                      "fields": {
+                        "long": {
+                          "mapValue": {
+                            "fields": {
+                              "initialQuantity": {
+                                "integerValue": "1000"
+                              },
+                              "partialsCount": {
+                                "integerValue": "10"
+                              },
+                              "stopTightenPhase": {
+                                "stringValue": "needs_tighten"
+                              }
+                            }
+                          }
+                        },
+                        "short": {
+                          "nullValue": null
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            "readOnlyStateBySymbol": {
+              "mapValue": {
+                "fields": {}
+              }
+            }
+          }
+        }
+      }
+    ],
+    "result": null
+  },
+  {
+    "kind": "firestore",
+    "name": "log writes with timestamp and TTL",
+    "method": "addDocument",
+    "args": [
+      "schwab-Logs",
+      {
+        "msg": "test",
+        "type": "Info",
+        "timestamp": {
+          "seconds": 1,
+          "nanoseconds": 0
+        },
+        "expiredAt": {
+          "seconds": 604801,
+          "nanoseconds": 0
+        }
+      }
+    ],
+    "pages": [
+      {
+        "status": 200,
+        "body": "{\"fields\":{}}"
+      }
+    ],
+    "requests": [
+      {
+        "path": "/v1/projects/test-project/databases/(default)/documents/schwab-Logs",
+        "method": "POST",
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "body": {
+          "fields": {
+            "msg": {
+              "stringValue": "test"
+            },
+            "type": {
+              "stringValue": "Info"
+            },
+            "timestamp": {
+              "timestampValue": "1970-01-01T00:00:01.000000000Z"
+            },
+            "expiredAt": {
+              "timestampValue": "1970-01-08T00:00:01.000000000Z"
+            }
+          }
+        }
+      }
+    ],
+    "result": null
+  },
+  {
+    "kind": "firestore",
+    "name": "configuration permissions failure remains visible",
+    "method": "fetchConfigData",
+    "args": [],
+    "pages": [
+      {
+        "status": 403,
+        "body": "test-firestore-key"
+      }
+    ],
+    "requests": [
+      {
+        "path": "/v1/projects/test-project/databases/(default)/documents:runQuery",
+        "method": "POST",
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "body": {
+          "structuredQuery": {
+            "from": [
+              {
+                "collectionId": "configDataSnapshot"
+              }
+            ],
+            "orderBy": [
+              {
+                "field": {
+                  "fieldPath": "timestamp"
+                },
+                "direction": "DESCENDING"
+              }
+            ],
+            "limit": 1
+          }
+        }
+      }
+    ],
+    "error": "Firestore POST HTTP 403"
+  },
+  {
+    "kind": "firestore",
+    "name": "empty configuration collection is an error",
+    "method": "fetchConfigData",
+    "args": [],
+    "pages": [
+      {
+        "status": 200,
+        "body": "[{\"readTime\":\"2026-10-01T14:00:00Z\"}]"
+      }
+    ],
+    "requests": [
+      {
+        "path": "/v1/projects/test-project/databases/(default)/documents:runQuery",
+        "method": "POST",
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "body": {
+          "structuredQuery": {
+            "from": [
+              {
+                "collectionId": "configDataSnapshot"
+              }
+            ],
+            "orderBy": [
+              {
+                "field": {
+                  "fieldPath": "timestamp"
+                },
+                "direction": "DESCENDING"
+              }
+            ],
+            "limit": 1
+          }
+        }
+      }
+    ],
+    "error": "Firestore has no configuration snapshot"
+  },
+  {
+    "kind": "oauth",
+    "name": "refresh uses broker expiry and preserves old refresh token when omitted",
+    "method": "refresh",
+    "args": [],
+    "credentials": {
+      "appKey": "test-app",
+      "secret": "test-secret",
+      "access_token": "old-access",
+      "refresh_token": "old-refresh",
+      "expires_at": 0,
+      "accountHashValue": "test-account"
+    },
+    "pages": [
+      {
+        "status": 200,
+        "body": "{\"access_token\":\"new-access\",\"expires_in\":1800}"
+      }
+    ],
+    "requests": [
+      {
+        "path": "/v1/oauth/token",
+        "method": "POST",
+        "headers": {
+          "Content-Type": "application/x-www-form-urlencoded",
+          "Authorization": "Basic dGVzdC1hcHA6dGVzdC1zZWNyZXQ="
+        },
+        "body": "grant_type=refresh_token&refresh_token=old-refresh"
+      }
+    ],
+    "saved": [
+      {
+        "appKey": "test-app",
+        "secret": "test-secret",
+        "access_token": "new-access",
+        "refresh_token": "old-refresh",
+        "expires_at": 1900000,
+        "accountHashValue": "test-account"
+      }
+    ],
+    "result": {
+      "appKey": "test-app",
+      "secret": "test-secret",
+      "access_token": "new-access",
+      "refresh_token": "old-refresh",
+      "expires_at": 1900000,
+      "accountHashValue": "test-account"
+    }
+  },
+  {
+    "kind": "oauth",
+    "name": "refresh persists rotated refresh token",
+    "method": "refresh",
+    "args": [],
+    "credentials": {
+      "appKey": "test-app",
+      "secret": "test-secret",
+      "access_token": "old-access",
+      "refresh_token": "old-refresh",
+      "expires_at": 0,
+      "accountHashValue": "test-account"
+    },
+    "pages": [
+      {
+        "status": 200,
+        "body": "{\"access_token\":\"new-access\",\"refresh_token\":\"new-refresh\",\"expires_in\":1200}"
+      }
+    ],
+    "requests": [
+      {
+        "path": "/v1/oauth/token",
+        "method": "POST",
+        "headers": {
+          "Content-Type": "application/x-www-form-urlencoded",
+          "Authorization": "Basic dGVzdC1hcHA6dGVzdC1zZWNyZXQ="
+        },
+        "body": "grant_type=refresh_token&refresh_token=old-refresh"
+      }
+    ],
+    "saved": [
+      {
+        "appKey": "test-app",
+        "secret": "test-secret",
+        "access_token": "new-access",
+        "refresh_token": "new-refresh",
+        "expires_at": 1300000,
+        "accountHashValue": "test-account"
+      }
+    ],
+    "result": {
+      "appKey": "test-app",
+      "secret": "test-secret",
+      "access_token": "new-access",
+      "refresh_token": "new-refresh",
+      "expires_at": 1300000,
+      "accountHashValue": "test-account"
+    }
+  },
+  {
+    "kind": "oauth",
+    "name": "valid token is reused without network",
+    "method": "accessToken",
+    "args": [],
+    "credentials": {
+      "appKey": "test-app",
+      "secret": "test-secret",
+      "access_token": "old-access",
+      "refresh_token": "old-refresh",
+      "expires_at": 200000,
+      "accountHashValue": "test-account"
+    },
+    "pages": [],
+    "requests": [],
+    "saved": [],
+    "result": "old-access"
+  },
+  {
+    "kind": "oauth",
+    "name": "token near expiry refreshes",
+    "method": "accessToken",
+    "args": [],
+    "credentials": {
+      "appKey": "test-app",
+      "secret": "test-secret",
+      "access_token": "old-access",
+      "refresh_token": "old-refresh",
+      "expires_at": 150000,
+      "accountHashValue": "test-account"
+    },
+    "pages": [
+      {
+        "status": 200,
+        "body": "{\"access_token\":\"new-access\",\"expires_in\":600}"
+      }
+    ],
+    "requests": [
+      {
+        "path": "/v1/oauth/token",
+        "method": "POST",
+        "headers": {
+          "Content-Type": "application/x-www-form-urlencoded",
+          "Authorization": "Basic dGVzdC1hcHA6dGVzdC1zZWNyZXQ="
+        },
+        "body": "grant_type=refresh_token&refresh_token=old-refresh"
+      }
+    ],
+    "saved": [
+      {
+        "appKey": "test-app",
+        "secret": "test-secret",
+        "access_token": "new-access",
+        "refresh_token": "old-refresh",
+        "expires_at": 700000,
+        "accountHashValue": "test-account"
+      }
+    ],
+    "result": "new-access"
+  },
+  {
+    "kind": "oauth",
+    "name": "revoked refresh token needs authorization without logging response",
+    "method": "refresh",
+    "args": [],
+    "credentials": {
+      "appKey": "test-app",
+      "secret": "test-secret",
+      "access_token": "old-access",
+      "refresh_token": "old-refresh",
+      "expires_at": 0,
+      "accountHashValue": "test-account"
+    },
+    "pages": [
+      {
+        "status": 400,
+        "body": "test-secret"
+      }
+    ],
+    "requests": [
+      {
+        "path": "/v1/oauth/token",
+        "method": "POST",
+        "headers": {
+          "Content-Type": "application/x-www-form-urlencoded",
+          "Authorization": "Basic dGVzdC1hcHA6dGVzdC1zZWNyZXQ="
+        },
+        "body": "grant_type=refresh_token&refresh_token=old-refresh"
+      }
+    ],
+    "saved": [],
+    "error": "Schwab OAuth HTTP 400; authorize again if refresh token is revoked"
+  },
+  {
+    "kind": "oauth",
+    "name": "missing refresh token needs authorization",
+    "method": "refresh",
+    "args": [],
+    "credentials": {
+      "appKey": "test-app",
+      "secret": "test-secret",
+      "access_token": "old-access",
+      "refresh_token": "",
+      "expires_at": 0,
+      "accountHashValue": "test-account"
+    },
+    "pages": [],
+    "requests": [],
+    "saved": [],
+    "error": "Schwab refresh token is missing; authorize again"
+  },
+  {
+    "kind": "oauth",
+    "name": "missing token expiry is invalid",
+    "method": "refresh",
+    "args": [],
+    "credentials": {
+      "appKey": "test-app",
+      "secret": "test-secret",
+      "access_token": "old-access",
+      "refresh_token": "old-refresh",
+      "expires_at": 0,
+      "accountHashValue": "test-account"
+    },
+    "pages": [
+      {
+        "status": 200,
+        "body": "{\"access_token\":\"new-access\"}"
+      }
+    ],
+    "requests": [
+      {
+        "path": "/v1/oauth/token",
+        "method": "POST",
+        "headers": {
+          "Content-Type": "application/x-www-form-urlencoded",
+          "Authorization": "Basic dGVzdC1hcHA6dGVzdC1zZWNyZXQ="
+        },
+        "body": "grant_type=refresh_token&refresh_token=old-refresh"
+      }
+    ],
+    "saved": [],
+    "error": "Schwab OAuth returned no usable token/expiry"
+  },
+  {
+    "kind": "oauth",
+    "name": "manual callback exchanges decoded code and saves credentials",
+    "method": "exchangeAuthorizationCode",
+    "args": [
+      "https://127.0.0.1/?code=sample%40%2B&session=ignored"
+    ],
+    "credentials": {
+      "appKey": "test-app",
+      "secret": "test-secret",
+      "access_token": "old-access",
+      "refresh_token": "old-refresh",
+      "expires_at": 0,
+      "accountHashValue": "test-account"
+    },
+    "pages": [
+      {
+        "status": 200,
+        "body": "{\"access_token\":\"new-access\",\"refresh_token\":\"new-refresh\",\"expires_in\":1800}"
+      }
+    ],
+    "requests": [
+      {
+        "path": "/v1/oauth/token",
+        "method": "POST",
+        "headers": {
+          "Content-Type": "application/x-www-form-urlencoded",
+          "Authorization": "Basic dGVzdC1hcHA6dGVzdC1zZWNyZXQ="
+        },
+        "body": "grant_type=authorization_code&code=sample%40%2B&redirect_uri=https%3A%2F%2F127.0.0.1"
+      }
+    ],
+    "saved": [
+      {
+        "appKey": "test-app",
+        "secret": "test-secret",
+        "access_token": "new-access",
+        "refresh_token": "new-refresh",
+        "expires_at": 1900000,
+        "accountHashValue": "test-account"
+      }
+    ],
+    "result": {
+      "appKey": "test-app",
+      "secret": "test-secret",
+      "access_token": "new-access",
+      "refresh_token": "new-refresh",
+      "expires_at": 1900000,
+      "accountHashValue": "test-account"
+    }
+  },
+  {
+    "kind": "log",
+    "name": "notification log retains encoded message, date and seven-day TTL",
+    "method": "log",
+    "args": [
+      "Info",
+      "test message",
+      {
+        "symbol": "AAPL"
+      }
+    ],
+    "pages": [
+      {
+        "status": 200,
+        "body": "{\"fields\":{}}"
+      }
+    ],
+    "requests": [
+      {
+        "path": "/v1/projects/test-project/databases/(default)/documents/schwab-Logs",
+        "method": "POST",
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "body": {
+          "fields": {
+            "msg": {
+              "stringValue": "\"test message\""
+            },
+            "type": {
+              "stringValue": "Info"
+            },
+            "timestamp": {
+              "timestampValue": "2026-10-01T13:30:00.000000000Z"
+            },
+            "dateStr": {
+              "stringValue": "2026-10-1"
+            },
+            "expiredAt": {
+              "timestampValue": "2026-10-08T13:30:00.000000000Z"
+            },
+            "symbol": {
+              "stringValue": "AAPL"
+            }
+          }
+        }
+      }
+    ],
+    "result": null
+  },
+  {
+    "kind": "log",
+    "name": "order log retains payload and seven-day TTL",
+    "method": "logOrder",
+    "args": [
+      {
+        "orderType": "STOP",
+        "price": 10
+      },
+      {
+        "symbol": "AAPL"
+      }
+    ],
+    "pages": [
+      {
+        "status": 200,
+        "body": "{\"fields\":{}}"
+      }
+    ],
+    "requests": [
+      {
+        "path": "/v1/projects/test-project/databases/(default)/documents/schwab-Orders",
+        "method": "POST",
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "body": {
+          "fields": {
+            "timestamp": {
+              "timestampValue": "2026-10-01T13:30:00.000000000Z"
+            },
+            "dateStr": {
+              "stringValue": "2026-10-1"
+            },
+            "expiredAt": {
+              "timestampValue": "2026-10-08T13:30:00.000000000Z"
+            },
+            "logOrder": {
+              "stringValue": "{\"orderType\":\"STOP\",\"price\":10}"
+            },
+            "symbol": {
+              "stringValue": "AAPL"
+            }
+          }
+        }
+      }
+    ],
+    "result": null
+  },
+  {
+    "kind": "log",
+    "name": "breakout log retains state and three-day TTL",
+    "method": "logBreakoutTradeState",
+    "args": [
+      "AAPL",
+      {
+        "quantity": 100
+      }
+    ],
+    "pages": [
+      {
+        "status": 200,
+        "body": "{\"fields\":{}}"
+      }
+    ],
+    "requests": [
+      {
+        "path": "/v1/projects/test-project/databases/(default)/documents/BreakoutTradeState",
+        "method": "POST",
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "body": {
+          "fields": {
+            "symbol": {
+              "stringValue": "AAPL"
+            },
+            "timestamp": {
+              "timestampValue": "2026-10-01T13:30:00.000000000Z"
+            },
+            "dateStr": {
+              "stringValue": "2026-10-1"
+            },
+            "expiredAt": {
+              "timestampValue": "2026-10-04T13:30:00.000000000Z"
+            },
+            "quantity": {
+              "integerValue": "100"
+            }
+          }
+        }
+      }
+    ],
+    "result": null
+  }
+]
