@@ -68,6 +68,32 @@ Updated: 2026-10-01. Design: [standalone-native-trading-plan.md](standalone-nati
 
 ## Resume checkpoint
 
+Runtime checkpoint following the state extraction (`a79f838` ViteApp / `243ee1e`
+plugin): matching `runtime/TradingRuntime` owns direct startup, saved state,
+configuration/positions/daily-order reads, OAuth checks every 30 seconds, account
+refresh every 15 seconds, config refresh every minute, history/live loading and
+100ms local market updates. Stream reconnects backfill and re-read fresh OAuth
+preferences. Safe GET reads retry a 401 once after token refresh; mutations never
+auto-retry. State writes are ordered, independent of manual action dispatch.
+Native broker API now accepts injected HTTP with real response headers, preserving
+Location IDs and existing mutation outcomes. Direct JDK HTTP adapter added.
+
+New fake-service runtime tests in both languages cover expired-token startup,
+state restore, eligibility/inputs, exactly one stream per vendor, renewal,
+Firestore persistence, account reads and teardown. Java also sends a real native
+entry decision to a fake broker and persists accepted metadata without ViteApp.
+`StartupEligibility` mirrors existing configured/implied market cap, premarket
+volume and consolidation rules. No real services/orders were used.
+
+Next: finish state/command/job ownership and local Bookmap projections, add a native
+factory/lifecycle adapter, then remove execution bridge and native-routing flag.
+The runtime is independently testable but NOT YET started by RongPlugin. Remaining
+runtime gaps before wiring: unselected held-symbol exit inputs, day rollover,
+config-removal snapshot cleanup, local OAuth authorization/restart controls,
+read 429 scheduling/backoff, and notification/pending-entry/discipline jobs.
+The browser uses extracted core libraries; new TS orchestration is currently a
+headless mirror, not a replacement for its existing chart startup adapter.
+
 Latest implemented slice: `core/account/TradeLedger`, `core/state/TradeState`,
 `core/configuration/TradingConfig`, `core/controllers/ExecutionInputs` in both
 languages. Browser fill grouping, accepted-state registration, tradebook factory

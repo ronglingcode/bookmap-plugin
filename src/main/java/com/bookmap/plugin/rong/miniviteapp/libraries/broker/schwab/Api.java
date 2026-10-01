@@ -13,28 +13,38 @@ import java.time.Duration;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.function.BiConsumer;
+import com.bookmap.plugin.rong.miniviteapp.ports.HttpPort;
+import java.util.LinkedHashMap;
+import java.util.Map;
 
 /** Actual Schwab responses, not ProxyServer's synthetic JSON envelope. No retries or credential logging. */
 public final class Api {
     private static final DateTimeFormatter ENTRY_LOG_TIME = DateTimeFormatter.ofPattern("HH:mm:ss.SSS");
-    private final HttpClient client;
+    private final HttpPort http;
     private final URI base;
     private final BiConsumer<String, String> log;
     public Api() { this(URI.create("https://api.schwabapi.com/trader/v1/")); }
     public Api(BiConsumer<String, String> log) { this(URI.create("https://api.schwabapi.com/trader/v1/"), log); }
     public Api(URI base) { this(base, (symbol, message) -> { }); }
-    public Api(URI base, BiConsumer<String, String> log) {
-        this.base = base;
-        this.log = log;
-        client = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(5))
-                .followRedirects(HttpClient.Redirect.NEVER).build();
+    public Api(URI base, BiConsumer<String, String> log) { this(base, nativeHttp(), log); }
+    public Api(HttpPort http, BiConsumer<String, String> log) { this(URI.create("https://api.schwabapi.com/trader/v1/"), http, log); }
+    public Api(URI base, HttpPort http, BiConsumer<String, String> log) { this.base = base; this.http = http; this.log = log; }
+    private static HttpPort nativeHttp() {
+        HttpClient client = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(5)).followRedirects(HttpClient.Redirect.NEVER).build();
+        return (uri, method, headers, body) -> {
+            HttpRequest.Builder request = HttpRequest.newBuilder(uri).timeout(Duration.ofSeconds(8)); headers.forEach(request::header);
+            request.method(method, body == null ? HttpRequest.BodyPublishers.noBody() : HttpRequest.BodyPublishers.ofString(body));
+            HttpResponse<String> response = client.send(request.build(), HttpResponse.BodyHandlers.ofString());
+            Map<String, String> returned = new LinkedHashMap<>(); response.headers().map().forEach((key, values) -> returned.put(key, String.join(",", values)));
+            return new HttpPort.Response(response.statusCode(), response.body(), returned);
+        };
     }
     public static final class Result {
         public final String method, orderId, newOrderId, outcome, reason;
         public final int status;
-        public Result(Request request, HttpResponse<String> response, String token, String account) {
-            method = request.method; orderId = request.orderId; status = response.statusCode();
-            String location = response.headers().firstValue("location").orElse("");
+        public Result(Request request, HttpPort.Response response, String token, String account) {
+            method = request.method; orderId = request.orderId; status = response.status;
+            String location = response.header("location");
             String id = location.substring(location.lastIndexOf('/') + 1);
             newOrderId = id.matches("[0-9]+") ? id : "";
             boolean success = method.equals("DELETE") ? status == 200 || status == 204
@@ -53,25 +63,20 @@ public final class Api {
             json.addProperty("outcome", outcome); json.addProperty("reason", reason); return json;
         }
     }
-    private HttpResponse<String> send(String account, String token, String path, String method, JsonObject body)
+    private HttpPort.Response send(String account, String token, String path, String method, JsonObject body)
             throws Exception {
         return send(account, token, path, method, body, null);
     }
-    private HttpResponse<String> send(String account, String token, String path, String method, JsonObject body,
+    private HttpPort.Response send(String account, String token, String path, String method, JsonObject body,
             String timedEntrySymbol) throws Exception {
-        HttpRequest.Builder builder = HttpRequest.newBuilder(base.resolve("accounts/" + account + path))
-                .timeout(Duration.ofSeconds(8)).header("Authorization", "Bearer " + token)
-                .header("Accept", "application/json");
-        if (body != null) builder.header("Content-Type", "application/json");
-        builder.method(method, body == null ? HttpRequest.BodyPublishers.noBody()
-                : HttpRequest.BodyPublishers.ofString(body.toString()));
-        HttpRequest request = builder.build();
+        Map<String, String> headers = new LinkedHashMap<>(); headers.put("Authorization", "Bearer " + token); headers.put("Accept", "application/json");
+        if (body != null) headers.put("Content-Type", "application/json");
         long startedAt = System.nanoTime();
         if (timedEntrySymbol != null)
             log.accept(timedEntrySymbol, "Native entry POST sending to broker at " + LocalDateTime.now().format(ENTRY_LOG_TIME));
-        HttpResponse<String> response;
+        HttpPort.Response response;
         try {
-            response = client.send(request, HttpResponse.BodyHandlers.ofString());
+            response = http.request(base.resolve("accounts/" + account + path), method, headers, body == null ? null : body.toString());
         } catch (Exception error) {
             if (timedEntrySymbol != null)
                 log.accept(timedEntrySymbol, "Native entry POST received no response after "
@@ -82,18 +87,18 @@ public final class Api {
             log.accept(timedEntrySymbol, "Native entry POST response received at "
                     + LocalDateTime.now().format(ENTRY_LOG_TIME) + " after "
                     + Duration.ofNanos(System.nanoTime() - startedAt).toMillis() + " ms (HTTP "
-                    + response.statusCode() + ")");
+                    + response.status + ")");
         return response;
     }
-    private static String httpFailure(String operation, HttpResponse<String> response, String token, String account) {
-        String body = response.body();
-        return ExecutionDiagnostics.sanitize(operation + " HTTP " + response.statusCode() + ": " +
+    private static String httpFailure(String operation, HttpPort.Response response, String token, String account) {
+        String body = response.body;
+        return ExecutionDiagnostics.sanitize(operation + " HTTP " + response.status + ": " +
                 (body == null || body.isBlank() ? "empty broker response body" : body), token, account);
     }
     private JsonObject read(String account, String token, String path) throws Exception {
-        HttpResponse<String> response = send(account, token, path, "GET", null);
-        Models.require(response.statusCode() == 200, httpFailure("GET account positions", response, token, account));
-        try { return JsonParser.parseString(response.body()).getAsJsonObject(); }
+        HttpPort.Response response = send(account, token, path, "GET", null);
+        Models.require(response.status == 200, httpFailure("GET account positions", response, token, account));
+        try { return JsonParser.parseString(response.body).getAsJsonObject(); }
         catch (RuntimeException error) { throw new java.io.IOException("GET account positions HTTP 200 response parsing failed", error); }
     }
     public void validateFlatEntry(String account, String token, String symbol) throws Exception {
@@ -111,11 +116,11 @@ public final class Api {
             }
             var now = java.time.Instant.now().truncatedTo(java.time.temporal.ChronoUnit.MILLIS);
             operation = "GET pending symbol orders";
-            HttpResponse<String> response = send(account, token, "/orders?maxResults=3000&fromEnteredTime=" +
+            HttpPort.Response response = send(account, token, "/orders?maxResults=3000&fromEnteredTime=" +
                     now.minusSeconds(59L * 86400) + "&toEnteredTime=" + now, "GET", null);
-            Models.require(response.statusCode() == 200, httpFailure(operation, response, token, account));
+            Models.require(response.status == 200, httpFailure(operation, response, token, account));
             operation = "parse GET pending symbol orders response (HTTP 200)";
-            var list = JsonParser.parseString(response.body()).getAsJsonArray();
+            var list = JsonParser.parseString(response.body).getAsJsonArray();
             operation = "inspect GET pending symbol orders response (HTTP 200)";
             Models.require(list.size() < 3000, "entry order read reached 3000 results and may be truncated");
             for (var element : list) requireNoSymbolOrders(element.getAsJsonObject(), symbol);

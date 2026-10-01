@@ -11,6 +11,9 @@ public interface HttpPort {
     final class Response {
         public final int status;
         public final String body;
-        public Response(int status, String body) { this.status = status; this.body = body; }
+        public final Map<String, String> headers;
+        public Response(int status, String body) { this(status, body, Map.of()); }
+        public Response(int status, String body, Map<String, String> headers) { this.status = status; this.body = body; this.headers = Map.copyOf(headers); }
+        public String header(String name) { return headers.entrySet().stream().filter(value -> value.getKey().equalsIgnoreCase(name)).map(Map.Entry::getValue).findFirst().orElse(""); }
     }
 }

@@ -1,0 +1,62 @@
+package com.bookmap.plugin.rong.miniviteapp;
+
+import com.bookmap.plugin.rong.miniviteapp.runtime.TradingRuntime;
+import com.bookmap.plugin.rong.miniviteapp.ports.*;
+import com.bookmap.plugin.rong.miniviteapp.libraries.firestore.DocumentCodec;
+import com.google.gson.*;
+import java.io.InputStreamReader;
+import java.nio.charset.StandardCharsets;
+import java.time.Instant;
+import java.util.*;
+import java.util.concurrent.*;
+import java.util.concurrent.atomic.*;
+import org.junit.jupiter.api.Test;
+import static org.junit.jupiter.api.Assertions.*;
+
+class TradingRuntimeTest {
+    static JsonObject json(String text) { return JsonParser.parseString(text).getAsJsonObject(); }
+    static class Task { long delay; Runnable run; boolean canceled; }
+    static class Socket implements SocketPort.Connection { SocketPort.Handlers handlers; boolean closed; public void send(String value) { } public void close() { closed = true; } }
+    @Test void standaloneStartupRenewalAcceptedEntryPersistenceAndTeardown() throws Exception {
+        JsonArray fixtures = JsonParser.parseReader(new InputStreamReader(getClass().getResourceAsStream("/state-fixtures.json"), StandardCharsets.UTF_8)).getAsJsonArray();
+        JsonObject config = null, saved = null;
+        for (JsonElement item : fixtures) { JsonObject f = item.getAsJsonObject(); if (f.get("name").getAsString().equals("stock selections config")) config = f.getAsJsonArray("args").get(0).getAsJsonObject(); if (f.get("name").getAsString().equals("new state and accepted entry")) saved = f.getAsJsonObject("result"); }
+        final JsonObject configData = config, savedState = saved;
+        AtomicLong now = new AtomicLong(Instant.parse("2026-10-01T13:32:00Z").toEpochMilli()); AtomicInteger refreshes = new AtomicInteger(), accountReads = new AtomicInteger(), writes = new AtomicInteger(), mutations = new AtomicInteger();
+        AtomicReference<JsonObject> secrets = new AtomicReference<>(json("{\"appKey\":\"fake-app\",\"secret\":\"fake-secret\",\"access_token\":\"expired\",\"refresh_token\":\"fake-refresh\",\"expires_at\":0,\"accountHashValue\":\"fake-account\"}"));
+        List<JsonObject> emitted = new CopyOnWriteArrayList<>(); List<String> logs = new CopyOnWriteArrayList<>(); List<Task> tasks = new ArrayList<>(); List<Socket> sockets = new ArrayList<>();
+        HttpPort http = (uri, method, headers, body) -> {
+            assertFalse(uri.toString().contains("localhost")); String path = uri.getPath();
+            if (path.endsWith("/oauth/token")) { int count = refreshes.incrementAndGet(); return new HttpPort.Response(200, "{\"access_token\":\"fresh-" + count + "\",\"refresh_token\":\"rotated-" + count + "\",\"expires_in\":1800}"); }
+            if (path.endsWith(":runQuery")) { JsonObject document = new JsonObject(); document.add("fields", DocumentCodec.encodeFields(configData)); JsonObject row = new JsonObject(); row.add("document", document); JsonArray rows = new JsonArray(); rows.add(row); return new HttpPort.Response(200, rows.toString()); }
+            if (path.endsWith("/tradingState")) { if (method.equals("PATCH")) { writes.incrementAndGet(); assertEquals(savedState.get("date"), DocumentCodec.decodeFields(json(body).getAsJsonObject("fields")).get("date")); return new HttpPort.Response(200, "{}"); } JsonObject document = new JsonObject(); document.add("fields", DocumentCodec.encodeFields(savedState)); return new HttpPort.Response(200, document.toString()); }
+            String account = "{\"positions\":[],\"currentBalances\":{\"liquidationValue\":25000}}";
+            if (path.endsWith("/accounts")) { accountReads.incrementAndGet(); return new HttpPort.Response(200, "[{\"securitiesAccount\":" + account + "}]"); }
+            if (path.endsWith("/accounts/fake-account")) return new HttpPort.Response(200, "{\"securitiesAccount\":" + account + "}");
+            if (path.endsWith("/orders")) { if (method.equals("POST")) { mutations.incrementAndGet(); return new HttpPort.Response(201, "", Map.of("Location", "https://fake.invalid/orders/123")); } return new HttpPort.Response(200, "[]"); }
+            if (path.endsWith("/userPreference")) return new HttpPort.Response(200, "{\"streamerInfo\":[{\"streamerSocketUrl\":\"wss://fake.invalid\",\"schwabClientCustomerId\":\"customer\",\"schwabClientCorrelId\":\"correl\",\"schwabClientChannel\":\"channel\",\"schwabClientFunctionId\":\"function\"}]}");
+            if (path.contains("/reference/")) return new HttpPort.Response(200, "{\"results\":{\"weighted_shares_outstanding\":1000000000}}");
+            if (path.contains("/v3/trades/")) return new HttpPort.Response(200, "{\"results\":[]}");
+            if (path.contains("/aggs/")) return new HttpPort.Response(200, "{\"results\":[{\"t\":1790859600000,\"o\":10,\"h\":11,\"l\":9,\"c\":10,\"v\":1000000,\"vw\":10},{\"t\":1790861400000,\"o\":10,\"h\":11,\"l\":9,\"c\":10,\"v\":2000000,\"vw\":10}]}");
+            throw new AssertionError("Unexpected route " + path);
+        };
+        CredentialPort credentials = new CredentialPort() { public JsonObject loadSchwab() { return secrets.get().deepCopy(); } public void saveSchwab(JsonObject value) { secrets.set(value.deepCopy()); } };
+        try (TradingRuntime runtime = new TradingRuntime(http, credentials, json("{\"firebaseConfig\":{\"projectId\":\"fake-project\",\"apiKey\":\"fake-firebase\"},\"massive\":{\"apiKey\":\"fake-massive\"}}"),
+            (url, handlers) -> { Socket socket = new Socket(); socket.handlers = handlers; sockets.add(socket); return socket; },
+            (delay, run) -> { Task task = new Task(); task.delay = delay; task.run = run; tasks.add(task); return () -> task.canceled = true; }, Runnable::run, now::get,
+            new TradingRuntime.Events() { public void message(JsonObject value) { emitted.add(value.deepCopy()); } public void log(String symbol, String value) { logs.add(value); } public void notify(String symbol, String value) { logs.add(value); } })) {
+            runtime.start().get(2, TimeUnit.SECONDS); assertEquals(1, refreshes.get()); assertEquals(1, accountReads.get()); assertEquals(2, sockets.size());
+            JsonObject view = runtime.view("AAPL", "test"); assertEquals(100, view.getAsJsonObject("state").getAsJsonObject("stateBySymbol").getAsJsonObject("AAPL").getAsJsonObject("breakoutTradeStateForLong").get("initialQuantity").getAsInt());
+            runtime.persistState(); runtime.pendingPersistence().get(2, TimeUnit.SECONDS); assertEquals(1, writes.get());
+            now.addAndGet(1800000); runtime.refreshToken(); assertEquals(2, refreshes.get()); runtime.refreshAccount(); assertEquals(2, accountReads.get());
+            // A real native decision and fake broker acceptance initialize state locally, without a ViteApp ACK.
+            JsonObject action = json("{\"symbol\":\"AAPL\",\"tradebook_id\":\"GapGiveAndGoBookmapReversal\",\"entry_method\":\"0.1 R\",\"use_market_order\":true,\"price\":10}"); runtime.dispatch(action);
+            long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(2); while (emitted.stream().noneMatch(event -> event.has("outcome")) && System.nanoTime() < deadline) Thread.sleep(5);
+            assertEquals(1, mutations.get(), logs.toString()); assertTrue(emitted.stream().anyMatch(event -> event.has("outcome") && event.get("outcome").getAsString().equals("accepted")), emitted.toString());
+            runtime.pendingPersistence().get(2, TimeUnit.SECONDS); assertEquals(2, writes.get());
+            runtime.close(); assertTrue(sockets.stream().allMatch(socket -> socket.closed)); assertTrue(tasks.stream().allMatch(task -> task.canceled)); int readCount = accountReads.get(); tasks.forEach(task -> task.run.run()); runtime.refreshAccount(); assertEquals(readCount, accountReads.get());
+            assertTrue(logs.stream().noneMatch(value -> value.contains("fake-secret") || value.contains("fake-refresh")));
+        }
+    }
+}
+
