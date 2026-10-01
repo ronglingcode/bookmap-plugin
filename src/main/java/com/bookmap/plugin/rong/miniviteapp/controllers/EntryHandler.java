@@ -8,7 +8,7 @@ import com.google.gson.JsonObject;
 import com.bookmap.plugin.rong.miniviteapp.api.Broker;
 import java.util.regex.Pattern;
 
-/** Wall-reversal buttons and chart B/S, with flag-controlled entries into existing exposure. */
+/** Wall-reversal entries; existing-position risk sizing is independent of the routing flag. */
 public final class EntryHandler {
     private EntryHandler() { }
     private static final Pattern RISK_METHOD = Pattern.compile("(?:^|\\s)(\\d+(?:\\.\\d+)?)\\s*R$", Pattern.CASE_INSENSITIVE);
@@ -21,12 +21,17 @@ public final class EntryHandler {
                 (Models.string(action, "source").equals("bookmap_chart_hotkey") || Models.string(action, "button_id").startsWith("chart_hotkey:"));
         return BookmapWallReversal.supports(id) && (key.isEmpty() || hover);
     }
+    public static boolean matchesPositionSide(Snapshot state, JsonObject action) {
+        String id = field(action, "tradebook_id", "tradebookId");
+        return state != null && state.netQuantity != 0 && BookmapWallReversal.supports(id)
+                && (state.netQuantity > 0) == BookmapWallReversal.side(id);
+    }
     public static Plan handleEntry(Snapshot state, JsonObject action, String key) {
         return handleEntry(state, action, key, false);
     }
-    public static Plan handleEntry(Snapshot state, JsonObject action, String key, boolean extended) {
+    public static Plan handleEntry(Snapshot state, JsonObject action, String key, boolean allowExposure) {
         boolean flat = state.netQuantity == 0 && state.entries.isEmpty() && state.pairs.isEmpty();
-        Models.require(extended || flat, "initial native entry requires flat symbol with no pending orders");
+        Models.require(allowExposure || flat, "initial native entry requires flat symbol with no pending orders");
         Models.require(!Models.bool(action, "retest_blocked") && !Models.bool(action, "retestBlocked"), "Bookmap retest blocks entry");
         Models.require(!action.has("priceUnit") || Models.string(action, "priceUnit").equals("real"), "unsupported entry price unit");
         JsonObject context = state.entryContext;
@@ -64,7 +69,7 @@ public final class EntryHandler {
             if (Models.positive(parsed)) methodMultiplier = parsed;
         }
         JsonObject ruleContext = context;
-        if (extended) {
+        if (allowExposure) {
             ruleContext = context.deepCopy();
             ruleContext.addProperty("liquidityScale", Models.number(context, "liquidityScale")
                     * ExtendedEntryRules.nextEntryMultiplier(state, isLong, entry));
@@ -80,7 +85,7 @@ public final class EntryHandler {
         Plan plan = OrderFlow.submitEntry(state, context, definition, action, isLong, market, entry, stop, multiplier, count, method);
         plan.requireFlatEntry = flat;
         plan.entry.addProperty("preserveExistingTrade", state.netQuantity != 0 && (state.netQuantity > 0) == isLong);
-        if (extended) {
+        if (allowExposure) {
             var opening = plan.requests.remove(0);
             if (state.netQuantity != 0 && (state.netQuantity > 0) != isLong) for (var pair : state.pairs) {
                 Models.require(pair.marketLeg().isBuy == isLong, "exit side disagrees with opposite position");

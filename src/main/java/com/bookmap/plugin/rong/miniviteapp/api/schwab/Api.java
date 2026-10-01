@@ -1,6 +1,5 @@
 package com.bookmap.plugin.rong.miniviteapp.api.schwab;
 
-import com.bookmap.plugin.rong.PluginLog;
 import com.bookmap.plugin.rong.miniviteapp.models.Models;
 import com.bookmap.plugin.rong.miniviteapp.ExecutionDiagnostics;
 import com.bookmap.plugin.rong.miniviteapp.models.Models.*;
@@ -13,15 +12,20 @@ import java.net.http.HttpResponse;
 import java.time.Duration;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import java.util.function.BiConsumer;
 
 /** Actual Schwab responses, not ProxyServer's synthetic JSON envelope. No retries or credential logging. */
 public final class Api {
     private static final DateTimeFormatter ENTRY_LOG_TIME = DateTimeFormatter.ofPattern("HH:mm:ss.SSS");
     private final HttpClient client;
     private final URI base;
+    private final BiConsumer<String, String> log;
     public Api() { this(URI.create("https://api.schwabapi.com/trader/v1/")); }
-    public Api(URI base) {
+    public Api(BiConsumer<String, String> log) { this(URI.create("https://api.schwabapi.com/trader/v1/"), log); }
+    public Api(URI base) { this(base, (symbol, message) -> { }); }
+    public Api(URI base, BiConsumer<String, String> log) {
         this.base = base;
+        this.log = log;
         client = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(5))
                 .followRedirects(HttpClient.Redirect.NEVER).build();
     }
@@ -64,18 +68,18 @@ public final class Api {
         HttpRequest request = builder.build();
         long startedAt = System.nanoTime();
         if (timedEntrySymbol != null)
-            PluginLog.action(timedEntrySymbol, "Native entry POST sending to broker at " + LocalDateTime.now().format(ENTRY_LOG_TIME));
+            log.accept(timedEntrySymbol, "Native entry POST sending to broker at " + LocalDateTime.now().format(ENTRY_LOG_TIME));
         HttpResponse<String> response;
         try {
             response = client.send(request, HttpResponse.BodyHandlers.ofString());
         } catch (Exception error) {
             if (timedEntrySymbol != null)
-                PluginLog.action(timedEntrySymbol, "Native entry POST received no response after "
+                log.accept(timedEntrySymbol, "Native entry POST received no response after "
                         + Duration.ofNanos(System.nanoTime() - startedAt).toMillis() + " ms");
             throw error;
         }
         if (timedEntrySymbol != null)
-            PluginLog.action(timedEntrySymbol, "Native entry POST response received at "
+            log.accept(timedEntrySymbol, "Native entry POST response received at "
                     + LocalDateTime.now().format(ENTRY_LOG_TIME) + " after "
                     + Duration.ofNanos(System.nanoTime() - startedAt).toMillis() + " ms (HTTP "
                     + response.statusCode() + ")");

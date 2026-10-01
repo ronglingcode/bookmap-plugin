@@ -32,6 +32,7 @@ class NativeExecutionTest {
         final List<String> requests = new CopyOnWriteArrayList<>();
         final List<String> authorizations = new CopyOnWriteArrayList<>();
         final List<JsonObject> bodies = new CopyOnWriteArrayList<>();
+        final List<String> logs = new CopyOnWriteArrayList<>();
         final AtomicInteger mutations = new AtomicInteger();
         final HttpServer server;
         final MiniViteApp engine;
@@ -108,8 +109,10 @@ class NativeExecutionTest {
                 finally { exchange.close(); }
             });
             server.start();
-            engine = new MiniViteApp(new Api(URI.create("http://127.0.0.1:" + server.getAddress().getPort() + "/")),
-                    (client, event) -> { eventConnections.add(client); events.add(event.deepCopy()); });
+            java.util.function.BiConsumer<String, String> log = (symbol, message) -> logs.add(symbol + ": " + message);
+            engine = new MiniViteApp(new Api(URI.create("http://127.0.0.1:" + server.getAddress().getPort() + "/"), log),
+                    (client, event) -> { eventConnections.add(client); events.add(event.deepCopy()); },
+                    log, com.bookmap.plugin.rong.SymbolUtils::cleanSymbol);
         }
         JsonObject findOrder(String id) {
             for (var value : state.getAsJsonArray("entries")) if (value.getAsJsonObject().get("orderID").getAsString().equals(id)) return value.getAsJsonObject();
@@ -248,16 +251,52 @@ class NativeExecutionTest {
             assertEquals(1, rig.mutations.get());
         }
     }
-    @Test void existingExposureEntryUsesTheFlagAndPreservesActiveTrade() throws Exception {
+    @Test void adapterCallbacksNormalizeAliasesAndReceiveWarningsAndEntryTiming() throws Exception {
+        try (var rig = new Rig()) {
+            var command = rig.connectEntry(); command.addProperty("symbol", "AAPL:NASDAQ:STOCKS@BMD");
+            rig.state.getAsJsonObject("entryContext").addProperty("availableBuyingPower", 1);
+            rig.updateState(System.currentTimeMillis());
+            assertTrue(rig.engine.route(command));
+            assertEquals("accepted", rig.finish().get("outcome").getAsString());
+            assertTrue(rig.logs.stream().anyMatch(line -> line.contains("estimated buying power insufficient")));
+            assertTrue(rig.logs.stream().anyMatch(line -> line.startsWith("AAPL: Native entry POST sending")));
+            assertTrue(rig.logs.stream().anyMatch(line -> line.startsWith("AAPL: Native entry POST response received")));
+            assertTrue(rig.logs.stream().noneMatch(line -> line.contains("fake-access-token")));
+        }
+    }
+    @Test void sameDirectionEntriesStayNativeWithEitherFlagSettingAndPreserveActiveTrade() throws Exception {
+        for (boolean enabled : new boolean[]{false, true}) for (boolean isLong : new boolean[]{true, false})
         for (String method : new String[]{"1 R", "0.25 R"}) try (var rig = new Rig()) {
-            rig.state = ExtendedExecutionPlanTest.longState(); rig.connect();
-            var command = action(""); command.addProperty("tradebook_id", "RangeBoundBidReversal");
+            rig.connectExtended(isLong ? "long market reload" : "short market reload");
+            rig.engine.setExtendedEnabled(enabled);
+            var command = action(""); command.addProperty("tradebook_id", isLong ? "RangeBoundBidReversal" : "RangeBoundOfferReversal");
             command.addProperty("entry_method", method);
-            assertFalse(rig.engine.route(command));
-            rig.engine.setExtendedEnabled(true); assertTrue(rig.engine.route(command));
+            command.addProperty("use_market_order", method.equals("1 R"));
+            assertTrue(rig.engine.route(command));
             var result = rig.finish(); assertEquals("accepted", result.get("outcome").getAsString());
             assertTrue(result.getAsJsonObject("entry").get("preserveExistingTrade").getAsBoolean());
             assertEquals(1, rig.mutations.get()); assertTrue(rig.requests.stream().noneMatch(request -> request.startsWith("GET ")));
+        }
+    }
+    @Test void pendingOrdersAndOppositeDirectionEntriesStillFollowTheFlag() throws Exception {
+        for (int scenario = 0; scenario < 3; scenario++) try (var rig = new Rig()) {
+            rig.state = ExtendedExecutionPlanTest.longState();
+            if (scenario == 0) rig.state.add("entries", json("{\"orders\":[{\"orderID\":\"101\",\"isBuy\":true,\"orderType\":\"STOP\",\"quantity\":100,\"price\":10.5}]}").getAsJsonArray("orders"));
+            rig.connect();
+            var command = action(""); command.addProperty("tradebook_id", scenario == 0 ? "RangeBoundBidReversal" : "RangeBoundOfferReversal");
+            command.addProperty("use_market_order", scenario == 1);
+            assertFalse(rig.engine.route(command)); assertEquals(0, rig.mutations.get());
+            rig.engine.setExtendedEnabled(true); assertTrue(rig.engine.route(command));
+            assertEquals("accepted", rig.finish().get("outcome").getAsString());
+        }
+    }
+    @Test void genericBuyStillUsesTheFlagWithASameDirectionPosition() throws Exception {
+        try (var rig = new Rig()) {
+            rig.state = ExtendedExecutionPlanTest.longState(); rig.connect();
+            var command = action("KeyB");
+            assertFalse(rig.engine.route(command));
+            rig.engine.setExtendedEnabled(true); assertTrue(rig.engine.route(command));
+            assertEquals("accepted", rig.finish().get("outcome").getAsString());
         }
     }
     @Test void acceptedProtectedEntryIsReportedEvenWhenLaterCancellationFails() throws Exception {
@@ -303,7 +342,7 @@ class NativeExecutionTest {
     @Test void ambiguousExtendedOutcomeStillBlocksLegacyRoutingWhenFlagIsOff() throws Exception {
         try (var rig = new Rig()) {
             rig.state = ExtendedExecutionPlanTest.longState(); rig.connect(); rig.engine.setExtendedEnabled(true);
-            var command = action(""); command.addProperty("tradebook_id", "RangeBoundBidReversal"); rig.mutationStatus = 503;
+            var command = action(""); command.addProperty("tradebook_id", "RangeBoundOfferReversal"); rig.mutationStatus = 503;
             rig.engine.route(command); assertEquals("unknown", rig.finish().get("outcome").getAsString());
             rig.engine.setExtendedEnabled(false);
             assertTrue(rig.engine.route(command)); assertEquals(1, rig.mutations.get());

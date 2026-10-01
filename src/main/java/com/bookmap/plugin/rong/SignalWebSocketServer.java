@@ -28,7 +28,7 @@ public class SignalWebSocketServer extends WebSocketServer {
                 if (connection instanceof WebSocket && ((WebSocket) connection).isOpen()) {
                     ((WebSocket) connection).send(json.toString());
                 }
-            });
+            }, PluginLog::action, SymbolUtils::cleanSymbol);
 
     /** The single routing boundary for local button and chart actions. */
     public void dispatchTradingAction(JsonObject action) {

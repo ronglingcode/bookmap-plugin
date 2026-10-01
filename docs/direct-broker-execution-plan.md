@@ -1,8 +1,9 @@
 # Native broker execution plan
 
-Status: cancel, exits, adjustments, Add Partial, Swap, and flat initial entries
-with any risk-method label always execute natively. Entries with exposure/pending
-orders and generic directional B/S are implemented behind the
+Status: cancel, exits, adjustments, Add Partial, Swap, flat initial entries, and
+same-direction adds without pending entry orders always execute natively, with any
+risk-method label. Opposite-position entries, entries with pending orders, and
+generic directional B/S are implemented behind the
 default-off `experimentalDirectBrokerExecution` flag. Off forwards only these
 extended workflows to ViteApp; on executes them natively. See
 [setup and supported actions](direct-broker-execution.md).

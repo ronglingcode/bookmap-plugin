@@ -26,6 +26,16 @@ java {
     targetCompatibility = JavaVersion.VERSION_11
 }
 
+// Compile the native engine without the plugin classes or Bookmap's compile-only APIs.
+// This keeps trading decisions, broker access, and future data migrations standalone.
+tasks.register('compileNativeExecution', JavaCompile) {
+    source fileTree('src/main/java/com/bookmap/plugin/rong/miniviteapp') { include '**/*.java' }
+    classpath = configurations.runtimeClasspath
+    destinationDirectory = layout.buildDirectory.dir('private/native-execution-classes')
+    options.release = 11
+}
+tasks.named('check') { dependsOn tasks.named('compileNativeExecution') }
+
 repositories {
     mavenCentral()
     maven { url "https://maven.bookmap.com/maven2/releases/" }

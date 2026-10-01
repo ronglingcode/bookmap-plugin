@@ -114,6 +114,7 @@ public final class Models {
     public static final class Plan {
         public final String action;
         public final List<Request> requests = new ArrayList<>();
+        public final List<String> warnings = new ArrayList<>();
         public boolean clearPending;
         public JsonObject entry;
         public boolean experimental, requireFlatEntry;

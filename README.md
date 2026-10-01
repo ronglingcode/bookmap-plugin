@@ -13,6 +13,13 @@ the broker would accept. Leave broker rejection decisions to the broker.
 Exits submit without broker position/protective-order preflight reads. Streaming
 ViteApp market bundles update execution prices independently of account polling.
 
+Native trading and future data-source migrations belong in
+`src/main/java/com/bookmap/plugin/rong/miniviteapp/`. This engine has no dependency
+on Bookmap APIs or the plugin's classes. `SignalWebSocketServer` is the adapter:
+it supplies message delivery, logging, and Bookmap alias normalization through
+callbacks. `compileNativeExecution`, included in `build`, verifies that the engine
+compiles independently of the plugin and Bookmap API classpath.
+
 This repository builds the bmtrader trading addon:
 
 | Plugin   | JAR                | Description                   |
@@ -138,7 +145,7 @@ Every price-bearing message uses the canonical wire-price contract:
 | `custom_button_click` | Extended action forwarded to ViteApp when its native flag is off | On extended user action |
 | `core_plan_update` | Requested exit-plan target/count change | On user action |
 
-Action lifecycle and exit-plan messages include a `symbol` field identifying the instrument. Local trade actions may use Bookmap session high/low, an estimated market-entry price, or a hovered chart price. Cancel, exits, adjustments, reload, Swap, and flat initial wall entries with any risk method always execute natively. Entries with exposure/pending orders and generic non-chart B/S follow the experimental flag: off forwards to ViteApp, on executes natively. Native plan/dispatch failures never fall back to ViteApp. The plugin does not send order-book snapshots or wall levels; initial profit targets without wall context use the standard 3R fallback.
+Action lifecycle and exit-plan messages include a `symbol` field identifying the instrument. Local trade actions may use Bookmap session high/low, an estimated market-entry price, or a hovered chart price. Cancel, exits, adjustments, reload, Swap, flat initial wall entries, and same-direction adds without pending entry orders always execute natively. Entries with pending orders, opposite-position entries, and generic non-chart B/S follow the experimental flag: off forwards to ViteApp, on executes natively. Risk-method labels do not select the executor. Native plan/dispatch failures never fall back to ViteApp. The plugin does not send order-book snapshots or wall levels; initial profit targets without wall context use the standard 3R fallback.
 
 ### Send key levels and zones (client → server)
 
@@ -328,9 +335,11 @@ Market levels are client-owned. In live or replay mode, the plugin draws the lat
 
 ## Configuration
 
-Direct Schwab cancellation, exits, reload, Swap, and flat initial wall-reversal entries
+Direct Schwab cancellation, exits, reload, Swap, flat initial wall-reversal entries,
+and same-direction adds without pending entry orders
 always use native broker execution. **Experimental: Extended Native Execution (Schwab)**
-controls entries with exposure/pending orders and generic non-chart B/S, and defaults to **off**. Its stored key remains
+controls entries with pending orders, opposite-position entries, and generic
+non-chart B/S, and defaults to **off**. Its stored key remains
 `experimentalDirectBrokerExecution`.
 
 | Operations | Flag off | Flag on |
@@ -338,10 +347,11 @@ controls entries with exposure/pending orders and generic non-chart B/S, and def
 | Cancel C, Flatten F, Market Out M/numpad, digit adjustments, G/H/T batch adjustments | Native | Native |
 | Flat initial wall-reversal button/chart B/S entries with any risk-method label, with no pending orders | Native | Native |
 | Add Partial/reload A or Shift+A; Swap W | Native | Native |
-| Entries with existing positions or pending orders, including same-direction adds and opposite-position entries | ViteApp | Native |
+| Same-direction wall-reversal entries with an existing position and no pending entry orders | Native | Native |
+| Entries with pending entry orders (or exit orders while flat), and opposite-position entries | ViteApp | Native |
 | Generic non-chart B/S selecting one enabled directional tradebook | ViteApp | Native |
 
-Risk-method labels do not choose the executor. An entry with existing exposure or
+Risk-method labels do not choose the executor. An entry with an opposite position or
 pending orders still follows the flag, even when using a non-default risk method.
 
 Current ViteApp tradebooks all use the mirrored Bookmap wall-reversal family.

@@ -1,6 +1,5 @@
 package com.bookmap.plugin.rong.miniviteapp.controllers;
 
-import com.bookmap.plugin.rong.PluginLog;
 import com.bookmap.plugin.rong.miniviteapp.algorithms.RiskManager;
 import com.bookmap.plugin.rong.miniviteapp.algorithms.TakeProfit;
 import com.bookmap.plugin.rong.miniviteapp.api.schwab.OrderFactory;
@@ -25,6 +24,7 @@ public final class OrderFlow {
         var targets = TakeProfit.getEntryProfitTargets(shares, orderEntry, fixed > 0 ? orderStop : riskPrice, isLong, walls, count);
         double total = 0; for (var element : targets) total += Models.number(element.getAsJsonObject(), "quantity");
         double buyingPower = Models.number(context, "availableBuyingPower");
+        Plan plan = new Plan("wall_reversal_entry");
         Models.require(Double.isFinite(buyingPower), "buying-power sizing input missing");
         if (buyingPower <= orderEntry * total) {
             total = 0;
@@ -34,9 +34,8 @@ public final class OrderFlow {
                 target.addProperty("quantity", quantity); total += quantity;
             }
             if (buyingPower <= orderEntry * total)
-                PluginLog.action(state.symbol, "Native warning: estimated buying power insufficient after half sizing; broker will decide");
+                plan.warnings.add("Native warning: estimated buying power insufficient after half sizing; broker will decide");
         }
-        Plan plan = new Plan("wall_reversal_entry");
         plan.requests.add(new Request("POST", null, OrderFactory.createOneEntryWithMultipleExits(state.symbol, isLong, type, total, orderEntry, targets, orderStop)));
         JsonObject basePlan = definition.getAsJsonObject("basePlan").deepCopy();
         basePlan.getAsJsonObject("planConfigs").addProperty("sizingCount", count);

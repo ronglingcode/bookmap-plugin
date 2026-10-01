@@ -1,7 +1,5 @@
 package com.bookmap.plugin.rong.miniviteapp;
 
-import com.bookmap.plugin.rong.PluginLog;
-import com.bookmap.plugin.rong.SymbolUtils;
 import com.bookmap.plugin.rong.miniviteapp.api.schwab.Api;
 import com.bookmap.plugin.rong.miniviteapp.config.ExecutionConfig;
 import com.bookmap.plugin.rong.miniviteapp.controllers.KeyboardHandler;
@@ -14,11 +12,14 @@ import com.google.gson.JsonObject;
 import java.util.*;
 import java.util.concurrent.*;
 import java.util.function.BiConsumer;
+import java.util.function.Function;
 
 /** Single-user executor. State transitions use this monitor; I/O runs outside it. */
 public final class MiniViteApp implements AutoCloseable {
     private final Api api;
     private final BiConsumer<Object, JsonObject> sender;
+    private final BiConsumer<String, String> log;
+    private final Function<String, String> symbolKey;
     private final ExecutorService executor = Executors.newCachedThreadPool(task -> {
         Thread thread = new Thread(task, "bmtrader-native-execution"); thread.setDaemon(true); return thread;
     });
@@ -32,8 +33,16 @@ public final class MiniViteApp implements AutoCloseable {
     public MiniViteApp(BiConsumer<Object, JsonObject> sender) {
         this(new Api(), sender);
     }
+    public MiniViteApp(BiConsumer<Object, JsonObject> sender, BiConsumer<String, String> log,
+            Function<String, String> symbolKey) {
+        this(new Api(log), sender, log, symbolKey);
+    }
     public MiniViteApp(Api api, BiConsumer<Object, JsonObject> sender) {
-        this.api = api; this.sender = sender;
+        this(api, sender, (symbol, message) -> { }, symbol -> symbol == null ? "" : symbol.trim());
+    }
+    public MiniViteApp(Api api, BiConsumer<Object, JsonObject> sender, BiConsumer<String, String> log,
+            Function<String, String> symbolKey) {
+        this.api = api; this.sender = sender; this.log = log; this.symbolKey = symbolKey;
     }
     private JsonObject message(String type) {
         JsonObject json = new JsonObject(); json.addProperty("type", type);
@@ -52,8 +61,8 @@ public final class MiniViteApp implements AutoCloseable {
     }
     public synchronized void setExtendedEnabled(boolean enabled) { extendedEnabled = enabled; }
     public synchronized void unregister(String symbol) {
-        snapshots.remove(SymbolUtils.cleanSymbol(symbol));
-        marketData.remove(SymbolUtils.cleanSymbol(symbol));
+        snapshots.remove(symbolKey.apply(symbol));
+        marketData.remove(symbolKey.apply(symbol));
     }
     public synchronized boolean resetAfterBrokerReview() {
         requiresReview = false; reviewReason = ""; return true;
@@ -72,12 +81,12 @@ public final class MiniViteApp implements AutoCloseable {
                     snapshots.put(state.symbol, state);
                 }
             } else if (type.equals("execution_market_data")) {
-                marketData.put(SymbolUtils.cleanSymbol(Models.string(json, "symbol")), json.deepCopy());
+                marketData.put(symbolKey.apply(Models.string(json, "symbol")), json.deepCopy());
             } else if (type.equals("execution_entry_state")) {
                 if (!Models.bool(json, "initialized")) {
                     requiresReview = true;
                     reviewReason = ExecutionDiagnostics.sanitize("entry state initialization failed: " + Models.string(json, "reason"), token, account);
-                    PluginLog.action(Models.string(json, "symbol"), "Native requires review: " + reviewReason);
+                    log.accept(Models.string(json, "symbol"), "Native requires review: " + reviewReason);
                     sender.accept(connection, status());
                 }
             }
@@ -89,7 +98,7 @@ public final class MiniViteApp implements AutoCloseable {
             String reason = type + " update failed: " + ExecutionDiagnostics.describe(error, token, account, incomingToken);
             rejected.addProperty("reason", reason);
             sender.accept(connection, rejected);
-            PluginLog.action("Native update rejected: " + reason);
+            log.accept("", "Native update rejected: " + reason);
         }
         return true;
     }
@@ -98,12 +107,14 @@ public final class MiniViteApp implements AutoCloseable {
         if (key.isEmpty()) key = Models.string(action, "key_code");
         boolean shift = Models.bool(action, "shiftKey") || Models.bool(action, "shift_key");
         boolean entry = EntryHandler.supports(action, key);
-        String symbol = SymbolUtils.cleanSymbol(Models.string(action, "symbol"));
+        String symbol = symbolKey.apply(Models.string(action, "symbol"));
         Snapshot state = snapshots.get(symbol);
+        boolean sameDirection = entry && EntryHandler.matchesPositionSide(state, action);
         boolean extended = !KeyboardHandler.supports(key, shift) && !key.equals("KeyA") && !key.equals("KeyW")
                 && !(entry
-                && (state == null || state.netQuantity == 0 && state.entries.isEmpty() && state.pairs.isEmpty()));
-        // Exposure/pending-order entries and generic B/S follow the flag; other supported actions stay native.
+                && (state == null || state.entries.isEmpty()
+                && (sameDirection || state.netQuantity == 0 && state.pairs.isEmpty())));
+        // Pending-entry/opposite-position entries and generic B/S follow the flag; same-direction adds stay native.
         if (extended && !extendedEnabled && !requiresReview && !closed) return false;
         try {
             long now = System.currentTimeMillis();
@@ -127,12 +138,13 @@ public final class MiniViteApp implements AutoCloseable {
                     state = new Snapshot(state, prices);
                 }
             }
-            Plan plan = entry ? EntryHandler.handleEntry(state, action, key, extended)
+            Plan plan = entry ? EntryHandler.handleEntry(state, action, key, extended || sameDirection)
                     : directionalEntry ? EntryHandler.handleDirectionalEntry(state, action, key)
                     : key.equals("KeyA") ? ExtendedHandler.reload(state, shift, Models.number(action, "price"))
                     : key.equals("KeyW") ? ExtendedHandler.swap(state)
                     : KeyboardHandler.handleKeyPressed(state, key, shift, Models.number(action, "price"));
             plan.experimental = extended;
+            for (String warning : plan.warnings) log.accept(symbol, warning);
             if (!key.equals("KeyC")) {
                 double total = plan.requests.stream().filter(request -> request.body != null)
                         .map(request -> request.body.getAsJsonArray("orderLegCollection").get(0).getAsJsonObject())
@@ -145,7 +157,7 @@ public final class MiniViteApp implements AutoCloseable {
             String actionId = UUID.randomUUID().toString();
             String capturedAccount = account;
             if (token.isEmpty() || expiresAt <= now)
-                PluginLog.action(symbol, "Native warning: access token missing or expired; broker will decide");
+                log.accept(symbol, "Native warning: access token missing or expired; broker will decide");
             JsonObject started = message("execution_started"); started.addProperty("actionId", actionId);
             started.addProperty("symbol", symbol); started.addProperty("action", plan.action);
             started.addProperty("buttonName", Models.string(action, "button_name"));
@@ -161,7 +173,7 @@ public final class MiniViteApp implements AutoCloseable {
         } catch (RuntimeException error) {
             String reason = "build " + (entry ? "wall_reversal_entry" : key) + " plan failed: "
                     + ExecutionDiagnostics.describe(error, token, account);
-            PluginLog.action(symbol, "Native blocked: " + reason);
+            log.accept(symbol, "Native blocked: " + reason);
             JsonObject blocked = message("execution_blocked"); blocked.addProperty("symbol", symbol);
             blocked.addProperty("reason", reason); sender.accept(connection, blocked);
         }
@@ -224,7 +236,7 @@ public final class MiniViteApp implements AutoCloseable {
             // An accepted entry still needs its trade state if a subsequent old-entry cancellation fails.
             if (entryAccepted) finished.add("entry", plan.entry);
             sender.accept(connection, finished);
-            PluginLog.action(state.symbol, "Native " + plan.action + ": " + outcome + (reason.isEmpty() ? "" : " - " + reason));
+            log.accept(state.symbol, "Native " + plan.action + ": " + outcome + (reason.isEmpty() ? "" : " - " + reason));
         }
     }
     @Override public synchronized void close() {
