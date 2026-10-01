@@ -1,4 +1,4 @@
-package com.bookmap.plugin.rong.miniviteapp.controllers;
+package com.bookmap.plugin.rong.miniviteapp.core.controllers;
 
 import com.bookmap.plugin.rong.miniviteapp.models.Models;
 import com.bookmap.plugin.rong.miniviteapp.models.Models.Snapshot;

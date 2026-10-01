@@ -1,4 +1,4 @@
-package com.bookmap.plugin.rong.miniviteapp.algorithms;
+package com.bookmap.plugin.rong.miniviteapp.core.algorithms;
 
 import com.bookmap.plugin.rong.miniviteapp.models.Models;
 

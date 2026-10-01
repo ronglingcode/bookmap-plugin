@@ -1,0 +1,538 @@
+[
+  {
+    "name": "today follows pages, sorts and replaces duplicate buckets",
+    "method": "getPriceHistory",
+    "args": [
+      "AAPL",
+      1,
+      "2026-10-01"
+    ],
+    "pages": [
+      {
+        "status": 200,
+        "body": "{\"status\":\"OK\",\"results\":[{\"t\":1790861460000,\"o\":10,\"h\":11,\"l\":9,\"c\":10,\"v\":100,\"vw\":10},{\"t\":1790861400000,\"o\":10,\"h\":11,\"l\":9,\"c\":10,\"v\":100,\"vw\":10}],\"next_url\":\"https://api.massive.com/page?cursor=next\"}"
+      },
+      {
+        "status": 200,
+        "body": "{\"status\":\"OK\",\"results\":[{\"t\":1790861460000,\"o\":11,\"h\":12,\"l\":10,\"c\":11,\"v\":100,\"vw\":11}]}"
+      }
+    ],
+    "paths": [
+      "/v2/aggs/ticker/AAPL/range/1/minute/2026-10-01/2026-10-02?adjusted=true&sort=asc&limit=50000",
+      "/page?cursor=next"
+    ],
+    "result": [
+      {
+        "symbol": "AAPL",
+        "datetime": 1790861400000,
+        "open": 10,
+        "high": 11,
+        "low": 9,
+        "close": 10,
+        "volume": 100,
+        "vwap": 10
+      },
+      {
+        "symbol": "AAPL",
+        "datetime": 1790861460000,
+        "open": 11,
+        "high": 12,
+        "low": 10,
+        "close": 11,
+        "volume": 100,
+        "vwap": 11
+      }
+    ]
+  },
+  {
+    "name": "no eligible trades is an empty interval",
+    "method": "getPriceHistory",
+    "args": [
+      "AAPL",
+      1,
+      "2026-10-01"
+    ],
+    "pages": [
+      {
+        "status": 200,
+        "body": "{\"status\":\"OK\",\"resultsCount\":0}"
+      }
+    ],
+    "paths": [
+      "/v2/aggs/ticker/AAPL/range/1/minute/2026-10-01/2026-10-02?adjusted=true&sort=asc&limit=50000"
+    ],
+    "result": []
+  },
+  {
+    "name": "daily range excludes today and preserves existing calendar lookback",
+    "method": "getDailyCandlesForLastNDays",
+    "args": [
+      "AAPL",
+      1095,
+      "2026-10-01"
+    ],
+    "pages": [
+      {
+        "status": 200,
+        "body": "{\"results\":[]}"
+      }
+    ],
+    "paths": [
+      "/v2/aggs/ticker/AAPL/range/1/day/2023-09-30/2026-09-30?adjusted=true&sort=asc&limit=50000"
+    ],
+    "result": []
+  },
+  {
+    "name": "higher timeframe needs no undocumented extendedHours parameter",
+    "method": "getPriceHistoryFromOldDateForHigherTimeframe",
+    "args": [
+      "BRK.B",
+      30,
+      "2026-09-11",
+      "2026-10-01"
+    ],
+    "pages": [
+      {
+        "status": 200,
+        "body": "{\"results\":[]}"
+      }
+    ],
+    "paths": [
+      "/v2/aggs/ticker/BRK.B/range/30/minute/2026-09-11/2026-10-01?adjusted=true&sort=asc&limit=50000"
+    ],
+    "result": []
+  },
+  {
+    "name": "missing aggregate vwap maps to zero",
+    "method": "getBars",
+    "args": [
+      "AAPL",
+      "/bars"
+    ],
+    "pages": [
+      {
+        "status": 200,
+        "body": "{\"results\":[{\"t\":1790861400000,\"o\":10,\"h\":11,\"l\":9,\"c\":10,\"v\":100}]}"
+      }
+    ],
+    "paths": [
+      "/bars"
+    ],
+    "result": [
+      {
+        "symbol": "AAPL",
+        "datetime": 1790861400000,
+        "open": 10,
+        "high": 11,
+        "low": 9,
+        "close": 10,
+        "volume": 100,
+        "vwap": 0
+      }
+    ]
+  },
+  {
+    "name": "weighted shares have precedence",
+    "method": "getSharesOutstanding",
+    "args": [
+      "AAPL"
+    ],
+    "pages": [
+      {
+        "status": 200,
+        "body": "{\"results\":{\"weighted_shares_outstanding\":200,\"share_class_shares_outstanding\":100}}"
+      }
+    ],
+    "paths": [
+      "/v3/reference/tickers/AAPL"
+    ],
+    "result": 200
+  },
+  {
+    "name": "shares fall back to class shares",
+    "method": "getSharesOutstanding",
+    "args": [
+      "AAPL"
+    ],
+    "pages": [
+      {
+        "status": 200,
+        "body": "{\"results\":{\"weighted_shares_outstanding\":0,\"share_class_shares_outstanding\":100}}"
+      }
+    ],
+    "paths": [
+      "/v3/reference/tickers/AAPL"
+    ],
+    "result": 100
+  },
+  {
+    "name": "missing shares yield zero",
+    "method": "getSharesOutstanding",
+    "args": [
+      "AAPL"
+    ],
+    "pages": [
+      {
+        "status": 200,
+        "body": "{\"results\":{}}"
+      }
+    ],
+    "paths": [
+      "/v3/reference/tickers/AAPL"
+    ],
+    "result": 0
+  },
+  {
+    "name": "rate limit is visible without response secrets",
+    "method": "getBars",
+    "args": [
+      "AAPL",
+      "/bars"
+    ],
+    "pages": [
+      {
+        "status": 429,
+        "body": "fixture-secret-key"
+      }
+    ],
+    "paths": [
+      "/bars"
+    ],
+    "error": "Massive read HTTP 429"
+  },
+  {
+    "name": "entitlement error is not empty market data",
+    "method": "getBars",
+    "args": [
+      "AAPL",
+      "/bars"
+    ],
+    "pages": [
+      {
+        "status": 200,
+        "body": "{\"status\":\"NOT_AUTHORIZED\"}"
+      }
+    ],
+    "paths": [
+      "/bars"
+    ],
+    "error": "Massive read failed: NOT_AUTHORIZED"
+  },
+  {
+    "name": "malformed results are rejected",
+    "method": "getBars",
+    "args": [
+      "AAPL",
+      "/bars"
+    ],
+    "pages": [
+      {
+        "status": 200,
+        "body": "{\"results\":{}}"
+      }
+    ],
+    "paths": [
+      "/bars"
+    ],
+    "error": "Massive read returned invalid results"
+  },
+  {
+    "name": "bad required aggregate is rejected",
+    "method": "getBars",
+    "args": [
+      "AAPL",
+      "/bars"
+    ],
+    "pages": [
+      {
+        "status": 200,
+        "body": "{\"results\":[{\"t\":1}]}"
+      }
+    ],
+    "paths": [
+      "/bars"
+    ],
+    "error": "Massive aggregate missing o"
+  },
+  {
+    "name": "pagination cannot forward credentials to another host",
+    "method": "getBars",
+    "args": [
+      "AAPL",
+      "/bars"
+    ],
+    "pages": [
+      {
+        "status": 200,
+        "body": "{\"next_url\":\"https://other.invalid/page\"}"
+      }
+    ],
+    "paths": [
+      "/bars"
+    ],
+    "error": "Massive pagination returned another host"
+  },
+  {
+    "name": "repeated cursor fails instead of hanging",
+    "method": "getBars",
+    "args": [
+      "AAPL",
+      "/bars"
+    ],
+    "pages": [
+      {
+        "status": 200,
+        "body": "{\"next_url\":\"https://api.massive.com/bars\"}"
+      },
+      {
+        "status": 200,
+        "body": "{\"next_url\":\"https://api.massive.com/bars\"}"
+      }
+    ],
+    "paths": [
+      "/bars"
+    ],
+    "error": "Massive repeated pagination cursor"
+  },
+  {
+    "name": "full history composes all three historical inputs",
+    "method": "getFullPriceHistory",
+    "args": [
+      "AAPL",
+      "2026-10-01"
+    ],
+    "pages": [
+      {
+        "status": 200,
+        "body": "{\"results\":[{\"t\":1790861400000,\"o\":10,\"h\":11,\"l\":9,\"c\":10,\"v\":100,\"vw\":10}]}"
+      },
+      {
+        "status": 200,
+        "body": "{\"results\":[{\"t\":1790740800000,\"o\":10,\"h\":11,\"l\":9,\"c\":10,\"v\":100,\"vw\":10}]}"
+      },
+      {
+        "status": 200,
+        "body": "{\"results\":[{\"t\":1790769600000,\"o\":10,\"h\":11,\"l\":9,\"c\":10,\"v\":100,\"vw\":10},{\"t\":1790856000000,\"o\":20,\"h\":21,\"l\":19,\"c\":20,\"v\":200,\"vw\":20}]}"
+      }
+    ],
+    "paths": [
+      "/v2/aggs/ticker/AAPL/range/1/minute/2026-10-01/2026-10-02?adjusted=true&sort=asc&limit=50000",
+      "/v2/aggs/ticker/AAPL/range/1/day/2023-09-30/2026-09-30?adjusted=true&sort=asc&limit=50000",
+      "/v2/aggs/ticker/AAPL/range/30/minute/2026-09-11/2026-10-01?adjusted=true&sort=asc&limit=50000"
+    ],
+    "result": {
+      "today1MinuteBars": [
+        {
+          "symbol": "AAPL",
+          "datetime": 1790861400000,
+          "open": 10,
+          "high": 11,
+          "low": 9,
+          "close": 10,
+          "volume": 100,
+          "vwap": 10
+        }
+      ],
+      "dailyBars": [
+        {
+          "symbol": "AAPL",
+          "datetime": 1790740800000,
+          "open": 10,
+          "high": 11,
+          "low": 9,
+          "close": 10,
+          "volume": 100,
+          "vwap": 10
+        }
+      ],
+      "premarketDollarCollection": {
+        "previousDaysDollar": [
+          {
+            "day": "2026-09-30",
+            "data": 1000
+          }
+        ],
+        "previousDaysShares": [
+          {
+            "day": "2026-09-30",
+            "data": 100
+          }
+        ],
+        "previousDaysDollarAverage": 1000,
+        "previousDaysSharesAverage": 100,
+        "previousDaysDollarMedian": 1000,
+        "lastDayDollar": 4000,
+        "lastDayShares": 200,
+        "rvol": 4
+      }
+    }
+  },
+  {
+    "name": "premarket grouping uses historical DST, median dollars, and typical-price fallback",
+    "method": "calculatePremarketVolume",
+    "args": [
+      [
+        {
+          "symbol": "AAPL",
+          "datetime": 1772805600000,
+          "open": 10,
+          "high": 11,
+          "low": 9,
+          "close": 10,
+          "volume": 100,
+          "vwap": 10
+        },
+        {
+          "symbol": "AAPL",
+          "datetime": 1772807400000,
+          "open": 100,
+          "high": 101,
+          "low": 99,
+          "close": 100,
+          "volume": 100,
+          "vwap": 100
+        },
+        {
+          "symbol": "AAPL",
+          "datetime": 1773061200000,
+          "open": 20,
+          "high": 21,
+          "low": 19,
+          "close": 20,
+          "volume": 100,
+          "vwap": 20
+        },
+        {
+          "symbol": "AAPL",
+          "datetime": 1773063000000,
+          "open": 100,
+          "high": 101,
+          "low": 99,
+          "close": 100,
+          "volume": 100,
+          "vwap": 100
+        },
+        {
+          "symbol": "AAPL",
+          "datetime": 1773147600000,
+          "open": 30,
+          "high": 31,
+          "low": 29,
+          "close": 30,
+          "volume": 100,
+          "vwap": 999
+        }
+      ]
+    ],
+    "result": {
+      "previousDaysDollar": [
+        {
+          "day": "2026-03-06",
+          "data": 1000
+        },
+        {
+          "day": "2026-03-09",
+          "data": 2000
+        }
+      ],
+      "previousDaysShares": [
+        {
+          "day": "2026-03-06",
+          "data": 100
+        },
+        {
+          "day": "2026-03-09",
+          "data": 100
+        }
+      ],
+      "previousDaysDollarAverage": 1500,
+      "previousDaysSharesAverage": 100,
+      "previousDaysDollarMedian": 1500,
+      "lastDayDollar": 3000,
+      "lastDayShares": 100,
+      "rvol": 2
+    }
+  },
+  {
+    "name": "empty premarket",
+    "method": "calculatePremarketVolume",
+    "args": [
+      []
+    ],
+    "result": {
+      "previousDaysDollar": [],
+      "previousDaysShares": [],
+      "previousDaysDollarAverage": 0,
+      "previousDaysSharesAverage": 0,
+      "previousDaysDollarMedian": 0,
+      "lastDayDollar": 0,
+      "lastDayShares": 0,
+      "rvol": 0
+    }
+  },
+  {
+    "name": "market clock 2026-03-06T14:30:00Z",
+    "method": "marketTime",
+    "args": [
+      1772807400000
+    ],
+    "result": {
+      "date": "2026-03-06",
+      "minutesSinceMarketOpen": 0,
+      "isPremarket": false,
+      "isRegularSession": true
+    }
+  },
+  {
+    "name": "market clock 2026-03-09T13:30:00Z",
+    "method": "marketTime",
+    "args": [
+      1773063000000
+    ],
+    "result": {
+      "date": "2026-03-09",
+      "minutesSinceMarketOpen": 0,
+      "isPremarket": false,
+      "isRegularSession": true
+    }
+  },
+  {
+    "name": "market clock 2026-11-02T14:30:00Z",
+    "method": "marketTime",
+    "args": [
+      1793629800000
+    ],
+    "result": {
+      "date": "2026-11-02",
+      "minutesSinceMarketOpen": 0,
+      "isPremarket": false,
+      "isRegularSession": true
+    }
+  },
+  {
+    "name": "market clock 2026-10-01T20:00:00Z",
+    "method": "marketTime",
+    "args": [
+      1790884800000
+    ],
+    "result": {
+      "date": "2026-10-01",
+      "minutesSinceMarketOpen": 390,
+      "isPremarket": false,
+      "isRegularSession": false
+    }
+  },
+  {
+    "name": "market clock 2026-10-02T00:00:00Z",
+    "method": "marketTime",
+    "args": [
+      1790899200000
+    ],
+    "result": {
+      "date": "2026-10-01",
+      "minutesSinceMarketOpen": 630,
+      "isPremarket": false,
+      "isRegularSession": false
+    }
+  }
+]

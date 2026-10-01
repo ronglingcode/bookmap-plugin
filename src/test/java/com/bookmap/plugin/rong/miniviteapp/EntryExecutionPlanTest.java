@@ -1,6 +1,6 @@
 package com.bookmap.plugin.rong.miniviteapp;
 
-import com.bookmap.plugin.rong.miniviteapp.controllers.EntryHandler;
+import com.bookmap.plugin.rong.miniviteapp.core.controllers.EntryHandler;
 import com.bookmap.plugin.rong.miniviteapp.models.Models.Snapshot;
 import com.google.gson.JsonParser;
 import java.io.InputStreamReader;

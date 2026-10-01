@@ -1,8 +1,8 @@
 package com.bookmap.plugin.rong.miniviteapp;
 
-import com.bookmap.plugin.rong.miniviteapp.controllers.ExtendedHandler;
-import com.bookmap.plugin.rong.miniviteapp.controllers.EntryHandler;
-import com.bookmap.plugin.rong.miniviteapp.controllers.ExtendedEntryRules;
+import com.bookmap.plugin.rong.miniviteapp.core.controllers.ExtendedHandler;
+import com.bookmap.plugin.rong.miniviteapp.core.controllers.EntryHandler;
+import com.bookmap.plugin.rong.miniviteapp.core.controllers.ExtendedEntryRules;
 import com.bookmap.plugin.rong.miniviteapp.models.Models;
 import com.bookmap.plugin.rong.miniviteapp.models.Models.Snapshot;
 import com.bookmap.plugin.rong.miniviteapp.models.Models.Plan;

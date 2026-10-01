@@ -1,8 +1,8 @@
-package com.bookmap.plugin.rong.miniviteapp.controllers;
+package com.bookmap.plugin.rong.miniviteapp.core.controllers;
 
-import com.bookmap.plugin.rong.miniviteapp.algorithms.RiskManager;
-import com.bookmap.plugin.rong.miniviteapp.algorithms.TakeProfit;
-import com.bookmap.plugin.rong.miniviteapp.api.schwab.OrderFactory;
+import com.bookmap.plugin.rong.miniviteapp.core.algorithms.RiskManager;
+import com.bookmap.plugin.rong.miniviteapp.core.algorithms.TakeProfit;
+import com.bookmap.plugin.rong.miniviteapp.libraries.broker.schwab.OrderFactory;
 import com.bookmap.plugin.rong.miniviteapp.models.Models;
 import com.bookmap.plugin.rong.miniviteapp.models.Models.*;
 import com.google.gson.JsonObject;

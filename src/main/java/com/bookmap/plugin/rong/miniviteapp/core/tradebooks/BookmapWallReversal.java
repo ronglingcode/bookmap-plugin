@@ -1,4 +1,4 @@
-package com.bookmap.plugin.rong.miniviteapp.tradebooks;
+package com.bookmap.plugin.rong.miniviteapp.core.tradebooks;
 
 import com.bookmap.plugin.rong.miniviteapp.models.Models;
 import com.google.gson.JsonObject;

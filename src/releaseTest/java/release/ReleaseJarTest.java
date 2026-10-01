@@ -193,7 +193,7 @@ class ReleaseJarTest {
         Object stateJson = jsonObject.getMethod("getAsJsonObject", String.class).invoke(json, "state");
         String stateName = "com.bookmap.plugin.rong.miniviteapp.models.Models$Snapshot";
         Object state = mappedClass(stateName).getConstructor(jsonObject).newInstance(stateJson);
-        String handlerName = "com.bookmap.plugin.rong.miniviteapp.controllers.KeyboardHandler";
+        String handlerName = "com.bookmap.plugin.rong.miniviteapp.core.controllers.KeyboardHandler";
         String planName = "com.bookmap.plugin.rong.miniviteapp.models.Models$Plan";
         Object plan = mappedMethod(handlerName, planName + " handleKeyPressed(" + stateName
                 + ",java.lang.String,boolean,double)", mappedClass(stateName), String.class, boolean.class, double.class)
@@ -216,7 +216,7 @@ class ReleaseJarTest {
         Object actionJson = jsonObject.getMethod("getAsJsonObject", String.class).invoke(json, "action");
         String stateName = "com.bookmap.plugin.rong.miniviteapp.models.Models$Snapshot";
         Object state = mappedClass(stateName).getConstructor(jsonObject).newInstance(stateJson);
-        String handlerName = "com.bookmap.plugin.rong.miniviteapp.controllers.EntryHandler";
+        String handlerName = "com.bookmap.plugin.rong.miniviteapp.core.controllers.EntryHandler";
         String planName = "com.bookmap.plugin.rong.miniviteapp.models.Models$Plan";
         Object plan = mappedMethod(handlerName, planName + " handleEntry(" + stateName
                 + ",com.bookmap.plugin.shaded.gson.JsonObject,java.lang.String)", mappedClass(stateName), jsonObject, String.class)
@@ -233,7 +233,7 @@ class ReleaseJarTest {
                 Files.readString(Path.of(System.getProperty("extended.fixtures"))));
         Object fixtures = array.getClass().getMethod("getAsJsonArray").invoke(array);
         String stateName = "com.bookmap.plugin.rong.miniviteapp.models.Models$Snapshot";
-        String handlerName = "com.bookmap.plugin.rong.miniviteapp.controllers.ExtendedHandler";
+        String handlerName = "com.bookmap.plugin.rong.miniviteapp.core.controllers.ExtendedHandler";
         String planName = "com.bookmap.plugin.rong.miniviteapp.models.Models$Plan";
         for (int index : new int[]{0, 15}) {
             Object element = fixtures.getClass().getMethod("get", int.class).invoke(fixtures, index);

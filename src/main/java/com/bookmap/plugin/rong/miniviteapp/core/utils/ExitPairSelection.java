@@ -1,4 +1,4 @@
-package com.bookmap.plugin.rong.miniviteapp.utils;
+package com.bookmap.plugin.rong.miniviteapp.core.utils;
 
 import com.bookmap.plugin.rong.miniviteapp.models.Models.ExitPair;
 import java.util.List;

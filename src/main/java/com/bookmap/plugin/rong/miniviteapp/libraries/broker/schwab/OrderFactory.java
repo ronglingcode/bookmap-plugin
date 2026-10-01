@@ -1,4 +1,4 @@
-package com.bookmap.plugin.rong.miniviteapp.api.schwab;
+package com.bookmap.plugin.rong.miniviteapp.libraries.broker.schwab;
 
 import com.bookmap.plugin.rong.miniviteapp.models.Models;
 import com.google.gson.JsonArray;

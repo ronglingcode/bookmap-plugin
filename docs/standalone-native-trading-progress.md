@@ -21,10 +21,10 @@ Updated: 2026-10-01. Design: [standalone-native-trading-plan.md](standalone-nati
 | Phase | Status | Evidence / remaining work |
 | --- | --- | --- |
 | Scope cleanup | Complete | Removed unused OpenAI secret accessor, agent-response client, AI notes; regenerated dead-code inventory. `npm run build` passed. |
-| 1. Contracts and parity baseline | Pending | Existing direct/extended fixtures available; add market/account/state contracts and scenarios. |
-| 2. Mirrored module extraction | Pending | Java namespace already compiles without Bookmap APIs; browser decisions still mixed with globals/UI. |
+| 1. Contracts and parity baseline | In progress | Added matching domain candles, HTTP ports, market clock and 22 Massive/market scenarios generated from production TS; account/state contracts remain. |
+| 2. Mirrored module extraction | In progress | Extracted TS pure sizing/target/entry/core-target/exit-selection helpers and Schwab payload builders into `src/trading`; compatibility exports retained. Reorganized all Java decisions under `core` and existing broker code under `libraries/broker`. Other browser handlers still mix globals/UI. |
 | 3. Secrets, Firestore, OAuth | Pending | Read-only Firestore config REST checks passed during planning; writes/auth lifecycle not implemented. |
-| 4. Massive/history/market state | Pending | Exact endpoints and calculations inventoried in design. |
+| 4. Massive/history/market state | In progress | Matching direct REST clients, history composition, shares reference and headless premarket statistics implemented; ViteApp uses extracted client. Java runtime wiring, trade streams and candle/VWAP/level state remain. |
 | 5. Account/streams/runtime | Pending | Java mutation client exists; ongoing account sync and vendor streams still depend on ViteApp. |
 | 6. State/workflow completion | Pending | Four extended routes already implemented but flagged; state ownership/additional commands/jobs missing. |
 | 7. Bookmap adapter | Pending | Runtime currently owned by WebSocket server; UI/config updates still come from ViteApp. |
@@ -33,7 +33,13 @@ Updated: 2026-10-01. Design: [standalone-native-trading-plan.md](standalone-nati
 ## Baseline and verification
 
 - Baseline: ViteApp `7dfd5a3`; bookmap-plugin `a080dbf`.
-- Existing last native build: 191 tests passed before this migration (not rerun yet).
+- Cleanup commit: ViteApp `d4686b5`; plan/progress commit: bookmap-plugin `62e71f5`.
+- Browser extraction: production build, direct execution (6 tests), extended execution
+  (19 handler fixtures plus accepted-add state test), core-target exits (6 tests),
+  and Massive (22 scenarios) passed.
+- Java extraction: full Gradle build passed, including native-only compilation,
+  regular tests and actual obfuscated-JAR tests. Existing execution fixture tests
+  remain unchanged except package imports; Massive parity checks all 22 scenarios.
 - Native Java target remains 11. Gradle builds use per-command
   `JAVA_HOME=C:\Users\lingr\trading\.tools\jdk-21.0.12.1+1`.
 - Browser validation: `npm run build`, relevant Node test scripts in package.json.
@@ -42,9 +48,33 @@ Updated: 2026-10-01. Design: [standalone-native-trading-plan.md](standalone-nati
 
 ## Resume checkpoint
 
-The design and this progress file live in bookmap-plugin/docs. Scope cleanup is
-the first implementation step. Finish the running browser build, inspect/commit
-cleanup, then implement matching domain contracts and extract existing pure
-decision functions before adding direct vendor clients and the Java runtime.
-Use the design's source inventory; do not duplicate dead strategies or UI-only
-indicators. Update this checkpoint after each meaningful completed phase.
+The first library extraction and Massive REST slice are implemented and verified.
+TS code: `ViteApp/src/trading`; Java: `miniviteapp/{core,libraries,models,ports,runtime}`.
+Old TS paths are thin compatibility exports. The extended fixture loader includes
+the new risk-sizing module so it still executes real production code.
+
+Next: implement user-supplied local credentials schema/store, Firestore REST codec
+and repositories, and broker OAuth refresh with rotation/persistence. Then account
+projection, streams and local runtime market state. Do not remove the bridge/flag
+yet: Bookmap still obtains tokens, account snapshots, execution context and views
+from ViteApp. The Java Massive client is verified independently but not wired into
+the plugin lifecycle. Keep implementing through phase 8; this checkpoint is not
+completion of the standalone migration.
+
+## Explicit behavior corrections in the Massive extraction
+
+- Use session dates/history premarket grouping in `America/New_York`, including
+  historical DST; domain timestamps stay epoch milliseconds, chart conversion
+  remains in the browser adapter.
+- Follow paginated history instead of silently stopping at the first page; today
+  requests a 50,000 base-bar limit. Deduplicate/sort buckets across pages.
+- Successful responses without `results` are empty intervals; HTTP failures and
+  entitlement errors remain errors. Diagnostics do not embed credential URLs.
+- Preserve weighted-share fallback and prior-day median dollar RVOL. Preserve
+  existing daily lookback range. Remove undocumented `extendedHours` query flag.
+- Replace a preexisting literal Massive streaming key with the configured key.
+- No OHLC/VWAP trade-batch correction yet; that remains a separate verified change.
+
+Source verification: Massive [custom bars](https://massive.com/docs/rest/stocks/aggregates/custom-bars)
+and [trades](https://www.massive.com/docs/websocket/stocks/trades) docs checked
+2026-10-01 for pagination, omitted empty results, timestamps, limit and stream shape.
