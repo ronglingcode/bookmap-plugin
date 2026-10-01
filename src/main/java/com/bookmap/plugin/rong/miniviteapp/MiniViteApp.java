@@ -100,10 +100,10 @@ public final class MiniViteApp implements AutoCloseable {
         boolean entry = EntryHandler.supports(action, key);
         String symbol = SymbolUtils.cleanSymbol(Models.string(action, "symbol"));
         Snapshot state = snapshots.get(symbol);
-        boolean extended = !KeyboardHandler.supports(key, shift)
-                && !(entry && EntryHandler.standardMethod(action)
+        boolean extended = !KeyboardHandler.supports(key, shift) && !key.equals("KeyA") && !key.equals("KeyW")
+                && !(entry
                 && (state == null || state.netQuantity == 0 && state.entries.isEmpty() && state.pairs.isEmpty()));
-        // Only newly migrated workflows can use ViteApp. Review/shutdown never silently changes executor.
+        // Exposure/pending-order entries and generic B/S follow the flag; other supported actions stay native.
         if (extended && !extendedEnabled && !requiresReview && !closed) return false;
         try {
             long now = System.currentTimeMillis();

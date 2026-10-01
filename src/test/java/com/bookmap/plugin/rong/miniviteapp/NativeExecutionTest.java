@@ -226,13 +226,11 @@ class NativeExecutionTest {
             assertTrue(rig.authorizations.stream().allMatch(value -> value.equals("Bearer fake-access-token")));
         }
     }
-    @Test void extendedFlagSelectsViteAppOrNativeWithoutAnExposurePreflight() throws Exception {
+    @Test void reloadAndSwapStayNativeWithEitherFlagSettingWithoutAnExposurePreflight() throws Exception {
         for (String name : new String[]{"long market reload", "swap closes and reenters original long direction", "swap pending entry keeps final pair"}) {
-            try (var rig = new Rig()) {
+            for (boolean enabled : new boolean[]{false, true}) try (var rig = new Rig()) {
                 JsonObject command = rig.connectExtended(name);
-                rig.engine.setExtendedEnabled(false);
-                assertFalse(rig.engine.route(command)); assertEquals(0, rig.mutations.get());
-                rig.engine.setExtendedEnabled(true);
+                rig.engine.setExtendedEnabled(enabled);
                 assertTrue(rig.engine.route(command));
                 assertEquals("accepted", rig.finish().get("outcome").getAsString(), name);
                 assertTrue(rig.requests.stream().noneMatch(request -> request.startsWith("GET ")), name);
@@ -240,10 +238,21 @@ class NativeExecutionTest {
             }
         }
     }
+    @Test void flatEntriesWithOtherRiskLabelsStayNativeWithTheFlagOff() throws Exception {
+        for (String method : new String[]{"pattern 0.25R", "2 R", "unparsed method"}) try (var rig = new Rig()) {
+            var command = rig.connectEntry(); command.addProperty("entry_method", method);
+            assertTrue(rig.engine.route(command));
+            var result = rig.finish(); assertEquals("accepted", result.get("outcome").getAsString(), method);
+            assertEquals(method.equals("pattern 0.25R") ? 0.25 : method.equals("2 R") ? 2 : 1,
+                    result.getAsJsonObject("entry").get("multiplier").getAsDouble(), 0.00001, method);
+            assertEquals(1, rig.mutations.get());
+        }
+    }
     @Test void existingExposureEntryUsesTheFlagAndPreservesActiveTrade() throws Exception {
-        try (var rig = new Rig()) {
+        for (String method : new String[]{"1 R", "0.25 R"}) try (var rig = new Rig()) {
             rig.state = ExtendedExecutionPlanTest.longState(); rig.connect();
             var command = action(""); command.addProperty("tradebook_id", "RangeBoundBidReversal");
+            command.addProperty("entry_method", method);
             assertFalse(rig.engine.route(command));
             rig.engine.setExtendedEnabled(true); assertTrue(rig.engine.route(command));
             var result = rig.finish(); assertEquals("accepted", result.get("outcome").getAsString());
@@ -267,7 +276,11 @@ class NativeExecutionTest {
     }
     @Test void disablingExtendedFlagStopsItsNextRequestWithoutLegacyFallback() throws Exception {
         try (var rig = new Rig()) {
-            var command = rig.connectExtended("swap pending entry keeps final pair");
+            rig.state = ExtendedExecutionPlanTest.longState();
+            rig.state.addProperty("netQuantity", 0); rig.state.add("pairs", new JsonArray());
+            rig.state.add("entries", json("{\"orders\":[{\"orderID\":\"101\",\"isBuy\":true,\"orderType\":\"STOP\",\"quantity\":100,\"price\":10.5}]}").getAsJsonArray("orders"));
+            rig.connect(); rig.engine.setExtendedEnabled(true);
+            var command = action(""); command.addProperty("tradebook_id", "RangeBoundBidReversal");
             rig.allowMutation = new CountDownLatch(1); rig.engine.route(command);
             assertTrue(rig.mutationEntered.await(3, TimeUnit.SECONDS));
             rig.engine.setExtendedEnabled(false); rig.allowMutation.countDown();
@@ -277,9 +290,20 @@ class NativeExecutionTest {
             assertTrue(rig.engine.status().get("enabled").getAsBoolean());
         }
     }
+    @Test void disablingExtendedFlagDoesNotInterruptNativeSwap() throws Exception {
+        try (var rig = new Rig()) {
+            var command = rig.connectExtended("swap pending entry keeps final pair");
+            rig.allowMutation = new CountDownLatch(1); assertTrue(rig.engine.route(command));
+            assertTrue(rig.mutationEntered.await(3, TimeUnit.SECONDS));
+            rig.engine.setExtendedEnabled(false); rig.allowMutation.countDown();
+            assertEquals("accepted", rig.finish().get("outcome").getAsString());
+            assertEquals(4, rig.mutations.get());
+        }
+    }
     @Test void ambiguousExtendedOutcomeStillBlocksLegacyRoutingWhenFlagIsOff() throws Exception {
         try (var rig = new Rig()) {
-            var command = rig.connectExtended("long market reload"); rig.mutationStatus = 503;
+            rig.state = ExtendedExecutionPlanTest.longState(); rig.connect(); rig.engine.setExtendedEnabled(true);
+            var command = action(""); command.addProperty("tradebook_id", "RangeBoundBidReversal"); rig.mutationStatus = 503;
             rig.engine.route(command); assertEquals("unknown", rig.finish().get("outcome").getAsString());
             rig.engine.setExtendedEnabled(false);
             assertTrue(rig.engine.route(command)); assertEquals(1, rig.mutations.get());

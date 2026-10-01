@@ -10,7 +10,7 @@ plan metadata. Native mutations go straight to Schwab without ProxyServer.
 1. Run ViteApp with a live Schwab equity profile and a successful token refresh.
    Connect it to Bookmap using the existing local WebSocket.
 2. Install matching ViteApp/plugin builds using execution protocol version 3.
-   Cancel, exits, and standard flat initial entries always execute natively. No addon
+   Cancel, exits, reload, Swap, and flat initial entries with any risk method always execute natively. No addon
    setting can switch them to ViteApp. The protocol's enabled status fields remain
    true while running so existing ViteApp clients continue publishing inputs.
 3. **Experimental: Extended Native Execution (Schwab)** defaults to **off**.
@@ -36,7 +36,10 @@ publish the latest account and quote values without an execution fence.
 | Digit keys at chart price | Adjust the selected STOP or LIMIT leg. |
 | G / H / T at chart price | Adjust half / all exit pairs. |
 | F / flatten | Preserve ViteApp's uncovered-shares branch; otherwise market out the exit pairs and any remainder. |
-| Standard initial wall-reversal entry | Market/breakout buttons or matching chart B/S, default/1 R/0.1 R, while flat with no pending entry or exit orders. |
+| Initial wall-reversal entry | Market/breakout buttons or matching chart B/S, with any risk-method label, while flat with no pending entry or exit orders. |
+| Add Partial / reload, A / Shift+A | Native protected partial entry at hovered/crosshair price or market. |
+| Swap, W | Native close-and-reentry in the original direction; a pending same-direction entry instead closes all but the last exit pair. |
+| Risk-method labels | ViteApp-compatible numeric R parsing and partial-count selection; unparsed labels use the default multiplier. Exposure/pending-order entries still follow the flag. |
 
 Core target protection, equity price rounding, bid/ask stop clamping, pair
 ordering, and closing direction follow ViteApp. Native partial market exits and
@@ -45,7 +48,7 @@ block the action. Exits do not read the broker position or protective orders
 before submission. Input age is not checked.
 ### First entry workflow
 
-Native wall-reversal buttons (1 R / 0.1 R, market / breakout) and chart B/S
+Native wall-reversal buttons (market / breakout, with any risk-method label) and chart B/S
 hover entries are available when the symbol is flat and has no pending entry
 or exit orders. Hover entries preserve the STOP/LIMIT path even with Shift.
 The supported tradebooks are the existing `BookmapWallReversal` family,
@@ -71,20 +74,18 @@ initialization or an account refresh. An initialization failure requires review.
 
 | Operation | Flag off | Flag on |
 | --- | --- | --- |
-| Add Partial / reload, A / Shift+A | ViteApp | Native protected partial entry at hovered/crosshair price or market. |
-| Swap, W | ViteApp | Native close-and-reentry in the original direction; a pending same-direction entry instead closes all but the last exit pair. |
 | Same-direction full entry with a position | ViteApp | Native existing-risk sizing with active trade/core state preserved. |
 | Entry with pending orders | ViteApp | Native protected entry followed by cancellation of old same-direction entries. |
 | Opposite-position market entry | ViteApp | Native market replacement of old exit pairs before submitting the new protected entry. |
 | Opposite-position breakout entry | ViteApp | Native adjustment of old protective stops to the new entry price, then submission of the new protected entry. |
 | Non-chart B/S without an explicit tradebook | ViteApp | Native selection of exactly one enabled tradebook in the requested direction; zero/multiple matches block. |
-| Other risk-method labels | ViteApp | Native ViteApp-compatible numeric R parsing and partial-count selection; unparsed labels use ViteApp's default multiplier. |
 
 All tradebooks currently constructed by ViteApp belong to the mirrored wall-reversal
 family. There is no additional non-wall strategy family in the current app.
 Chart B/S without a matching wall-reversal tradebook remains invalid in both routes.
 
-Reload mirrors the hard entry boundary before the low-risk override. That override
+Reload and Swap always execute natively, regardless of the flag. Reload mirrors
+the hard entry boundary before the low-risk override. That override
 bypasses add-budget/stop-tightening checks; attendance is still required by the
 protected-entry submission. Otherwise the daily-loss, position-plus-pending-entry
 risk budgets, add count/half-day-range rule, and stop-tightening phase apply.
@@ -190,7 +191,7 @@ broker reads and mutation are separate requests; those comparisons are not atomi
 | Exit selection/shape | Require position, requested pair/index, current price where rules need it, matching closing side, and matching side/quantity across paired legs. Partial market exits and target adjustments require split pairs; price adjustments require both legs and an existing leg price. |
 | Mirrored exit rules | ViteApp checks that relevant tradebook exit methods are the ported base/Bookmap methods. Java blocks unsupported custom methods rather than silently skip the strategy's rules. |
 | Core-target rule | For an earlier exit with this rule enabled, use original partial number and core count to select protected partials. Require their active plan, positive entry/target on the profitable side, and proposed exit at least `entry + 0.9 * (target - entry)` for longs (at most for shorts). Missing original partial identity blocks this rule. Flatten skips core protection. |
-| Entry tradebook/action | Look up a supported enabled definition with the requested side. Require B/S hover direction to agree, real price units, and no Bookmap retest-block flag. Default/1 R/0.1 R initial entries are always native; additional risk methods require the extended flag. |
+| Entry tradebook/action | Look up a supported enabled definition with the requested side. Require B/S hover direction to agree, real price units, and no Bookmap retest-block flag. Flat initial entries with any risk-method label are always native; entries with exposure/pending orders and generic non-chart B/S require the extended flag. |
 | Entry prices/boundary | Require available ordered day high/low, positive entry/stop, stop below a long entry or above a short entry, including after quote/estimate adjustment. Compare entry with the definition's boundary: inside its range when requested, otherwise above the long lower bound/below the short upper bound. Boundary inputs and range flag must be usable. |
 | Regular session | Require ViteApp's supplied seconds since market open between 0 and 23,400. No Bookmap replay-clock or input-age check is involved. |
 | Entry discipline | Require ViteApp's attendance permission and empty watchlist block reason. Compare realized P&L against negative daily loss limit; require liquidity multiplier in `(0, 1]`. These are supplied strategy inputs, not independent broker validations. |

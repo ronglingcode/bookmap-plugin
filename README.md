@@ -138,7 +138,7 @@ Every price-bearing message uses the canonical wire-price contract:
 | `custom_button_click` | Extended action forwarded to ViteApp when its native flag is off | On extended user action |
 | `core_plan_update` | Requested exit-plan target/count change | On user action |
 
-Action lifecycle and exit-plan messages include a `symbol` field identifying the instrument. Local trade actions may use Bookmap session high/low, an estimated market-entry price, or a hovered chart price. Cancel, exits, adjustments, and standard flat initial wall entries always execute natively. Extended operations follow the experimental flag: off forwards to ViteApp, on executes natively. Native plan/dispatch failures never fall back to ViteApp. The plugin does not send order-book snapshots or wall levels; initial profit targets without wall context use the standard 3R fallback.
+Action lifecycle and exit-plan messages include a `symbol` field identifying the instrument. Local trade actions may use Bookmap session high/low, an estimated market-entry price, or a hovered chart price. Cancel, exits, adjustments, reload, Swap, and flat initial wall entries with any risk method always execute natively. Entries with exposure/pending orders and generic non-chart B/S follow the experimental flag: off forwards to ViteApp, on executes natively. Native plan/dispatch failures never fall back to ViteApp. The plugin does not send order-book snapshots or wall levels; initial profit targets without wall context use the standard 3R fallback.
 
 ### Send key levels and zones (client → server)
 
@@ -328,18 +328,21 @@ Market levels are client-owned. In live or replay mode, the plugin draws the lat
 
 ## Configuration
 
-Direct Schwab cancellation, exits, and initial wall-reversal entries
+Direct Schwab cancellation, exits, reload, Swap, and flat initial wall-reversal entries
 always use native broker execution. **Experimental: Extended Native Execution (Schwab)**
-controls only the new workflows and defaults to **off**. Its stored key remains
+controls entries with exposure/pending orders and generic non-chart B/S, and defaults to **off**. Its stored key remains
 `experimentalDirectBrokerExecution`.
 
 | Operations | Flag off | Flag on |
 | --- | --- | --- |
 | Cancel C, Flatten F, Market Out M/numpad, digit adjustments, G/H/T batch adjustments | Native | Native |
-| Flat initial wall-reversal button/chart B/S entries using default, 1 R, or 0.1 R, with no pending orders | Native | Native |
-| Add Partial/reload A or Shift+A; Swap W | ViteApp | Native |
+| Flat initial wall-reversal button/chart B/S entries with any risk-method label, with no pending orders | Native | Native |
+| Add Partial/reload A or Shift+A; Swap W | Native | Native |
 | Entries with existing positions or pending orders, including same-direction adds and opposite-position entries | ViteApp | Native |
-| Generic non-chart B/S selecting one enabled directional tradebook; other parsed risk methods such as 0.25 R | ViteApp | Native |
+| Generic non-chart B/S selecting one enabled directional tradebook | ViteApp | Native |
+
+Risk-method labels do not choose the executor. An entry with existing exposure or
+pending orders still follows the flag, even when using a non-default risk method.
 
 Current ViteApp tradebooks all use the mirrored Bookmap wall-reversal family.
 Chart B/S requires a matching wall-reversal definition. Broker review still blocks

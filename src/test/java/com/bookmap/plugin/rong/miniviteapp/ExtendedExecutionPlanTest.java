@@ -80,7 +80,7 @@ class ExtendedExecutionPlanTest {
     @Test void nonDefaultRiskMethodMatchesViteParsingAndFlatEntryStillGetsExposurePreflight() {
         JsonObject json = longState(); json.addProperty("netQuantity", 0); json.add("pairs", new JsonArray());
         JsonObject action = new JsonObject(); action.addProperty("tradebook_id", "RangeBoundBidReversal"); action.addProperty("entry_method", "pattern 0.25R");
-        Plan plan = EntryHandler.handleEntry(new Snapshot(json), action, "", true);
+        Plan plan = EntryHandler.handleEntry(new Snapshot(json), action, "");
         assertEquals(0.25, Models.number(plan.entry, "multiplier"));
         assertEquals(3, plan.requests.get(0).body.getAsJsonArray("childOrderStrategies").size());
         assertTrue(plan.requireFlatEntry);

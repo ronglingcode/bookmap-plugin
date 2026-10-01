@@ -8,14 +8,10 @@ import com.google.gson.JsonObject;
 import com.bookmap.plugin.rong.miniviteapp.api.Broker;
 import java.util.regex.Pattern;
 
-/** First migration: wall-reversal buttons and chart B/S, with no existing symbol exposure. */
+/** Wall-reversal buttons and chart B/S, with flag-controlled entries into existing exposure. */
 public final class EntryHandler {
     private EntryHandler() { }
     private static final Pattern RISK_METHOD = Pattern.compile("(?:^|\\s)(\\d+(?:\\.\\d+)?)\\s*R$", Pattern.CASE_INSENSITIVE);
-    public static boolean standardMethod(JsonObject action) {
-        String method = field(action, "entry_method", "entryMethod");
-        return method.isEmpty() || method.equals("1 R") || method.equals("0.1 R");
-    }
     private static String field(JsonObject action, String first, String second) {
         String value = Models.string(action, first); return value.isEmpty() ? Models.string(action, second) : value;
     }
@@ -61,7 +57,6 @@ public final class EntryHandler {
         Models.require(Models.positive(entry) && Models.positive(stop) && (isLong ? stop < entry : stop > entry), "invalid entry or protective stop");
         BookmapWallReversal.checkEntryPrice(definition, entry, isLong);
         String method = field(action, "entry_method", "entryMethod");
-        Models.require(extended || standardMethod(action), "unsupported entry method");
         double methodMultiplier = 1;
         var match = RISK_METHOD.matcher(method.trim());
         if (match.find()) {

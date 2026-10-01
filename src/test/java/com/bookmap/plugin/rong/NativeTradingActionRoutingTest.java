@@ -14,7 +14,7 @@ class NativeTradingActionRoutingTest {
             @Override public void broadcast(String text) { broadcasts.add(text); }
         };
         try {
-            for (String key : new String[]{"KeyC", "KeyF", "KeyM", "Digit1", "Numpad1", "KeyG", "KeyH", "KeyT"}) {
+            for (String key : new String[]{"KeyC", "KeyF", "KeyM", "Digit1", "Numpad1", "KeyG", "KeyH", "KeyT", "KeyA", "KeyW"}) {
                 JsonObject action = new JsonObject();
                 action.addProperty("type", "custom_button_click");
                 action.addProperty("symbol", "AAPL");
@@ -25,9 +25,12 @@ class NativeTradingActionRoutingTest {
             button.addProperty("type", "custom_button_click");
             button.addProperty("symbol", "AAPL");
             button.addProperty("tradebook_id", "RangeBoundBidReversal");
-            server.dispatchTradingAction(button);
+            for (String method : new String[]{"", "1 R", "0.1 R", "0.25 R", "2 R", "unparsed method"}) {
+                button.addProperty("entry_method", method);
+                server.dispatchTradingAction(button);
+            }
             assertTrue(broadcasts.isEmpty());
-            for (String key : new String[]{"KeyA", "KeyW"}) {
+            for (String key : new String[]{"KeyB", "KeyS"}) {
                 JsonObject action = button.deepCopy(); action.addProperty("keyCode", key);
                 server.dispatchTradingAction(action);
             }
