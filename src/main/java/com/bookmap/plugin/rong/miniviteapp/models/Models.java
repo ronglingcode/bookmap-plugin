@@ -117,7 +117,7 @@ public final class Models {
         public final List<String> warnings = new ArrayList<>();
         public boolean clearPending;
         public JsonObject entry;
-        public boolean experimental, requireFlatEntry;
+        public boolean requireFlatEntry;
         public Plan(String action) { this.action = action; }
         public JsonArray toJson() {
             JsonArray result = new JsonArray();

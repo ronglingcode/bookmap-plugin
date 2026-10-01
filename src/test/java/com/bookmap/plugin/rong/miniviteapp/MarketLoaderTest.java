@@ -13,6 +13,16 @@ import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.*;
 
 class MarketLoaderTest {
+    @Test void removedOrPriorSessionHistoryCannotOverwriteANewLoad() throws Exception {
+        CountDownLatch requested = new CountDownLatch(1), release = new CountDownLatch(1); AtomicInteger reads = new AtomicInteger();
+        Api api = new Api((uri, method, headers, body) -> { if (reads.incrementAndGet() == 1) { requested.countDown(); assertTrue(release.await(5, TimeUnit.SECONDS)); } return new HttpPort.Response(200, "{\"results\":[]}"); }, () -> "test-key");
+        var executor = Executors.newFixedThreadPool(2);
+        try (MarketLoader loader = new MarketLoader(api, executor, () -> java.time.Instant.parse("2026-10-02T13:30:00Z").toEpochMilli())) {
+            var old = loader.load("AAPL", "2026-10-01", 10000, 0, 0); assertTrue(requested.await(5, TimeUnit.SECONDS)); loader.forget("AAPL");
+            var next = loader.load("AAPL", "2026-10-02", 10000, 0, 0).get(5, TimeUnit.SECONDS); release.countDown(); assertThrows(java.util.concurrent.ExecutionException.class, () -> old.get(5, TimeUnit.SECONDS));
+            assertSame(next.state, loader.getState("AAPL")); assertEquals("2026-10-02", next.state.snapshot().get("date").getAsString());
+        } finally { release.countDown(); executor.shutdownNow(); }
+    }
     @Test void buffersLivePrintsAndBackfillsCurrentMinuteExactlyOnce() throws Exception {
         long base = java.time.Instant.parse("2026-10-01T13:30:00Z").toEpochMilli();
         CountDownLatch requested = new CountDownLatch(1), release = new CountDownLatch(1); AtomicInteger reads = new AtomicInteger();

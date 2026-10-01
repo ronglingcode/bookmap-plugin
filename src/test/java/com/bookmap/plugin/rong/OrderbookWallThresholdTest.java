@@ -75,7 +75,7 @@ class OrderbookWallThresholdTest {
         tradebooks.add(tradebook("GapAndCrapBookmapBidWallBreakdown", false, "0.25R"));
         config.add("tradebooks", tradebooks);
 
-        server.onMessage(null, config.toString());
+        localMessage(server, config.toString());
 
         assertTrue(server.hasEnabledWallBreakTradeButton("WEN", false));
         assertTrue(server.hasEnabledWallBreakTradeButton("WEN", true));
@@ -93,7 +93,7 @@ class OrderbookWallThresholdTest {
         tradebooks.add(tradebook("GapAndCrapBookmapBidWallBreakdown", true, "0.25R"));
         config.add("tradebooks", tradebooks);
 
-        server.onMessage(null, config.toString());
+        localMessage(server, config.toString());
 
         assertFalse(server.hasEnabledWallBreakTradeButton("WEN", false));
         assertFalse(server.hasEnabledWallBreakTradeButton("WEN", true));
@@ -114,7 +114,7 @@ class OrderbookWallThresholdTest {
         tradebooks.add(stringSide);
         config.add("tradebooks", tradebooks);
 
-        server.onMessage(null, config.toString());
+        localMessage(server, config.toString());
 
         assertFalse(server.hasEnabledWallBreakTradeButton("WEN", false));
         assertFalse(server.hasEnabledWallBreakTradeButton("WEN", true));
@@ -131,7 +131,7 @@ class OrderbookWallThresholdTest {
         tradebooks.add(tradebook("GapGiveAndGoBookmapReversal", true, "0.25R"));
         tradebooks.add(tradebook("GapAndCrapOfferStepDownReappear", false, "0.25R"));
         config.add("tradebooks", tradebooks);
-        server.onMessage(null, config.toString());
+        localMessage(server, config.toString());
 
         assertTrue(server.hasEnabledPatternTradebook("WEN", PatternType.OFFER_WALL_BREAKOUT));
         assertTrue(server.hasEnabledPatternTradebook("WEN", PatternType.BID_REAPPEAR));
@@ -154,7 +154,7 @@ class OrderbookWallThresholdTest {
         tradebooks.add(tradebook("RangeBoundBidReversal", true, "0.025 R"));
         tradebooks.add(tradebook("GapAndCrapOfferStepDownReappear", false, "0.25 R"));
         config.add("tradebooks", tradebooks);
-        server.onMessage(null, config.toString());
+        localMessage(server, config.toString());
 
         assertEquals(
                 "GapGiveAndGoBookmapReversal",
@@ -176,4 +176,5 @@ class OrderbookWallThresholdTest {
         tradebook.add("entryMethods", entryMethods);
         return tradebook;
     }
+    private static void localMessage(com.bookmap.plugin.rong.SignalWebSocketServer server, String json) { server.acceptLocalMessage(com.google.gson.JsonParser.parseString(json).getAsJsonObject()); }
 }

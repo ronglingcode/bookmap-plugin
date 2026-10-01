@@ -135,19 +135,24 @@ public class IndicatorSettingsPanel extends StrategyPanel {
 
         gbc.gridy++;
         JCheckBox fireKeyboardEventCheckbox = new JCheckBox(
-                "Fire Keyboard Hotkey Events (C/F, B/S, A/G/T/W, digits; numpad = market out)",
+                "Chart Hotkeys (B/S, A/W, C/F/Q/P, G/H/T, J/K/L, Z/Space, digits/numpad/M)",
                 config.isEnabled(IndicatorConfig.FIRE_KEYBOARD_EVENT));
         fireKeyboardEventCheckbox.addActionListener(e ->
                 config.setEnabled(IndicatorConfig.FIRE_KEYBOARD_EVENT, fireKeyboardEventCheckbox.isSelected()));
         add(fireKeyboardEventCheckbox, gbc);
 
         gbc.gridy++;
-        JCheckBox nativeExecution = new JCheckBox("Experimental: Extended Native Execution (Schwab)",
-                config.isEnabled(IndicatorConfig.EXPERIMENTAL_DIRECT_BROKER_EXECUTION));
-        nativeExecution.setToolTipText("Native entries with pending orders, opposite-position entries, and generic non-chart B/S. Cancel, exits, reload, Swap, flat entries, and same-direction adds without pending entry orders always execute natively.");
-        nativeExecution.addActionListener(e -> config.setEnabled(
-                IndicatorConfig.EXPERIMENTAL_DIRECT_BROKER_EXECUTION, nativeExecution.isSelected()));
-        add(nativeExecution, gbc);
+        JCheckBox tradingSound = new JCheckBox("Native Trading Notification Sound", config.isEnabled(IndicatorConfig.TRADING_NOTIFICATION_SOUND));
+        tradingSound.addActionListener(e -> config.setEnabled(IndicatorConfig.TRADING_NOTIFICATION_SOUND, tradingSound.isSelected()));
+        add(tradingSound, gbc);
+        gbc.gridy++;
+        javax.swing.JButton restart = new javax.swing.JButton("Restart Native Trading / Reload Secrets");
+        restart.addActionListener(e -> RongPlugin.restartNativeTrading()); add(restart, gbc);
+        gbc.gridy++;
+        javax.swing.JButton openAuthorization = new javax.swing.JButton("Open Schwab Authorization"); openAuthorization.addActionListener(e -> RongPlugin.openNativeAuthorization()); add(openAuthorization, gbc);
+        gbc.gridy++;
+        javax.swing.JButton authorize = new javax.swing.JButton("Import Schwab Authorization Callback URL");
+        authorize.addActionListener(e -> { String callback = javax.swing.JOptionPane.showInputDialog(this, "Paste the redirected Schwab authorization URL (containing code). It is exchanged locally and is never logged."); if (callback != null && !callback.isBlank()) RongPlugin.authorizeNativeTrading(callback); }); add(authorize, gbc);
         gbc.gridy++;
         javax.swing.JButton resetNative = new javax.swing.JButton("Reset Native Execution After Broker Review");
         resetNative.setToolTipText("Use only after checking unresolved orders at the broker. Does not resend orders.");

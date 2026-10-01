@@ -139,8 +139,7 @@ class NativeExecutionTest {
                 var fixture = element.getAsJsonObject();
                 if (!fixture.get("name").getAsString().equals(name)) continue;
                 state = fixture.getAsJsonObject("state").deepCopy();
-                connect(); engine.setExtendedEnabled(true);
-                return fixture.getAsJsonObject("action").deepCopy();
+                connect(); return fixture.getAsJsonObject("action").deepCopy();
             }
             throw new AssertionError(name);
         }
@@ -194,8 +193,7 @@ class NativeExecutionTest {
     }
     @Test void unsupportedActionsBlockLocallyWithConfiguredInputs() throws Exception {
         try (var rig = new Rig()) {
-            rig.connect(); rig.engine.setExtendedEnabled(true);
-            var unsupportedButton = action("");
+            rig.connect(); var unsupportedButton = action("");
             unsupportedButton.addProperty("tradebook_id", "UnsupportedTradebook");
             for (var command : new JsonObject[]{action("KeyV"), unsupportedButton}) {
                 rig.engine.route(command);
@@ -219,21 +217,19 @@ class NativeExecutionTest {
             assertFalse(rig.engine.status().get("blocked").getAsBoolean());
         }
     }
-    @Test void stableNativeActionsIgnoreExtendedFlagAndRetainTokensWhenItChanges() throws Exception {
+    @Test void nativeActionsUseLocalTokens() throws Exception {
         try (var rig = new Rig()) {
-            rig.connect(); rig.engine.setExtendedEnabled(true); rig.engine.setExtendedEnabled(false);
-            assertTrue(rig.engine.status().get("enabled").getAsBoolean());
-            assertFalse(rig.engine.status().get("extendedEnabled").getAsBoolean());
+            rig.connect(); assertTrue(rig.engine.status().get("enabled").getAsBoolean());
+            assertTrue(rig.engine.status().get("extendedEnabled").getAsBoolean());
             assertTrue(rig.engine.route(action("KeyC")));
             assertEquals("accepted", rig.finish().get("outcome").getAsString());
             assertTrue(rig.authorizations.stream().allMatch(value -> value.equals("Bearer fake-access-token")));
         }
     }
-    @Test void reloadAndSwapStayNativeWithEitherFlagSettingWithoutAnExposurePreflight() throws Exception {
+    @Test void reloadAndSwapStayNativeWithoutAnExposurePreflight() throws Exception {
         for (String name : new String[]{"long market reload", "swap closes and reenters original long direction", "swap pending entry keeps final pair"}) {
-            for (boolean enabled : new boolean[]{false, true}) try (var rig = new Rig()) {
+            try (var rig = new Rig()) {
                 JsonObject command = rig.connectExtended(name);
-                rig.engine.setExtendedEnabled(enabled);
                 assertTrue(rig.engine.route(command));
                 assertEquals("accepted", rig.finish().get("outcome").getAsString(), name);
                 assertTrue(rig.requests.stream().noneMatch(request -> request.startsWith("GET ")), name);
@@ -241,7 +237,7 @@ class NativeExecutionTest {
             }
         }
     }
-    @Test void flatEntriesWithOtherRiskLabelsStayNativeWithTheFlagOff() throws Exception {
+    @Test void flatEntriesWithOtherRiskLabelsStayNative() throws Exception {
         for (String method : new String[]{"pattern 0.25R", "2 R", "unparsed method"}) try (var rig = new Rig()) {
             var command = rig.connectEntry(); command.addProperty("entry_method", method);
             assertTrue(rig.engine.route(command));
@@ -264,11 +260,10 @@ class NativeExecutionTest {
             assertTrue(rig.logs.stream().noneMatch(line -> line.contains("fake-access-token")));
         }
     }
-    @Test void sameDirectionEntriesStayNativeWithEitherFlagSettingAndPreserveActiveTrade() throws Exception {
-        for (boolean enabled : new boolean[]{false, true}) for (boolean isLong : new boolean[]{true, false})
+    @Test void sameDirectionEntriesStayNativeAndPreserveActiveTrade() throws Exception {
+        for (boolean isLong : new boolean[]{true, false})
         for (String method : new String[]{"1 R", "0.25 R"}) try (var rig = new Rig()) {
             rig.connectExtended(isLong ? "long market reload" : "short market reload");
-            rig.engine.setExtendedEnabled(enabled);
             var command = action(""); command.addProperty("tradebook_id", isLong ? "RangeBoundBidReversal" : "RangeBoundOfferReversal");
             command.addProperty("entry_method", method);
             command.addProperty("use_market_order", method.equals("1 R"));
@@ -278,24 +273,22 @@ class NativeExecutionTest {
             assertEquals(1, rig.mutations.get()); assertTrue(rig.requests.stream().noneMatch(request -> request.startsWith("GET ")));
         }
     }
-    @Test void pendingOrdersAndOppositeDirectionEntriesStillFollowTheFlag() throws Exception {
+    @Test void pendingOrdersAndOppositeDirectionEntriesAreAlwaysNative() throws Exception {
         for (int scenario = 0; scenario < 3; scenario++) try (var rig = new Rig()) {
             rig.state = ExtendedExecutionPlanTest.longState();
             if (scenario == 0) rig.state.add("entries", json("{\"orders\":[{\"orderID\":\"101\",\"isBuy\":true,\"orderType\":\"STOP\",\"quantity\":100,\"price\":10.5}]}").getAsJsonArray("orders"));
             rig.connect();
             var command = action(""); command.addProperty("tradebook_id", scenario == 0 ? "RangeBoundBidReversal" : "RangeBoundOfferReversal");
             command.addProperty("use_market_order", scenario == 1);
-            assertFalse(rig.engine.route(command)); assertEquals(0, rig.mutations.get());
-            rig.engine.setExtendedEnabled(true); assertTrue(rig.engine.route(command));
+            assertTrue(rig.engine.route(command));
             assertEquals("accepted", rig.finish().get("outcome").getAsString());
         }
     }
-    @Test void genericBuyStillUsesTheFlagWithASameDirectionPosition() throws Exception {
+    @Test void genericBuyIsNativeWithASameDirectionPosition() throws Exception {
         try (var rig = new Rig()) {
             rig.state = ExtendedExecutionPlanTest.longState(); rig.connect();
             var command = action("KeyB");
-            assertFalse(rig.engine.route(command));
-            rig.engine.setExtendedEnabled(true); assertTrue(rig.engine.route(command));
+            assertTrue(rig.engine.route(command));
             assertEquals("accepted", rig.finish().get("outcome").getAsString());
         }
     }
@@ -304,7 +297,7 @@ class NativeExecutionTest {
             rig.state = ExtendedExecutionPlanTest.longState();
             rig.state.addProperty("netQuantity", 0); rig.state.add("pairs", new JsonArray());
             rig.state.add("entries", json("{\"orders\":[{\"orderID\":\"101\",\"isBuy\":true,\"orderType\":\"STOP\",\"quantity\":100,\"price\":10.5}]}").getAsJsonArray("orders"));
-            rig.connect(); rig.engine.setExtendedEnabled(true); rig.rejectMutationNumber = 2;
+            rig.connect(); rig.rejectMutationNumber = 2;
             var command = action(""); command.addProperty("tradebook_id", "RangeBoundBidReversal");
             rig.engine.route(command); var result = rig.finish();
             assertEquals("rejected", result.get("outcome").getAsString());
@@ -313,40 +306,22 @@ class NativeExecutionTest {
             assertTrue(rig.requests.get(0).startsWith("POST ")); assertTrue(rig.requests.get(1).startsWith("DELETE "));
         }
     }
-    @Test void disablingExtendedFlagStopsItsNextRequestWithoutLegacyFallback() throws Exception {
-        try (var rig = new Rig()) {
-            rig.state = ExtendedExecutionPlanTest.longState();
-            rig.state.addProperty("netQuantity", 0); rig.state.add("pairs", new JsonArray());
-            rig.state.add("entries", json("{\"orders\":[{\"orderID\":\"101\",\"isBuy\":true,\"orderType\":\"STOP\",\"quantity\":100,\"price\":10.5}]}").getAsJsonArray("orders"));
-            rig.connect(); rig.engine.setExtendedEnabled(true);
-            var command = action(""); command.addProperty("tradebook_id", "RangeBoundBidReversal");
-            rig.allowMutation = new CountDownLatch(1); rig.engine.route(command);
-            assertTrue(rig.mutationEntered.await(3, TimeUnit.SECONDS));
-            rig.engine.setExtendedEnabled(false); rig.allowMutation.countDown();
-            var result = rig.finish(); assertEquals("partial", result.get("outcome").getAsString());
-            assertTrue(result.get("reason").getAsString().contains("extended native execution disabled before dispatch"));
-            assertEquals(1, rig.mutations.get());
-            assertTrue(rig.engine.status().get("enabled").getAsBoolean());
-        }
-    }
-    @Test void disablingExtendedFlagDoesNotInterruptNativeSwap() throws Exception {
+    @Test void nativeSwapCompletesItsRequestSequence() throws Exception {
         try (var rig = new Rig()) {
             var command = rig.connectExtended("swap pending entry keeps final pair");
             rig.allowMutation = new CountDownLatch(1); assertTrue(rig.engine.route(command));
             assertTrue(rig.mutationEntered.await(3, TimeUnit.SECONDS));
-            rig.engine.setExtendedEnabled(false); rig.allowMutation.countDown();
+            rig.allowMutation.countDown();
             assertEquals("accepted", rig.finish().get("outcome").getAsString());
             assertEquals(4, rig.mutations.get());
         }
     }
-    @Test void ambiguousExtendedOutcomeStillBlocksLegacyRoutingWhenFlagIsOff() throws Exception {
+    @Test void ambiguousOutcomeRequiresReviewBeforeAnotherNativeAction() throws Exception {
         try (var rig = new Rig()) {
-            rig.state = ExtendedExecutionPlanTest.longState(); rig.connect(); rig.engine.setExtendedEnabled(true);
-            var command = action(""); command.addProperty("tradebook_id", "RangeBoundOfferReversal"); rig.mutationStatus = 503;
+            rig.state = ExtendedExecutionPlanTest.longState(); rig.connect(); var command = action(""); command.addProperty("tradebook_id", "RangeBoundOfferReversal"); rig.mutationStatus = 503;
             rig.engine.route(command); assertEquals("unknown", rig.finish().get("outcome").getAsString());
-            rig.engine.setExtendedEnabled(false);
             assertTrue(rig.engine.route(command)); assertEquals(1, rig.mutations.get());
-            assertTrue(rig.engine.resetAfterBrokerReview()); assertFalse(rig.engine.route(command));
+            assertTrue(rig.engine.resetAfterBrokerReview()); assertTrue(rig.engine.route(command));
         }
     }
     @Test void initialEntryPreflightBlocksPositionAndPendingOrderChanges() throws Exception {
@@ -670,6 +645,16 @@ class NativeExecutionTest {
             assertSame(reconnected, rig.eventConnections.get(rig.eventConnections.size()-1));
             rig.state.add("entries", new JsonArray()); rig.updateState(System.currentTimeMillis()+10);
             assertFalse(rig.engine.status().get("blocked").getAsBoolean());
+        }
+    }
+    @Test void acceptedPendingTriggerPutReportsMetadataWithoutPostingAnotherEntry() throws Exception {
+        try (var rig = new Rig()) {
+            rig.state = ExtendedExecutionPlanTest.longState(); rig.state.addProperty("netQuantity", 0); rig.state.add("pairs", new JsonArray());
+            rig.state.add("entries", JsonParser.parseString("[{\"orderID\":\"101\",\"orderType\":\"STOP\",\"quantity\":10,\"price\":10.5,\"exitStopPrice\":9.5,\"isBuy\":true}]").getAsJsonArray());
+            rig.state.getAsJsonObject("entryContext").add("longTrade", WorkflowExecutionTest.active()); rig.state.getAsJsonObject("entryContext").addProperty("lowOfDay", 9);
+            rig.connect(); assertTrue(rig.engine.route(action("RefreshEntryStop"))); var result = rig.finish();
+            assertEquals("accepted", result.get("outcome").getAsString()); assertTrue(result.has("entry")); assertEquals(1, rig.mutations.get());
+            assertEquals(1, rig.requests.size()); assertTrue(rig.requests.get(0).startsWith("PUT ")); assertEquals("TRIGGER", rig.bodies.get(0).get("orderStrategyType").getAsString());
         }
     }
 }

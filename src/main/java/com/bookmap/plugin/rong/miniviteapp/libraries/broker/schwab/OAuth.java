@@ -42,7 +42,8 @@ public final class OAuth {
         }
     }
     public synchronized JsonObject exchangeAuthorizationCode(String callbackUrl) throws Exception {
-        String code = "", query = URI.create(callbackUrl).getRawQuery();
+        String code = "", query;
+        try { query = URI.create(callbackUrl).getRawQuery(); } catch (IllegalArgumentException error) { throw new IOException("Schwab callback URL is invalid"); }
         if (query != null) for (String part : query.split("&")) {
             String[] pair = part.split("=", 2);
             if (pair[0].equals("code") && pair.length > 1) code = URLDecoder.decode(pair[1], StandardCharsets.UTF_8);
@@ -52,6 +53,11 @@ public final class OAuth {
         Map<String, String> data = new LinkedHashMap<>(); data.put("grant_type", "authorization_code"); data.put("code", code);
         String redirect = string(value, "redirectUrl"); data.put("redirect_uri", redirect.isEmpty() ? "https://127.0.0.1" : redirect);
         return exchange(data, value);
+    }
+    public URI authorizationUrl() throws Exception {
+        JsonObject value = credentials.loadSchwab(); String key = string(value, "appKey"), redirect = string(value, "redirectUrl");
+        if (key.isEmpty()) throw new IOException("Schwab app key is missing");
+        return URI.create("https://api.schwabapi.com/v1/oauth/authorize?redirect_uri=" + encode(redirect.isEmpty() ? "https://127.0.0.1" : redirect) + "&client_id=" + encode(key));
     }
     private JsonObject exchange(Map<String, String> data, JsonObject previous) throws Exception {
         if (string(previous, "appKey").isEmpty() || string(previous, "secret").isEmpty()) throw new IOException("Schwab app credentials are missing");

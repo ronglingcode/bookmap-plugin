@@ -269,7 +269,7 @@ public class TradeButtonWindow {
                     if (corePlanStatusLabel != null) {
                         corePlanStatusLabel.setForeground(SHORT_TRADEBOOK_BUTTON_COLOR);
                         corePlanStatusLabel.setText(config.getError().isEmpty()
-                                ? "ViteApp rejected the update."
+                                ? "Native runtime rejected the update."
                                 : config.getError());
                     }
                 }
@@ -447,7 +447,7 @@ public class TradeButtonWindow {
         pendingCorePlanRequestId = symbol + ":" + System.nanoTime();
         corePlanUpdateButton.setEnabled(false);
         corePlanStatusLabel.setForeground(THRESHOLD_TEXT_COLOR);
-        corePlanStatusLabel.setText("Saving in ViteApp...");
+        corePlanStatusLabel.setText("Saving locally...");
 
         JsonObject json = new JsonObject();
         json.addProperty("type", "core_plan_update");
@@ -457,7 +457,7 @@ public class TradeButtonWindow {
         json.addProperty("coreCount", count);
         json.addProperty("requestId", pendingCorePlanRequestId);
         json.addProperty("timestamp", System.currentTimeMillis());
-        server.broadcast(json.toString());
+        server.dispatchTradingAction(json);
         PluginLog.action(symbol, "Requested exit plan update: target "
                 + formatPrice(target) + ", count " + count);
     }
@@ -540,7 +540,22 @@ public class TradeButtonWindow {
         hotkeyPanel.add(createHotkeyButton("Market Out Half", "market_out_half", "KeyG", true));
         hotkeyPanel.add(createHotkeyButton("Swap", "swap", "KeyW"));
         hotkeyPanel.add(createCorePlanButton());
+        JButton inputs = new JButton("Entry Inputs"); applyHotkeyButtonStyle(inputs); inputs.addActionListener(e -> showManualInputs()); hotkeyPanel.add(inputs);
+        hotkeyPanel.add(createHotkeyButton("Cancel Entries", "cancel_entries", "KeyQ"));
+        hotkeyPanel.add(createHotkeyButton("Reset Targets", "reset_targets", "KeyP"));
         return hotkeyPanel;
+    }
+
+    private void showManualInputs() {
+        String[] fields = {"customEntryPrice", "customStopLong", "customStopShort", "fixedQuantity"};
+        String[] labels = {"Custom entry price (0 = automatic)", "Long stop (0 = day low)", "Short stop (0 = day high)", "Fixed shares (0 = risk sizing)"};
+        JsonObject current = server.getManualInputs(symbol); JTextField[] inputs = new JTextField[fields.length]; JPanel panel = new JPanel(new GridLayout(0, 2, 8, 8));
+        for (int i = 0; i < fields.length; i++) { panel.add(new JLabel(labels[i])); inputs[i] = new JTextField(current.has(fields[i]) ? current.get(fields[i]).getAsString() : "0", 12); panel.add(inputs[i]); }
+        if (JOptionPane.showConfirmDialog(frame, panel, symbol + " Native Entry Inputs", JOptionPane.OK_CANCEL_OPTION, JOptionPane.PLAIN_MESSAGE) != JOptionPane.OK_OPTION) return;
+        JsonObject action = new JsonObject(); action.addProperty("type", "manual_inputs"); action.addProperty("symbol", symbol);
+        try { for (int i = 0; i < fields.length; i++) { double value = Double.parseDouble(inputs[i].getText().trim()); if (!Double.isFinite(value) || value < 0 || fields[i].equals("fixedQuantity") && value != Math.floor(value)) throw new IllegalArgumentException(); action.addProperty(fields[i], value); } }
+        catch (IllegalArgumentException error) { JOptionPane.showMessageDialog(frame, "Use nonnegative prices and whole share quantities."); return; }
+        server.dispatchTradingAction(action);
     }
 
     private JButton createCorePlanButton() {

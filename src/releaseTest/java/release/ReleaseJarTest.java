@@ -131,7 +131,7 @@ class ReleaseJarTest {
     }
 
     @Test
-    void obfuscatedWebsocketParserDeliversValidPositionsAndRejectsInvalidOnes() throws Exception {
+    void obfuscatedLocalViewParserDeliversValidPositionsAndRejectsInvalidOnes() throws Exception {
         String serverName = "com.bookmap.plugin.rong.SignalWebSocketServer";
         String listenerName = serverName + "$NewPositionListener";
         Class<?> serverType = mappedClass(serverName);
@@ -154,11 +154,13 @@ class ReleaseJarTest {
         mappedMethod(serverName, "void registerNewPositionListener(java.lang.String," + listenerName + ")",
                 String.class, listenerType).invoke(server, "AAPL", listener);
         Class<?> websocket = Class.forName("com.bookmap.plugin.shaded.websocket.WebSocket");
-        Method onMessage = serverType.getMethod("onMessage", websocket, String.class);
+        Class<?> jsonObject = Class.forName("com.bookmap.plugin.shaded.gson.JsonObject");
+        Method accept = mappedMethod(serverName, "void acceptLocalMessage(com.bookmap.plugin.shaded.gson.JsonObject)", jsonObject);
+        Method parse = Class.forName("com.bookmap.plugin.shaded.gson.JsonParser").getMethod("parseString", String.class);
         String valid = "{\"type\":\"new_position\",\"priceUnit\":\"real\",\"symbol\":\"AAPL\","
                 + "\"isLong\":true,\"netQuantity\":100,\"averagePrice\":110.25,"
                 + "\"eventId\":\"release-check\",\"timestamp\":1785243960000}";
-        onMessage.invoke(server, null, valid);
+        accept.invoke(server, parse.invoke(null, valid).getClass().getMethod("getAsJsonObject").invoke(parse.invoke(null, valid)));
         Object position = received.get();
         assertNotNull(position);
         String positionName = "com.bookmap.plugin.rong.NewPositionDefinition";
@@ -166,7 +168,8 @@ class ReleaseJarTest {
         assertEquals(110.25, (double) mappedMethod(positionName, "double getAveragePrice()").invoke(position), 0.00001);
         assertEquals(100d, (double) mappedMethod(positionName, "double getNetQuantity()").invoke(position), 0.00001);
         received.set(null);
-        onMessage.invoke(server, null, valid.replace("\"netQuantity\":100", "\"netQuantity\":0"));
+        Object invalid = parse.invoke(null, valid.replace("\"netQuantity\":100", "\"netQuantity\":0"));
+        accept.invoke(server, invalid.getClass().getMethod("getAsJsonObject").invoke(invalid));
         assertNull(received.get());
     }
 
@@ -248,6 +251,16 @@ class ReleaseJarTest {
             Object expected = jsonObject.getMethod("getAsJsonArray", String.class).invoke(fixture, "requests");
             assertEquals(expected, requests);
         }
+    }
+
+    @Test void nativeFactoryLoadsPrivateJsonAndClosesWithoutBookmapOrProxy() throws Exception {
+        Path temporary = Files.createTempFile("bmtrader-release-credentials-", ".json"); String previous = System.getProperty("bmtrader.secrets");
+        Files.writeString(temporary, "{\"massive\":{\"apiKey\":\"fake-massive\"},\"firebaseConfig\":{\"projectId\":\"fake-project\",\"apiKey\":\"fake-api\"},\"schwab\":{}}");
+        try {
+            System.setProperty("bmtrader.secrets", temporary.toString()); Class<?> events = mappedClass("com.bookmap.plugin.rong.miniviteapp.runtime.TradingRuntime$Events");
+            Object sink = Proxy.newProxyInstance(getClass().getClassLoader(), new Class<?>[]{events}, (proxy, method, args) -> null);
+            try (AutoCloseable runtime = (AutoCloseable) mappedClass("com.bookmap.plugin.rong.miniviteapp.runtime.NativeRuntime").getConstructor(events).newInstance(sink)) { assertNotNull(runtime); }
+        } finally { if (previous == null) System.clearProperty("bmtrader.secrets"); else System.setProperty("bmtrader.secrets", previous); Files.deleteIfExists(temporary); }
     }
 
     private static boolean isImplementation(String name) {

@@ -20,19 +20,23 @@ Updated: 2026-10-01. Design: [standalone-native-trading-plan.md](standalone-nati
 
 | Phase | Status | Evidence / remaining work |
 | --- | --- | --- |
-| Scope cleanup | Complete | Removed unused OpenAI secret accessor, agent-response client, AI notes; regenerated dead-code inventory. `npm run build` passed. |
-| 1. Contracts and parity baseline | In progress | Added matching domain candles, HTTP ports, market clock and 22 Massive/market scenarios generated from production TS; account/state contracts remain. |
-| 2. Mirrored module extraction | In progress | Extracted TS pure sizing/target/entry/core-target/exit-selection helpers and Schwab payload builders into `src/trading`; compatibility exports retained. Reorganized all Java decisions under `core` and existing broker code under `libraries/broker`. Other browser handlers still mix globals/UI. |
-| 3. Secrets, Firestore, OAuth | In progress | Matching OAuth, credential ports, Firestore REST codecs/config/state/log operations complete. Java local-file store and blank template added. Browser uses libraries. Java startup, periodic refresh and local authorization controls remain part of runtime/adapter phases. |
-| 4. Massive/history/market state | In progress | Matching REST clients and history/live loader, headless candles/VWAP/session levels, Camarilla, liquidity and eligibility implemented. Browser DB now renders headless state and preserves every worker-batched print. Java stream/runtime wiring remains. |
-| 5. Account/streams/runtime | In progress | Mirrored Schwab reads/account projection, vendor stream protocols and reconnecting two-stream runtime implemented. Java JDK socket adapter added. Wiring configuration/account cache/periodic refresh into the plugin lifecycle remains. |
-| 6. State/workflow completion | In progress | Mirrored trade ledger, persisted state, configuration validation/definitions and execution-input construction implemented; local runtime state ownership/additional commands/jobs remain. |
-| 7. Bookmap adapter | Pending | Runtime currently owned by WebSocket server; UI/config updates still come from ViteApp. |
-| 8. Remove bridge/flag, final verification | Pending | Must verify browser and proxy closed, token expiry, restore/reconnect, and obfuscated JAR. |
+| Scope cleanup | Complete | Replay and AI/chat removed from ViteApp before extraction; browser build passes. |
+| 1. Contracts and parity baseline | Complete | Mirrored domain/ports and production-generated Massive, services, market, broker, stream and state/workflow/view fixtures. |
+| 2. Mirrored module extraction | Complete | TS src/trading and Java miniviteapp libraries/core/runtime/ports/adapters. Browser compatibility adapters retained. |
+| 3. Secrets, Firestore, OAuth | Complete | Local JSON/template, direct config/state/audit REST, coalesced refresh/rotation and native manual OAuth controls. |
+| 4. Massive/history/market state | Complete | Direct REST/reference/trades + stream, history/live overlap, eligibility, local indicators and closed-minute VWAP history/projection. |
+| 5. Account/streams/runtime | Complete | Direct account/orders/preferences, ledger, two reconnecting vendor streams, 3s read coalescing/429 delay, periodic config/account/OAuth jobs. |
+| 6. State/workflow completion | Complete | Local accepted state, core edits, Q/P/J/K/L/Z/Space/manual inputs, pending-stop job, risk/volume/VWAP/discipline/core reminders and Firestore audits. |
+| 7. Bookmap adapter | Complete | First/last attachment runtime ownership, existing display parsers in process, local controls and optional sound. |
+| 8. Remove bridge/flag, final verification | Complete | Old flag/forwarding and browser bridge/context removed. External inputs ignored. Both builds and fake-service/parity/release suites pass; docs revised. |
+| Manual live smoke | Not run | User supplies local JSON. Actual Bookmap attachment, live vendor order acceptance and real Firestore writes were not exercised. |
 
 ## Baseline and verification
 
 - Baseline: ViteApp `7dfd5a3`; bookmap-plugin `a080dbf`.
+- Final TS workflow/bridge-removal checkpoint: ViteApp `a883086`.
+- Standalone startup checkpoint: ViteApp `90bb54b`; bookmap-plugin `6cbad1e`.
+- This document is committed with the final Java adapter/workflow/setup slice.
 - Cleanup commit: ViteApp `d4686b5`; plan/progress commit: bookmap-plugin `62e71f5`.
 - First library/Massive checkpoint: ViteApp `61b9006`; bookmap-plugin `570bb7a`.
 - Services checkpoint: ViteApp `a6e0bf6`; bookmap-plugin `bde33bd`.
@@ -66,87 +70,66 @@ Updated: 2026-10-01. Design: [standalone-native-trading-plan.md](standalone-nati
 - Java validation: `./gradlew.bat build`, including standalone native compile/release-JAR tests.
 - No credentials copied, no live orders sent, no real state documents overwritten.
 
-## Resume checkpoint
+## Resume checkpoint — implementation complete
 
-Runtime checkpoint following the state extraction (`a79f838` ViteApp / `243ee1e`
-plugin): matching `runtime/TradingRuntime` owns direct startup, saved state,
-configuration/positions/daily-order reads, OAuth checks every 30 seconds, account
-refresh every 15 seconds, config refresh every minute, history/live loading and
-100ms local market updates. Stream reconnects backfill and re-read fresh OAuth
-preferences. Safe GET reads retry a 401 once after token refresh; mutations never
-auto-retry. State writes are ordered, independent of manual action dispatch.
-Native broker API now accepts injected HTTP with real response headers, preserving
-Location IDs and existing mutation outcomes. Direct JDK HTTP adapter added.
+Resumed after usage reset on 2026-10-01. All implementation phases are complete.
+The native runtime is wired to RongPlugin's first/last attachment; startup requires
+only user-owned JSON and the vendor services. ViteApp and ProxyServer can be closed.
+Every supported operation is native; the old extended-execution routing flag and
+browser executionBridge/executionEntryContext/market publishers are gone. The
+optional core-target protection remains a separate false-by-default trading policy.
 
-New fake-service runtime tests in both languages cover expired-token startup,
-state restore, eligibility/inputs, exactly one stream per vendor, renewal,
-Firestore persistence, account reads and teardown. Java also sends a real native
-entry decision to a fake broker and persists accepted metadata without ViteApp.
-`StartupEligibility` mirrors existing configured/implied market cap, premarket
-volume and consolidation rules. No real services/orders were used.
+Current final slice adds mirrored workflow decisions and local view projection,
+Q/P/trailing/pending-stop requests, accepted PUT state, manual entry/stop/fixed-share
+controls, notifications/audits and lifecycle. Runtime handles removed selections,
+held/unselected exit state, clearing closed positions, day rollover and obsolete
+history loads. Read coalescing respects a three-second minimum and Retry-After.
+Native chart entries now share authoritative local retest readiness with buttons;
+warning mode logs/notifies while yes blocks. Retest completion now logs/sounds
+locally once, without a browser listener. Space clears price inputs and retains
+fixed quantity. VWAP history seeds only completed minutes; live display updates
+use the last closed point, and repeated unchanged points are ignored.
 
-Next: finish state/command/job ownership and local Bookmap projections, add a native
-factory/lifecycle adapter, then remove execution bridge and native-routing flag.
-The runtime is independently testable but NOT YET started by RongPlugin. Remaining
-runtime gaps before wiring: unselected held-symbol exit inputs, day rollover,
-config-removal snapshot cleanup, local OAuth authorization/restart controls,
-read 429 scheduling/backoff, and notification/pending-entry/discipline jobs.
-The browser uses extracted core libraries; new TS orchestration is currently a
-headless mirror, not a replacement for its existing chart startup adapter.
+Verification completed:
 
-Latest implemented slice: `core/account/TradeLedger`, `core/state/TradeState`,
-`core/configuration/TradingConfig`, `core/controllers/ExecutionInputs` in both
-languages. Browser fill grouping, accepted-state registration, tradebook factory
-and bridge entry-context adapter now call these pure modules. `test:state` and
-Java `StateParityTest` cover 39 production-core scenarios. Full browser build,
-direct/extended execution suites and full Java build (native-only and release
-JAR checks included) pass.
+- Browser production build and headless type-check pass.
+- 99 shared account/state/config/workflow/view cases, 39 market cases plus four
+  browser/loader regressions, 23 Massive, 22 Firestore/OAuth plus refresh concurrency,
+  23 broker read/projection and 18 stream protocol plus socket lifecycle pass.
+- Direct execution: five production fixture/metadata tests. Extended execution:
+  nineteen production-handler fixtures plus accepted-add regression. Core exits:
+  six tests. Fake runtime covers startup, token expiry/rotation, accepted broker
+  entry, persistence/audit, manual inputs, read coalescing/429, removed/held symbols
+  and teardown, without browser or proxy.
+- Full Java Gradle build passes: 201 regular tests and nine actual obfuscated-JAR
+  release tests; native-only engine compilation passes without Bookmap API.
+- Browser price/VWAP, exit-pair selection and new-position regressions also pass.
+- No live broker mutations, real Firestore writes or real secrets used by checks.
+- Existing nonblocking build notices: Vite large bundle/missing runtime stylesheet;
+  Java deprecated API/Gradle usage. Both builds succeed.
 
-Next concrete step: add native runtime startup from LocalCredentials, fetch config,
-account and restored state, schedule OAuth/account/config reads, start MarketStreams
-and MarketLoader, and feed ExecutionInputs directly to MiniViteApp. Keep callbacks
-and I/O outside state locks. Then port commands/jobs and local Bookmap view updates.
-Bookmap still relies on the ViteApp bridge at this checkpoint; do not remove it or
-claim standalone completion before lifecycle wiring and end-to-end fake validation.
+The current operation/setup source of truth is [direct-broker-execution.md](direct-broker-execution.md).
+Secrets/setup: [config/README.md](../config/README.md). Release artifact:
+`build/libs/lingrong1988_bmtrader_1.30.jar`.
 
-Core behavior corrections: a single fill crossing zero is split into closing the
-old trade and opening its opposite remainder; the old ledger misclassified that
-case. Dynamic add targets (`vwap`/premarket levels) validate before market history
-loads. Stop-only pairs sort after priced limits with stable ties. Captured sizing
-count and existing add-state preservation remain intact. Default missing add
-references are zero. Domain state snapshots are detached copies; same-day Firestore
-date labels and SDK timestamp shapes remain compatible.
+TS TradingRuntime is a headless mirror; production browser code still uses its
+chart/global bootstrap with extracted libraries/core. Other brokers/futures,
+inactive historical strategies, extra browser indicators/DOM/speech and Firebase
+sign-in were not ported. R/E are disabled; V has no constructed active tradebook;
+U is unused. No active Schwab equity operation was found impossible to port.
+Partial market/target workflows retain the split-protective-order requirement;
+new native/browser entries already submit multiple brackets. Legacy single-order
+restoration requires resetting captured targets with P before managing partials.
 
-The first library extraction and Massive REST slice are implemented and verified.
-TS code: `ViteApp/src/trading`; Java: `miniviteapp/{core,libraries,models,ports,runtime}`.
-Old TS paths are thin compatibility exports. The extended fixture loader includes
-the new risk-sizing module so it still executes real production code.
+Next session: fill the user-owned local secrets JSON, attach the release addon with
+ViteApp/ProxyServer closed, and inspect startup, loaded config/levels/account state,
+stream reconnect and OAuth renewal. Inspect vendor permissions and actual UI
+attachment before assessing live execution. Do not send real orders as an automated
+smoke check. Future trading changes should update both matching core modules and
+the relevant fixture generators, then build both repos.
 
-Credentials/Firestore/OAuth libraries are now implemented; configuration details
-are in `config/README.md`, empty schema in `config/secrets.template.json`.
-Java `runtime/LocalCredentials` reads user JSON, persists rotations without losing
-other sections, and supports `bmtrader.secrets` path override. Pure `MarketClock`
-now belongs under `core/marketdata`, so core never imports runtime.
-
-Headless market state and pure existing calculations are implemented. Browser
-liquidity, Camarilla, eligibility and trade parsing call these modules. Browser
-`data/db.ts` now renders the headless state through `adapters/browserMarket`.
-Initialization reads the current core snapshot, including any trades arriving
-between the history promise and chart readiness; reload resets UI-derived arrays.
-
-Matching history/live loaders now seed complete minute bars + individual-trade
-backfill + buffered stream prints, with concurrent loads coalesced. Native I/O runs
-on an injected executor; close prevents a pending read from reinstalling state.
-Schwab read/projection and stream libraries are now implemented (details below).
-Next: configuration/watchlist and execution-input construction, shared account cache,
-periodic token/account scheduling and local persisted trade state. Then wire the
-native runtime into Bookmap lifecycle and replace bridge-fed views/actions.
-Native OAuth needs periodic startup/runtime scheduling; clients alone do not start
-background work. Do not remove the bridge/flag
-yet: Bookmap still obtains tokens, account snapshots, execution context and views
-from ViteApp. The Java Massive client is verified independently but not wired into
-the plugin lifecycle. Keep implementing through phase 8; this checkpoint is not
-completion of the standalone migration.
+The sections below preserve earlier checkpoints; their unfinished-work notes are
+historical and superseded by this checkpoint.
 
 ## Account and stream checkpoint
 

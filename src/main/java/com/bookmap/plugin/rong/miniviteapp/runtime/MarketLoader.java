@@ -36,6 +36,7 @@ public final class MarketLoader implements AutoCloseable {
         final CompletableFuture<Loaded> promise = new CompletableFuture<>();
     }
     public synchronized MarketState getState(String symbol) { return states.get(symbol); }
+    public synchronized void forget(String symbol) { states.remove(symbol); loading.remove(symbol); }
     public synchronized boolean acceptTrade(Trade trade) {
         if (closed || Mapper.shouldFilterTrade(trade)) return false;
         Loading pending = loading.get(trade.symbol); if (pending != null) pending.buffer.add(trade);
@@ -48,10 +49,10 @@ public final class MarketLoader implements AutoCloseable {
         try { executor.execute(() -> {
             try {
                 Loaded result = performLoad(symbol, date, marketCap, correctionVolume, correctionDollars, liveFrom, pending);
-                synchronized (this) { loading.remove(symbol); }
+                synchronized (this) { loading.remove(symbol, pending); }
                 pending.promise.complete(result);
             } catch (Exception error) {
-                synchronized (this) { loading.remove(symbol); }
+                synchronized (this) { loading.remove(symbol, pending); }
                 pending.promise.completeExceptionally(error);
             }
         }); } catch (RuntimeException error) { loading.remove(symbol); pending.promise.completeExceptionally(error); }
@@ -60,7 +61,7 @@ public final class MarketLoader implements AutoCloseable {
     private Loaded performLoad(String symbol, String date, double marketCap, double correctionVolume, double correctionDollars, long liveFrom, Loading pending) throws Exception {
         JsonObject history = api.getFullPriceHistory(symbol, date); List<Trade> backfill = api.getTrades(symbol, liveFrom, now.getAsLong());
         synchronized (this) {
-            if (closed) throw new IllegalStateException("Market loader stopped");
+            if (closed || loading.get(symbol) != pending) throw new IllegalStateException("Market load replaced or stopped");
             MarketState state = new MarketState(symbol, date, marketCap); state.initialize(candles(history.getAsJsonArray("today1MinuteBars")), liveFrom, correctionVolume, correctionDollars);
             List<Trade> prints = new ArrayList<>(backfill); prints.addAll(pending.buffer); prints.sort(Comparator.comparingLong(trade -> trade.timestamp));
             for (Trade trade : prints) if (!Mapper.shouldFilterTrade(trade)) state.applyTrade(trade);

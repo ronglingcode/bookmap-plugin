@@ -8,7 +8,7 @@ import com.google.gson.JsonObject;
 import com.bookmap.plugin.rong.miniviteapp.libraries.broker.Broker;
 import java.util.regex.Pattern;
 
-/** Wall-reversal entries; existing-position risk sizing is independent of the routing flag. */
+/** Native wall-reversal entries, including existing-position and pending-order workflows. */
 public final class EntryHandler {
     private EntryHandler() { }
     private static final Pattern RISK_METHOD = Pattern.compile("(?:^|\\s)(\\d+(?:\\.\\d+)?)\\s*R$", Pattern.CASE_INSENSITIVE);

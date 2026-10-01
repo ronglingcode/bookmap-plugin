@@ -22,7 +22,7 @@ class IndicatorConfigTest {
         IndicatorConfig config = new IndicatorConfig();
 
         assertTrue(config.isEnabled(IndicatorConfig.FIRE_KEYBOARD_EVENT));
-        assertFalse(config.isEnabled(IndicatorConfig.EXPERIMENTAL_DIRECT_BROKER_EXECUTION));
+        assertTrue(config.isEnabled(IndicatorConfig.TRADING_NOTIFICATION_SOUND));
     }
 
     @Test

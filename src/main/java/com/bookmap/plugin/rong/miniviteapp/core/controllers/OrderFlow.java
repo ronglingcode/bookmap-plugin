@@ -26,18 +26,11 @@ public final class OrderFlow {
         double buyingPower = Models.number(context, "availableBuyingPower");
         Plan plan = new Plan("wall_reversal_entry");
         Models.require(Double.isFinite(buyingPower), "buying-power sizing input missing");
-        if (buyingPower <= orderEntry * total) {
-            total = 0;
-            // Preserve TS half-size allocation; Schwab validates the resulting quantities.
-            for (var element : targets) {
-                var target = element.getAsJsonObject(); double quantity = Models.number(target, "quantity") / 2;
-                target.addProperty("quantity", quantity); total += quantity;
-            }
-            if (buyingPower <= orderEntry * total)
-                plan.warnings.add("Native warning: estimated buying power insufficient after half sizing; broker will decide");
-        }
+        JsonObject allocation = Workflows.buyingPowerTargets(targets, orderEntry, buyingPower); targets = allocation.getAsJsonArray("targets"); total = allocation.get("totalQuantity").getAsDouble();
+        if (allocation.get("insufficient").getAsBoolean()) plan.warnings.add("Native warning: estimated buying power insufficient after half sizing; broker will decide");
         plan.requests.add(new Request("POST", null, OrderFactory.createOneEntryWithMultipleExits(state.symbol, isLong, type, total, orderEntry, targets, orderStop)));
         JsonObject basePlan = definition.getAsJsonObject("basePlan").deepCopy();
+        if (!basePlan.has("planConfigs") || !basePlan.get("planConfigs").isJsonObject()) basePlan.add("planConfigs", new JsonObject());
         basePlan.getAsJsonObject("planConfigs").addProperty("sizingCount", count);
         if (!method.isEmpty()) basePlan.addProperty("entryMethod", method);
         JsonObject submit = new JsonObject(); submit.addProperty("totalQuantity", total); submit.add("profitTargets", targets);

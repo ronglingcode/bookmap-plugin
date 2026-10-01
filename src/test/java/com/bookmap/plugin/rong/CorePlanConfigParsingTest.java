@@ -17,7 +17,7 @@ class CorePlanConfigParsingTest {
         AtomicReference<CorePlanConfigDefinition> configRef = new AtomicReference<>();
         server.registerCorePlanConfigListener("AAPL", configRef::set);
 
-        server.onMessage(null, activeConfigJson(110, 5, 109, true));
+        localMessage(server, activeConfigJson(110, 5, 109, true));
 
         CorePlanConfigDefinition config = configRef.get();
         assertTrue(config.hasActiveTrade());
@@ -39,8 +39,8 @@ class CorePlanConfigParsingTest {
         AtomicReference<CorePlanConfigDefinition> configRef = new AtomicReference<>();
         server.registerCorePlanConfigListener("AAPL", configRef::set);
 
-        server.onMessage(null, activeConfigJson(110, 5, 109, false));
-        server.onMessage(null, "{"
+        localMessage(server, activeConfigJson(110, 5, 109, false));
+        localMessage(server, "{"
                 + "\"type\":\"core_plan_config\","
                 + "\"priceUnit\":\"real\","
                 + "\"symbol\":\"AAPL\","
@@ -57,7 +57,7 @@ class CorePlanConfigParsingTest {
         AtomicReference<CorePlanConfigDefinition> configRef = new AtomicReference<>();
         server.registerCorePlanConfigListener("AAPL", configRef::set);
 
-        server.onMessage(null, activeConfigJson(110, 8, 109, false));
+        localMessage(server, activeConfigJson(110, 8, 109, false));
 
         assertNull(configRef.get());
     }
@@ -86,4 +86,5 @@ class CorePlanConfigParsingTest {
                 + "\"timestamp\":1785243960000"
                 + "}";
     }
+    private static void localMessage(com.bookmap.plugin.rong.SignalWebSocketServer server, String json) { server.acceptLocalMessage(com.google.gson.JsonParser.parseString(json).getAsJsonObject()); }
 }

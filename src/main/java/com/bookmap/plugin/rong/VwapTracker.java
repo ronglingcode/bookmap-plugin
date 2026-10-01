@@ -3,7 +3,7 @@ package com.bookmap.plugin.rong;
 import java.util.ArrayList;
 import java.util.List;
 
-/** Stores authoritative closed-minute VWAP values received from ViteApp. */
+/** Stores authoritative VWAP values from the local native market state. */
 public final class VwapTracker {
 
     private static final long NS_PER_MS = 1_000_000L;

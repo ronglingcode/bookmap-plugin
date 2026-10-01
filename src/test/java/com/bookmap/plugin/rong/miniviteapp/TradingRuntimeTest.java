@@ -22,7 +22,8 @@ class TradingRuntimeTest {
         JsonObject config = null, saved = null;
         for (JsonElement item : fixtures) { JsonObject f = item.getAsJsonObject(); if (f.get("name").getAsString().equals("stock selections config")) config = f.getAsJsonArray("args").get(0).getAsJsonObject(); if (f.get("name").getAsString().equals("new state and accepted entry")) saved = f.getAsJsonObject("result"); }
         final JsonObject configData = config, savedState = saved;
-        AtomicLong now = new AtomicLong(Instant.parse("2026-10-01T13:32:00Z").toEpochMilli()); AtomicInteger refreshes = new AtomicInteger(), accountReads = new AtomicInteger(), writes = new AtomicInteger(), mutations = new AtomicInteger();
+        AtomicLong now = new AtomicLong(Instant.parse("2026-10-01T13:32:00Z").toEpochMilli()); AtomicInteger refreshes = new AtomicInteger(), accountReads = new AtomicInteger(), writes = new AtomicInteger(), mutations = new AtomicInteger(), audits = new AtomicInteger();
+        AtomicBoolean limited = new AtomicBoolean(); AtomicReference<String> positionData = new AtomicReference<>("[]");
         AtomicReference<JsonObject> secrets = new AtomicReference<>(json("{\"appKey\":\"fake-app\",\"secret\":\"fake-secret\",\"access_token\":\"expired\",\"refresh_token\":\"fake-refresh\",\"expires_at\":0,\"accountHashValue\":\"fake-account\"}"));
         List<JsonObject> emitted = new CopyOnWriteArrayList<>(); List<String> logs = new CopyOnWriteArrayList<>(); List<Task> tasks = new ArrayList<>(); List<Socket> sockets = new ArrayList<>();
         HttpPort http = (uri, method, headers, body) -> {
@@ -30,14 +31,15 @@ class TradingRuntimeTest {
             if (path.endsWith("/oauth/token")) { int count = refreshes.incrementAndGet(); return new HttpPort.Response(200, "{\"access_token\":\"fresh-" + count + "\",\"refresh_token\":\"rotated-" + count + "\",\"expires_in\":1800}"); }
             if (path.endsWith(":runQuery")) { JsonObject document = new JsonObject(); document.add("fields", DocumentCodec.encodeFields(configData)); JsonObject row = new JsonObject(); row.add("document", document); JsonArray rows = new JsonArray(); rows.add(row); return new HttpPort.Response(200, rows.toString()); }
             if (path.endsWith("/tradingState")) { if (method.equals("PATCH")) { writes.incrementAndGet(); assertEquals(savedState.get("date"), DocumentCodec.decodeFields(json(body).getAsJsonObject("fields")).get("date")); return new HttpPort.Response(200, "{}"); } JsonObject document = new JsonObject(); document.add("fields", DocumentCodec.encodeFields(savedState)); return new HttpPort.Response(200, document.toString()); }
-            String account = "{\"positions\":[],\"currentBalances\":{\"liquidationValue\":25000}}";
-            if (path.endsWith("/accounts")) { accountReads.incrementAndGet(); return new HttpPort.Response(200, "[{\"securitiesAccount\":" + account + "}]"); }
+            String account = "{\"positions\":" + positionData.get() + ",\"currentBalances\":{\"liquidationValue\":25000}}";
+            if (path.endsWith("/accounts")) { accountReads.incrementAndGet(); if (limited.get()) return new HttpPort.Response(429, "", Map.of("Retry-After", "60")); return new HttpPort.Response(200, "[{\"securitiesAccount\":" + account + "}]"); }
             if (path.endsWith("/accounts/fake-account")) return new HttpPort.Response(200, "{\"securitiesAccount\":" + account + "}");
             if (path.endsWith("/orders")) { if (method.equals("POST")) { mutations.incrementAndGet(); return new HttpPort.Response(201, "", Map.of("Location", "https://fake.invalid/orders/123")); } return new HttpPort.Response(200, "[]"); }
             if (path.endsWith("/userPreference")) return new HttpPort.Response(200, "{\"streamerInfo\":[{\"streamerSocketUrl\":\"wss://fake.invalid\",\"schwabClientCustomerId\":\"customer\",\"schwabClientCorrelId\":\"correl\",\"schwabClientChannel\":\"channel\",\"schwabClientFunctionId\":\"function\"}]}");
             if (path.contains("/reference/")) return new HttpPort.Response(200, "{\"results\":{\"weighted_shares_outstanding\":1000000000}}");
             if (path.contains("/v3/trades/")) return new HttpPort.Response(200, "{\"results\":[]}");
             if (path.contains("/aggs/")) return new HttpPort.Response(200, "{\"results\":[{\"t\":1790859600000,\"o\":10,\"h\":11,\"l\":9,\"c\":10,\"v\":1000000,\"vw\":10},{\"t\":1790861400000,\"o\":10,\"h\":11,\"l\":9,\"c\":10,\"v\":2000000,\"vw\":10}]}");
+            if (path.endsWith("-Logs") || path.endsWith("-Orders") || path.endsWith("/BreakoutTradeState")) { audits.incrementAndGet(); assertFalse(body.contains("fake-secret") || body.contains("fake-refresh")); return new HttpPort.Response(201, "{}"); }
             throw new AssertionError("Unexpected route " + path);
         };
         CredentialPort credentials = new CredentialPort() { public JsonObject loadSchwab() { return secrets.get().deepCopy(); } public void saveSchwab(JsonObject value) { secrets.set(value.deepCopy()); } };
@@ -54,6 +56,14 @@ class TradingRuntimeTest {
             long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(2); while (emitted.stream().noneMatch(event -> event.has("outcome")) && System.nanoTime() < deadline) Thread.sleep(5);
             assertEquals(1, mutations.get(), logs.toString()); assertTrue(emitted.stream().anyMatch(event -> event.has("outcome") && event.get("outcome").getAsString().equals("accepted")), emitted.toString());
             runtime.pendingPersistence().get(2, TimeUnit.SECONDS); assertEquals(2, writes.get());
+            runtime.dispatch(json("{\"type\":\"manual_inputs\",\"symbol\":\"AAPL\",\"customEntryPrice\":11,\"fixedQuantity\":20}")); assertEquals(20, runtime.manualInputs("AAPL").get("fixedQuantity").getAsInt()); runtime.dispatch(json("{\"symbol\":\"AAPL\",\"keyCode\":\"Space\"}")); assertEquals(json("{\"fixedQuantity\":20}"), runtime.manualInputs("AAPL"));
+            for (int i = 0; i < 10; i++) runtime.refreshAccount(); assertEquals(2, accountReads.get());
+            assertEquals(1, tasks.stream().filter(task -> task.delay == 3000 && !task.canceled).count()); Task deferred = tasks.stream().filter(task -> task.delay == 3000 && !task.canceled).findFirst().orElseThrow(); deferred.canceled = true; limited.set(true); now.addAndGet(3000); deferred.run.run(); assertEquals(3, accountReads.get());
+            runtime.refreshAccount(); assertEquals(3, accountReads.get()); Task retry = tasks.stream().filter(task -> task.delay == 60000 && !task.canceled).reduce((a, b) -> b).orElseThrow(); retry.canceled = true; limited.set(false); now.addAndGet(60000); retry.run.run(); assertEquals(4, accountReads.get());
+            positionData.set("[{\"instrument\":{\"symbol\":\"MSFT\",\"assetType\":\"EQUITY\"},\"longQuantity\":10,\"shortQuantity\":0,\"averagePrice\":20}]"); now.addAndGet(3000); runtime.refreshAccount(); assertEquals(10, runtime.view("MSFT", "test").getAsJsonObject("account").getAsJsonObject("positions").getAsJsonObject("MSFT").get("netQuantity").getAsInt());
+            positionData.set("[]"); now.addAndGet(3000); runtime.refreshAccount(); assertTrue(emitted.stream().anyMatch(event -> event.has("symbol") && event.get("symbol").getAsString().equals("MSFT") && event.get("type").getAsString().equals("account_ready") && event.getAsJsonObject("account").getAsJsonObject("positions").size() == 0));
+            configData.add("stockSelections", new JsonArray()); runtime.refreshConfig(); assertFalse(runtime.view("AAPL", "test").has("plan")); assertTrue(audits.get() > 0);
+            runtime.pendingPersistence().get(2, TimeUnit.SECONDS);
             runtime.close(); assertTrue(sockets.stream().allMatch(socket -> socket.closed)); assertTrue(tasks.stream().allMatch(task -> task.canceled)); int readCount = accountReads.get(); tasks.forEach(task -> task.run.run()); runtime.refreshAccount(); assertEquals(readCount, accountReads.get());
             assertTrue(logs.stream().noneMatch(value -> value.contains("fake-secret") || value.contains("fake-refresh")));
         }

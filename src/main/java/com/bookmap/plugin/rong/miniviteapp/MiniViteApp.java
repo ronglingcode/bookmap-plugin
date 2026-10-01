@@ -23,7 +23,7 @@ public final class MiniViteApp implements AutoCloseable {
     private final ExecutorService executor = Executors.newCachedThreadPool(task -> {
         Thread thread = new Thread(task, "bmtrader-native-execution"); thread.setDaemon(true); return thread;
     });
-    private boolean extendedEnabled, requiresReview, closed;
+    private boolean requiresReview, closed;
     private String reviewReason = "";
     private Object connection;
     private String account = "", token = "";
@@ -50,16 +50,15 @@ public final class MiniViteApp implements AutoCloseable {
     }
     public synchronized JsonObject status() {
         JsonObject json = message("execution_status");
-        // Keep protocol 3 status fields so existing ViteApp clients publish execution inputs.
+        // Preserve internal protocol 3 status fields; all operations use this executor.
         json.addProperty("enabled", !closed);
         json.addProperty("exitsEnabled", !closed); json.addProperty("entriesEnabled", !closed);
-        json.addProperty("extendedEnabled", extendedEnabled && !closed);
+        json.addProperty("extendedEnabled", !closed);
         json.addProperty("blocked", requiresReview);
         json.addProperty("requiresReview", requiresReview);
         json.addProperty("reason", reviewReason);
         return json;
     }
-    public synchronized void setExtendedEnabled(boolean enabled) { extendedEnabled = enabled; }
     public synchronized void unregister(String symbol) {
         snapshots.remove(symbolKey.apply(symbol));
         marketData.remove(symbolKey.apply(symbol));
@@ -114,13 +113,10 @@ public final class MiniViteApp implements AutoCloseable {
                 && !(entry
                 && (state == null || state.entries.isEmpty()
                 && (sameDirection || state.netQuantity == 0 && state.pairs.isEmpty())));
-        // Pending-entry/opposite-position entries and generic B/S follow the flag; same-direction adds stay native.
-        if (extended && !extendedEnabled && !requiresReview && !closed) return false;
         try {
             long now = System.currentTimeMillis();
             Models.require(!closed, "native executor stopped");
             Models.require(!requiresReview, "broker review required: " + reviewReason);
-            Models.require(!extended || extendedEnabled, "extended native execution disabled");
             boolean directionalEntry = (key.equals("KeyB") || key.equals("KeyS")) && !entry;
             Models.require(entry || directionalEntry || key.equals("KeyA") || key.equals("KeyW") || KeyboardHandler.supports(key, shift), "unsupported native action: "
                     + (key.isEmpty() ? Models.string(action, "tradebook_id") : key));
@@ -143,13 +139,9 @@ public final class MiniViteApp implements AutoCloseable {
                     : key.equals("KeyA") ? ExtendedHandler.reload(state, shift, Models.number(action, "price"))
                     : key.equals("KeyW") ? ExtendedHandler.swap(state)
                     : KeyboardHandler.handleKeyPressed(state, key, shift, Models.number(action, "price"));
-            plan.experimental = extended;
             for (String warning : plan.warnings) log.accept(symbol, warning);
             if (!key.equals("KeyC")) {
-                double total = plan.requests.stream().filter(request -> request.body != null)
-                        .map(request -> request.body.getAsJsonArray("orderLegCollection").get(0).getAsJsonObject())
-                        .filter(leg -> Models.string(leg, "instruction").equals("SELL") || Models.string(leg, "instruction").equals("BUY_TO_COVER"))
-                        .mapToDouble(leg -> leg.get("quantity").getAsDouble()).sum();
+                double total = plan.requests.stream().filter(request -> request.body != null).mapToDouble(request -> closingQuantity(request.body)).sum();
                 Models.require(total <= Math.abs(state.netQuantity), "closing quantity exceeds position");
             }
             Set<String> unique = new HashSet<>();
@@ -181,8 +173,12 @@ public final class MiniViteApp implements AutoCloseable {
     }
     private synchronized String guard(Plan plan) {
         Models.require(!closed, "native executor stopped before dispatch");
-        Models.require(!plan.experimental || extendedEnabled, "extended native execution disabled before dispatch");
         return token;
+    }
+    private static double closingQuantity(JsonObject body) {
+        if (Models.string(body, "orderStrategyType").equals("OCO")) { double quantity = 0; for (var child : body.getAsJsonArray("childOrderStrategies")) quantity = Math.max(quantity, closingQuantity(child.getAsJsonObject())); return quantity; }
+        if (!body.has("orderLegCollection")) return 0;
+        JsonObject leg = body.getAsJsonArray("orderLegCollection").get(0).getAsJsonObject(); String instruction = Models.string(leg, "instruction"); return instruction.equals("SELL") || instruction.equals("BUY_TO_COVER") ? Models.number(leg, "quantity") : 0;
     }
     private void execute(String accountHash,
             String actionId, Snapshot state, Plan plan) {
@@ -205,7 +201,7 @@ public final class MiniViteApp implements AutoCloseable {
                 operation = requestOperation;
                 accessToken = guard(plan);
                 dispatched = true;
-                Api.Result result = opening
+                Api.Result result = opening && request.method.equals("POST")
                         ? api.mutateEntry(accountHash, accessToken, request, state.symbol)
                         : api.mutate(accountHash, accessToken, request);
                 results.add(result.toJson());

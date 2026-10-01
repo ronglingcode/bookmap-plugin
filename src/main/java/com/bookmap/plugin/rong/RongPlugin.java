@@ -72,6 +72,8 @@ public class RongPlugin implements CustomModuleAdapter,
 
     // Shared WebSocket server across all symbol instances
     private static SignalWebSocketServer sharedServer;
+    private static NativeTradingAdapter nativeTrading;
+    private static final java.util.Map<String, Api> nativeApis = new java.util.LinkedHashMap<>();
     private static int instanceCount = 0;
     private static ChartHoverHotkeyHandler chartHoverHotkeyHandler;
     private static PriceLineStore priceLineStore;
@@ -172,6 +174,9 @@ public class RongPlugin implements CustomModuleAdapter,
                 filledExecutionManager = new FilledExecutionManager(filledExecutionStore);
                 sharedServer.registerAccountStateListener(filledExecutionManager);
             }
+            nativeApis.put(cleanAlias, api);
+            if (nativeTrading == null) { nativeTrading = new NativeTradingAdapter(sharedServer, indicatorConfig); nativeTrading.attach(cleanAlias, api); nativeTrading.start(); }
+            else nativeTrading.attach(cleanAlias, api);
             instanceCount++;
         }
         this.vwapIndicator = api.registerIndicatorModifiable("VWAP", GraphType.PRIMARY);
@@ -429,6 +434,8 @@ public class RongPlugin implements CustomModuleAdapter,
             sharedServer.unregisterSymbol(alias);
         }
         synchronized (RongPlugin.class) {
+            nativeApis.remove(alias);
+            if (nativeTrading != null) nativeTrading.detach(alias);
             instanceCount--;
             if (instanceCount <= 0 && sharedServer != null) {
                 ChartHoverHotkeyHandler.removeAwtListener();
@@ -474,6 +481,8 @@ public class RongPlugin implements CustomModuleAdapter,
                 if (filledExecutionPainter != null) {
                     filledExecutionPainter.shutdown();
                 }
+                if (nativeTrading != null) { nativeTrading.close(); nativeTrading = null; }
+                nativeApis.clear();
                 ActionLogWindow.dispose();
                 sharedServer.shutdown();
                 sharedServer = null;
@@ -597,15 +606,20 @@ public class RongPlugin implements CustomModuleAdapter,
     }
 
     public static void resetNativeExecutionAfterBrokerReview() {
-        if (sharedServer != null) sharedServer.resetNativeExecutionAfterBrokerReview();
+        if (nativeTrading != null) nativeTrading.resetAfterBrokerReview();
     }
+
+    public static synchronized void restartNativeTrading() {
+        if (sharedServer == null) return;
+        if (nativeTrading != null) nativeTrading.close();
+        nativeTrading = new NativeTradingAdapter(sharedServer, indicatorConfig);
+        nativeApis.forEach(nativeTrading::attach); nativeTrading.start();
+    }
+    public static void authorizeNativeTrading(String callback) { if (nativeTrading != null) nativeTrading.authorize(callback); }
+    public static void openNativeAuthorization() { if (nativeTrading != null) nativeTrading.openAuthorization(); }
 
     @Override
     public void onIndicatorConfigChanged(String indicatorKey, boolean enabled) {
-        if (IndicatorConfig.EXPERIMENTAL_DIRECT_BROKER_EXECUTION.equals(indicatorKey)) {
-            if (sharedServer != null) sharedServer.setExperimentalDirectExecution(enabled);
-            return;
-        }
         if (IndicatorConfig.VWAP.equals(indicatorKey)) {
             updateVwapIndicatorVisibility();
             if (enabled && vwapTracker != null) {

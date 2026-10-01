@@ -1,5 +1,10 @@
 # Standalone native trading and mirrored TypeScript/Java plan
 
+> Historical design/rollout document. The implementation is now wired. See
+> [current standalone operations/setup](direct-broker-execution.md) and
+> [progress and verification](standalone-native-trading-progress.md).
+
+
 Planning baseline: 2026-10-01. ViteApp `7dfd5a3`; bookmap-plugin `a080dbf`.
 
 This is a design and migration plan, not an implemented rewrite. Both working

@@ -15,7 +15,7 @@ class VwapUpdateConfigParsingTest {
         AtomicReference<VwapUpdateDefinition> updateRef = new AtomicReference<>();
         server.registerVwapUpdateListener("AAPL", updateRef::set);
 
-        server.onMessage(null, "{"
+        localMessage(server, "{"
                 + "\"type\":\"vwap_update\","
                 + "\"priceUnit\":\"real\","
                 + "\"symbol\":\"AAPL\","
@@ -36,8 +36,8 @@ class VwapUpdateConfigParsingTest {
         AtomicReference<VwapUpdateDefinition> updateRef = new AtomicReference<>();
         server.registerVwapUpdateListener("AAPL", updateRef::set);
 
-        server.onMessage(null, updateJson(101.0, 1785244020000L, 1785244020500L));
-        server.onMessage(null, updateJson(99.0, 1785243960000L, 1785244030000L));
+        localMessage(server, updateJson(101.0, 1785244020000L, 1785244020500L));
+        localMessage(server, updateJson(99.0, 1785243960000L, 1785244030000L));
 
         assertEquals(101.0, updateRef.get().getVwap(), 0.00001);
     }
@@ -48,9 +48,21 @@ class VwapUpdateConfigParsingTest {
         AtomicReference<VwapUpdateDefinition> updateRef = new AtomicReference<>();
         server.registerVwapUpdateListener("AAPL", updateRef::set);
 
-        server.onMessage(null, updateJson(0, 1785243960000L, 1785243960500L));
+        localMessage(server, updateJson(0, 1785243960000L, 1785243960500L));
 
         assertNull(updateRef.get());
+    }
+
+    @Test
+    void repeatedClosedPointDoesNotNotifyAgainButChangedValueDoes() {
+        SignalWebSocketServer server = new SignalWebSocketServer(0, 90);
+        java.util.List<VwapUpdateDefinition> updates = new java.util.ArrayList<>();
+        server.registerVwapUpdateListener("AAPL", updates::add);
+        localMessage(server, updateJson(101, 1785244020000L, 1785244020500L));
+        localMessage(server, updateJson(101, 1785244020000L, 1785244030000L));
+        assertEquals(1, updates.size());
+        localMessage(server, updateJson(102, 1785244020000L, 1785244031000L));
+        assertEquals(2, updates.size());
     }
 
     private static String updateJson(double vwap, long effectiveTimeMs, long sentAtMs) {
@@ -63,4 +75,5 @@ class VwapUpdateConfigParsingTest {
                 + "\"sentAtMs\":" + sentAtMs
                 + "}";
     }
+    private static void localMessage(com.bookmap.plugin.rong.SignalWebSocketServer server, String json) { server.acceptLocalMessage(com.google.gson.JsonParser.parseString(json).getAsJsonObject()); }
 }

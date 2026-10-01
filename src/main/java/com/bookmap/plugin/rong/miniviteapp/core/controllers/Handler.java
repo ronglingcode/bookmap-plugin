@@ -18,14 +18,14 @@ public final class Handler {
         return plan;
     }
     public static Plan numberPadPressed(Snapshot state, String key) {
-        requireExits(state); Models.require(state.splitPartials, "split exits in ViteApp before native partial execution");
+        requireExits(state); Models.require(state.splitPartials, "partial execution requires split protective orders");
         int index = indexForKey(state, key);
         ExitPair pair = state.pairs.get(index);
         CoreTargetExitRules.check(state, pair, state.currentPrice, true);
         Plan plan = new Plan("market_out_partial"); Broker.instantOutOneExitPair(plan, pair); return plan;
     }
     public static Plan keyGPressedWithShift(Snapshot state) {
-        requireExits(state); Models.require(state.splitPartials, "split exits in ViteApp before native partial execution");
+        requireExits(state); Models.require(state.splitPartials, "partial execution requires split protective orders");
         Plan plan = new Plan("market_out_half");
         for (var pair : state.pairs.subList(0, (state.pairs.size() + 1) / 2)) {
             CoreTargetExitRules.check(state, pair, state.currentPrice, true);
@@ -35,13 +35,13 @@ public final class Handler {
     }
     public static Plan numberKeyPressedAtPrice(Snapshot state, String key, double price) {
         requireExits(state); boolean stop = isStopLeg(state, price);
-        Models.require(state.splitPartials || stop, "split exits in ViteApp before native target adjustment");
+        Models.require(state.splitPartials || stop, "target adjustment requires split protective orders");
         Plan plan = new Plan("adjust_exit");
         adjust(state, plan, List.of(state.pairs.get(indexForKey(state, key))), price, stop); return plan;
     }
     public static Plan adjustBatchExitsAtPrice(Snapshot state, String key, double price) {
         requireExits(state); boolean stop = isStopLeg(state, price);
-        Models.require(state.splitPartials || stop, "split exits in ViteApp before native target adjustment");
+        Models.require(state.splitPartials || stop, "target adjustment requires split protective orders");
         Plan plan = new Plan("adjust_batch_exits");
         List<ExitPair> pairs = key.equals("KeyT") ? state.pairs : state.pairs.subList(0, (state.pairs.size() + 1) / 2);
         adjust(state, plan, pairs, price, stop); return plan;

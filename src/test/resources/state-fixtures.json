@@ -3855,6 +3855,145 @@
         }
       ],
       "entryContext": {
+        "activeTrade": {
+          "hasValue": true,
+          "entryPrice": 10,
+          "stopLossPrice": 9,
+          "coreInvalidationLevel": -1,
+          "riskLevel": 9,
+          "initialQuantity": 100,
+          "submitTime": {
+            "seconds": 1790861400,
+            "nanoseconds": 123000000
+          },
+          "isLong": true,
+          "status": "Pending",
+          "isMarketOrder": true,
+          "lowestExitBatchCount": -1,
+          "sizeMultipler": 0.5,
+          "maxPullbackAllowed": 9.25,
+          "maxPullbackReached": 0,
+          "adjustedTargetDueToMaxPullback": false,
+          "exitDescription": "",
+          "closedOutsideRatio": -1,
+          "stopTightenPhase": "idle",
+          "coreTargetReminderShown": false,
+          "submitEntryResult": {
+            "totalQuantity": 100,
+            "isSingleOrder": false,
+            "profitTargets": [
+              {
+                "target": 11,
+                "quantity": 100
+              }
+            ],
+            "tradeBookID": "GapGiveAndGoBookmapReversal"
+          },
+          "plan": {
+            "planConfigs": {
+              "requireReversal": true,
+              "sizingCount": 5
+            },
+            "coreTarget": 13,
+            "coreCount": 3,
+            "runnerCount": 0,
+            "runnerTriggerCondition": ""
+          }
+        },
+        "longTrade": {
+          "hasValue": true,
+          "entryPrice": 10,
+          "stopLossPrice": 9,
+          "coreInvalidationLevel": -1,
+          "riskLevel": 9,
+          "initialQuantity": 100,
+          "submitTime": {
+            "seconds": 1790861400,
+            "nanoseconds": 123000000
+          },
+          "isLong": true,
+          "status": "Pending",
+          "isMarketOrder": true,
+          "lowestExitBatchCount": -1,
+          "sizeMultipler": 0.5,
+          "maxPullbackAllowed": 9.25,
+          "maxPullbackReached": 0,
+          "adjustedTargetDueToMaxPullback": false,
+          "exitDescription": "",
+          "closedOutsideRatio": -1,
+          "stopTightenPhase": "idle",
+          "coreTargetReminderShown": false,
+          "submitEntryResult": {
+            "totalQuantity": 100,
+            "isSingleOrder": false,
+            "profitTargets": [
+              {
+                "target": 11,
+                "quantity": 100
+              }
+            ],
+            "tradeBookID": "GapGiveAndGoBookmapReversal"
+          },
+          "plan": {
+            "planConfigs": {
+              "requireReversal": true,
+              "sizingCount": 5
+            },
+            "coreTarget": 13,
+            "coreCount": 3,
+            "runnerCount": 0,
+            "runnerTriggerCondition": ""
+          }
+        },
+        "shortTrade": {
+          "hasValue": false,
+          "entryPrice": 0,
+          "stopLossPrice": 0,
+          "coreInvalidationLevel": -1,
+          "riskLevel": 0,
+          "initialQuantity": 0,
+          "submitTime": {
+            "seconds": 1790861400,
+            "nanoseconds": 0
+          },
+          "isLong": false,
+          "status": "None",
+          "isMarketOrder": false,
+          "lowestExitBatchCount": -1,
+          "sizeMultipler": 0,
+          "maxPullbackAllowed": 0,
+          "maxPullbackReached": 0,
+          "adjustedTargetDueToMaxPullback": false,
+          "exitDescription": "",
+          "closedOutsideRatio": -1,
+          "stopTightenPhase": "idle",
+          "coreTargetReminderShown": false,
+          "submitEntryResult": {
+            "isSingleOrder": false,
+            "profitTargets": [],
+            "totalQuantity": 0,
+            "tradeBookID": ""
+          },
+          "plan": {
+            "planConfigs": {
+              "requireReversal": true
+            },
+            "coreTarget": 0,
+            "coreCount": 0,
+            "runnerCount": 0,
+            "runnerTriggerCondition": ""
+          }
+        },
+        "candles": [
+          {
+            "datetime": 1790861340000,
+            "volume": 1000
+          },
+          {
+            "datetime": 1790861400000,
+            "volume": 2000
+          }
+        ],
         "definitions": [
           {
             "tradebookID": "GapGiveAndGoBookmapReversal",
@@ -4359,6 +4498,151 @@
         }
       ],
       "entryContext": {
+        "activeTrade": {
+          "hasValue": true,
+          "entryPrice": 10,
+          "stopLossPrice": 11,
+          "coreInvalidationLevel": -1,
+          "riskLevel": 11,
+          "initialQuantity": 100,
+          "submitTime": {
+            "seconds": 1790861400,
+            "nanoseconds": 0
+          },
+          "isLong": false,
+          "status": "Pending",
+          "isMarketOrder": true,
+          "lowestExitBatchCount": -1,
+          "sizeMultipler": 0.5,
+          "maxPullbackAllowed": 10.75,
+          "maxPullbackReached": 0,
+          "adjustedTargetDueToMaxPullback": false,
+          "exitDescription": "",
+          "closedOutsideRatio": -1,
+          "stopTightenPhase": "idle",
+          "coreTargetReminderShown": false,
+          "submitEntryResult": {
+            "totalQuantity": 100,
+            "isSingleOrder": false,
+            "profitTargets": [
+              {
+                "target": 11,
+                "quantity": 100
+              }
+            ],
+            "tradeBookID": "GapGiveAndGoBookmapReversal"
+          },
+          "plan": {
+            "planConfigs": {
+              "requireReversal": true,
+              "sizingCount": 5
+            },
+            "coreTarget": 13,
+            "coreCount": 3,
+            "runnerCount": 0,
+            "runnerTriggerCondition": ""
+          }
+        },
+        "longTrade": {
+          "hasValue": true,
+          "entryPrice": 10,
+          "stopLossPrice": 9,
+          "coreInvalidationLevel": -1,
+          "riskLevel": 9,
+          "initialQuantity": 100,
+          "submitTime": {
+            "seconds": 1790861400,
+            "nanoseconds": 123000000
+          },
+          "isLong": true,
+          "status": "Pending",
+          "isMarketOrder": true,
+          "lowestExitBatchCount": -1,
+          "sizeMultipler": 0.5,
+          "maxPullbackAllowed": 9.25,
+          "maxPullbackReached": 0,
+          "adjustedTargetDueToMaxPullback": false,
+          "exitDescription": "",
+          "closedOutsideRatio": -1,
+          "stopTightenPhase": "idle",
+          "coreTargetReminderShown": false,
+          "submitEntryResult": {
+            "totalQuantity": 100,
+            "isSingleOrder": false,
+            "profitTargets": [
+              {
+                "target": 11,
+                "quantity": 100
+              }
+            ],
+            "tradeBookID": "GapGiveAndGoBookmapReversal"
+          },
+          "plan": {
+            "planConfigs": {
+              "requireReversal": true,
+              "sizingCount": 5
+            },
+            "coreTarget": 13,
+            "coreCount": 3,
+            "runnerCount": 0,
+            "runnerTriggerCondition": ""
+          }
+        },
+        "shortTrade": {
+          "hasValue": true,
+          "entryPrice": 10,
+          "stopLossPrice": 11,
+          "coreInvalidationLevel": -1,
+          "riskLevel": 11,
+          "initialQuantity": 100,
+          "submitTime": {
+            "seconds": 1790861400,
+            "nanoseconds": 0
+          },
+          "isLong": false,
+          "status": "Pending",
+          "isMarketOrder": true,
+          "lowestExitBatchCount": -1,
+          "sizeMultipler": 0.5,
+          "maxPullbackAllowed": 10.75,
+          "maxPullbackReached": 0,
+          "adjustedTargetDueToMaxPullback": false,
+          "exitDescription": "",
+          "closedOutsideRatio": -1,
+          "stopTightenPhase": "idle",
+          "coreTargetReminderShown": false,
+          "submitEntryResult": {
+            "totalQuantity": 100,
+            "isSingleOrder": false,
+            "profitTargets": [
+              {
+                "target": 11,
+                "quantity": 100
+              }
+            ],
+            "tradeBookID": "GapGiveAndGoBookmapReversal"
+          },
+          "plan": {
+            "planConfigs": {
+              "requireReversal": true,
+              "sizingCount": 5
+            },
+            "coreTarget": 13,
+            "coreCount": 3,
+            "runnerCount": 0,
+            "runnerTriggerCondition": ""
+          }
+        },
+        "candles": [
+          {
+            "datetime": 1790861340000,
+            "volume": 1000
+          },
+          {
+            "datetime": 1790861400000,
+            "volume": 2000
+          }
+        ],
         "definitions": [
           {
             "tradebookID": "GapGiveAndGoBookmapReversal",
@@ -4745,6 +5029,133 @@
         }
       ],
       "entryContext": {
+        "activeTrade": {
+          "hasValue": false,
+          "entryPrice": 0,
+          "stopLossPrice": 0,
+          "coreInvalidationLevel": -1,
+          "riskLevel": 0,
+          "initialQuantity": 0,
+          "submitTime": {
+            "seconds": 1790861400,
+            "nanoseconds": 0
+          },
+          "isLong": false,
+          "status": "None",
+          "isMarketOrder": false,
+          "lowestExitBatchCount": -1,
+          "sizeMultipler": 0,
+          "maxPullbackAllowed": 0,
+          "maxPullbackReached": 0,
+          "adjustedTargetDueToMaxPullback": false,
+          "exitDescription": "",
+          "closedOutsideRatio": -1,
+          "stopTightenPhase": "idle",
+          "coreTargetReminderShown": false,
+          "submitEntryResult": {
+            "isSingleOrder": false,
+            "profitTargets": [],
+            "totalQuantity": 0,
+            "tradeBookID": ""
+          },
+          "plan": {
+            "planConfigs": {
+              "requireReversal": true
+            },
+            "coreTarget": 0,
+            "coreCount": 0,
+            "runnerCount": 0,
+            "runnerTriggerCondition": ""
+          }
+        },
+        "longTrade": {
+          "hasValue": false,
+          "entryPrice": 0,
+          "stopLossPrice": 0,
+          "coreInvalidationLevel": -1,
+          "riskLevel": 0,
+          "initialQuantity": 0,
+          "submitTime": {
+            "seconds": 1790861400,
+            "nanoseconds": 0
+          },
+          "isLong": true,
+          "status": "None",
+          "isMarketOrder": false,
+          "lowestExitBatchCount": -1,
+          "sizeMultipler": 0,
+          "maxPullbackAllowed": 0,
+          "maxPullbackReached": 0,
+          "adjustedTargetDueToMaxPullback": false,
+          "exitDescription": "",
+          "closedOutsideRatio": -1,
+          "stopTightenPhase": "idle",
+          "coreTargetReminderShown": false,
+          "submitEntryResult": {
+            "isSingleOrder": false,
+            "profitTargets": [],
+            "totalQuantity": 0,
+            "tradeBookID": ""
+          },
+          "plan": {
+            "planConfigs": {
+              "requireReversal": true
+            },
+            "coreTarget": 0,
+            "coreCount": 0,
+            "runnerCount": 0,
+            "runnerTriggerCondition": ""
+          }
+        },
+        "shortTrade": {
+          "hasValue": false,
+          "entryPrice": 0,
+          "stopLossPrice": 0,
+          "coreInvalidationLevel": -1,
+          "riskLevel": 0,
+          "initialQuantity": 0,
+          "submitTime": {
+            "seconds": 1790861400,
+            "nanoseconds": 0
+          },
+          "isLong": false,
+          "status": "None",
+          "isMarketOrder": false,
+          "lowestExitBatchCount": -1,
+          "sizeMultipler": 0,
+          "maxPullbackAllowed": 0,
+          "maxPullbackReached": 0,
+          "adjustedTargetDueToMaxPullback": false,
+          "exitDescription": "",
+          "closedOutsideRatio": -1,
+          "stopTightenPhase": "idle",
+          "coreTargetReminderShown": false,
+          "submitEntryResult": {
+            "isSingleOrder": false,
+            "profitTargets": [],
+            "totalQuantity": 0,
+            "tradeBookID": ""
+          },
+          "plan": {
+            "planConfigs": {
+              "requireReversal": true
+            },
+            "coreTarget": 0,
+            "coreCount": 0,
+            "runnerCount": 0,
+            "runnerTriggerCondition": ""
+          }
+        },
+        "candles": [
+          {
+            "datetime": 1790861340000,
+            "volume": 1000
+          },
+          {
+            "datetime": 1790861400000,
+            "volume": 2000
+          }
+        ],
         "definitions": [
           {
             "tradebookID": "GapGiveAndGoBookmapReversal",
@@ -5155,6 +5566,145 @@
         }
       ],
       "entryContext": {
+        "activeTrade": {
+          "hasValue": true,
+          "entryPrice": 10,
+          "stopLossPrice": 9,
+          "coreInvalidationLevel": -1,
+          "riskLevel": 9,
+          "initialQuantity": 10,
+          "submitTime": {
+            "seconds": 1790861400,
+            "nanoseconds": 0
+          },
+          "isLong": true,
+          "status": "Pending",
+          "isMarketOrder": true,
+          "lowestExitBatchCount": -1,
+          "sizeMultipler": 0.5,
+          "maxPullbackAllowed": 9.25,
+          "maxPullbackReached": 0,
+          "adjustedTargetDueToMaxPullback": false,
+          "exitDescription": "",
+          "closedOutsideRatio": -1,
+          "stopTightenPhase": "idle",
+          "coreTargetReminderShown": false,
+          "submitEntryResult": {
+            "totalQuantity": 10,
+            "isSingleOrder": true,
+            "profitTargets": [
+              {
+                "target": 11,
+                "quantity": 100
+              }
+            ],
+            "tradeBookID": "GapGiveAndGoBookmapReversal"
+          },
+          "plan": {
+            "planConfigs": {
+              "requireReversal": true,
+              "sizingCount": 5
+            },
+            "coreTarget": 13,
+            "coreCount": 3,
+            "runnerCount": 0,
+            "runnerTriggerCondition": ""
+          }
+        },
+        "longTrade": {
+          "hasValue": true,
+          "entryPrice": 10,
+          "stopLossPrice": 9,
+          "coreInvalidationLevel": -1,
+          "riskLevel": 9,
+          "initialQuantity": 10,
+          "submitTime": {
+            "seconds": 1790861400,
+            "nanoseconds": 0
+          },
+          "isLong": true,
+          "status": "Pending",
+          "isMarketOrder": true,
+          "lowestExitBatchCount": -1,
+          "sizeMultipler": 0.5,
+          "maxPullbackAllowed": 9.25,
+          "maxPullbackReached": 0,
+          "adjustedTargetDueToMaxPullback": false,
+          "exitDescription": "",
+          "closedOutsideRatio": -1,
+          "stopTightenPhase": "idle",
+          "coreTargetReminderShown": false,
+          "submitEntryResult": {
+            "totalQuantity": 10,
+            "isSingleOrder": true,
+            "profitTargets": [
+              {
+                "target": 11,
+                "quantity": 100
+              }
+            ],
+            "tradeBookID": "GapGiveAndGoBookmapReversal"
+          },
+          "plan": {
+            "planConfigs": {
+              "requireReversal": true,
+              "sizingCount": 5
+            },
+            "coreTarget": 13,
+            "coreCount": 3,
+            "runnerCount": 0,
+            "runnerTriggerCondition": ""
+          }
+        },
+        "shortTrade": {
+          "hasValue": false,
+          "entryPrice": 0,
+          "stopLossPrice": 0,
+          "coreInvalidationLevel": -1,
+          "riskLevel": 0,
+          "initialQuantity": 0,
+          "submitTime": {
+            "seconds": 1790861400,
+            "nanoseconds": 0
+          },
+          "isLong": false,
+          "status": "None",
+          "isMarketOrder": false,
+          "lowestExitBatchCount": -1,
+          "sizeMultipler": 0,
+          "maxPullbackAllowed": 0,
+          "maxPullbackReached": 0,
+          "adjustedTargetDueToMaxPullback": false,
+          "exitDescription": "",
+          "closedOutsideRatio": -1,
+          "stopTightenPhase": "idle",
+          "coreTargetReminderShown": false,
+          "submitEntryResult": {
+            "isSingleOrder": false,
+            "profitTargets": [],
+            "totalQuantity": 0,
+            "tradeBookID": ""
+          },
+          "plan": {
+            "planConfigs": {
+              "requireReversal": true
+            },
+            "coreTarget": 0,
+            "coreCount": 0,
+            "runnerCount": 0,
+            "runnerTriggerCondition": ""
+          }
+        },
+        "candles": [
+          {
+            "datetime": 1790861340000,
+            "volume": 1000
+          },
+          {
+            "datetime": 1790861400000,
+            "volume": 2000
+          }
+        ],
         "definitions": [
           {
             "tradebookID": "GapGiveAndGoBookmapReversal",
@@ -5241,5 +5791,4443 @@
         "allowAddIfBelow": 1000
       }
     }
+  },
+  {
+    "name": "trail 5 true true",
+    "kind": "workflow",
+    "method": "trailStopPrice",
+    "args": [
+      [
+        {
+          "symbol": "AAPL",
+          "datetime": 1790861400000,
+          "open": 10,
+          "close": 10,
+          "low": 9,
+          "high": 11,
+          "volume": 1000,
+          "vwap": 10
+        },
+        {
+          "symbol": "AAPL",
+          "datetime": 1790861640000,
+          "open": 10,
+          "close": 10,
+          "low": 8.9,
+          "high": 11.1,
+          "volume": 1000,
+          "vwap": 10
+        },
+        {
+          "symbol": "AAPL",
+          "datetime": 1790861700000,
+          "open": 10,
+          "close": 10,
+          "low": 8.8,
+          "high": 11.2,
+          "volume": 1000,
+          "vwap": 10
+        },
+        {
+          "symbol": "AAPL",
+          "datetime": 1790862240000,
+          "open": 10,
+          "close": 10,
+          "low": 8.7,
+          "high": 11.3,
+          "volume": 1000,
+          "vwap": 10
+        },
+        {
+          "symbol": "AAPL",
+          "datetime": 1790862300000,
+          "open": 10,
+          "close": 10,
+          "low": 8.6,
+          "high": 11.4,
+          "volume": 1000,
+          "vwap": 10
+        },
+        {
+          "symbol": "AAPL",
+          "datetime": 1790863140000,
+          "open": 10,
+          "close": 10,
+          "low": 8.5,
+          "high": 11.5,
+          "volume": 1000,
+          "vwap": 10
+        },
+        {
+          "symbol": "AAPL",
+          "datetime": 1790863200000,
+          "open": 10,
+          "close": 10,
+          "low": 8.4,
+          "high": 11.6,
+          "volume": 1000,
+          "vwap": 10
+        }
+      ],
+      true,
+      5,
+      true
+    ],
+    "result": 8.49
+  },
+  {
+    "name": "trail 5 true false",
+    "kind": "workflow",
+    "method": "trailStopPrice",
+    "args": [
+      [
+        {
+          "symbol": "AAPL",
+          "datetime": 1790861400000,
+          "open": 10,
+          "close": 10,
+          "low": 9,
+          "high": 11,
+          "volume": 1000,
+          "vwap": 10
+        },
+        {
+          "symbol": "AAPL",
+          "datetime": 1790861640000,
+          "open": 10,
+          "close": 10,
+          "low": 8.9,
+          "high": 11.1,
+          "volume": 1000,
+          "vwap": 10
+        },
+        {
+          "symbol": "AAPL",
+          "datetime": 1790861700000,
+          "open": 10,
+          "close": 10,
+          "low": 8.8,
+          "high": 11.2,
+          "volume": 1000,
+          "vwap": 10
+        },
+        {
+          "symbol": "AAPL",
+          "datetime": 1790862240000,
+          "open": 10,
+          "close": 10,
+          "low": 8.7,
+          "high": 11.3,
+          "volume": 1000,
+          "vwap": 10
+        },
+        {
+          "symbol": "AAPL",
+          "datetime": 1790862300000,
+          "open": 10,
+          "close": 10,
+          "low": 8.6,
+          "high": 11.4,
+          "volume": 1000,
+          "vwap": 10
+        },
+        {
+          "symbol": "AAPL",
+          "datetime": 1790863140000,
+          "open": 10,
+          "close": 10,
+          "low": 8.5,
+          "high": 11.5,
+          "volume": 1000,
+          "vwap": 10
+        },
+        {
+          "symbol": "AAPL",
+          "datetime": 1790863200000,
+          "open": 10,
+          "close": 10,
+          "low": 8.4,
+          "high": 11.6,
+          "volume": 1000,
+          "vwap": 10
+        }
+      ],
+      true,
+      5,
+      false
+    ],
+    "result": 8.49
+  },
+  {
+    "name": "trail 5 false true",
+    "kind": "workflow",
+    "method": "trailStopPrice",
+    "args": [
+      [
+        {
+          "symbol": "AAPL",
+          "datetime": 1790861400000,
+          "open": 10,
+          "close": 10,
+          "low": 9,
+          "high": 11,
+          "volume": 1000,
+          "vwap": 10
+        },
+        {
+          "symbol": "AAPL",
+          "datetime": 1790861640000,
+          "open": 10,
+          "close": 10,
+          "low": 8.9,
+          "high": 11.1,
+          "volume": 1000,
+          "vwap": 10
+        },
+        {
+          "symbol": "AAPL",
+          "datetime": 1790861700000,
+          "open": 10,
+          "close": 10,
+          "low": 8.8,
+          "high": 11.2,
+          "volume": 1000,
+          "vwap": 10
+        },
+        {
+          "symbol": "AAPL",
+          "datetime": 1790862240000,
+          "open": 10,
+          "close": 10,
+          "low": 8.7,
+          "high": 11.3,
+          "volume": 1000,
+          "vwap": 10
+        },
+        {
+          "symbol": "AAPL",
+          "datetime": 1790862300000,
+          "open": 10,
+          "close": 10,
+          "low": 8.6,
+          "high": 11.4,
+          "volume": 1000,
+          "vwap": 10
+        },
+        {
+          "symbol": "AAPL",
+          "datetime": 1790863140000,
+          "open": 10,
+          "close": 10,
+          "low": 8.5,
+          "high": 11.5,
+          "volume": 1000,
+          "vwap": 10
+        },
+        {
+          "symbol": "AAPL",
+          "datetime": 1790863200000,
+          "open": 10,
+          "close": 10,
+          "low": 8.4,
+          "high": 11.6,
+          "volume": 1000,
+          "vwap": 10
+        }
+      ],
+      false,
+      5,
+      true
+    ],
+    "result": 11.51
+  },
+  {
+    "name": "trail 5 false false",
+    "kind": "workflow",
+    "method": "trailStopPrice",
+    "args": [
+      [
+        {
+          "symbol": "AAPL",
+          "datetime": 1790861400000,
+          "open": 10,
+          "close": 10,
+          "low": 9,
+          "high": 11,
+          "volume": 1000,
+          "vwap": 10
+        },
+        {
+          "symbol": "AAPL",
+          "datetime": 1790861640000,
+          "open": 10,
+          "close": 10,
+          "low": 8.9,
+          "high": 11.1,
+          "volume": 1000,
+          "vwap": 10
+        },
+        {
+          "symbol": "AAPL",
+          "datetime": 1790861700000,
+          "open": 10,
+          "close": 10,
+          "low": 8.8,
+          "high": 11.2,
+          "volume": 1000,
+          "vwap": 10
+        },
+        {
+          "symbol": "AAPL",
+          "datetime": 1790862240000,
+          "open": 10,
+          "close": 10,
+          "low": 8.7,
+          "high": 11.3,
+          "volume": 1000,
+          "vwap": 10
+        },
+        {
+          "symbol": "AAPL",
+          "datetime": 1790862300000,
+          "open": 10,
+          "close": 10,
+          "low": 8.6,
+          "high": 11.4,
+          "volume": 1000,
+          "vwap": 10
+        },
+        {
+          "symbol": "AAPL",
+          "datetime": 1790863140000,
+          "open": 10,
+          "close": 10,
+          "low": 8.5,
+          "high": 11.5,
+          "volume": 1000,
+          "vwap": 10
+        },
+        {
+          "symbol": "AAPL",
+          "datetime": 1790863200000,
+          "open": 10,
+          "close": 10,
+          "low": 8.4,
+          "high": 11.6,
+          "volume": 1000,
+          "vwap": 10
+        }
+      ],
+      false,
+      5,
+      false
+    ],
+    "result": 11.51
+  },
+  {
+    "name": "trail 15 true true",
+    "kind": "workflow",
+    "method": "trailStopPrice",
+    "args": [
+      [
+        {
+          "symbol": "AAPL",
+          "datetime": 1790861400000,
+          "open": 10,
+          "close": 10,
+          "low": 9,
+          "high": 11,
+          "volume": 1000,
+          "vwap": 10
+        },
+        {
+          "symbol": "AAPL",
+          "datetime": 1790861640000,
+          "open": 10,
+          "close": 10,
+          "low": 8.9,
+          "high": 11.1,
+          "volume": 1000,
+          "vwap": 10
+        },
+        {
+          "symbol": "AAPL",
+          "datetime": 1790861700000,
+          "open": 10,
+          "close": 10,
+          "low": 8.8,
+          "high": 11.2,
+          "volume": 1000,
+          "vwap": 10
+        },
+        {
+          "symbol": "AAPL",
+          "datetime": 1790862240000,
+          "open": 10,
+          "close": 10,
+          "low": 8.7,
+          "high": 11.3,
+          "volume": 1000,
+          "vwap": 10
+        },
+        {
+          "symbol": "AAPL",
+          "datetime": 1790862300000,
+          "open": 10,
+          "close": 10,
+          "low": 8.6,
+          "high": 11.4,
+          "volume": 1000,
+          "vwap": 10
+        },
+        {
+          "symbol": "AAPL",
+          "datetime": 1790863140000,
+          "open": 10,
+          "close": 10,
+          "low": 8.5,
+          "high": 11.5,
+          "volume": 1000,
+          "vwap": 10
+        },
+        {
+          "symbol": "AAPL",
+          "datetime": 1790863200000,
+          "open": 10,
+          "close": 10,
+          "low": 8.4,
+          "high": 11.6,
+          "volume": 1000,
+          "vwap": 10
+        }
+      ],
+      true,
+      15,
+      true
+    ],
+    "result": 8.49
+  },
+  {
+    "name": "trail 15 true false",
+    "kind": "workflow",
+    "method": "trailStopPrice",
+    "args": [
+      [
+        {
+          "symbol": "AAPL",
+          "datetime": 1790861400000,
+          "open": 10,
+          "close": 10,
+          "low": 9,
+          "high": 11,
+          "volume": 1000,
+          "vwap": 10
+        },
+        {
+          "symbol": "AAPL",
+          "datetime": 1790861640000,
+          "open": 10,
+          "close": 10,
+          "low": 8.9,
+          "high": 11.1,
+          "volume": 1000,
+          "vwap": 10
+        },
+        {
+          "symbol": "AAPL",
+          "datetime": 1790861700000,
+          "open": 10,
+          "close": 10,
+          "low": 8.8,
+          "high": 11.2,
+          "volume": 1000,
+          "vwap": 10
+        },
+        {
+          "symbol": "AAPL",
+          "datetime": 1790862240000,
+          "open": 10,
+          "close": 10,
+          "low": 8.7,
+          "high": 11.3,
+          "volume": 1000,
+          "vwap": 10
+        },
+        {
+          "symbol": "AAPL",
+          "datetime": 1790862300000,
+          "open": 10,
+          "close": 10,
+          "low": 8.6,
+          "high": 11.4,
+          "volume": 1000,
+          "vwap": 10
+        },
+        {
+          "symbol": "AAPL",
+          "datetime": 1790863140000,
+          "open": 10,
+          "close": 10,
+          "low": 8.5,
+          "high": 11.5,
+          "volume": 1000,
+          "vwap": 10
+        },
+        {
+          "symbol": "AAPL",
+          "datetime": 1790863200000,
+          "open": 10,
+          "close": 10,
+          "low": 8.4,
+          "high": 11.6,
+          "volume": 1000,
+          "vwap": 10
+        }
+      ],
+      true,
+      15,
+      false
+    ],
+    "result": 8.49
+  },
+  {
+    "name": "trail 15 false true",
+    "kind": "workflow",
+    "method": "trailStopPrice",
+    "args": [
+      [
+        {
+          "symbol": "AAPL",
+          "datetime": 1790861400000,
+          "open": 10,
+          "close": 10,
+          "low": 9,
+          "high": 11,
+          "volume": 1000,
+          "vwap": 10
+        },
+        {
+          "symbol": "AAPL",
+          "datetime": 1790861640000,
+          "open": 10,
+          "close": 10,
+          "low": 8.9,
+          "high": 11.1,
+          "volume": 1000,
+          "vwap": 10
+        },
+        {
+          "symbol": "AAPL",
+          "datetime": 1790861700000,
+          "open": 10,
+          "close": 10,
+          "low": 8.8,
+          "high": 11.2,
+          "volume": 1000,
+          "vwap": 10
+        },
+        {
+          "symbol": "AAPL",
+          "datetime": 1790862240000,
+          "open": 10,
+          "close": 10,
+          "low": 8.7,
+          "high": 11.3,
+          "volume": 1000,
+          "vwap": 10
+        },
+        {
+          "symbol": "AAPL",
+          "datetime": 1790862300000,
+          "open": 10,
+          "close": 10,
+          "low": 8.6,
+          "high": 11.4,
+          "volume": 1000,
+          "vwap": 10
+        },
+        {
+          "symbol": "AAPL",
+          "datetime": 1790863140000,
+          "open": 10,
+          "close": 10,
+          "low": 8.5,
+          "high": 11.5,
+          "volume": 1000,
+          "vwap": 10
+        },
+        {
+          "symbol": "AAPL",
+          "datetime": 1790863200000,
+          "open": 10,
+          "close": 10,
+          "low": 8.4,
+          "high": 11.6,
+          "volume": 1000,
+          "vwap": 10
+        }
+      ],
+      false,
+      15,
+      true
+    ],
+    "result": 11.51
+  },
+  {
+    "name": "trail 15 false false",
+    "kind": "workflow",
+    "method": "trailStopPrice",
+    "args": [
+      [
+        {
+          "symbol": "AAPL",
+          "datetime": 1790861400000,
+          "open": 10,
+          "close": 10,
+          "low": 9,
+          "high": 11,
+          "volume": 1000,
+          "vwap": 10
+        },
+        {
+          "symbol": "AAPL",
+          "datetime": 1790861640000,
+          "open": 10,
+          "close": 10,
+          "low": 8.9,
+          "high": 11.1,
+          "volume": 1000,
+          "vwap": 10
+        },
+        {
+          "symbol": "AAPL",
+          "datetime": 1790861700000,
+          "open": 10,
+          "close": 10,
+          "low": 8.8,
+          "high": 11.2,
+          "volume": 1000,
+          "vwap": 10
+        },
+        {
+          "symbol": "AAPL",
+          "datetime": 1790862240000,
+          "open": 10,
+          "close": 10,
+          "low": 8.7,
+          "high": 11.3,
+          "volume": 1000,
+          "vwap": 10
+        },
+        {
+          "symbol": "AAPL",
+          "datetime": 1790862300000,
+          "open": 10,
+          "close": 10,
+          "low": 8.6,
+          "high": 11.4,
+          "volume": 1000,
+          "vwap": 10
+        },
+        {
+          "symbol": "AAPL",
+          "datetime": 1790863140000,
+          "open": 10,
+          "close": 10,
+          "low": 8.5,
+          "high": 11.5,
+          "volume": 1000,
+          "vwap": 10
+        },
+        {
+          "symbol": "AAPL",
+          "datetime": 1790863200000,
+          "open": 10,
+          "close": 10,
+          "low": 8.4,
+          "high": 11.6,
+          "volume": 1000,
+          "vwap": 10
+        }
+      ],
+      false,
+      15,
+      false
+    ],
+    "result": 11.51
+  },
+  {
+    "name": "trail 30 true true",
+    "kind": "workflow",
+    "method": "trailStopPrice",
+    "args": [
+      [
+        {
+          "symbol": "AAPL",
+          "datetime": 1790861400000,
+          "open": 10,
+          "close": 10,
+          "low": 9,
+          "high": 11,
+          "volume": 1000,
+          "vwap": 10
+        },
+        {
+          "symbol": "AAPL",
+          "datetime": 1790861640000,
+          "open": 10,
+          "close": 10,
+          "low": 8.9,
+          "high": 11.1,
+          "volume": 1000,
+          "vwap": 10
+        },
+        {
+          "symbol": "AAPL",
+          "datetime": 1790861700000,
+          "open": 10,
+          "close": 10,
+          "low": 8.8,
+          "high": 11.2,
+          "volume": 1000,
+          "vwap": 10
+        },
+        {
+          "symbol": "AAPL",
+          "datetime": 1790862240000,
+          "open": 10,
+          "close": 10,
+          "low": 8.7,
+          "high": 11.3,
+          "volume": 1000,
+          "vwap": 10
+        },
+        {
+          "symbol": "AAPL",
+          "datetime": 1790862300000,
+          "open": 10,
+          "close": 10,
+          "low": 8.6,
+          "high": 11.4,
+          "volume": 1000,
+          "vwap": 10
+        },
+        {
+          "symbol": "AAPL",
+          "datetime": 1790863140000,
+          "open": 10,
+          "close": 10,
+          "low": 8.5,
+          "high": 11.5,
+          "volume": 1000,
+          "vwap": 10
+        },
+        {
+          "symbol": "AAPL",
+          "datetime": 1790863200000,
+          "open": 10,
+          "close": 10,
+          "low": 8.4,
+          "high": 11.6,
+          "volume": 1000,
+          "vwap": 10
+        }
+      ],
+      true,
+      30,
+      true
+    ],
+    "result": 8.49
+  },
+  {
+    "name": "trail 30 true false",
+    "kind": "workflow",
+    "method": "trailStopPrice",
+    "args": [
+      [
+        {
+          "symbol": "AAPL",
+          "datetime": 1790861400000,
+          "open": 10,
+          "close": 10,
+          "low": 9,
+          "high": 11,
+          "volume": 1000,
+          "vwap": 10
+        },
+        {
+          "symbol": "AAPL",
+          "datetime": 1790861640000,
+          "open": 10,
+          "close": 10,
+          "low": 8.9,
+          "high": 11.1,
+          "volume": 1000,
+          "vwap": 10
+        },
+        {
+          "symbol": "AAPL",
+          "datetime": 1790861700000,
+          "open": 10,
+          "close": 10,
+          "low": 8.8,
+          "high": 11.2,
+          "volume": 1000,
+          "vwap": 10
+        },
+        {
+          "symbol": "AAPL",
+          "datetime": 1790862240000,
+          "open": 10,
+          "close": 10,
+          "low": 8.7,
+          "high": 11.3,
+          "volume": 1000,
+          "vwap": 10
+        },
+        {
+          "symbol": "AAPL",
+          "datetime": 1790862300000,
+          "open": 10,
+          "close": 10,
+          "low": 8.6,
+          "high": 11.4,
+          "volume": 1000,
+          "vwap": 10
+        },
+        {
+          "symbol": "AAPL",
+          "datetime": 1790863140000,
+          "open": 10,
+          "close": 10,
+          "low": 8.5,
+          "high": 11.5,
+          "volume": 1000,
+          "vwap": 10
+        },
+        {
+          "symbol": "AAPL",
+          "datetime": 1790863200000,
+          "open": 10,
+          "close": 10,
+          "low": 8.4,
+          "high": 11.6,
+          "volume": 1000,
+          "vwap": 10
+        }
+      ],
+      true,
+      30,
+      false
+    ],
+    "result": 8.49
+  },
+  {
+    "name": "trail 30 false true",
+    "kind": "workflow",
+    "method": "trailStopPrice",
+    "args": [
+      [
+        {
+          "symbol": "AAPL",
+          "datetime": 1790861400000,
+          "open": 10,
+          "close": 10,
+          "low": 9,
+          "high": 11,
+          "volume": 1000,
+          "vwap": 10
+        },
+        {
+          "symbol": "AAPL",
+          "datetime": 1790861640000,
+          "open": 10,
+          "close": 10,
+          "low": 8.9,
+          "high": 11.1,
+          "volume": 1000,
+          "vwap": 10
+        },
+        {
+          "symbol": "AAPL",
+          "datetime": 1790861700000,
+          "open": 10,
+          "close": 10,
+          "low": 8.8,
+          "high": 11.2,
+          "volume": 1000,
+          "vwap": 10
+        },
+        {
+          "symbol": "AAPL",
+          "datetime": 1790862240000,
+          "open": 10,
+          "close": 10,
+          "low": 8.7,
+          "high": 11.3,
+          "volume": 1000,
+          "vwap": 10
+        },
+        {
+          "symbol": "AAPL",
+          "datetime": 1790862300000,
+          "open": 10,
+          "close": 10,
+          "low": 8.6,
+          "high": 11.4,
+          "volume": 1000,
+          "vwap": 10
+        },
+        {
+          "symbol": "AAPL",
+          "datetime": 1790863140000,
+          "open": 10,
+          "close": 10,
+          "low": 8.5,
+          "high": 11.5,
+          "volume": 1000,
+          "vwap": 10
+        },
+        {
+          "symbol": "AAPL",
+          "datetime": 1790863200000,
+          "open": 10,
+          "close": 10,
+          "low": 8.4,
+          "high": 11.6,
+          "volume": 1000,
+          "vwap": 10
+        }
+      ],
+      false,
+      30,
+      true
+    ],
+    "result": 11.51
+  },
+  {
+    "name": "trail 30 false false",
+    "kind": "workflow",
+    "method": "trailStopPrice",
+    "args": [
+      [
+        {
+          "symbol": "AAPL",
+          "datetime": 1790861400000,
+          "open": 10,
+          "close": 10,
+          "low": 9,
+          "high": 11,
+          "volume": 1000,
+          "vwap": 10
+        },
+        {
+          "symbol": "AAPL",
+          "datetime": 1790861640000,
+          "open": 10,
+          "close": 10,
+          "low": 8.9,
+          "high": 11.1,
+          "volume": 1000,
+          "vwap": 10
+        },
+        {
+          "symbol": "AAPL",
+          "datetime": 1790861700000,
+          "open": 10,
+          "close": 10,
+          "low": 8.8,
+          "high": 11.2,
+          "volume": 1000,
+          "vwap": 10
+        },
+        {
+          "symbol": "AAPL",
+          "datetime": 1790862240000,
+          "open": 10,
+          "close": 10,
+          "low": 8.7,
+          "high": 11.3,
+          "volume": 1000,
+          "vwap": 10
+        },
+        {
+          "symbol": "AAPL",
+          "datetime": 1790862300000,
+          "open": 10,
+          "close": 10,
+          "low": 8.6,
+          "high": 11.4,
+          "volume": 1000,
+          "vwap": 10
+        },
+        {
+          "symbol": "AAPL",
+          "datetime": 1790863140000,
+          "open": 10,
+          "close": 10,
+          "low": 8.5,
+          "high": 11.5,
+          "volume": 1000,
+          "vwap": 10
+        },
+        {
+          "symbol": "AAPL",
+          "datetime": 1790863200000,
+          "open": 10,
+          "close": 10,
+          "low": 8.4,
+          "high": 11.6,
+          "volume": 1000,
+          "vwap": 10
+        }
+      ],
+      false,
+      30,
+      false
+    ],
+    "result": 11.51
+  },
+  {
+    "name": "trail insufficient bars",
+    "kind": "workflow",
+    "method": "trailStopPrice",
+    "args": [
+      [
+        {
+          "symbol": "AAPL",
+          "datetime": 1790861400000,
+          "open": 10,
+          "close": 10,
+          "low": 9,
+          "high": 11,
+          "volume": 1000,
+          "vwap": 10
+        },
+        {
+          "symbol": "AAPL",
+          "datetime": 1790861640000,
+          "open": 10,
+          "close": 10,
+          "low": 8.9,
+          "high": 11.1,
+          "volume": 1000,
+          "vwap": 10
+        }
+      ],
+      true,
+      5,
+      false
+    ],
+    "error": "Not enough trailing bars"
+  },
+  {
+    "name": "market trail requires lower low",
+    "kind": "workflow",
+    "method": "trailStopPrice",
+    "args": [
+      [
+        {
+          "symbol": "AAPL",
+          "datetime": 1790861400000,
+          "open": 10,
+          "close": 10,
+          "low": 9,
+          "high": 11,
+          "volume": 1000,
+          "vwap": 10
+        },
+        {
+          "symbol": "AAPL",
+          "datetime": 1790861640000,
+          "open": 10,
+          "close": 10,
+          "low": 9,
+          "high": 11.1,
+          "volume": 1000,
+          "vwap": 10
+        },
+        {
+          "symbol": "AAPL",
+          "datetime": 1790861700000,
+          "open": 10,
+          "close": 10,
+          "low": 9,
+          "high": 11.2,
+          "volume": 1000,
+          "vwap": 10
+        },
+        {
+          "symbol": "AAPL",
+          "datetime": 1790862240000,
+          "open": 10,
+          "close": 10,
+          "low": 9,
+          "high": 11.3,
+          "volume": 1000,
+          "vwap": 10
+        },
+        {
+          "symbol": "AAPL",
+          "datetime": 1790862300000,
+          "open": 10,
+          "close": 10,
+          "low": 9,
+          "high": 11.4,
+          "volume": 1000,
+          "vwap": 10
+        },
+        {
+          "symbol": "AAPL",
+          "datetime": 1790863140000,
+          "open": 10,
+          "close": 10,
+          "low": 9,
+          "high": 11.5,
+          "volume": 1000,
+          "vwap": 10
+        },
+        {
+          "symbol": "AAPL",
+          "datetime": 1790863200000,
+          "open": 10,
+          "close": 10,
+          "low": 9,
+          "high": 11.6,
+          "volume": 1000,
+          "vwap": 10
+        }
+      ],
+      true,
+      5,
+      true
+    ],
+    "error": "No lower low for market trailing exit"
+  },
+  {
+    "name": "reset clips final target to remaining position",
+    "kind": "workflow",
+    "method": "profitResetTargets",
+    "args": [
+      [
+        {
+          "quantity": 10,
+          "target": 11
+        },
+        {
+          "quantity": 10,
+          "target": 12
+        },
+        {
+          "quantity": 10,
+          "target": 13
+        }
+      ],
+      15
+    ],
+    "result": [
+      {
+        "quantity": 10,
+        "target": 13
+      },
+      {
+        "quantity": 5,
+        "target": 12
+      }
+    ]
+  },
+  {
+    "name": "reset insufficient targets",
+    "kind": "workflow",
+    "method": "profitResetTargets",
+    "args": [
+      [
+        {
+          "quantity": 10,
+          "target": 11
+        },
+        {
+          "quantity": 10,
+          "target": 12
+        }
+      ],
+      25
+    ],
+    "error": "Captured targets do not cover the current position"
+  },
+  {
+    "name": "discipline idle 0",
+    "kind": "workflow",
+    "method": "stopDiscipline",
+    "args": [
+      "idle",
+      0,
+      100,
+      true,
+      [
+        {
+          "STOP": {
+            "quantity": 30,
+            "price": 9.5
+          }
+        }
+      ],
+      9,
+      11
+    ],
+    "result": {
+      "phase": "idle",
+      "remind": false,
+      "neededShares": 0
+    }
+  },
+  {
+    "name": "discipline idle 50",
+    "kind": "workflow",
+    "method": "stopDiscipline",
+    "args": [
+      "idle",
+      50,
+      100,
+      true,
+      [
+        {
+          "STOP": {
+            "quantity": 30,
+            "price": 9.5
+          }
+        }
+      ],
+      9,
+      11
+    ],
+    "result": {
+      "phase": "needs_tighten",
+      "remind": false,
+      "neededShares": 0
+    }
+  },
+  {
+    "name": "discipline idle 80",
+    "kind": "workflow",
+    "method": "stopDiscipline",
+    "args": [
+      "idle",
+      80,
+      100,
+      true,
+      [
+        {
+          "STOP": {
+            "quantity": 30,
+            "price": 9.5
+          }
+        }
+      ],
+      9,
+      11
+    ],
+    "result": {
+      "phase": "needs_tighten",
+      "remind": true,
+      "neededShares": 30
+    }
+  },
+  {
+    "name": "discipline idle 100",
+    "kind": "workflow",
+    "method": "stopDiscipline",
+    "args": [
+      "idle",
+      100,
+      100,
+      true,
+      [
+        {
+          "STOP": {
+            "quantity": 30,
+            "price": 9.5
+          }
+        }
+      ],
+      9,
+      11
+    ],
+    "result": {
+      "phase": "idle",
+      "remind": false,
+      "neededShares": 50
+    }
+  },
+  {
+    "name": "discipline needs_tighten 0",
+    "kind": "workflow",
+    "method": "stopDiscipline",
+    "args": [
+      "needs_tighten",
+      0,
+      100,
+      true,
+      [
+        {
+          "STOP": {
+            "quantity": 30,
+            "price": 9.5
+          }
+        }
+      ],
+      9,
+      11
+    ],
+    "result": {
+      "phase": "needs_tighten",
+      "remind": false,
+      "neededShares": 0
+    }
+  },
+  {
+    "name": "discipline needs_tighten 50",
+    "kind": "workflow",
+    "method": "stopDiscipline",
+    "args": [
+      "needs_tighten",
+      50,
+      100,
+      true,
+      [
+        {
+          "STOP": {
+            "quantity": 30,
+            "price": 9.5
+          }
+        }
+      ],
+      9,
+      11
+    ],
+    "result": {
+      "phase": "done",
+      "remind": false,
+      "neededShares": 0
+    }
+  },
+  {
+    "name": "discipline needs_tighten 80",
+    "kind": "workflow",
+    "method": "stopDiscipline",
+    "args": [
+      "needs_tighten",
+      80,
+      100,
+      true,
+      [
+        {
+          "STOP": {
+            "quantity": 30,
+            "price": 9.5
+          }
+        }
+      ],
+      9,
+      11
+    ],
+    "result": {
+      "phase": "done",
+      "remind": false,
+      "neededShares": 30
+    }
+  },
+  {
+    "name": "discipline needs_tighten 100",
+    "kind": "workflow",
+    "method": "stopDiscipline",
+    "args": [
+      "needs_tighten",
+      100,
+      100,
+      true,
+      [
+        {
+          "STOP": {
+            "quantity": 30,
+            "price": 9.5
+          }
+        }
+      ],
+      9,
+      11
+    ],
+    "result": {
+      "phase": "needs_tighten",
+      "remind": true,
+      "neededShares": 50
+    }
+  },
+  {
+    "name": "discipline done 0",
+    "kind": "workflow",
+    "method": "stopDiscipline",
+    "args": [
+      "done",
+      0,
+      100,
+      true,
+      [
+        {
+          "STOP": {
+            "quantity": 30,
+            "price": 9.5
+          }
+        }
+      ],
+      9,
+      11
+    ],
+    "result": {
+      "phase": "done",
+      "remind": false,
+      "neededShares": 0
+    }
+  },
+  {
+    "name": "discipline done 50",
+    "kind": "workflow",
+    "method": "stopDiscipline",
+    "args": [
+      "done",
+      50,
+      100,
+      true,
+      [
+        {
+          "STOP": {
+            "quantity": 30,
+            "price": 9.5
+          }
+        }
+      ],
+      9,
+      11
+    ],
+    "result": {
+      "phase": "done",
+      "remind": false,
+      "neededShares": 0
+    }
+  },
+  {
+    "name": "discipline done 80",
+    "kind": "workflow",
+    "method": "stopDiscipline",
+    "args": [
+      "done",
+      80,
+      100,
+      true,
+      [
+        {
+          "STOP": {
+            "quantity": 30,
+            "price": 9.5
+          }
+        }
+      ],
+      9,
+      11
+    ],
+    "result": {
+      "phase": "done",
+      "remind": false,
+      "neededShares": 30
+    }
+  },
+  {
+    "name": "discipline done 100",
+    "kind": "workflow",
+    "method": "stopDiscipline",
+    "args": [
+      "done",
+      100,
+      100,
+      true,
+      [
+        {
+          "STOP": {
+            "quantity": 30,
+            "price": 9.5
+          }
+        }
+      ],
+      9,
+      11
+    ],
+    "result": {
+      "phase": "needs_tighten",
+      "remind": true,
+      "neededShares": 50
+    }
+  },
+  {
+    "name": "pending stop widens inside five minutes",
+    "kind": "workflow",
+    "method": "pendingStopRefresh",
+    "args": [
+      [
+        {
+          "orderID": "old",
+          "isBuy": true,
+          "price": 10,
+          "exitStopPrice": 9
+        }
+      ],
+      0,
+      1,
+      "",
+      8,
+      12
+    ],
+    "result": {
+      "orderID": "old",
+      "stopPrice": 8,
+      "isLong": true,
+      "entryPrice": 10
+    }
+  },
+  {
+    "name": "pending old replacement suppressed",
+    "kind": "workflow",
+    "method": "pendingStopRefresh",
+    "args": [
+      [
+        {
+          "orderID": "old",
+          "isBuy": true,
+          "price": 10,
+          "exitStopPrice": 9
+        }
+      ],
+      0,
+      1,
+      "old",
+      8,
+      12
+    ],
+    "result": null
+  },
+  {
+    "name": "pending stop does not tighten",
+    "kind": "workflow",
+    "method": "pendingStopRefresh",
+    "args": [
+      [
+        {
+          "orderID": "old",
+          "isBuy": true,
+          "price": 10,
+          "exitStopPrice": 9
+        }
+      ],
+      0,
+      1,
+      "",
+      9.5,
+      12
+    ],
+    "result": null
+  },
+  {
+    "name": "pending timer stops after five minutes",
+    "kind": "workflow",
+    "method": "pendingStopRefresh",
+    "args": [
+      [
+        {
+          "orderID": "old",
+          "isBuy": true,
+          "price": 10,
+          "exitStopPrice": 9
+        }
+      ],
+      0,
+      300,
+      "",
+      8,
+      12
+    ],
+    "result": null
+  },
+  {
+    "name": "pending filled entry not replaced",
+    "kind": "workflow",
+    "method": "pendingStopRefresh",
+    "args": [
+      [
+        {
+          "orderID": "old",
+          "isBuy": true,
+          "price": 10,
+          "exitStopPrice": 9
+        }
+      ],
+      1,
+      1,
+      "",
+      8,
+      12
+    ],
+    "result": null
+  },
+  {
+    "name": "first VWAP touch pending",
+    "kind": "workflow",
+    "method": "firstVwapTouch",
+    "args": [
+      {},
+      {
+        "positionKey": "long:123:10.23:10",
+        "entryPrice": 10.23,
+        "entryVwap": 11,
+        "isLong": true
+      },
+      10.5,
+      11
+    ],
+    "result": {
+      "state": {
+        "positionKey": "long:123:10.23:10",
+        "entryPrice": 10.23,
+        "entryVwap": 11,
+        "isLong": true
+      },
+      "persist": true,
+      "notify": false
+    }
+  },
+  {
+    "name": "first VWAP touch alerts once",
+    "kind": "workflow",
+    "method": "firstVwapTouch",
+    "args": [
+      {},
+      {
+        "positionKey": "long:123:10.23:10",
+        "entryPrice": 10.23,
+        "entryVwap": 11,
+        "isLong": true
+      },
+      11,
+      11
+    ],
+    "result": {
+      "state": {
+        "positionKey": "long:123:10.23:10",
+        "entryPrice": 10.23,
+        "entryVwap": 11,
+        "isLong": true,
+        "alertedPositionKey": "long:123:10.23:10"
+      },
+      "persist": true,
+      "notify": true
+    }
+  },
+  {
+    "name": "first VWAP touch does not repeat",
+    "kind": "workflow",
+    "method": "firstVwapTouch",
+    "args": [
+      {
+        "positionKey": "long:123:10.23:10",
+        "entryPrice": 10.23,
+        "entryVwap": 11,
+        "isLong": true,
+        "alertedPositionKey": "long:123:10.23:10"
+      },
+      {
+        "positionKey": "long:123:10.23:10",
+        "entryPrice": 10.23,
+        "entryVwap": 11,
+        "isLong": true
+      },
+      12,
+      11
+    ],
+    "result": {
+      "state": {
+        "positionKey": "long:123:10.23:10",
+        "entryPrice": 10.23,
+        "entryVwap": 11,
+        "isLong": true,
+        "alertedPositionKey": "long:123:10.23:10"
+      },
+      "persist": false,
+      "notify": false
+    }
+  },
+  {
+    "name": "new VWAP position resets reminder",
+    "kind": "workflow",
+    "method": "firstVwapTouch",
+    "args": [
+      {
+        "positionKey": "long:123:10.23:10",
+        "entryPrice": 10.23,
+        "entryVwap": 11,
+        "isLong": true,
+        "alertedPositionKey": "long:123:10.23:10"
+      },
+      {
+        "positionKey": "new",
+        "entryPrice": 10.23,
+        "entryVwap": 11,
+        "isLong": true
+      },
+      12,
+      11
+    ],
+    "result": {
+      "state": {
+        "positionKey": "new",
+        "entryPrice": 10.23,
+        "entryVwap": 11,
+        "isLong": true,
+        "alertedPositionKey": "new"
+      },
+      "persist": true,
+      "notify": true
+    }
+  },
+  {
+    "name": "short first dip to VWAP",
+    "kind": "workflow",
+    "method": "firstVwapTouch",
+    "args": [
+      {},
+      {
+        "positionKey": "short",
+        "entryPrice": 12,
+        "entryVwap": 11,
+        "isLong": false
+      },
+      10,
+      11
+    ],
+    "result": {
+      "state": {
+        "positionKey": "short",
+        "entryPrice": 12,
+        "entryVwap": 11,
+        "isLong": false,
+        "alertedPositionKey": "short"
+      },
+      "persist": true,
+      "notify": true
+    }
+  },
+  {
+    "name": "entered near VWAP no reminder",
+    "kind": "workflow",
+    "method": "firstVwapTouch",
+    "args": [
+      {},
+      {
+        "positionKey": "long:123:10.23:10",
+        "entryPrice": 11,
+        "entryVwap": 11,
+        "isLong": true
+      },
+      12,
+      11
+    ],
+    "result": {
+      "state": {
+        "positionKey": "long:123:10.23:10",
+        "entryPrice": 11,
+        "entryVwap": 11,
+        "isLong": true
+      },
+      "persist": true,
+      "notify": false
+    }
+  },
+  {
+    "name": "flat VWAP reminder preserves state",
+    "kind": "workflow",
+    "method": "firstVwapTouch",
+    "args": [
+      {
+        "positionKey": "long:123:10.23:10",
+        "entryPrice": 10.23,
+        "entryVwap": 11,
+        "isLong": true,
+        "alertedPositionKey": "long:123:10.23:10"
+      },
+      null,
+      12,
+      11
+    ],
+    "result": {
+      "state": {
+        "positionKey": "long:123:10.23:10",
+        "entryPrice": 10.23,
+        "entryVwap": 11,
+        "isLong": true,
+        "alertedPositionKey": "long:123:10.23:10"
+      },
+      "persist": false,
+      "notify": false
+    }
+  },
+  {
+    "name": "partial completion requires removed pair",
+    "kind": "workflow",
+    "method": "completedPartials",
+    "args": [
+      100,
+      40,
+      8,
+      10
+    ],
+    "result": 2
+  },
+  {
+    "name": "no initial quantity partial fallback",
+    "kind": "workflow",
+    "method": "completedPartials",
+    "args": [
+      0,
+      40,
+      8,
+      10
+    ],
+    "result": 2
+  },
+  {
+    "name": "local views: local execution inputs long with captured sizing and stop-only pair",
+    "kind": "views",
+    "method": "nativeViews",
+    "args": [
+      {
+        "type": "account_ready",
+        "symbol": "AAPL",
+        "timestamp": 1790861401000,
+        "plan": {
+          "symbol": "AAPL",
+          "corePlan": "A specific momentum plan with support, risk, invalidation and follow-through rules.",
+          "analysis": {
+            "gap": {
+              "pdc": 10
+            },
+            "watchAreas": [],
+            "noTradeZones": [],
+            "waitForBidRetest": "yes",
+            "waitForOfferRetest": "warning"
+          },
+          "atr": {
+            "average": 1,
+            "mutiplier": 2,
+            "minimumMultipler": 1,
+            "maxQuantity": 1000
+          },
+          "vwapCorrection": {
+            "volumeSum": 0,
+            "tradingSum": 0
+          },
+          "marketCapInMillions": 10000,
+          "long": {
+            "enabled": true,
+            "firstTargetToAdd": "vwap",
+            "finalTargets": [
+              {
+                "partialCount": 5,
+                "rrr": 1,
+                "level": 0,
+                "atr": 0,
+                "text": "first"
+              },
+              {
+                "partialCount": 5,
+                "rrr": 2,
+                "level": 0,
+                "atr": 0,
+                "text": "second"
+              }
+            ],
+            "gapAndGoPlan": {
+              "planConfigs": {
+                "requireReversal": true,
+                "sizingCount": 5
+              },
+              "coreTarget": 13,
+              "coreCount": 3,
+              "runnerCount": 0,
+              "runnerTriggerCondition": "",
+              "support": {
+                "low": 9,
+                "high": 10
+              },
+              "recentPullback": 10
+            }
+          },
+          "short": {
+            "enabled": false,
+            "finalTargets": []
+          },
+          "keyLevels": {
+            "otherLevels": [
+              {
+                "price": 10.5,
+                "label": "key"
+              },
+              {
+                "price": 10.5,
+                "label": "duplicate"
+              },
+              {
+                "price": -1
+              }
+            ],
+            "zones": [
+              {
+                "low": 11,
+                "high": 9,
+                "label": "zone",
+                "color": "red"
+              },
+              {
+                "low": 9,
+                "high": 11
+              },
+              {
+                "low": 0,
+                "high": 1
+              }
+            ]
+          }
+        },
+        "market": {
+          "symbol": "AAPL",
+          "date": "2026-10-01",
+          "candles": [
+            {
+              "datetime": 1790861340000,
+              "volume": 1000
+            },
+            {
+              "datetime": 1790861400000,
+              "volume": 2000
+            }
+          ],
+          "currentPrice": 11,
+          "vwap": 10.5,
+          "liquidityScale": 0.5,
+          "openPrice": 10,
+          "highOfDay": 12,
+          "lowOfDay": 9,
+          "premarketHigh": 11,
+          "premarketLow": 8
+        },
+        "account": {
+          "positions": {
+            "AAPL": {
+              "netQuantity": 90,
+              "averagePrice": 10
+            }
+          },
+          "entryOrders": {},
+          "exitPairs": {
+            "AAPL": [
+              {
+                "symbol": "AAPL",
+                "source": "OCO",
+                "parentOrderID": "one",
+                "STOP": {
+                  "orderID": "ones",
+                  "quantity": 10,
+                  "price": 9,
+                  "isBuy": false
+                },
+                "LIMIT": {
+                  "orderID": "onel",
+                  "quantity": 10,
+                  "price": 12,
+                  "isBuy": false
+                }
+              },
+              {
+                "symbol": "AAPL",
+                "source": "OCO",
+                "parentOrderID": "two",
+                "STOP": {
+                  "orderID": "twos",
+                  "quantity": 10,
+                  "price": 9,
+                  "isBuy": false
+                },
+                "LIMIT": {
+                  "orderID": "twol",
+                  "quantity": 10,
+                  "price": 11,
+                  "isBuy": false
+                }
+              },
+              {
+                "symbol": "AAPL",
+                "source": "OCO",
+                "parentOrderID": "three",
+                "STOP": {
+                  "orderID": "three",
+                  "quantity": 10,
+                  "price": 9,
+                  "isBuy": false
+                }
+              }
+            ]
+          },
+          "currentBalance": 25000,
+          "executions": {
+            "AAPL": [
+              {
+                "price": 11,
+                "quantity": 30,
+                "isBuy": false,
+                "positionEffectIsOpen": false,
+                "timestamp": 1790861401000
+              }
+            ]
+          }
+        },
+        "ledger": {
+          "trades": {
+            "AAPL": [
+              {
+                "symbol": "AAPL",
+                "entries": [
+                  {
+                    "symbol": "AAPL",
+                    "orderID": "0",
+                    "timestamp": 1790861400000,
+                    "quantity": 100,
+                    "price": 10,
+                    "isBuy": true,
+                    "positionEffectIsOpen": true
+                  }
+                ],
+                "exits": [
+                  {
+                    "symbol": "AAPL",
+                    "orderID": "60000",
+                    "timestamp": 1790861460000,
+                    "quantity": 10,
+                    "price": 11,
+                    "isBuy": false,
+                    "positionEffectIsOpen": false
+                  }
+                ],
+                "realizedPnL": 10,
+                "isLong": true,
+                "isClosed": false
+              }
+            ]
+          },
+          "tradesCount": 1,
+          "nonBreakevenTradesCount": 0,
+          "realizedPnL": 10
+        },
+        "state": {
+          "date": "10/1/2026",
+          "initialBalance": 25000,
+          "stateBySymbol": {
+            "AAPL": {
+              "breakoutTradeStateForLong": {
+                "hasValue": true,
+                "entryPrice": 10,
+                "stopLossPrice": 9,
+                "coreInvalidationLevel": -1,
+                "riskLevel": 9,
+                "initialQuantity": 100,
+                "submitTime": {
+                  "seconds": 1790861400,
+                  "nanoseconds": 123000000
+                },
+                "isLong": true,
+                "status": "Pending",
+                "isMarketOrder": true,
+                "lowestExitBatchCount": -1,
+                "sizeMultipler": 0.5,
+                "maxPullbackAllowed": 9.25,
+                "maxPullbackReached": 0,
+                "adjustedTargetDueToMaxPullback": false,
+                "exitDescription": "",
+                "closedOutsideRatio": -1,
+                "stopTightenPhase": "idle",
+                "coreTargetReminderShown": false,
+                "submitEntryResult": {
+                  "totalQuantity": 100,
+                  "isSingleOrder": false,
+                  "profitTargets": [
+                    {
+                      "target": 11,
+                      "quantity": 100
+                    }
+                  ],
+                  "tradeBookID": "GapGiveAndGoBookmapReversal"
+                },
+                "plan": {
+                  "planConfigs": {
+                    "requireReversal": true,
+                    "sizingCount": 5
+                  },
+                  "coreTarget": 13,
+                  "coreCount": 3,
+                  "runnerCount": 0,
+                  "runnerTriggerCondition": ""
+                }
+              },
+              "breakoutTradeStateForShort": {
+                "hasValue": false,
+                "entryPrice": 0,
+                "stopLossPrice": 0,
+                "coreInvalidationLevel": -1,
+                "riskLevel": 0,
+                "initialQuantity": 0,
+                "submitTime": {
+                  "seconds": 1790861400,
+                  "nanoseconds": 0
+                },
+                "isLong": false,
+                "status": "None",
+                "isMarketOrder": false,
+                "lowestExitBatchCount": -1,
+                "sizeMultipler": 0,
+                "maxPullbackAllowed": 0,
+                "maxPullbackReached": 0,
+                "adjustedTargetDueToMaxPullback": false,
+                "exitDescription": "",
+                "closedOutsideRatio": -1,
+                "stopTightenPhase": "idle",
+                "coreTargetReminderShown": false,
+                "submitEntryResult": {
+                  "isSingleOrder": false,
+                  "profitTargets": [],
+                  "totalQuantity": 0,
+                  "tradeBookID": ""
+                },
+                "plan": {
+                  "planConfigs": {
+                    "requireReversal": true
+                  },
+                  "coreTarget": 0,
+                  "coreCount": 0,
+                  "runnerCount": 0,
+                  "runnerTriggerCondition": ""
+                }
+              },
+              "peakRiskMultiple": 0,
+              "activeBasePlan": {
+                "planConfigs": {
+                  "requireReversal": true,
+                  "sizingCount": 5
+                },
+                "coreTarget": 13,
+                "coreCount": 3,
+                "runnerCount": 0,
+                "runnerTriggerCondition": ""
+              }
+            }
+          },
+          "readOnlyStateBySymbol": {
+            "AAPL": {
+              "atr": {
+                "average": 1,
+                "mutiplier": 2,
+                "minimumMultipler": 1,
+                "maxQuantity": 1000
+              }
+            }
+          }
+        },
+        "policy": {
+          "batchCount": 10,
+          "riskDollars": 1000,
+          "dailyMaxLoss": 4000,
+          "coreTargetEnabled": true,
+          "maxRiskMultipleWithExistingPosition": 1.2,
+          "allowAddIfBelow": 1000
+        },
+        "history": {
+          "dailyBars": [
+            {
+              "high": 12,
+              "low": 8,
+              "close": 10
+            }
+          ]
+        }
+      }
+    ],
+    "result": [
+      {
+        "type": "trade_button_config",
+        "symbol": "AAPL",
+        "timestamp": 1790861401000,
+        "priceUnit": "real",
+        "tradebooks": [
+          {
+            "id": "AAPL:GapGiveAndGoBookmapReversal",
+            "label": "Gap, give and go bookmap reversal",
+            "sideIsLong": true,
+            "tradebookId": "GapGiveAndGoBookmapReversal",
+            "tradebookName": "Gap, Give & Go",
+            "entryMethods": [
+              "1 R",
+              "0.1 R"
+            ]
+          }
+        ]
+      },
+      {
+        "type": "key_levels_config",
+        "symbol": "AAPL",
+        "timestamp": 1790861401000,
+        "priceUnit": "real",
+        "levels": [
+          {
+            "price": 10.5,
+            "label": "key"
+          }
+        ],
+        "zones": [
+          {
+            "low": 9,
+            "high": 11,
+            "label": "zone",
+            "color": "red"
+          },
+          {
+            "low": 9,
+            "high": 10,
+            "label": "gap & go support",
+            "color": "green"
+          }
+        ],
+        "waitForBidRetest": "yes",
+        "waitForOfferRetest": "warning",
+        "previousDay": {
+          "high": 12,
+          "low": 8
+        },
+        "camPivots": {
+          "R1": 10.37,
+          "R2": 10.73,
+          "R3": 11.1,
+          "R4": 12.2,
+          "R5": 13.3,
+          "R6": 14.4,
+          "S1": 9.63,
+          "S2": 9.27,
+          "S3": 8.9,
+          "S4": 7.8,
+          "S5": 6.7,
+          "S6": 5.6
+        },
+        "premarket": {
+          "high": 11,
+          "low": 8
+        }
+      },
+      {
+        "type": "exit_order_pairs_config",
+        "symbol": "AAPL",
+        "timestamp": 1790861401000,
+        "priceUnit": "real",
+        "pairs": [
+          {
+            "symbol": "AAPL",
+            "source": "OCO",
+            "parentOrderID": "two",
+            "STOP": {
+              "orderID": "twos",
+              "quantity": 10,
+              "price": 9,
+              "isBuy": false
+            },
+            "LIMIT": {
+              "orderID": "twol",
+              "quantity": 10,
+              "price": 11,
+              "isBuy": false
+            },
+            "index": 1
+          },
+          {
+            "symbol": "AAPL",
+            "source": "OCO",
+            "parentOrderID": "one",
+            "STOP": {
+              "orderID": "ones",
+              "quantity": 10,
+              "price": 9,
+              "isBuy": false
+            },
+            "LIMIT": {
+              "orderID": "onel",
+              "quantity": 10,
+              "price": 12,
+              "isBuy": false
+            },
+            "index": 2
+          },
+          {
+            "symbol": "AAPL",
+            "source": "OCO",
+            "parentOrderID": "three",
+            "STOP": {
+              "orderID": "three",
+              "quantity": 10,
+              "price": 9,
+              "isBuy": false
+            },
+            "index": 3
+          }
+        ]
+      },
+      {
+        "type": "account_state",
+        "symbol": "AAPL",
+        "timestamp": 1790861401000,
+        "priceUnit": "real",
+        "position": {
+          "netQuantity": 90,
+          "averagePrice": 10,
+          "symbol": "AAPL",
+          "riskPercent": 9,
+          "riskText": "+0.09R"
+        },
+        "openOrders": [
+          {
+            "orderID": "twos",
+            "quantity": 10,
+            "price": 9,
+            "isBuy": false,
+            "role": "STOP",
+            "source": "OCO",
+            "parentOrderID": "two",
+            "pairIndex": 1
+          },
+          {
+            "orderID": "twol",
+            "quantity": 10,
+            "price": 11,
+            "isBuy": false,
+            "role": "LIMIT",
+            "source": "OCO",
+            "parentOrderID": "two",
+            "pairIndex": 1
+          },
+          {
+            "orderID": "ones",
+            "quantity": 10,
+            "price": 9,
+            "isBuy": false,
+            "role": "STOP",
+            "source": "OCO",
+            "parentOrderID": "one",
+            "pairIndex": 2
+          },
+          {
+            "orderID": "onel",
+            "quantity": 10,
+            "price": 12,
+            "isBuy": false,
+            "role": "LIMIT",
+            "source": "OCO",
+            "parentOrderID": "one",
+            "pairIndex": 2
+          },
+          {
+            "orderID": "three",
+            "quantity": 10,
+            "price": 9,
+            "isBuy": false,
+            "role": "STOP",
+            "source": "OCO",
+            "parentOrderID": "three",
+            "pairIndex": 3
+          }
+        ],
+        "executions": [
+          {
+            "price": 11,
+            "quantity": 30,
+            "isBuy": false,
+            "positionEffectIsOpen": false,
+            "timestamp": 1790861401000,
+            "timeMs": 1790861401000
+          }
+        ]
+      },
+      {
+        "type": "core_plan_config",
+        "symbol": "AAPL",
+        "timestamp": 1790861401000,
+        "priceUnit": "real",
+        "hasActiveTrade": true,
+        "reminderRequested": false,
+        "requestId": "",
+        "updateStatus": "",
+        "error": "",
+        "isLong": true,
+        "entryPrice": 10,
+        "coreTarget": 13,
+        "coreCount": 3,
+        "runnerCondition": "",
+        "runnerCount": 0,
+        "corePlan": "A specific momentum plan with support, risk, invalidation and follow-through rules.",
+        "bufferedTarget": 12.7,
+        "partialsTaken": 2,
+        "tradeId": "AAPL:long:1790861400123"
+      }
+    ]
+  },
+  {
+    "name": "live VWAP: local execution inputs long with captured sizing and stop-only pair",
+    "kind": "views",
+    "method": "nativeViews",
+    "args": [
+      {
+        "type": "market_update",
+        "symbol": "AAPL",
+        "timestamp": 1790861401000,
+        "market": {
+          "vwap": 11,
+          "latestPriceTime": 1790861400999,
+          "closedVwap": {
+            "datetime": 1790861341000,
+            "value": 10.05
+          }
+        }
+      }
+    ],
+    "result": [
+      {
+        "type": "vwap_update",
+        "symbol": "AAPL",
+        "timestamp": 1790861401000,
+        "priceUnit": "real",
+        "vwap": 10.05,
+        "effectiveTimeMs": 1790861401000,
+        "sentAtMs": 1790861401000
+      }
+    ]
+  },
+  {
+    "name": "local views: local execution inputs short ordered limits descending",
+    "kind": "views",
+    "method": "nativeViews",
+    "args": [
+      {
+        "type": "account_ready",
+        "symbol": "AAPL",
+        "timestamp": 1790861401000,
+        "plan": {
+          "symbol": "AAPL",
+          "corePlan": "A specific momentum plan with support, risk, invalidation and follow-through rules.",
+          "analysis": {
+            "gap": {
+              "pdc": 10
+            },
+            "watchAreas": [],
+            "noTradeZones": [],
+            "waitForBidRetest": "yes",
+            "waitForOfferRetest": "warning"
+          },
+          "atr": {
+            "average": 1,
+            "mutiplier": 2,
+            "minimumMultipler": 1,
+            "maxQuantity": 1000
+          },
+          "vwapCorrection": {
+            "volumeSum": 0,
+            "tradingSum": 0
+          },
+          "marketCapInMillions": 10000,
+          "long": {
+            "enabled": true,
+            "firstTargetToAdd": "vwap",
+            "finalTargets": [
+              {
+                "partialCount": 5,
+                "rrr": 1,
+                "level": 0,
+                "atr": 0,
+                "text": "first"
+              },
+              {
+                "partialCount": 5,
+                "rrr": 2,
+                "level": 0,
+                "atr": 0,
+                "text": "second"
+              }
+            ],
+            "gapAndGoPlan": {
+              "planConfigs": {
+                "requireReversal": true,
+                "sizingCount": 5
+              },
+              "coreTarget": 13,
+              "coreCount": 3,
+              "runnerCount": 0,
+              "runnerTriggerCondition": "",
+              "support": {
+                "low": 9,
+                "high": 10
+              },
+              "recentPullback": 10
+            }
+          },
+          "short": {
+            "enabled": false,
+            "finalTargets": []
+          },
+          "keyLevels": {
+            "otherLevels": [
+              {
+                "price": 10.5,
+                "label": "key"
+              },
+              {
+                "price": 10.5,
+                "label": "duplicate"
+              },
+              {
+                "price": -1
+              }
+            ],
+            "zones": [
+              {
+                "low": 11,
+                "high": 9,
+                "label": "zone",
+                "color": "red"
+              },
+              {
+                "low": 9,
+                "high": 11
+              },
+              {
+                "low": 0,
+                "high": 1
+              }
+            ]
+          }
+        },
+        "market": {
+          "symbol": "AAPL",
+          "date": "2026-10-01",
+          "candles": [
+            {
+              "datetime": 1790861340000,
+              "volume": 1000
+            },
+            {
+              "datetime": 1790861400000,
+              "volume": 2000
+            }
+          ],
+          "currentPrice": 11,
+          "vwap": 10.5,
+          "liquidityScale": 0.5,
+          "openPrice": 10,
+          "highOfDay": 12,
+          "lowOfDay": 9,
+          "premarketHigh": 11,
+          "premarketLow": 8
+        },
+        "account": {
+          "positions": {
+            "AAPL": {
+              "netQuantity": -90,
+              "averagePrice": 10
+            }
+          },
+          "entryOrders": {},
+          "exitPairs": {
+            "AAPL": [
+              {
+                "symbol": "AAPL",
+                "source": "OCO",
+                "parentOrderID": "one",
+                "STOP": {
+                  "orderID": "ones",
+                  "quantity": 10,
+                  "price": 9,
+                  "isBuy": true
+                },
+                "LIMIT": {
+                  "orderID": "onel",
+                  "quantity": 10,
+                  "price": 12,
+                  "isBuy": true
+                }
+              },
+              {
+                "symbol": "AAPL",
+                "source": "OCO",
+                "parentOrderID": "two",
+                "STOP": {
+                  "orderID": "twos",
+                  "quantity": 10,
+                  "price": 9,
+                  "isBuy": true
+                },
+                "LIMIT": {
+                  "orderID": "twol",
+                  "quantity": 10,
+                  "price": 11,
+                  "isBuy": true
+                }
+              },
+              {
+                "symbol": "AAPL",
+                "source": "OCO",
+                "parentOrderID": "three",
+                "STOP": {
+                  "orderID": "three",
+                  "quantity": 10,
+                  "price": 9,
+                  "isBuy": true
+                }
+              }
+            ]
+          },
+          "currentBalance": 25000,
+          "executions": {
+            "AAPL": [
+              {
+                "price": 11,
+                "quantity": 30,
+                "isBuy": false,
+                "positionEffectIsOpen": false,
+                "timestamp": 1790861401000
+              }
+            ]
+          }
+        },
+        "ledger": {
+          "trades": {
+            "AAPL": [
+              {
+                "symbol": "AAPL",
+                "entries": [
+                  {
+                    "symbol": "AAPL",
+                    "orderID": "0",
+                    "timestamp": 1790861400000,
+                    "quantity": 100,
+                    "price": 10,
+                    "isBuy": false,
+                    "positionEffectIsOpen": true
+                  }
+                ],
+                "exits": [
+                  {
+                    "symbol": "AAPL",
+                    "orderID": "60000",
+                    "timestamp": 1790861460000,
+                    "quantity": 10,
+                    "price": 11,
+                    "isBuy": true,
+                    "positionEffectIsOpen": false
+                  }
+                ],
+                "realizedPnL": -10,
+                "isLong": false,
+                "isClosed": false
+              }
+            ]
+          },
+          "tradesCount": 1,
+          "nonBreakevenTradesCount": 0,
+          "realizedPnL": -10
+        },
+        "state": {
+          "date": "10/1/2026",
+          "initialBalance": 25000,
+          "stateBySymbol": {
+            "AAPL": {
+              "breakoutTradeStateForLong": {
+                "hasValue": true,
+                "entryPrice": 10,
+                "stopLossPrice": 9,
+                "coreInvalidationLevel": -1,
+                "riskLevel": 9,
+                "initialQuantity": 100,
+                "submitTime": {
+                  "seconds": 1790861400,
+                  "nanoseconds": 123000000
+                },
+                "isLong": true,
+                "status": "Pending",
+                "isMarketOrder": true,
+                "lowestExitBatchCount": -1,
+                "sizeMultipler": 0.5,
+                "maxPullbackAllowed": 9.25,
+                "maxPullbackReached": 0,
+                "adjustedTargetDueToMaxPullback": false,
+                "exitDescription": "",
+                "closedOutsideRatio": -1,
+                "stopTightenPhase": "idle",
+                "coreTargetReminderShown": false,
+                "submitEntryResult": {
+                  "totalQuantity": 100,
+                  "isSingleOrder": false,
+                  "profitTargets": [
+                    {
+                      "target": 11,
+                      "quantity": 100
+                    }
+                  ],
+                  "tradeBookID": "GapGiveAndGoBookmapReversal"
+                },
+                "plan": {
+                  "planConfigs": {
+                    "requireReversal": true,
+                    "sizingCount": 5
+                  },
+                  "coreTarget": 13,
+                  "coreCount": 3,
+                  "runnerCount": 0,
+                  "runnerTriggerCondition": ""
+                }
+              },
+              "breakoutTradeStateForShort": {
+                "hasValue": true,
+                "entryPrice": 10,
+                "stopLossPrice": 11,
+                "coreInvalidationLevel": -1,
+                "riskLevel": 11,
+                "initialQuantity": 100,
+                "submitTime": {
+                  "seconds": 1790861400,
+                  "nanoseconds": 0
+                },
+                "isLong": false,
+                "status": "Pending",
+                "isMarketOrder": true,
+                "lowestExitBatchCount": -1,
+                "sizeMultipler": 0.5,
+                "maxPullbackAllowed": 10.75,
+                "maxPullbackReached": 0,
+                "adjustedTargetDueToMaxPullback": false,
+                "exitDescription": "",
+                "closedOutsideRatio": -1,
+                "stopTightenPhase": "idle",
+                "coreTargetReminderShown": false,
+                "submitEntryResult": {
+                  "totalQuantity": 100,
+                  "isSingleOrder": false,
+                  "profitTargets": [
+                    {
+                      "target": 11,
+                      "quantity": 100
+                    }
+                  ],
+                  "tradeBookID": "GapGiveAndGoBookmapReversal"
+                },
+                "plan": {
+                  "planConfigs": {
+                    "requireReversal": true,
+                    "sizingCount": 5
+                  },
+                  "coreTarget": 13,
+                  "coreCount": 3,
+                  "runnerCount": 0,
+                  "runnerTriggerCondition": ""
+                }
+              },
+              "peakRiskMultiple": 0,
+              "activeBasePlan": {
+                "planConfigs": {
+                  "requireReversal": true,
+                  "sizingCount": 5
+                },
+                "coreTarget": 13,
+                "coreCount": 3,
+                "runnerCount": 0,
+                "runnerTriggerCondition": ""
+              }
+            }
+          },
+          "readOnlyStateBySymbol": {
+            "AAPL": {
+              "atr": {
+                "average": 1,
+                "mutiplier": 2,
+                "minimumMultipler": 1,
+                "maxQuantity": 1000
+              }
+            }
+          }
+        },
+        "policy": {
+          "batchCount": 10,
+          "riskDollars": 1000,
+          "dailyMaxLoss": 4000,
+          "coreTargetEnabled": true,
+          "maxRiskMultipleWithExistingPosition": 1.2,
+          "allowAddIfBelow": 1000
+        },
+        "history": {
+          "dailyBars": [
+            {
+              "high": 12,
+              "low": 8,
+              "close": 10
+            }
+          ]
+        }
+      }
+    ],
+    "result": [
+      {
+        "type": "trade_button_config",
+        "symbol": "AAPL",
+        "timestamp": 1790861401000,
+        "priceUnit": "real",
+        "tradebooks": [
+          {
+            "id": "AAPL:GapGiveAndGoBookmapReversal",
+            "label": "Gap, give and go bookmap reversal",
+            "sideIsLong": true,
+            "tradebookId": "GapGiveAndGoBookmapReversal",
+            "tradebookName": "Gap, Give & Go",
+            "entryMethods": [
+              "1 R",
+              "0.1 R"
+            ]
+          }
+        ]
+      },
+      {
+        "type": "key_levels_config",
+        "symbol": "AAPL",
+        "timestamp": 1790861401000,
+        "priceUnit": "real",
+        "levels": [
+          {
+            "price": 10.5,
+            "label": "key"
+          }
+        ],
+        "zones": [
+          {
+            "low": 9,
+            "high": 11,
+            "label": "zone",
+            "color": "red"
+          },
+          {
+            "low": 9,
+            "high": 10,
+            "label": "gap & go support",
+            "color": "green"
+          }
+        ],
+        "waitForBidRetest": "yes",
+        "waitForOfferRetest": "warning",
+        "previousDay": {
+          "high": 12,
+          "low": 8
+        },
+        "camPivots": {
+          "R1": 10.37,
+          "R2": 10.73,
+          "R3": 11.1,
+          "R4": 12.2,
+          "R5": 13.3,
+          "R6": 14.4,
+          "S1": 9.63,
+          "S2": 9.27,
+          "S3": 8.9,
+          "S4": 7.8,
+          "S5": 6.7,
+          "S6": 5.6
+        },
+        "premarket": {
+          "high": 11,
+          "low": 8
+        }
+      },
+      {
+        "type": "exit_order_pairs_config",
+        "symbol": "AAPL",
+        "timestamp": 1790861401000,
+        "priceUnit": "real",
+        "pairs": [
+          {
+            "symbol": "AAPL",
+            "source": "OCO",
+            "parentOrderID": "one",
+            "STOP": {
+              "orderID": "ones",
+              "quantity": 10,
+              "price": 9,
+              "isBuy": true
+            },
+            "LIMIT": {
+              "orderID": "onel",
+              "quantity": 10,
+              "price": 12,
+              "isBuy": true
+            },
+            "index": 1
+          },
+          {
+            "symbol": "AAPL",
+            "source": "OCO",
+            "parentOrderID": "two",
+            "STOP": {
+              "orderID": "twos",
+              "quantity": 10,
+              "price": 9,
+              "isBuy": true
+            },
+            "LIMIT": {
+              "orderID": "twol",
+              "quantity": 10,
+              "price": 11,
+              "isBuy": true
+            },
+            "index": 2
+          },
+          {
+            "symbol": "AAPL",
+            "source": "OCO",
+            "parentOrderID": "three",
+            "STOP": {
+              "orderID": "three",
+              "quantity": 10,
+              "price": 9,
+              "isBuy": true
+            },
+            "index": 3
+          }
+        ]
+      },
+      {
+        "type": "account_state",
+        "symbol": "AAPL",
+        "timestamp": 1790861401000,
+        "priceUnit": "real",
+        "position": {
+          "netQuantity": -90,
+          "averagePrice": 10,
+          "symbol": "AAPL",
+          "riskPercent": 15,
+          "riskText": "-0.15R"
+        },
+        "openOrders": [
+          {
+            "orderID": "ones",
+            "quantity": 10,
+            "price": 9,
+            "isBuy": true,
+            "role": "STOP",
+            "source": "OCO",
+            "parentOrderID": "one",
+            "pairIndex": 1
+          },
+          {
+            "orderID": "onel",
+            "quantity": 10,
+            "price": 12,
+            "isBuy": true,
+            "role": "LIMIT",
+            "source": "OCO",
+            "parentOrderID": "one",
+            "pairIndex": 1
+          },
+          {
+            "orderID": "twos",
+            "quantity": 10,
+            "price": 9,
+            "isBuy": true,
+            "role": "STOP",
+            "source": "OCO",
+            "parentOrderID": "two",
+            "pairIndex": 2
+          },
+          {
+            "orderID": "twol",
+            "quantity": 10,
+            "price": 11,
+            "isBuy": true,
+            "role": "LIMIT",
+            "source": "OCO",
+            "parentOrderID": "two",
+            "pairIndex": 2
+          },
+          {
+            "orderID": "three",
+            "quantity": 10,
+            "price": 9,
+            "isBuy": true,
+            "role": "STOP",
+            "source": "OCO",
+            "parentOrderID": "three",
+            "pairIndex": 3
+          }
+        ],
+        "executions": [
+          {
+            "price": 11,
+            "quantity": 30,
+            "isBuy": false,
+            "positionEffectIsOpen": false,
+            "timestamp": 1790861401000,
+            "timeMs": 1790861401000
+          }
+        ]
+      },
+      {
+        "type": "core_plan_config",
+        "symbol": "AAPL",
+        "timestamp": 1790861401000,
+        "priceUnit": "real",
+        "hasActiveTrade": true,
+        "reminderRequested": false,
+        "requestId": "",
+        "updateStatus": "",
+        "error": "",
+        "isLong": false,
+        "entryPrice": 10,
+        "coreTarget": 13,
+        "coreCount": 3,
+        "runnerCondition": "",
+        "runnerCount": 0,
+        "corePlan": "A specific momentum plan with support, risk, invalidation and follow-through rules.",
+        "bufferedTarget": 12.7,
+        "partialsTaken": 2,
+        "tradeId": "AAPL:short:1790861400000"
+      }
+    ]
+  },
+  {
+    "name": "live VWAP: local execution inputs short ordered limits descending",
+    "kind": "views",
+    "method": "nativeViews",
+    "args": [
+      {
+        "type": "market_update",
+        "symbol": "AAPL",
+        "timestamp": 1790861401000,
+        "market": {
+          "vwap": 11,
+          "latestPriceTime": 1790861400999,
+          "closedVwap": {
+            "datetime": 1790861341000,
+            "value": 10.05
+          }
+        }
+      }
+    ],
+    "result": [
+      {
+        "type": "vwap_update",
+        "symbol": "AAPL",
+        "timestamp": 1790861401000,
+        "priceUnit": "real",
+        "vwap": 10.05,
+        "effectiveTimeMs": 1790861401000,
+        "sentAtMs": 1790861401000
+      }
+    ]
+  },
+  {
+    "name": "local views: local execution inputs flat reload direction",
+    "kind": "views",
+    "method": "nativeViews",
+    "args": [
+      {
+        "type": "account_ready",
+        "symbol": "AAPL",
+        "timestamp": 1790861401000,
+        "plan": {
+          "symbol": "AAPL",
+          "corePlan": "A specific momentum plan with support, risk, invalidation and follow-through rules.",
+          "analysis": {
+            "gap": {
+              "pdc": 10
+            },
+            "watchAreas": [],
+            "noTradeZones": [],
+            "waitForBidRetest": "yes",
+            "waitForOfferRetest": "warning"
+          },
+          "atr": {
+            "average": 1,
+            "mutiplier": 2,
+            "minimumMultipler": 1,
+            "maxQuantity": 1000
+          },
+          "vwapCorrection": {
+            "volumeSum": 0,
+            "tradingSum": 0
+          },
+          "marketCapInMillions": 10000,
+          "long": {
+            "enabled": true,
+            "firstTargetToAdd": "vwap",
+            "finalTargets": [
+              {
+                "partialCount": 5,
+                "rrr": 1,
+                "level": 0,
+                "atr": 0,
+                "text": "first"
+              },
+              {
+                "partialCount": 5,
+                "rrr": 2,
+                "level": 0,
+                "atr": 0,
+                "text": "second"
+              }
+            ],
+            "gapAndGoPlan": {
+              "planConfigs": {
+                "requireReversal": true,
+                "sizingCount": 5
+              },
+              "coreTarget": 13,
+              "coreCount": 3,
+              "runnerCount": 0,
+              "runnerTriggerCondition": "",
+              "support": {
+                "low": 9,
+                "high": 10
+              },
+              "recentPullback": 10
+            }
+          },
+          "short": {
+            "enabled": false,
+            "finalTargets": []
+          },
+          "keyLevels": {
+            "otherLevels": [
+              {
+                "price": 10.5,
+                "label": "key"
+              },
+              {
+                "price": 10.5,
+                "label": "duplicate"
+              },
+              {
+                "price": -1
+              }
+            ],
+            "zones": [
+              {
+                "low": 11,
+                "high": 9,
+                "label": "zone",
+                "color": "red"
+              },
+              {
+                "low": 9,
+                "high": 11
+              },
+              {
+                "low": 0,
+                "high": 1
+              }
+            ]
+          }
+        },
+        "market": {
+          "symbol": "AAPL",
+          "date": "2026-10-01",
+          "candles": [
+            {
+              "datetime": 1790861340000,
+              "volume": 1000
+            },
+            {
+              "datetime": 1790861400000,
+              "volume": 2000
+            }
+          ],
+          "currentPrice": 11,
+          "vwap": 10.5,
+          "liquidityScale": 0.5,
+          "openPrice": 10,
+          "highOfDay": 12,
+          "lowOfDay": 9,
+          "premarketHigh": 11,
+          "premarketLow": 8
+        },
+        "account": {
+          "positions": {
+            "AAPL": {
+              "netQuantity": 0,
+              "averagePrice": 10
+            }
+          },
+          "entryOrders": {},
+          "exitPairs": {
+            "AAPL": [
+              {
+                "symbol": "AAPL",
+                "source": "OCO",
+                "parentOrderID": "one",
+                "STOP": {
+                  "orderID": "ones",
+                  "quantity": 10,
+                  "price": 9,
+                  "isBuy": false
+                },
+                "LIMIT": {
+                  "orderID": "onel",
+                  "quantity": 10,
+                  "price": 12,
+                  "isBuy": false
+                }
+              },
+              {
+                "symbol": "AAPL",
+                "source": "OCO",
+                "parentOrderID": "two",
+                "STOP": {
+                  "orderID": "twos",
+                  "quantity": 10,
+                  "price": 9,
+                  "isBuy": false
+                },
+                "LIMIT": {
+                  "orderID": "twol",
+                  "quantity": 10,
+                  "price": 11,
+                  "isBuy": false
+                }
+              },
+              {
+                "symbol": "AAPL",
+                "source": "OCO",
+                "parentOrderID": "three",
+                "STOP": {
+                  "orderID": "three",
+                  "quantity": 10,
+                  "price": 9,
+                  "isBuy": false
+                }
+              }
+            ]
+          },
+          "currentBalance": 25000,
+          "executions": {
+            "AAPL": [
+              {
+                "price": 11,
+                "quantity": 30,
+                "isBuy": false,
+                "positionEffectIsOpen": false,
+                "timestamp": 1790861401000
+              }
+            ]
+          }
+        },
+        "ledger": {
+          "trades": {
+            "AAPL": [
+              {
+                "symbol": "AAPL",
+                "entries": [
+                  {
+                    "symbol": "AAPL",
+                    "orderID": "0",
+                    "timestamp": 1790861400000,
+                    "quantity": 100,
+                    "price": 10,
+                    "isBuy": true,
+                    "positionEffectIsOpen": true
+                  }
+                ],
+                "exits": [
+                  {
+                    "symbol": "AAPL",
+                    "orderID": "60000",
+                    "timestamp": 1790861460000,
+                    "quantity": 10,
+                    "price": 11,
+                    "isBuy": false,
+                    "positionEffectIsOpen": false
+                  }
+                ],
+                "realizedPnL": 10,
+                "isLong": true,
+                "isClosed": false
+              }
+            ]
+          },
+          "tradesCount": 1,
+          "nonBreakevenTradesCount": 0,
+          "realizedPnL": 10
+        },
+        "state": null,
+        "policy": {
+          "batchCount": 10,
+          "riskDollars": 1000,
+          "dailyMaxLoss": 4000,
+          "coreTargetEnabled": true,
+          "maxRiskMultipleWithExistingPosition": 1.2,
+          "allowAddIfBelow": 1000
+        },
+        "history": {
+          "dailyBars": [
+            {
+              "high": 12,
+              "low": 8,
+              "close": 10
+            }
+          ]
+        }
+      }
+    ],
+    "result": [
+      {
+        "type": "trade_button_config",
+        "symbol": "AAPL",
+        "timestamp": 1790861401000,
+        "priceUnit": "real",
+        "tradebooks": [
+          {
+            "id": "AAPL:GapGiveAndGoBookmapReversal",
+            "label": "Gap, give and go bookmap reversal",
+            "sideIsLong": true,
+            "tradebookId": "GapGiveAndGoBookmapReversal",
+            "tradebookName": "Gap, Give & Go",
+            "entryMethods": [
+              "1 R",
+              "0.1 R"
+            ]
+          }
+        ]
+      },
+      {
+        "type": "key_levels_config",
+        "symbol": "AAPL",
+        "timestamp": 1790861401000,
+        "priceUnit": "real",
+        "levels": [
+          {
+            "price": 10.5,
+            "label": "key"
+          }
+        ],
+        "zones": [
+          {
+            "low": 9,
+            "high": 11,
+            "label": "zone",
+            "color": "red"
+          },
+          {
+            "low": 9,
+            "high": 10,
+            "label": "gap & go support",
+            "color": "green"
+          }
+        ],
+        "waitForBidRetest": "yes",
+        "waitForOfferRetest": "warning",
+        "previousDay": {
+          "high": 12,
+          "low": 8
+        },
+        "camPivots": {
+          "R1": 10.37,
+          "R2": 10.73,
+          "R3": 11.1,
+          "R4": 12.2,
+          "R5": 13.3,
+          "R6": 14.4,
+          "S1": 9.63,
+          "S2": 9.27,
+          "S3": 8.9,
+          "S4": 7.8,
+          "S5": 6.7,
+          "S6": 5.6
+        },
+        "premarket": {
+          "high": 11,
+          "low": 8
+        }
+      },
+      {
+        "type": "exit_order_pairs_config",
+        "symbol": "AAPL",
+        "timestamp": 1790861401000,
+        "priceUnit": "real",
+        "pairs": [
+          {
+            "symbol": "AAPL",
+            "source": "OCO",
+            "parentOrderID": "two",
+            "STOP": {
+              "orderID": "twos",
+              "quantity": 10,
+              "price": 9,
+              "isBuy": false
+            },
+            "LIMIT": {
+              "orderID": "twol",
+              "quantity": 10,
+              "price": 11,
+              "isBuy": false
+            },
+            "index": 1
+          },
+          {
+            "symbol": "AAPL",
+            "source": "OCO",
+            "parentOrderID": "one",
+            "STOP": {
+              "orderID": "ones",
+              "quantity": 10,
+              "price": 9,
+              "isBuy": false
+            },
+            "LIMIT": {
+              "orderID": "onel",
+              "quantity": 10,
+              "price": 12,
+              "isBuy": false
+            },
+            "index": 2
+          },
+          {
+            "symbol": "AAPL",
+            "source": "OCO",
+            "parentOrderID": "three",
+            "STOP": {
+              "orderID": "three",
+              "quantity": 10,
+              "price": 9,
+              "isBuy": false
+            },
+            "index": 3
+          }
+        ]
+      },
+      {
+        "type": "account_state",
+        "symbol": "AAPL",
+        "timestamp": 1790861401000,
+        "priceUnit": "real",
+        "openOrders": [
+          {
+            "orderID": "twos",
+            "quantity": 10,
+            "price": 9,
+            "isBuy": false,
+            "role": "STOP",
+            "source": "OCO",
+            "parentOrderID": "two",
+            "pairIndex": 1
+          },
+          {
+            "orderID": "twol",
+            "quantity": 10,
+            "price": 11,
+            "isBuy": false,
+            "role": "LIMIT",
+            "source": "OCO",
+            "parentOrderID": "two",
+            "pairIndex": 1
+          },
+          {
+            "orderID": "ones",
+            "quantity": 10,
+            "price": 9,
+            "isBuy": false,
+            "role": "STOP",
+            "source": "OCO",
+            "parentOrderID": "one",
+            "pairIndex": 2
+          },
+          {
+            "orderID": "onel",
+            "quantity": 10,
+            "price": 12,
+            "isBuy": false,
+            "role": "LIMIT",
+            "source": "OCO",
+            "parentOrderID": "one",
+            "pairIndex": 2
+          },
+          {
+            "orderID": "three",
+            "quantity": 10,
+            "price": 9,
+            "isBuy": false,
+            "role": "STOP",
+            "source": "OCO",
+            "parentOrderID": "three",
+            "pairIndex": 3
+          }
+        ],
+        "executions": [
+          {
+            "price": 11,
+            "quantity": 30,
+            "isBuy": false,
+            "positionEffectIsOpen": false,
+            "timestamp": 1790861401000,
+            "timeMs": 1790861401000
+          }
+        ]
+      },
+      {
+        "type": "core_plan_config",
+        "symbol": "AAPL",
+        "timestamp": 1790861401000,
+        "priceUnit": "real",
+        "hasActiveTrade": false,
+        "reminderRequested": false,
+        "requestId": "",
+        "updateStatus": "",
+        "error": ""
+      }
+    ]
+  },
+  {
+    "name": "live VWAP: local execution inputs flat reload direction",
+    "kind": "views",
+    "method": "nativeViews",
+    "args": [
+      {
+        "type": "market_update",
+        "symbol": "AAPL",
+        "timestamp": 1790861401000,
+        "market": {
+          "vwap": 11,
+          "latestPriceTime": 1790861400999,
+          "closedVwap": {
+            "datetime": 1790861341000,
+            "value": 10.05
+          }
+        }
+      }
+    ],
+    "result": [
+      {
+        "type": "vwap_update",
+        "symbol": "AAPL",
+        "timestamp": 1790861401000,
+        "priceUnit": "real",
+        "vwap": 10.05,
+        "effectiveTimeMs": 1790861401000,
+        "sentAtMs": 1790861401000
+      }
+    ]
+  },
+  {
+    "name": "local views: single large exit disables split partials",
+    "kind": "views",
+    "method": "nativeViews",
+    "args": [
+      {
+        "type": "account_ready",
+        "symbol": "AAPL",
+        "timestamp": 1790861401000,
+        "plan": {
+          "symbol": "AAPL",
+          "corePlan": "A specific momentum plan with support, risk, invalidation and follow-through rules.",
+          "analysis": {
+            "gap": {
+              "pdc": 10
+            },
+            "watchAreas": [],
+            "noTradeZones": [],
+            "waitForBidRetest": "yes",
+            "waitForOfferRetest": "warning"
+          },
+          "atr": {
+            "average": 1,
+            "mutiplier": 2,
+            "minimumMultipler": 1,
+            "maxQuantity": 1000
+          },
+          "vwapCorrection": {
+            "volumeSum": 0,
+            "tradingSum": 0
+          },
+          "marketCapInMillions": 10000,
+          "long": {
+            "enabled": true,
+            "firstTargetToAdd": "vwap",
+            "finalTargets": [
+              {
+                "partialCount": 5,
+                "rrr": 1,
+                "level": 0,
+                "atr": 0,
+                "text": "first"
+              },
+              {
+                "partialCount": 5,
+                "rrr": 2,
+                "level": 0,
+                "atr": 0,
+                "text": "second"
+              }
+            ],
+            "gapAndGoPlan": {
+              "planConfigs": {
+                "requireReversal": true,
+                "sizingCount": 5
+              },
+              "coreTarget": 13,
+              "coreCount": 3,
+              "runnerCount": 0,
+              "runnerTriggerCondition": "",
+              "support": {
+                "low": 9,
+                "high": 10
+              },
+              "recentPullback": 10
+            }
+          },
+          "short": {
+            "enabled": false,
+            "finalTargets": []
+          },
+          "keyLevels": {
+            "otherLevels": [
+              {
+                "price": 10.5,
+                "label": "key"
+              },
+              {
+                "price": 10.5,
+                "label": "duplicate"
+              },
+              {
+                "price": -1
+              }
+            ],
+            "zones": [
+              {
+                "low": 11,
+                "high": 9,
+                "label": "zone",
+                "color": "red"
+              },
+              {
+                "low": 9,
+                "high": 11
+              },
+              {
+                "low": 0,
+                "high": 1
+              }
+            ]
+          }
+        },
+        "market": {
+          "symbol": "AAPL",
+          "date": "2026-10-01",
+          "candles": [
+            {
+              "datetime": 1790861340000,
+              "volume": 1000
+            },
+            {
+              "datetime": 1790861400000,
+              "volume": 2000
+            }
+          ],
+          "currentPrice": 11,
+          "vwap": 10.5,
+          "liquidityScale": 0.5,
+          "openPrice": 10,
+          "highOfDay": 12,
+          "lowOfDay": 9,
+          "premarketHigh": 11,
+          "premarketLow": 8
+        },
+        "account": {
+          "positions": {
+            "AAPL": {
+              "netQuantity": 100,
+              "averagePrice": 10
+            }
+          },
+          "entryOrders": {},
+          "exitPairs": {
+            "AAPL": [
+              {
+                "STOP": {
+                  "orderID": "large",
+                  "quantity": 100,
+                  "price": 9
+                }
+              }
+            ]
+          },
+          "currentBalance": 25000,
+          "executions": {
+            "AAPL": [
+              {
+                "price": 11,
+                "quantity": 30,
+                "isBuy": false,
+                "positionEffectIsOpen": false,
+                "timestamp": 1790861401000
+              }
+            ]
+          }
+        },
+        "ledger": {
+          "trades": {
+            "AAPL": [
+              {
+                "symbol": "AAPL",
+                "entries": [
+                  {
+                    "symbol": "AAPL",
+                    "orderID": "0",
+                    "timestamp": 1790861400000,
+                    "quantity": 100,
+                    "price": 10,
+                    "isBuy": true,
+                    "positionEffectIsOpen": true
+                  }
+                ],
+                "exits": [
+                  {
+                    "symbol": "AAPL",
+                    "orderID": "60000",
+                    "timestamp": 1790861460000,
+                    "quantity": 10,
+                    "price": 11,
+                    "isBuy": false,
+                    "positionEffectIsOpen": false
+                  }
+                ],
+                "realizedPnL": 10,
+                "isLong": true,
+                "isClosed": false
+              }
+            ]
+          },
+          "tradesCount": 1,
+          "nonBreakevenTradesCount": 0,
+          "realizedPnL": 10
+        },
+        "state": {
+          "date": "10/1/2026",
+          "initialBalance": 25000,
+          "stateBySymbol": {
+            "AAPL": {
+              "breakoutTradeStateForLong": {
+                "hasValue": true,
+                "entryPrice": 10,
+                "stopLossPrice": 9,
+                "coreInvalidationLevel": -1,
+                "riskLevel": 9,
+                "initialQuantity": 10,
+                "submitTime": {
+                  "seconds": 1790861400,
+                  "nanoseconds": 0
+                },
+                "isLong": true,
+                "status": "Pending",
+                "isMarketOrder": true,
+                "lowestExitBatchCount": -1,
+                "sizeMultipler": 0.5,
+                "maxPullbackAllowed": 9.25,
+                "maxPullbackReached": 0,
+                "adjustedTargetDueToMaxPullback": false,
+                "exitDescription": "",
+                "closedOutsideRatio": -1,
+                "stopTightenPhase": "idle",
+                "coreTargetReminderShown": false,
+                "submitEntryResult": {
+                  "totalQuantity": 10,
+                  "isSingleOrder": true,
+                  "profitTargets": [
+                    {
+                      "target": 11,
+                      "quantity": 100
+                    }
+                  ],
+                  "tradeBookID": "GapGiveAndGoBookmapReversal"
+                },
+                "plan": {
+                  "planConfigs": {
+                    "requireReversal": true,
+                    "sizingCount": 5
+                  },
+                  "coreTarget": 13,
+                  "coreCount": 3,
+                  "runnerCount": 0,
+                  "runnerTriggerCondition": ""
+                }
+              },
+              "breakoutTradeStateForShort": {
+                "hasValue": false,
+                "entryPrice": 0,
+                "stopLossPrice": 0,
+                "coreInvalidationLevel": -1,
+                "riskLevel": 0,
+                "initialQuantity": 0,
+                "submitTime": {
+                  "seconds": 1790861400,
+                  "nanoseconds": 0
+                },
+                "isLong": false,
+                "status": "None",
+                "isMarketOrder": false,
+                "lowestExitBatchCount": -1,
+                "sizeMultipler": 0,
+                "maxPullbackAllowed": 0,
+                "maxPullbackReached": 0,
+                "adjustedTargetDueToMaxPullback": false,
+                "exitDescription": "",
+                "closedOutsideRatio": -1,
+                "stopTightenPhase": "idle",
+                "coreTargetReminderShown": false,
+                "submitEntryResult": {
+                  "isSingleOrder": false,
+                  "profitTargets": [],
+                  "totalQuantity": 0,
+                  "tradeBookID": ""
+                },
+                "plan": {
+                  "planConfigs": {
+                    "requireReversal": true
+                  },
+                  "coreTarget": 0,
+                  "coreCount": 0,
+                  "runnerCount": 0,
+                  "runnerTriggerCondition": ""
+                }
+              },
+              "peakRiskMultiple": 0,
+              "activeBasePlan": {
+                "planConfigs": {
+                  "requireReversal": true,
+                  "sizingCount": 5
+                },
+                "coreTarget": 13,
+                "coreCount": 3,
+                "runnerCount": 0,
+                "runnerTriggerCondition": ""
+              }
+            }
+          },
+          "readOnlyStateBySymbol": {
+            "AAPL": {
+              "atr": {
+                "average": 1,
+                "mutiplier": 2,
+                "minimumMultipler": 1,
+                "maxQuantity": 1000
+              }
+            }
+          }
+        },
+        "policy": {
+          "batchCount": 10,
+          "riskDollars": 1000,
+          "dailyMaxLoss": 4000,
+          "coreTargetEnabled": true,
+          "maxRiskMultipleWithExistingPosition": 1.2,
+          "allowAddIfBelow": 1000
+        },
+        "history": {
+          "dailyBars": [
+            {
+              "high": 12,
+              "low": 8,
+              "close": 10
+            }
+          ]
+        }
+      }
+    ],
+    "result": [
+      {
+        "type": "trade_button_config",
+        "symbol": "AAPL",
+        "timestamp": 1790861401000,
+        "priceUnit": "real",
+        "tradebooks": [
+          {
+            "id": "AAPL:GapGiveAndGoBookmapReversal",
+            "label": "Gap, give and go bookmap reversal",
+            "sideIsLong": true,
+            "tradebookId": "GapGiveAndGoBookmapReversal",
+            "tradebookName": "Gap, Give & Go",
+            "entryMethods": [
+              "1 R",
+              "0.1 R"
+            ]
+          }
+        ]
+      },
+      {
+        "type": "key_levels_config",
+        "symbol": "AAPL",
+        "timestamp": 1790861401000,
+        "priceUnit": "real",
+        "levels": [
+          {
+            "price": 10.5,
+            "label": "key"
+          }
+        ],
+        "zones": [
+          {
+            "low": 9,
+            "high": 11,
+            "label": "zone",
+            "color": "red"
+          },
+          {
+            "low": 9,
+            "high": 10,
+            "label": "gap & go support",
+            "color": "green"
+          }
+        ],
+        "waitForBidRetest": "yes",
+        "waitForOfferRetest": "warning",
+        "previousDay": {
+          "high": 12,
+          "low": 8
+        },
+        "camPivots": {
+          "R1": 10.37,
+          "R2": 10.73,
+          "R3": 11.1,
+          "R4": 12.2,
+          "R5": 13.3,
+          "R6": 14.4,
+          "S1": 9.63,
+          "S2": 9.27,
+          "S3": 8.9,
+          "S4": 7.8,
+          "S5": 6.7,
+          "S6": 5.6
+        },
+        "premarket": {
+          "high": 11,
+          "low": 8
+        }
+      },
+      {
+        "type": "exit_order_pairs_config",
+        "symbol": "AAPL",
+        "timestamp": 1790861401000,
+        "priceUnit": "real",
+        "pairs": [
+          {
+            "STOP": {
+              "orderID": "large",
+              "quantity": 100,
+              "price": 9
+            },
+            "index": 1
+          }
+        ]
+      },
+      {
+        "type": "account_state",
+        "symbol": "AAPL",
+        "timestamp": 1790861401000,
+        "priceUnit": "real",
+        "position": {
+          "netQuantity": 100,
+          "averagePrice": 10,
+          "symbol": "AAPL",
+          "riskPercent": 10,
+          "riskText": "+0.1R"
+        },
+        "openOrders": [
+          {
+            "orderID": "large",
+            "quantity": 100,
+            "price": 9,
+            "role": "STOP",
+            "pairIndex": 1
+          }
+        ],
+        "executions": [
+          {
+            "price": 11,
+            "quantity": 30,
+            "isBuy": false,
+            "positionEffectIsOpen": false,
+            "timestamp": 1790861401000,
+            "timeMs": 1790861401000
+          }
+        ]
+      },
+      {
+        "type": "core_plan_config",
+        "symbol": "AAPL",
+        "timestamp": 1790861401000,
+        "priceUnit": "real",
+        "hasActiveTrade": true,
+        "reminderRequested": false,
+        "requestId": "",
+        "updateStatus": "",
+        "error": "",
+        "isLong": true,
+        "entryPrice": 10,
+        "coreTarget": 13,
+        "coreCount": 3,
+        "runnerCondition": "",
+        "runnerCount": 0,
+        "corePlan": "A specific momentum plan with support, risk, invalidation and follow-through rules.",
+        "bufferedTarget": 12.7,
+        "partialsTaken": 4,
+        "tradeId": "AAPL:long:1790861400000"
+      }
+    ]
+  },
+  {
+    "name": "live VWAP: single large exit disables split partials",
+    "kind": "views",
+    "method": "nativeViews",
+    "args": [
+      {
+        "type": "market_update",
+        "symbol": "AAPL",
+        "timestamp": 1790861401000,
+        "market": {
+          "vwap": 11,
+          "latestPriceTime": 1790861400999,
+          "closedVwap": {
+            "datetime": 1790861341000,
+            "value": 10.05
+          }
+        }
+      }
+    ],
+    "result": [
+      {
+        "type": "vwap_update",
+        "symbol": "AAPL",
+        "timestamp": 1790861401000,
+        "priceUnit": "real",
+        "vwap": 10.05,
+        "effectiveTimeMs": 1790861401000,
+        "sentAtMs": 1790861401000
+      }
+    ]
+  },
+  {
+    "name": "empty held-symbol display clears old buttons and levels",
+    "kind": "views",
+    "method": "nativeViews",
+    "args": [
+      {
+        "type": "account_ready",
+        "symbol": "MSFT",
+        "timestamp": 1790861400000,
+        "account": {
+          "positions": {
+            "MSFT": {
+              "netQuantity": -100,
+              "averagePrice": 20
+            }
+          }
+        }
+      }
+    ],
+    "result": [
+      {
+        "type": "trade_button_config",
+        "symbol": "MSFT",
+        "timestamp": 1790861400000,
+        "priceUnit": "real",
+        "tradebooks": []
+      },
+      {
+        "type": "key_levels_config",
+        "symbol": "MSFT",
+        "timestamp": 1790861400000,
+        "priceUnit": "real",
+        "levels": [],
+        "zones": [],
+        "waitForBidRetest": "no",
+        "waitForOfferRetest": "no",
+        "premarket": {
+          "high": 0,
+          "low": 0
+        }
+      },
+      {
+        "type": "exit_order_pairs_config",
+        "symbol": "MSFT",
+        "timestamp": 1790861400000,
+        "priceUnit": "real",
+        "pairs": []
+      },
+      {
+        "type": "account_state",
+        "symbol": "MSFT",
+        "timestamp": 1790861400000,
+        "priceUnit": "real",
+        "position": {
+          "netQuantity": -100,
+          "averagePrice": 20,
+          "symbol": "MSFT",
+          "riskPercent": 0,
+          "riskText": ""
+        },
+        "openOrders": [],
+        "executions": []
+      },
+      {
+        "type": "core_plan_config",
+        "symbol": "MSFT",
+        "timestamp": 1790861400000,
+        "priceUnit": "real",
+        "hasActiveTrade": false,
+        "reminderRequested": false,
+        "requestId": "",
+        "updateStatus": "",
+        "error": ""
+      }
+    ]
+  },
+  {
+    "name": "risk clips protective coverage at current remaining position",
+    "kind": "views",
+    "method": "positionRisk",
+    "args": [
+      30,
+      10,
+      [
+        {
+          "STOP": {
+            "price": 9,
+            "quantity": 100
+          }
+        }
+      ],
+      8,
+      12
+    ],
+    "result": 30
+  },
+  {
+    "name": "risk includes unprotected position day extreme",
+    "kind": "views",
+    "method": "positionRisk",
+    "args": [
+      -100,
+      10,
+      [
+        {
+          "STOP": {
+            "price": 11,
+            "quantity": 30
+          }
+        }
+      ],
+      8,
+      12
+    ],
+    "result": 170
+  },
+  {
+    "name": "buying power allocation 2000",
+    "kind": "workflow",
+    "method": "buyingPowerTargets",
+    "args": [
+      [
+        {
+          "target": 11,
+          "quantity": 40
+        },
+        {
+          "target": 12,
+          "quantity": 60
+        }
+      ],
+      10,
+      2000
+    ],
+    "result": {
+      "targets": [
+        {
+          "target": 11,
+          "quantity": 40
+        },
+        {
+          "target": 12,
+          "quantity": 60
+        }
+      ],
+      "totalQuantity": 100,
+      "halved": false,
+      "insufficient": false
+    }
+  },
+  {
+    "name": "buying power allocation 1000",
+    "kind": "workflow",
+    "method": "buyingPowerTargets",
+    "args": [
+      [
+        {
+          "target": 11,
+          "quantity": 40
+        },
+        {
+          "target": 12,
+          "quantity": 60
+        }
+      ],
+      10,
+      1000
+    ],
+    "result": {
+      "targets": [
+        {
+          "target": 11,
+          "quantity": 20
+        },
+        {
+          "target": 12,
+          "quantity": 30
+        }
+      ],
+      "totalQuantity": 50,
+      "halved": true,
+      "insufficient": false
+    }
+  },
+  {
+    "name": "buying power allocation 600",
+    "kind": "workflow",
+    "method": "buyingPowerTargets",
+    "args": [
+      [
+        {
+          "target": 11,
+          "quantity": 40
+        },
+        {
+          "target": 12,
+          "quantity": 60
+        }
+      ],
+      10,
+      600
+    ],
+    "result": {
+      "targets": [
+        {
+          "target": 11,
+          "quantity": 20
+        },
+        {
+          "target": 12,
+          "quantity": 30
+        }
+      ],
+      "totalQuantity": 50,
+      "halved": true,
+      "insufficient": false
+    }
+  },
+  {
+    "name": "buying power allocation 500",
+    "kind": "workflow",
+    "method": "buyingPowerTargets",
+    "args": [
+      [
+        {
+          "target": 11,
+          "quantity": 40
+        },
+        {
+          "target": 12,
+          "quantity": 60
+        }
+      ],
+      10,
+      500
+    ],
+    "result": {
+      "targets": [
+        {
+          "target": 11,
+          "quantity": 20
+        },
+        {
+          "target": 12,
+          "quantity": 30
+        }
+      ],
+      "totalQuantity": 50,
+      "halved": true,
+      "insufficient": true
+    }
+  },
+  {
+    "name": "buying power allocation 0",
+    "kind": "workflow",
+    "method": "buyingPowerTargets",
+    "args": [
+      [
+        {
+          "target": 11,
+          "quantity": 40
+        },
+        {
+          "target": 12,
+          "quantity": 60
+        }
+      ],
+      10,
+      0
+    ],
+    "result": {
+      "targets": [
+        {
+          "target": 11,
+          "quantity": 20
+        },
+        {
+          "target": 12,
+          "quantity": 30
+        }
+      ],
+      "totalQuantity": 50,
+      "halved": true,
+      "insufficient": true
+    }
+  },
+  {
+    "name": "VWAP seeds only closed history points",
+    "kind": "views",
+    "method": "nativeViews",
+    "args": [
+      {
+        "type": "market_ready",
+        "symbol": "AAPL",
+        "timestamp": 1790861490000,
+        "market": {
+          "vwaps": [
+            {
+              "datetime": 1790861340000,
+              "value": 10
+            },
+            {
+              "datetime": 1790861400000,
+              "value": 11
+            },
+            {
+              "datetime": 1790861460000,
+              "value": 12
+            }
+          ]
+        }
+      }
+    ],
+    "result": [
+      {
+        "type": "trade_button_config",
+        "symbol": "AAPL",
+        "timestamp": 1790861490000,
+        "priceUnit": "real",
+        "tradebooks": []
+      },
+      {
+        "type": "key_levels_config",
+        "symbol": "AAPL",
+        "timestamp": 1790861490000,
+        "priceUnit": "real",
+        "levels": [],
+        "zones": [],
+        "waitForBidRetest": "no",
+        "waitForOfferRetest": "no",
+        "premarket": {
+          "high": 0,
+          "low": 0
+        }
+      },
+      {
+        "type": "exit_order_pairs_config",
+        "symbol": "AAPL",
+        "timestamp": 1790861490000,
+        "priceUnit": "real",
+        "pairs": []
+      },
+      {
+        "type": "account_state",
+        "symbol": "AAPL",
+        "timestamp": 1790861490000,
+        "priceUnit": "real",
+        "openOrders": [],
+        "executions": []
+      },
+      {
+        "type": "core_plan_config",
+        "symbol": "AAPL",
+        "timestamp": 1790861490000,
+        "priceUnit": "real",
+        "hasActiveTrade": false,
+        "reminderRequested": false,
+        "requestId": "",
+        "updateStatus": "",
+        "error": ""
+      },
+      {
+        "type": "vwap_update",
+        "symbol": "AAPL",
+        "timestamp": 1790861490000,
+        "priceUnit": "real",
+        "vwap": 10,
+        "effectiveTimeMs": 1790861400000,
+        "sentAtMs": 1790861490000
+      },
+      {
+        "type": "vwap_update",
+        "symbol": "AAPL",
+        "timestamp": 1790861490000,
+        "priceUnit": "real",
+        "vwap": 11,
+        "effectiveTimeMs": 1790861460000,
+        "sentAtMs": 1790861490000
+      }
+    ]
+  },
+  {
+    "name": "VWAP partial minute has no closed point",
+    "kind": "views",
+    "method": "nativeViews",
+    "args": [
+      {
+        "type": "market_update",
+        "symbol": "AAPL",
+        "timestamp": 1790861400000,
+        "market": {
+          "vwap": 12
+        }
+      }
+    ],
+    "result": []
   }
 ]

@@ -107,6 +107,7 @@ public final class MarketState {
         json.addProperty("liquidityScale", liquidityScale); json.addProperty("liquidityScaleLockedAtMax", lockedAtMax);
         if (latest != null) json.add("candle", latest.candle(symbol).toJson());
         json.addProperty("firstTradeTime", latest == null ? 0 : latest.firstTradeTime); json.addProperty("latestPriceTime", latestPriceTime);
+        if (latest != null) { var closed = vwaps.lowerEntry(latest.datetime); if (closed != null) { JsonObject point = new JsonObject(); point.addProperty("datetime", closed.getKey()); point.addProperty("value", closed.getValue()); json.add("closedVwap", point); } }
         return json;
     }
     public synchronized JsonObject snapshot() {

@@ -91,7 +91,7 @@ public final class TradingConfig {
         private Result(JsonObject raw, List<String> symbols) {
             plans = raw.getAsJsonArray("plans").deepCopy(); this.symbols = List.copyOf(symbols); profile = string(raw, "activeProfileName").isEmpty() ? "momentumSimple" : string(raw, "activeProfileName");
             tradingSettings = raw.has("tradingSettings") && raw.get("tradingSettings").isJsonObject() ? raw.getAsJsonObject("tradingSettings").deepCopy() : new JsonObject();
-            if (!raw.has("tradingSettings")) { tradingSettings.addProperty("useSingleOrderForEntry", false); tradingSettings.addProperty("snapMode", true); }
+            if (!raw.has("tradingSettings") || raw.get("tradingSettings").isJsonNull()) { tradingSettings.addProperty("useSingleOrderForEntry", false); tradingSettings.addProperty("snapMode", true); }
         }
         public JsonObject plan(String symbol) { for (JsonElement value : plans) if (string(value.getAsJsonObject(), "symbol").equals(symbol)) return value.getAsJsonObject(); return null; }
         public JsonObject toJson() { JsonObject result = new JsonObject(); result.add("plans", plans.deepCopy()); JsonArray stocks = new JsonArray(); symbols.forEach(stocks::add); result.add("symbols", stocks); result.addProperty("profile", profile); result.add("tradingSettings", tradingSettings.deepCopy()); return result; }

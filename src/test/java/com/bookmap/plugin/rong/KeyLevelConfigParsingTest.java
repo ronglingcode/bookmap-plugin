@@ -24,7 +24,7 @@ class KeyLevelConfigParsingTest {
             levelsRef.set(levels);
         });
 
-        server.onMessage(null, "{"
+        localMessage(server, "{"
                 + "\"type\":\"key_levels_config\","
                 + "\"priceUnit\":\"real\","
                 + "\"symbol\":\"AAPL\","
@@ -45,7 +45,7 @@ class KeyLevelConfigParsingTest {
                 new AtomicReference<>(Collections.emptyList());
         server.registerKeyLevelConfigListener((symbol, levels) -> levelsRef.set(levels));
 
-        server.onMessage(null, "{"
+        localMessage(server, "{"
                 + "\"type\":\"key_levels_config\","
                 + "\"priceUnit\":\"ticks\","
                 + "\"symbol\":\"AAPL\","
@@ -67,7 +67,7 @@ class KeyLevelConfigParsingTest {
             zonesRef.set(zones);
         });
 
-        server.onMessage(null, "{"
+        localMessage(server, "{"
                 + "\"type\":\"key_levels_config\","
                 + "\"symbol\":\"AAPL\","
                 + "\"levels\":[],"
@@ -87,7 +87,7 @@ class KeyLevelConfigParsingTest {
     void entryRetestRequirementsAreStoredAndSatisfiedIndependentlyBySymbol() {
         SignalWebSocketServer server = new SignalWebSocketServer(0, 90);
 
-        server.onMessage(null, "{"
+        localMessage(server, "{"
                 + "\"type\":\"key_levels_config\","
                 + "\"symbol\":\"AAPL\","
                 + "\"waitForBidRetest\":\"yes\","
@@ -111,7 +111,7 @@ class KeyLevelConfigParsingTest {
         assertTrue(state.isOfferRetestPending());
 
         // Periodic ViteApp refreshes must not re-arm an already satisfied requirement.
-        server.onMessage(null, "{"
+        localMessage(server, "{"
                 + "\"type\":\"key_levels_config\","
                 + "\"symbol\":\"AAPL\","
                 + "\"waitForBidRetest\":\"warning\","
@@ -124,7 +124,7 @@ class KeyLevelConfigParsingTest {
         assertTrue(state.isOfferRetestPending());
         assertEquals(SignalWebSocketServer.EntryRetestMode.WARNING, state.getBidRetestMode());
 
-        server.onMessage(null, "{"
+        localMessage(server, "{"
                 + "\"type\":\"key_levels_config\","
                 + "\"symbol\":\"AAPL\","
                 + "\"waitForBidRetest\":\"no\","
@@ -137,7 +137,7 @@ class KeyLevelConfigParsingTest {
         assertFalse(state.isOfferRetestPending());
 
         // A later no -> yes transition starts a fresh wait.
-        server.onMessage(null, "{"
+        localMessage(server, "{"
                 + "\"type\":\"key_levels_config\","
                 + "\"symbol\":\"AAPL\","
                 + "\"waitForBidRetest\":\"yes\","
@@ -154,7 +154,7 @@ class KeyLevelConfigParsingTest {
     void entryRetestModesIgnoreBooleanValues() {
         SignalWebSocketServer server = new SignalWebSocketServer(0, 90);
 
-        server.onMessage(null, "{"
+        localMessage(server, "{"
                 + "\"type\":\"key_levels_config\","
                 + "\"symbol\":\"AAPL\","
                 + "\"waitForBidRetest\":true,"
@@ -168,4 +168,5 @@ class KeyLevelConfigParsingTest {
         assertFalse(state.isBidRetestPending());
         assertFalse(state.isOfferRetestPending());
     }
+    private static void localMessage(com.bookmap.plugin.rong.SignalWebSocketServer server, String json) { server.acceptLocalMessage(com.google.gson.JsonParser.parseString(json).getAsJsonObject()); }
 }

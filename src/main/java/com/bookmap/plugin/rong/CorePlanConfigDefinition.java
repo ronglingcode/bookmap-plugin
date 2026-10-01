@@ -1,6 +1,6 @@
 package com.bookmap.plugin.rong;
 
-/** The active trade's editable core-target plan as published by ViteApp. */
+/** The active trade's editable core-target plan projected from local captured state. */
 public final class CorePlanConfigDefinition {
 
     private final String symbol;

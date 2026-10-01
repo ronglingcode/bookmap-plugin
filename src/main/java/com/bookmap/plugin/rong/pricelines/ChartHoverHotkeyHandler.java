@@ -80,7 +80,7 @@ public class ChartHoverHotkeyHandler implements ScreenSpacePainterFactory {
     /** Chart hotkeys dispatched from the currently hovered Bookmap chart. */
     private static final Set<String> CHART_HOTKEYS =
             Set.of(
-                    "a", "b", "c", "f", "g", "s", "t", "w",
+                    "a", "b", "c", "f", "g", "h", "m", "s", "t", "w", "q", "p", "j", "k", "l", "z", "space",
                     "1", "2", "3", "4", "5", "6", "7", "8", "9", "0",
                     "numpad1", "numpad2", "numpad3", "numpad4", "numpad5",
                     "numpad6", "numpad7", "numpad8", "numpad9", "numpad0");
@@ -193,7 +193,8 @@ public class ChartHoverHotkeyHandler implements ScreenSpacePainterFactory {
             return;
         }
 
-        boolean priceRequired = !isPriceIndependentHotkey(normalizedKey);
+        boolean priceRequired = !(isPriceIndependentHotkey(normalizedKey)
+                || event.isShiftDown() && ("g".equals(normalizedKey) || "h".equals(normalizedKey)));
         HoverContext hover = resolveCurrentHoverContext(priceRequired);
         if (hover == null) {
             return;
@@ -201,7 +202,7 @@ public class ChartHoverHotkeyHandler implements ScreenSpacePainterFactory {
 
         String keyCode = toViteKeyCode(normalizedKey);
         if (!priceRequired) {
-            sendPriceIndependentHotkey(hover.instrument, normalizedKey, keyCode);
+            sendPriceIndependentHotkey(hover.instrument, normalizedKey, keyCode, event.isShiftDown());
             return;
         }
 
@@ -254,7 +255,7 @@ public class ChartHoverHotkeyHandler implements ScreenSpacePainterFactory {
     }
 
     private void sendPriceIndependentHotkey(
-            String instrument, String normalizedKey, String keyCode) {
+            String instrument, String normalizedKey, String keyCode, boolean shift) {
         String buttonId;
         String buttonName;
         if ("c".equals(normalizedKey)) {
@@ -266,6 +267,8 @@ public class ChartHoverHotkeyHandler implements ScreenSpacePainterFactory {
         } else if ("w".equals(normalizedKey)) {
             buttonId = "swap";
             buttonName = "Swap";
+        } else if (isPriceIndependentHotkey(normalizedKey) || shift && ("g".equals(normalizedKey) || "h".equals(normalizedKey))) {
+            buttonId = normalizedKey; buttonName = "Native " + normalizedKey.toUpperCase();
         } else {
             return;
         }
@@ -276,7 +279,7 @@ public class ChartHoverHotkeyHandler implements ScreenSpacePainterFactory {
                 buttonId,
                 buttonName,
                 keyCode,
-                false);
+                shift);
     }
 
     private static HoverContext resolveCurrentHoverContext(boolean priceRequired) {
@@ -621,6 +624,7 @@ public class ChartHoverHotkeyHandler implements ScreenSpacePainterFactory {
                 && normalizedKey.charAt(0) >= '0' && normalizedKey.charAt(0) <= '9') {
             return "Digit" + normalizedKey;
         }
+        if ("space".equals(normalizedKey)) return "Space";
         return "Key" + normalizedKey.toUpperCase();
     }
 
@@ -631,7 +635,8 @@ public class ChartHoverHotkeyHandler implements ScreenSpacePainterFactory {
     static boolean isPriceIndependentHotkey(String normalizedKey) {
         return "c".equals(normalizedKey)
                 || "f".equals(normalizedKey)
-                || "w".equals(normalizedKey);
+                || Set.of("w", "q", "p", "j", "k", "l", "m", "space").contains(normalizedKey)
+                || normalizedKey != null && normalizedKey.matches("numpad[0-9]");
     }
 
     static boolean isWallReversalHotkey(String normalizedKey) {

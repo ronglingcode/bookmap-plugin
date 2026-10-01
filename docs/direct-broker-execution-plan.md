@@ -1,5 +1,10 @@
 # Native broker execution plan
 
+> Historical design/rollout document. The implementation is now wired. See
+> [current standalone operations/setup](direct-broker-execution.md) and
+> [progress and verification](standalone-native-trading-progress.md).
+
+
 Status: cancel, exits, adjustments, Add Partial, Swap, flat initial entries, and
 same-direction adds without pending entry orders always execute natively, with any
 risk-method label. Opposite-position entries, entries with pending orders, and

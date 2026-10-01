@@ -20,29 +20,26 @@ import com.bookmap.plugin.rong.tradebuttons.TradebookButtonGroup;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
-import com.google.gson.JsonParser;
 
 public class SignalWebSocketServer extends WebSocketServer {
-    private final com.bookmap.plugin.rong.miniviteapp.MiniViteApp miniViteApp =
-            new com.bookmap.plugin.rong.miniviteapp.MiniViteApp((connection, json) -> {
-                if (connection instanceof WebSocket && ((WebSocket) connection).isOpen()) {
-                    ((WebSocket) connection).send(json.toString());
-                }
-            }, PluginLog::action, SymbolUtils::cleanSymbol);
-
-    /** The single routing boundary for local button and chart actions. */
+    private java.util.function.Consumer<JsonObject> tradingDispatch = action -> PluginLog.action(SymbolUtils.cleanSymbol(getString(action, "symbol")), "Native runtime unavailable; no action sent");
+    public void setTradingDispatch(java.util.function.Consumer<JsonObject> dispatch) { tradingDispatch = dispatch; }
+    /** All local actions go directly to the standalone runtime. */
     public void dispatchTradingAction(JsonObject action) {
-        if (!miniViteApp.route(action)) broadcast(action.toString());
+        JsonObject local = action.deepCopy(); String key = getString(local, "keyCode"); if (key.isEmpty()) key = getString(local, "key_code");
+        if (key.equals("KeyB") || key.equals("KeyS") || key.isEmpty() && !getString(local, "tradebook_id").isEmpty()) {
+            boolean isLong = key.equals("KeyB") || key.isEmpty() && getBoolean(local, "sideIsLong");
+            EntryRetestState retest = getEntryRetestState(getString(local, "symbol"));
+            local.addProperty("retest_blocked", retest.isEntryRetestBlocked(isLong));
+            if (retest.isEntryRetestPending(isLong)) local.addProperty("retest_warning", isLong ? "wait for bid retest" : "wait for offer retest");
+        }
+        tradingDispatch.accept(local);
     }
-
-    public void setExperimentalDirectExecution(boolean enabled) {
-        miniViteApp.setExtendedEnabled(enabled);
-        broadcast(miniViteApp.status().toString());
-    }
-
-    public void resetNativeExecutionAfterBrokerReview() {
-        if (miniViteApp.resetAfterBrokerReview()) broadcast(miniViteApp.status().toString());
-    }
+    private java.util.function.Function<String, JsonObject> manualInputs = symbol -> new JsonObject();
+    public void setManualInputs(java.util.function.Function<String, JsonObject> inputs) { manualInputs = inputs; }
+    public JsonObject getManualInputs(String symbol) { return manualInputs.apply(symbol); }
+    private java.util.function.BiConsumer<String, String> retestNotification = PluginLog::action;
+    public void setRetestNotification(java.util.function.BiConsumer<String, String> notification) { retestNotification = notification; }
 
     private static final int WALL_THRESHOLD_LARGEST_LEVEL_COUNT = 3;
 
@@ -145,7 +142,6 @@ public class SignalWebSocketServer extends WebSocketServer {
 
     /** Unregister a symbol when its plugin instance stops. */
     public void unregisterSymbol(String symbol) {
-        miniViteApp.unregister(symbol);
         symbolToOrderBook.remove(symbol);
         symbolToPips.remove(symbol);
         symbolToRegularSessionHighLow.remove(symbol);
@@ -302,7 +298,7 @@ public class SignalWebSocketServer extends WebSocketServer {
 
     /**
      * Returns the first enabled wall-reversal tradebook for the requested side.
-     * This is the same ordering pushed by ViteApp and rendered in the trade-button window.
+     * This is the local domain ordering rendered in the trade-button window.
      */
     public TradebookButtonGroup getPrimaryWallReversalTradebook(
             String symbol, boolean bidWallReversal) {
@@ -382,6 +378,7 @@ public class SignalWebSocketServer extends WebSocketServer {
         json.addProperty("side", bidRetest ? "bid" : "offer");
         json.addProperty("message", bidRetest ? "bid retest done" : "offer retest done");
         json.addProperty("timestamp", System.currentTimeMillis());
+        retestNotification.accept(symbol, json.get("message").getAsString());
         broadcast(json.toString());
     }
 
@@ -527,7 +524,7 @@ public class SignalWebSocketServer extends WebSocketServer {
 
     @Override
     public void onOpen(WebSocket conn, ClientHandshake handshake) {
-        conn.send(miniViteApp.status().toString());
+        conn.send("{\"type\":\"standalone_status\",\"native\":true}");
     }
 
     @Override
@@ -536,11 +533,12 @@ public class SignalWebSocketServer extends WebSocketServer {
 
     @Override
     public void onMessage(WebSocket conn, String message) {
-        String trimmed = message.trim();
-        JsonObject json = parseJsonObject(trimmed);
+        // External clients cannot supply tokens, trading inputs or overwrite local views.
+    }
+
+    public void acceptLocalMessage(JsonObject json) {
         if (json != null) {
             String type = getString(json, "type");
-            if (miniViteApp.receive(conn, json)) return;
             if (isPriceBearingMessageType(type)
                     && !BookmapPriceNormalizer.isSupportedWirePriceUnit(
                             getString(json, BookmapPriceNormalizer.WIRE_PRICE_UNIT_FIELD))) {
@@ -585,18 +583,6 @@ public class SignalWebSocketServer extends WebSocketServer {
         }
     }
 
-    private JsonObject parseJsonObject(String message) {
-        try {
-            JsonElement element = JsonParser.parseString(message);
-            if (element != null && element.isJsonObject()) {
-                return element.getAsJsonObject();
-            }
-        } catch (RuntimeException ignored) {
-            // Ignore invalid messages without writing diagnostic logs.
-        }
-        return null;
-    }
-
     private void handleVwapUpdate(JsonObject json) {
         String symbol = SymbolUtils.cleanSymbol(getString(json, "symbol"));
         if (symbol.isEmpty()) {
@@ -613,7 +599,8 @@ public class SignalWebSocketServer extends WebSocketServer {
             if (existing != null
                     && (update.getEffectiveTimeMs() < existing.getEffectiveTimeMs()
                     || (update.getEffectiveTimeMs() == existing.getEffectiveTimeMs()
-                    && update.getSentAtMs() <= existing.getSentAtMs()))) {
+                    && (update.getSentAtMs() <= existing.getSentAtMs()
+                    || update.getVwap() == existing.getVwap())))) {
                 return;
             }
 
@@ -990,7 +977,7 @@ public class SignalWebSocketServer extends WebSocketServer {
             netQuantity = getDouble(positionJson, "quantity");
         }
         double averagePrice = getWirePrice(positionJson, "averagePrice");
-        // Newer ViteApp sends a pre-formatted riskText label; null when absent
+        // Local projections supply a pre-formatted riskText label; null when absent
         // so callers can fall back to the legacy riskPercent value.
         String riskText = positionJson.has("riskText") && !positionJson.get("riskText").isJsonNull()
                 ? getString(positionJson, "riskText")
@@ -1708,7 +1695,6 @@ public class SignalWebSocketServer extends WebSocketServer {
     }
 
     public void shutdown() {
-        miniViteApp.close();
         try {
             stop(1000);
         } catch (InterruptedException e) {

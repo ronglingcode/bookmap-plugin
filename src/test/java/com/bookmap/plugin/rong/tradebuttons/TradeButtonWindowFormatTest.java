@@ -31,7 +31,7 @@ class TradeButtonWindowFormatTest {
     @Test
     void pendingRetestProducesDirectionSpecificWarningAndHonorsBlockingMode() {
         SignalWebSocketServer server = new SignalWebSocketServer(0, 90);
-        server.onMessage(null, "{"
+        localMessage(server, "{"
                 + "\"type\":\"key_levels_config\","
                 + "\"symbol\":\"AAPL\","
                 + "\"waitForBidRetest\":\"yes\","
@@ -51,4 +51,5 @@ class TradeButtonWindowFormatTest {
         assertEquals("wait for offer retest", TradeButtonWindow.getRetestWarning(false, state));
         assertEquals(false, TradeButtonWindow.isRetestBlocked(true, state));
     }
+    private static void localMessage(com.bookmap.plugin.rong.SignalWebSocketServer server, String json) { server.acceptLocalMessage(com.google.gson.JsonParser.parseString(json).getAsJsonObject()); }
 }

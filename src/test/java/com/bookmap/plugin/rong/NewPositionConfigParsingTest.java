@@ -16,7 +16,7 @@ class NewPositionConfigParsingTest {
         AtomicReference<NewPositionDefinition> positionRef = new AtomicReference<>();
         server.registerNewPositionListener("AAPL", positionRef::set);
 
-        server.onMessage(null, newPositionJson(100, true));
+        localMessage(server, newPositionJson(100, true));
 
         NewPositionDefinition position = positionRef.get();
         assertEquals("AAPL", position.getSymbol());
@@ -32,7 +32,7 @@ class NewPositionConfigParsingTest {
         AtomicReference<NewPositionDefinition> positionRef = new AtomicReference<>();
         server.registerNewPositionListener("AAPL", positionRef::set);
 
-        server.onMessage(null, newPositionJson(0, true));
+        localMessage(server, newPositionJson(0, true));
 
         assertNull(positionRef.get());
     }
@@ -43,7 +43,7 @@ class NewPositionConfigParsingTest {
         AtomicReference<NewPositionDefinition> positionRef = new AtomicReference<>();
         server.registerNewPositionListener("AAPL", positionRef::set);
 
-        server.onMessage(null, newPositionJson(-100, true));
+        localMessage(server, newPositionJson(-100, true));
 
         assertNull(positionRef.get());
     }
@@ -60,4 +60,5 @@ class NewPositionConfigParsingTest {
                 + "\"timestamp\":1785243960000"
                 + "}";
     }
+    private static void localMessage(com.bookmap.plugin.rong.SignalWebSocketServer server, String json) { server.acceptLocalMessage(com.google.gson.JsonParser.parseString(json).getAsJsonObject()); }
 }
