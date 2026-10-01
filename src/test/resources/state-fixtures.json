@@ -1,0 +1,5245 @@
+[
+  {
+    "name": "no executions",
+    "kind": "ledger",
+    "method": "projectTradeLedger",
+    "args": [
+      {}
+    ],
+    "result": {
+      "trades": {},
+      "tradesCount": 0,
+      "nonBreakevenTradesCount": 0,
+      "realizedPnL": 0
+    }
+  },
+  {
+    "name": "open long and weighted adds",
+    "kind": "ledger",
+    "method": "projectTradeLedger",
+    "args": [
+      {
+        "AAPL": [
+          {
+            "symbol": "AAPL",
+            "orderID": "0",
+            "timestamp": 1790861400000,
+            "quantity": 100,
+            "price": 10,
+            "isBuy": true,
+            "positionEffectIsOpen": true
+          },
+          {
+            "symbol": "AAPL",
+            "orderID": "60000",
+            "timestamp": 1790861460000,
+            "quantity": 50,
+            "price": 12,
+            "isBuy": true,
+            "positionEffectIsOpen": true
+          },
+          {
+            "symbol": "AAPL",
+            "orderID": "61000",
+            "timestamp": 1790861461000,
+            "quantity": 50,
+            "price": 13,
+            "isBuy": false,
+            "positionEffectIsOpen": false
+          }
+        ]
+      }
+    ],
+    "result": {
+      "trades": {
+        "AAPL": [
+          {
+            "symbol": "AAPL",
+            "entries": [
+              {
+                "symbol": "AAPL",
+                "orderID": "0",
+                "timestamp": 1790861400000,
+                "quantity": 100,
+                "price": 10,
+                "isBuy": true,
+                "positionEffectIsOpen": true
+              },
+              {
+                "symbol": "AAPL",
+                "orderID": "60000",
+                "timestamp": 1790861460000,
+                "quantity": 50,
+                "price": 12,
+                "isBuy": true,
+                "positionEffectIsOpen": true
+              }
+            ],
+            "exits": [
+              {
+                "symbol": "AAPL",
+                "orderID": "61000",
+                "timestamp": 1790861461000,
+                "quantity": 50,
+                "price": 13,
+                "isBuy": false,
+                "positionEffectIsOpen": false
+              }
+            ],
+            "realizedPnL": 116.6666666666667,
+            "isLong": true,
+            "isClosed": false
+          }
+        ]
+      },
+      "tradesCount": 1,
+      "nonBreakevenTradesCount": 0,
+      "realizedPnL": 116.6666666666667
+    }
+  },
+  {
+    "name": "closed long and reopened short",
+    "kind": "ledger",
+    "method": "projectTradeLedger",
+    "args": [
+      {
+        "AAPL": [
+          {
+            "symbol": "AAPL",
+            "orderID": "0",
+            "timestamp": 1790861400000,
+            "quantity": 100,
+            "price": 10,
+            "isBuy": true,
+            "positionEffectIsOpen": true
+          },
+          {
+            "symbol": "AAPL",
+            "orderID": "1000",
+            "timestamp": 1790861401000,
+            "quantity": 100,
+            "price": 12,
+            "isBuy": false,
+            "positionEffectIsOpen": false
+          },
+          {
+            "symbol": "AAPL",
+            "orderID": "2000",
+            "timestamp": 1790861402000,
+            "quantity": 40,
+            "price": 11,
+            "isBuy": false,
+            "positionEffectIsOpen": false
+          },
+          {
+            "symbol": "AAPL",
+            "orderID": "3000",
+            "timestamp": 1790861403000,
+            "quantity": 40,
+            "price": 10,
+            "isBuy": true,
+            "positionEffectIsOpen": true
+          }
+        ]
+      }
+    ],
+    "result": {
+      "trades": {
+        "AAPL": [
+          {
+            "symbol": "AAPL",
+            "entries": [
+              {
+                "symbol": "AAPL",
+                "orderID": "0",
+                "timestamp": 1790861400000,
+                "quantity": 100,
+                "price": 10,
+                "isBuy": true,
+                "positionEffectIsOpen": true
+              }
+            ],
+            "exits": [
+              {
+                "symbol": "AAPL",
+                "orderID": "1000",
+                "timestamp": 1790861401000,
+                "quantity": 100,
+                "price": 12,
+                "isBuy": false,
+                "positionEffectIsOpen": false
+              }
+            ],
+            "realizedPnL": 200,
+            "isLong": true,
+            "isClosed": true
+          },
+          {
+            "symbol": "AAPL",
+            "entries": [
+              {
+                "symbol": "AAPL",
+                "orderID": "2000",
+                "timestamp": 1790861402000,
+                "quantity": 40,
+                "price": 11,
+                "isBuy": false,
+                "positionEffectIsOpen": true
+              }
+            ],
+            "exits": [
+              {
+                "symbol": "AAPL",
+                "orderID": "3000",
+                "timestamp": 1790861403000,
+                "quantity": 40,
+                "price": 10,
+                "isBuy": true,
+                "positionEffectIsOpen": false
+              }
+            ],
+            "realizedPnL": 40,
+            "isLong": false,
+            "isClosed": true
+          }
+        ]
+      },
+      "tradesCount": 2,
+      "nonBreakevenTradesCount": 0,
+      "realizedPnL": 240
+    }
+  },
+  {
+    "name": "one fill reverses a long into short",
+    "kind": "ledger",
+    "method": "projectTradeLedger",
+    "args": [
+      {
+        "AAPL": [
+          {
+            "symbol": "AAPL",
+            "orderID": "0",
+            "timestamp": 1790861400000,
+            "quantity": 100,
+            "price": 10,
+            "isBuy": true,
+            "positionEffectIsOpen": true
+          },
+          {
+            "symbol": "AAPL",
+            "orderID": "1000",
+            "timestamp": 1790861401000,
+            "quantity": 150,
+            "price": 12,
+            "isBuy": false,
+            "positionEffectIsOpen": false
+          }
+        ]
+      }
+    ],
+    "result": {
+      "trades": {
+        "AAPL": [
+          {
+            "symbol": "AAPL",
+            "entries": [
+              {
+                "symbol": "AAPL",
+                "orderID": "0",
+                "timestamp": 1790861400000,
+                "quantity": 100,
+                "price": 10,
+                "isBuy": true,
+                "positionEffectIsOpen": true
+              }
+            ],
+            "exits": [
+              {
+                "symbol": "AAPL",
+                "orderID": "1000",
+                "timestamp": 1790861401000,
+                "quantity": 100,
+                "price": 12,
+                "isBuy": false,
+                "positionEffectIsOpen": false
+              }
+            ],
+            "realizedPnL": 200,
+            "isLong": true,
+            "isClosed": true
+          },
+          {
+            "symbol": "AAPL",
+            "entries": [
+              {
+                "symbol": "AAPL",
+                "orderID": "1000",
+                "timestamp": 1790861401000,
+                "quantity": 50,
+                "price": 12,
+                "isBuy": false,
+                "positionEffectIsOpen": true
+              }
+            ],
+            "exits": [],
+            "realizedPnL": 0,
+            "isLong": false,
+            "isClosed": false
+          }
+        ]
+      },
+      "tradesCount": 2,
+      "nonBreakevenTradesCount": 0,
+      "realizedPnL": 200
+    }
+  },
+  {
+    "name": "one fill reverses a short into long",
+    "kind": "ledger",
+    "method": "projectTradeLedger",
+    "args": [
+      {
+        "AAPL": [
+          {
+            "symbol": "AAPL",
+            "orderID": "0",
+            "timestamp": 1790861400000,
+            "quantity": 100,
+            "price": 10,
+            "isBuy": false,
+            "positionEffectIsOpen": false
+          },
+          {
+            "symbol": "AAPL",
+            "orderID": "1000",
+            "timestamp": 1790861401000,
+            "quantity": 150,
+            "price": 8,
+            "isBuy": true,
+            "positionEffectIsOpen": true
+          }
+        ]
+      }
+    ],
+    "result": {
+      "trades": {
+        "AAPL": [
+          {
+            "symbol": "AAPL",
+            "entries": [
+              {
+                "symbol": "AAPL",
+                "orderID": "0",
+                "timestamp": 1790861400000,
+                "quantity": 100,
+                "price": 10,
+                "isBuy": false,
+                "positionEffectIsOpen": true
+              }
+            ],
+            "exits": [
+              {
+                "symbol": "AAPL",
+                "orderID": "1000",
+                "timestamp": 1790861401000,
+                "quantity": 100,
+                "price": 8,
+                "isBuy": true,
+                "positionEffectIsOpen": false
+              }
+            ],
+            "realizedPnL": 200,
+            "isLong": false,
+            "isClosed": true
+          },
+          {
+            "symbol": "AAPL",
+            "entries": [
+              {
+                "symbol": "AAPL",
+                "orderID": "1000",
+                "timestamp": 1790861401000,
+                "quantity": 50,
+                "price": 8,
+                "isBuy": true,
+                "positionEffectIsOpen": true
+              }
+            ],
+            "exits": [],
+            "realizedPnL": 0,
+            "isLong": true,
+            "isClosed": false
+          }
+        ]
+      },
+      "tradesCount": 2,
+      "nonBreakevenTradesCount": 0,
+      "realizedPnL": 200
+    }
+  },
+  {
+    "name": "sort and aggregate same minute entries",
+    "kind": "ledger",
+    "method": "projectTradeLedger",
+    "args": [
+      {
+        "AAPL": [
+          {
+            "symbol": "AAPL",
+            "orderID": "60000",
+            "timestamp": 1790861460000,
+            "quantity": 100,
+            "price": 12,
+            "isBuy": false,
+            "positionEffectIsOpen": false
+          },
+          {
+            "symbol": "AAPL",
+            "orderID": "2",
+            "timestamp": 1790861400002,
+            "quantity": 50,
+            "price": 10,
+            "isBuy": true,
+            "positionEffectIsOpen": true
+          },
+          {
+            "symbol": "AAPL",
+            "orderID": "1",
+            "timestamp": 1790861400001,
+            "quantity": 50,
+            "price": 11,
+            "isBuy": true,
+            "positionEffectIsOpen": true
+          }
+        ]
+      }
+    ],
+    "result": {
+      "trades": {
+        "AAPL": [
+          {
+            "symbol": "AAPL",
+            "entries": [
+              {
+                "symbol": "AAPL",
+                "orderID": "1",
+                "timestamp": 1790861400001,
+                "quantity": 100,
+                "price": 10.5,
+                "isBuy": true,
+                "positionEffectIsOpen": true
+              }
+            ],
+            "exits": [
+              {
+                "symbol": "AAPL",
+                "orderID": "60000",
+                "timestamp": 1790861460000,
+                "quantity": 100,
+                "price": 12,
+                "isBuy": false,
+                "positionEffectIsOpen": false
+              }
+            ],
+            "realizedPnL": 150,
+            "isLong": true,
+            "isClosed": true
+          }
+        ]
+      },
+      "tradesCount": 1,
+      "nonBreakevenTradesCount": 0,
+      "realizedPnL": 150
+    }
+  },
+  {
+    "name": "breakeven count retains five percent daily max threshold",
+    "kind": "ledger",
+    "method": "projectTradeLedger",
+    "args": [
+      {
+        "AAPL": [
+          {
+            "symbol": "AAPL",
+            "orderID": "0",
+            "timestamp": 1790861400000,
+            "quantity": 100,
+            "price": 10,
+            "isBuy": true,
+            "positionEffectIsOpen": true
+          },
+          {
+            "symbol": "AAPL",
+            "orderID": "1",
+            "timestamp": 1790861400001,
+            "quantity": 100,
+            "price": 12,
+            "isBuy": false,
+            "positionEffectIsOpen": false
+          }
+        ]
+      }
+    ],
+    "result": {
+      "trades": {
+        "AAPL": [
+          {
+            "symbol": "AAPL",
+            "entries": [
+              {
+                "symbol": "AAPL",
+                "orderID": "0",
+                "timestamp": 1790861400000,
+                "quantity": 100,
+                "price": 10,
+                "isBuy": true,
+                "positionEffectIsOpen": true
+              }
+            ],
+            "exits": [
+              {
+                "symbol": "AAPL",
+                "orderID": "1",
+                "timestamp": 1790861400001,
+                "quantity": 100,
+                "price": 12,
+                "isBuy": false,
+                "positionEffectIsOpen": false
+              }
+            ],
+            "realizedPnL": 200,
+            "isLong": true,
+            "isClosed": true
+          }
+        ]
+      },
+      "tradesCount": 1,
+      "nonBreakevenTradesCount": 0,
+      "realizedPnL": 200
+    }
+  },
+  {
+    "name": "added partial stack after a reload",
+    "kind": "ledger",
+    "method": "addedPartialStack",
+    "args": [
+      {
+        "symbol": "AAPL",
+        "entries": [
+          {
+            "symbol": "AAPL",
+            "orderID": "0",
+            "timestamp": 1790861400000,
+            "quantity": 100,
+            "price": 10,
+            "isBuy": true,
+            "positionEffectIsOpen": true
+          },
+          {
+            "symbol": "AAPL",
+            "orderID": "60000",
+            "timestamp": 1790861460000,
+            "quantity": 10,
+            "price": 11,
+            "isBuy": true,
+            "positionEffectIsOpen": true
+          },
+          {
+            "symbol": "AAPL",
+            "orderID": "180000",
+            "timestamp": 1790861580000,
+            "quantity": 10,
+            "price": 13,
+            "isBuy": true,
+            "positionEffectIsOpen": true
+          }
+        ],
+        "exits": [
+          {
+            "symbol": "AAPL",
+            "orderID": "120000",
+            "timestamp": 1790861520000,
+            "quantity": 10,
+            "price": 12,
+            "isBuy": false,
+            "positionEffectIsOpen": false
+          }
+        ],
+        "realizedPnL": 16.66666666666666,
+        "isLong": true,
+        "isClosed": false
+      },
+      100
+    ],
+    "result": [
+      13
+    ]
+  },
+  {
+    "name": "empty add stack",
+    "kind": "ledger",
+    "method": "addedPartialStack",
+    "args": [
+      null,
+      100
+    ],
+    "result": []
+  },
+  {
+    "name": "default long state",
+    "kind": "state",
+    "method": "defaultBreakout",
+    "args": [
+      true,
+      1790861400123
+    ],
+    "result": {
+      "hasValue": false,
+      "entryPrice": 0,
+      "stopLossPrice": 0,
+      "coreInvalidationLevel": -1,
+      "riskLevel": 0,
+      "initialQuantity": 0,
+      "submitTime": {
+        "seconds": 1790861400,
+        "nanoseconds": 123000000
+      },
+      "isLong": true,
+      "status": "None",
+      "isMarketOrder": false,
+      "lowestExitBatchCount": -1,
+      "sizeMultipler": 0,
+      "maxPullbackAllowed": 0,
+      "maxPullbackReached": 0,
+      "adjustedTargetDueToMaxPullback": false,
+      "exitDescription": "",
+      "closedOutsideRatio": -1,
+      "stopTightenPhase": "idle",
+      "coreTargetReminderShown": false,
+      "submitEntryResult": {
+        "isSingleOrder": false,
+        "profitTargets": [],
+        "totalQuantity": 0,
+        "tradeBookID": ""
+      },
+      "plan": {
+        "planConfigs": {
+          "requireReversal": true
+        },
+        "coreTarget": 0,
+        "coreCount": 0,
+        "runnerCount": 0,
+        "runnerTriggerCondition": ""
+      }
+    }
+  },
+  {
+    "name": "default short state",
+    "kind": "state",
+    "method": "defaultBreakout",
+    "args": [
+      false,
+      1790861400456
+    ],
+    "result": {
+      "hasValue": false,
+      "entryPrice": 0,
+      "stopLossPrice": 0,
+      "coreInvalidationLevel": -1,
+      "riskLevel": 0,
+      "initialQuantity": 0,
+      "submitTime": {
+        "seconds": 1790861400,
+        "nanoseconds": 456000000
+      },
+      "isLong": false,
+      "status": "None",
+      "isMarketOrder": false,
+      "lowestExitBatchCount": -1,
+      "sizeMultipler": 0,
+      "maxPullbackAllowed": 0,
+      "maxPullbackReached": 0,
+      "adjustedTargetDueToMaxPullback": false,
+      "exitDescription": "",
+      "closedOutsideRatio": -1,
+      "stopTightenPhase": "idle",
+      "coreTargetReminderShown": false,
+      "submitEntryResult": {
+        "isSingleOrder": false,
+        "profitTargets": [],
+        "totalQuantity": 0,
+        "tradeBookID": ""
+      },
+      "plan": {
+        "planConfigs": {
+          "requireReversal": true
+        },
+        "coreTarget": 0,
+        "coreCount": 0,
+        "runnerCount": 0,
+        "runnerTriggerCondition": ""
+      }
+    }
+  },
+  {
+    "name": "accepted long state and timestamp",
+    "kind": "state",
+    "method": "acceptedBreakout",
+    "args": [
+      {
+        "isLong": true,
+        "useMarketOrder": true,
+        "entryPrice": 10,
+        "stopOutPrice": 9,
+        "multiplier": 0.5,
+        "basePlan": {
+          "planConfigs": {
+            "requireReversal": true,
+            "sizingCount": 5
+          },
+          "coreTarget": 13,
+          "coreCount": 3,
+          "runnerCount": 0,
+          "runnerTriggerCondition": ""
+        },
+        "submitEntryResult": {
+          "totalQuantity": 100,
+          "isSingleOrder": false,
+          "profitTargets": [
+            {
+              "target": 11,
+              "quantity": 100
+            }
+          ],
+          "tradeBookID": "GapGiveAndGoBookmapReversal"
+        }
+      },
+      1790861400123
+    ],
+    "result": {
+      "hasValue": true,
+      "entryPrice": 10,
+      "stopLossPrice": 9,
+      "coreInvalidationLevel": -1,
+      "riskLevel": 9,
+      "initialQuantity": 100,
+      "submitTime": {
+        "seconds": 1790861400,
+        "nanoseconds": 123000000
+      },
+      "isLong": true,
+      "status": "Pending",
+      "isMarketOrder": true,
+      "lowestExitBatchCount": -1,
+      "sizeMultipler": 0.5,
+      "maxPullbackAllowed": 9.25,
+      "maxPullbackReached": 0,
+      "adjustedTargetDueToMaxPullback": false,
+      "exitDescription": "",
+      "closedOutsideRatio": -1,
+      "stopTightenPhase": "idle",
+      "coreTargetReminderShown": false,
+      "submitEntryResult": {
+        "totalQuantity": 100,
+        "isSingleOrder": false,
+        "profitTargets": [
+          {
+            "target": 11,
+            "quantity": 100
+          }
+        ],
+        "tradeBookID": "GapGiveAndGoBookmapReversal"
+      },
+      "plan": {
+        "planConfigs": {
+          "requireReversal": true,
+          "sizingCount": 5
+        },
+        "coreTarget": 13,
+        "coreCount": 3,
+        "runnerCount": 0,
+        "runnerTriggerCondition": ""
+      }
+    }
+  },
+  {
+    "name": "accepted short state and pullback",
+    "kind": "state",
+    "method": "acceptedBreakout",
+    "args": [
+      {
+        "isLong": false,
+        "useMarketOrder": true,
+        "entryPrice": 10,
+        "stopOutPrice": 11,
+        "multiplier": 0.5,
+        "basePlan": {
+          "planConfigs": {
+            "requireReversal": true,
+            "sizingCount": 5
+          },
+          "coreTarget": 13,
+          "coreCount": 3,
+          "runnerCount": 0,
+          "runnerTriggerCondition": ""
+        },
+        "submitEntryResult": {
+          "totalQuantity": 100,
+          "isSingleOrder": false,
+          "profitTargets": [
+            {
+              "target": 11,
+              "quantity": 100
+            }
+          ],
+          "tradeBookID": "GapGiveAndGoBookmapReversal"
+        }
+      },
+      1790861400456
+    ],
+    "result": {
+      "hasValue": true,
+      "entryPrice": 10,
+      "stopLossPrice": 11,
+      "coreInvalidationLevel": -1,
+      "riskLevel": 11,
+      "initialQuantity": 100,
+      "submitTime": {
+        "seconds": 1790861400,
+        "nanoseconds": 456000000
+      },
+      "isLong": false,
+      "status": "Pending",
+      "isMarketOrder": true,
+      "lowestExitBatchCount": -1,
+      "sizeMultipler": 0.5,
+      "maxPullbackAllowed": 10.75,
+      "maxPullbackReached": 0,
+      "adjustedTargetDueToMaxPullback": false,
+      "exitDescription": "",
+      "closedOutsideRatio": -1,
+      "stopTightenPhase": "idle",
+      "coreTargetReminderShown": false,
+      "submitEntryResult": {
+        "totalQuantity": 100,
+        "isSingleOrder": false,
+        "profitTargets": [
+          {
+            "target": 11,
+            "quantity": 100
+          }
+        ],
+        "tradeBookID": "GapGiveAndGoBookmapReversal"
+      },
+      "plan": {
+        "planConfigs": {
+          "requireReversal": true,
+          "sizingCount": 5
+        },
+        "coreTarget": 13,
+        "coreCount": 3,
+        "runnerCount": 0,
+        "runnerTriggerCondition": ""
+      }
+    }
+  },
+  {
+    "name": "new state and accepted entry",
+    "kind": "store",
+    "args": [
+      "2026-10-01",
+      25000,
+      1790861400000,
+      null
+    ],
+    "actions": [
+      [
+        "acceptEntry",
+        "AAPL",
+        {
+          "isLong": true,
+          "useMarketOrder": true,
+          "entryPrice": 10,
+          "stopOutPrice": 9,
+          "multiplier": 0.5,
+          "basePlan": {
+            "planConfigs": {
+              "requireReversal": true,
+              "sizingCount": 5
+            },
+            "coreTarget": 13,
+            "coreCount": 3,
+            "runnerCount": 0,
+            "runnerTriggerCondition": ""
+          },
+          "submitEntryResult": {
+            "totalQuantity": 100,
+            "isSingleOrder": false,
+            "profitTargets": [
+              {
+                "target": 11,
+                "quantity": 100
+              }
+            ],
+            "tradeBookID": "GapGiveAndGoBookmapReversal"
+          }
+        },
+        {
+          "average": 1,
+          "mutiplier": 2,
+          "minimumMultipler": 1,
+          "maxQuantity": 1000
+        },
+        1790861400123
+      ]
+    ],
+    "result": {
+      "date": "10/1/2026",
+      "initialBalance": 25000,
+      "stateBySymbol": {
+        "AAPL": {
+          "breakoutTradeStateForLong": {
+            "hasValue": true,
+            "entryPrice": 10,
+            "stopLossPrice": 9,
+            "coreInvalidationLevel": -1,
+            "riskLevel": 9,
+            "initialQuantity": 100,
+            "submitTime": {
+              "seconds": 1790861400,
+              "nanoseconds": 123000000
+            },
+            "isLong": true,
+            "status": "Pending",
+            "isMarketOrder": true,
+            "lowestExitBatchCount": -1,
+            "sizeMultipler": 0.5,
+            "maxPullbackAllowed": 9.25,
+            "maxPullbackReached": 0,
+            "adjustedTargetDueToMaxPullback": false,
+            "exitDescription": "",
+            "closedOutsideRatio": -1,
+            "stopTightenPhase": "idle",
+            "coreTargetReminderShown": false,
+            "submitEntryResult": {
+              "totalQuantity": 100,
+              "isSingleOrder": false,
+              "profitTargets": [
+                {
+                  "target": 11,
+                  "quantity": 100
+                }
+              ],
+              "tradeBookID": "GapGiveAndGoBookmapReversal"
+            },
+            "plan": {
+              "planConfigs": {
+                "requireReversal": true,
+                "sizingCount": 5
+              },
+              "coreTarget": 13,
+              "coreCount": 3,
+              "runnerCount": 0,
+              "runnerTriggerCondition": ""
+            }
+          },
+          "breakoutTradeStateForShort": {
+            "hasValue": false,
+            "entryPrice": 0,
+            "stopLossPrice": 0,
+            "coreInvalidationLevel": -1,
+            "riskLevel": 0,
+            "initialQuantity": 0,
+            "submitTime": {
+              "seconds": 1790861400,
+              "nanoseconds": 0
+            },
+            "isLong": false,
+            "status": "None",
+            "isMarketOrder": false,
+            "lowestExitBatchCount": -1,
+            "sizeMultipler": 0,
+            "maxPullbackAllowed": 0,
+            "maxPullbackReached": 0,
+            "adjustedTargetDueToMaxPullback": false,
+            "exitDescription": "",
+            "closedOutsideRatio": -1,
+            "stopTightenPhase": "idle",
+            "coreTargetReminderShown": false,
+            "submitEntryResult": {
+              "isSingleOrder": false,
+              "profitTargets": [],
+              "totalQuantity": 0,
+              "tradeBookID": ""
+            },
+            "plan": {
+              "planConfigs": {
+                "requireReversal": true
+              },
+              "coreTarget": 0,
+              "coreCount": 0,
+              "runnerCount": 0,
+              "runnerTriggerCondition": ""
+            }
+          },
+          "peakRiskMultiple": 0,
+          "activeBasePlan": {
+            "planConfigs": {
+              "requireReversal": true,
+              "sizingCount": 5
+            },
+            "coreTarget": 13,
+            "coreCount": 3,
+            "runnerCount": 0,
+            "runnerTriggerCondition": ""
+          }
+        }
+      },
+      "readOnlyStateBySymbol": {
+        "AAPL": {
+          "atr": {
+            "average": 1,
+            "mutiplier": 2,
+            "minimumMultipler": 1,
+            "maxQuantity": 1000
+          }
+        }
+      }
+    }
+  },
+  {
+    "name": "same day restores captured plan",
+    "kind": "store",
+    "args": [
+      "2026-10-01",
+      25000,
+      1790861400000,
+      {
+        "date": "10/1/2026",
+        "initialBalance": 25000,
+        "stateBySymbol": {
+          "AAPL": {
+            "breakoutTradeStateForLong": {
+              "hasValue": true,
+              "entryPrice": 10,
+              "stopLossPrice": 9,
+              "coreInvalidationLevel": -1,
+              "riskLevel": 9,
+              "initialQuantity": 100,
+              "submitTime": {
+                "seconds": 1790861400,
+                "nanoseconds": 123000000
+              },
+              "isLong": true,
+              "status": "Pending",
+              "isMarketOrder": true,
+              "lowestExitBatchCount": -1,
+              "sizeMultipler": 0.5,
+              "maxPullbackAllowed": 9.25,
+              "maxPullbackReached": 0,
+              "adjustedTargetDueToMaxPullback": false,
+              "exitDescription": "",
+              "closedOutsideRatio": -1,
+              "stopTightenPhase": "idle",
+              "coreTargetReminderShown": false,
+              "submitEntryResult": {
+                "totalQuantity": 100,
+                "isSingleOrder": false,
+                "profitTargets": [
+                  {
+                    "target": 11,
+                    "quantity": 100
+                  }
+                ],
+                "tradeBookID": "GapGiveAndGoBookmapReversal"
+              },
+              "plan": {
+                "planConfigs": {
+                  "requireReversal": true,
+                  "sizingCount": 5
+                },
+                "coreTarget": 13,
+                "coreCount": 3,
+                "runnerCount": 0,
+                "runnerTriggerCondition": ""
+              }
+            },
+            "breakoutTradeStateForShort": {
+              "hasValue": false,
+              "entryPrice": 0,
+              "stopLossPrice": 0,
+              "coreInvalidationLevel": -1,
+              "riskLevel": 0,
+              "initialQuantity": 0,
+              "submitTime": {
+                "seconds": 1790861400,
+                "nanoseconds": 0
+              },
+              "isLong": false,
+              "status": "None",
+              "isMarketOrder": false,
+              "lowestExitBatchCount": -1,
+              "sizeMultipler": 0,
+              "maxPullbackAllowed": 0,
+              "maxPullbackReached": 0,
+              "adjustedTargetDueToMaxPullback": false,
+              "exitDescription": "",
+              "closedOutsideRatio": -1,
+              "stopTightenPhase": "idle",
+              "coreTargetReminderShown": false,
+              "submitEntryResult": {
+                "isSingleOrder": false,
+                "profitTargets": [],
+                "totalQuantity": 0,
+                "tradeBookID": ""
+              },
+              "plan": {
+                "planConfigs": {
+                  "requireReversal": true
+                },
+                "coreTarget": 0,
+                "coreCount": 0,
+                "runnerCount": 0,
+                "runnerTriggerCondition": ""
+              }
+            },
+            "peakRiskMultiple": 0,
+            "activeBasePlan": {
+              "planConfigs": {
+                "requireReversal": true,
+                "sizingCount": 5
+              },
+              "coreTarget": 13,
+              "coreCount": 3,
+              "runnerCount": 0,
+              "runnerTriggerCondition": ""
+            }
+          }
+        },
+        "readOnlyStateBySymbol": {
+          "AAPL": {
+            "atr": {
+              "average": 1,
+              "mutiplier": 2,
+              "minimumMultipler": 1,
+              "maxQuantity": 1000
+            }
+          }
+        }
+      }
+    ],
+    "actions": [],
+    "result": {
+      "date": "10/1/2026",
+      "initialBalance": 25000,
+      "stateBySymbol": {
+        "AAPL": {
+          "breakoutTradeStateForLong": {
+            "hasValue": true,
+            "entryPrice": 10,
+            "stopLossPrice": 9,
+            "coreInvalidationLevel": -1,
+            "riskLevel": 9,
+            "initialQuantity": 100,
+            "submitTime": {
+              "seconds": 1790861400,
+              "nanoseconds": 123000000
+            },
+            "isLong": true,
+            "status": "Pending",
+            "isMarketOrder": true,
+            "lowestExitBatchCount": -1,
+            "sizeMultipler": 0.5,
+            "maxPullbackAllowed": 9.25,
+            "maxPullbackReached": 0,
+            "adjustedTargetDueToMaxPullback": false,
+            "exitDescription": "",
+            "closedOutsideRatio": -1,
+            "stopTightenPhase": "idle",
+            "coreTargetReminderShown": false,
+            "submitEntryResult": {
+              "totalQuantity": 100,
+              "isSingleOrder": false,
+              "profitTargets": [
+                {
+                  "target": 11,
+                  "quantity": 100
+                }
+              ],
+              "tradeBookID": "GapGiveAndGoBookmapReversal"
+            },
+            "plan": {
+              "planConfigs": {
+                "requireReversal": true,
+                "sizingCount": 5
+              },
+              "coreTarget": 13,
+              "coreCount": 3,
+              "runnerCount": 0,
+              "runnerTriggerCondition": ""
+            }
+          },
+          "breakoutTradeStateForShort": {
+            "hasValue": false,
+            "entryPrice": 0,
+            "stopLossPrice": 0,
+            "coreInvalidationLevel": -1,
+            "riskLevel": 0,
+            "initialQuantity": 0,
+            "submitTime": {
+              "seconds": 1790861400,
+              "nanoseconds": 0
+            },
+            "isLong": false,
+            "status": "None",
+            "isMarketOrder": false,
+            "lowestExitBatchCount": -1,
+            "sizeMultipler": 0,
+            "maxPullbackAllowed": 0,
+            "maxPullbackReached": 0,
+            "adjustedTargetDueToMaxPullback": false,
+            "exitDescription": "",
+            "closedOutsideRatio": -1,
+            "stopTightenPhase": "idle",
+            "coreTargetReminderShown": false,
+            "submitEntryResult": {
+              "isSingleOrder": false,
+              "profitTargets": [],
+              "totalQuantity": 0,
+              "tradeBookID": ""
+            },
+            "plan": {
+              "planConfigs": {
+                "requireReversal": true
+              },
+              "coreTarget": 0,
+              "coreCount": 0,
+              "runnerCount": 0,
+              "runnerTriggerCondition": ""
+            }
+          },
+          "peakRiskMultiple": 0,
+          "activeBasePlan": {
+            "planConfigs": {
+              "requireReversal": true,
+              "sizingCount": 5
+            },
+            "coreTarget": 13,
+            "coreCount": 3,
+            "runnerCount": 0,
+            "runnerTriggerCondition": ""
+          }
+        }
+      },
+      "readOnlyStateBySymbol": {
+        "AAPL": {
+          "atr": {
+            "average": 1,
+            "mutiplier": 2,
+            "minimumMultipler": 1,
+            "maxQuantity": 1000
+          }
+        }
+      }
+    }
+  },
+  {
+    "name": "different day resets state",
+    "kind": "store",
+    "args": [
+      "2026-10-01",
+      25000,
+      1790861400000,
+      {
+        "date": "9/30/2026",
+        "initialBalance": 25000,
+        "stateBySymbol": {
+          "AAPL": {
+            "breakoutTradeStateForLong": {
+              "hasValue": true,
+              "entryPrice": 10,
+              "stopLossPrice": 9,
+              "coreInvalidationLevel": -1,
+              "riskLevel": 9,
+              "initialQuantity": 100,
+              "submitTime": {
+                "seconds": 1790861400,
+                "nanoseconds": 123000000
+              },
+              "isLong": true,
+              "status": "Pending",
+              "isMarketOrder": true,
+              "lowestExitBatchCount": -1,
+              "sizeMultipler": 0.5,
+              "maxPullbackAllowed": 9.25,
+              "maxPullbackReached": 0,
+              "adjustedTargetDueToMaxPullback": false,
+              "exitDescription": "",
+              "closedOutsideRatio": -1,
+              "stopTightenPhase": "idle",
+              "coreTargetReminderShown": false,
+              "submitEntryResult": {
+                "totalQuantity": 100,
+                "isSingleOrder": false,
+                "profitTargets": [
+                  {
+                    "target": 11,
+                    "quantity": 100
+                  }
+                ],
+                "tradeBookID": "GapGiveAndGoBookmapReversal"
+              },
+              "plan": {
+                "planConfigs": {
+                  "requireReversal": true,
+                  "sizingCount": 5
+                },
+                "coreTarget": 13,
+                "coreCount": 3,
+                "runnerCount": 0,
+                "runnerTriggerCondition": ""
+              }
+            },
+            "breakoutTradeStateForShort": {
+              "hasValue": false,
+              "entryPrice": 0,
+              "stopLossPrice": 0,
+              "coreInvalidationLevel": -1,
+              "riskLevel": 0,
+              "initialQuantity": 0,
+              "submitTime": {
+                "seconds": 1790861400,
+                "nanoseconds": 0
+              },
+              "isLong": false,
+              "status": "None",
+              "isMarketOrder": false,
+              "lowestExitBatchCount": -1,
+              "sizeMultipler": 0,
+              "maxPullbackAllowed": 0,
+              "maxPullbackReached": 0,
+              "adjustedTargetDueToMaxPullback": false,
+              "exitDescription": "",
+              "closedOutsideRatio": -1,
+              "stopTightenPhase": "idle",
+              "coreTargetReminderShown": false,
+              "submitEntryResult": {
+                "isSingleOrder": false,
+                "profitTargets": [],
+                "totalQuantity": 0,
+                "tradeBookID": ""
+              },
+              "plan": {
+                "planConfigs": {
+                  "requireReversal": true
+                },
+                "coreTarget": 0,
+                "coreCount": 0,
+                "runnerCount": 0,
+                "runnerTriggerCondition": ""
+              }
+            },
+            "peakRiskMultiple": 0,
+            "activeBasePlan": {
+              "planConfigs": {
+                "requireReversal": true,
+                "sizingCount": 5
+              },
+              "coreTarget": 13,
+              "coreCount": 3,
+              "runnerCount": 0,
+              "runnerTriggerCondition": ""
+            }
+          }
+        },
+        "readOnlyStateBySymbol": {
+          "AAPL": {
+            "atr": {
+              "average": 1,
+              "mutiplier": 2,
+              "minimumMultipler": 1,
+              "maxQuantity": 1000
+            }
+          }
+        }
+      }
+    ],
+    "actions": [],
+    "result": {
+      "date": "10/1/2026",
+      "initialBalance": 25000,
+      "stateBySymbol": {},
+      "readOnlyStateBySymbol": {}
+    }
+  },
+  {
+    "name": "ISO date is compatible",
+    "kind": "store",
+    "args": [
+      "2026-10-01",
+      25000,
+      1790861400000,
+      {
+        "date": "2026-10-01",
+        "initialBalance": 25000,
+        "stateBySymbol": {
+          "AAPL": {
+            "breakoutTradeStateForLong": {
+              "hasValue": true,
+              "entryPrice": 10,
+              "stopLossPrice": 9,
+              "coreInvalidationLevel": -1,
+              "riskLevel": 9,
+              "initialQuantity": 100,
+              "submitTime": {
+                "seconds": 1790861400,
+                "nanoseconds": 123000000
+              },
+              "isLong": true,
+              "status": "Pending",
+              "isMarketOrder": true,
+              "lowestExitBatchCount": -1,
+              "sizeMultipler": 0.5,
+              "maxPullbackAllowed": 9.25,
+              "maxPullbackReached": 0,
+              "adjustedTargetDueToMaxPullback": false,
+              "exitDescription": "",
+              "closedOutsideRatio": -1,
+              "stopTightenPhase": "idle",
+              "coreTargetReminderShown": false,
+              "submitEntryResult": {
+                "totalQuantity": 100,
+                "isSingleOrder": false,
+                "profitTargets": [
+                  {
+                    "target": 11,
+                    "quantity": 100
+                  }
+                ],
+                "tradeBookID": "GapGiveAndGoBookmapReversal"
+              },
+              "plan": {
+                "planConfigs": {
+                  "requireReversal": true,
+                  "sizingCount": 5
+                },
+                "coreTarget": 13,
+                "coreCount": 3,
+                "runnerCount": 0,
+                "runnerTriggerCondition": ""
+              }
+            },
+            "breakoutTradeStateForShort": {
+              "hasValue": false,
+              "entryPrice": 0,
+              "stopLossPrice": 0,
+              "coreInvalidationLevel": -1,
+              "riskLevel": 0,
+              "initialQuantity": 0,
+              "submitTime": {
+                "seconds": 1790861400,
+                "nanoseconds": 0
+              },
+              "isLong": false,
+              "status": "None",
+              "isMarketOrder": false,
+              "lowestExitBatchCount": -1,
+              "sizeMultipler": 0,
+              "maxPullbackAllowed": 0,
+              "maxPullbackReached": 0,
+              "adjustedTargetDueToMaxPullback": false,
+              "exitDescription": "",
+              "closedOutsideRatio": -1,
+              "stopTightenPhase": "idle",
+              "coreTargetReminderShown": false,
+              "submitEntryResult": {
+                "isSingleOrder": false,
+                "profitTargets": [],
+                "totalQuantity": 0,
+                "tradeBookID": ""
+              },
+              "plan": {
+                "planConfigs": {
+                  "requireReversal": true
+                },
+                "coreTarget": 0,
+                "coreCount": 0,
+                "runnerCount": 0,
+                "runnerTriggerCondition": ""
+              }
+            },
+            "peakRiskMultiple": 0,
+            "activeBasePlan": {
+              "planConfigs": {
+                "requireReversal": true,
+                "sizingCount": 5
+              },
+              "coreTarget": 13,
+              "coreCount": 3,
+              "runnerCount": 0,
+              "runnerTriggerCondition": ""
+            }
+          }
+        },
+        "readOnlyStateBySymbol": {
+          "AAPL": {
+            "atr": {
+              "average": 1,
+              "mutiplier": 2,
+              "minimumMultipler": 1,
+              "maxQuantity": 1000
+            }
+          }
+        }
+      }
+    ],
+    "actions": [],
+    "result": {
+      "date": "2026-10-01",
+      "initialBalance": 25000,
+      "stateBySymbol": {
+        "AAPL": {
+          "breakoutTradeStateForLong": {
+            "hasValue": true,
+            "entryPrice": 10,
+            "stopLossPrice": 9,
+            "coreInvalidationLevel": -1,
+            "riskLevel": 9,
+            "initialQuantity": 100,
+            "submitTime": {
+              "seconds": 1790861400,
+              "nanoseconds": 123000000
+            },
+            "isLong": true,
+            "status": "Pending",
+            "isMarketOrder": true,
+            "lowestExitBatchCount": -1,
+            "sizeMultipler": 0.5,
+            "maxPullbackAllowed": 9.25,
+            "maxPullbackReached": 0,
+            "adjustedTargetDueToMaxPullback": false,
+            "exitDescription": "",
+            "closedOutsideRatio": -1,
+            "stopTightenPhase": "idle",
+            "coreTargetReminderShown": false,
+            "submitEntryResult": {
+              "totalQuantity": 100,
+              "isSingleOrder": false,
+              "profitTargets": [
+                {
+                  "target": 11,
+                  "quantity": 100
+                }
+              ],
+              "tradeBookID": "GapGiveAndGoBookmapReversal"
+            },
+            "plan": {
+              "planConfigs": {
+                "requireReversal": true,
+                "sizingCount": 5
+              },
+              "coreTarget": 13,
+              "coreCount": 3,
+              "runnerCount": 0,
+              "runnerTriggerCondition": ""
+            }
+          },
+          "breakoutTradeStateForShort": {
+            "hasValue": false,
+            "entryPrice": 0,
+            "stopLossPrice": 0,
+            "coreInvalidationLevel": -1,
+            "riskLevel": 0,
+            "initialQuantity": 0,
+            "submitTime": {
+              "seconds": 1790861400,
+              "nanoseconds": 0
+            },
+            "isLong": false,
+            "status": "None",
+            "isMarketOrder": false,
+            "lowestExitBatchCount": -1,
+            "sizeMultipler": 0,
+            "maxPullbackAllowed": 0,
+            "maxPullbackReached": 0,
+            "adjustedTargetDueToMaxPullback": false,
+            "exitDescription": "",
+            "closedOutsideRatio": -1,
+            "stopTightenPhase": "idle",
+            "coreTargetReminderShown": false,
+            "submitEntryResult": {
+              "isSingleOrder": false,
+              "profitTargets": [],
+              "totalQuantity": 0,
+              "tradeBookID": ""
+            },
+            "plan": {
+              "planConfigs": {
+                "requireReversal": true
+              },
+              "coreTarget": 0,
+              "coreCount": 0,
+              "runnerCount": 0,
+              "runnerTriggerCondition": ""
+            }
+          },
+          "peakRiskMultiple": 0,
+          "activeBasePlan": {
+            "planConfigs": {
+              "requireReversal": true,
+              "sizingCount": 5
+            },
+            "coreTarget": 13,
+            "coreCount": 3,
+            "runnerCount": 0,
+            "runnerTriggerCondition": ""
+          }
+        }
+      },
+      "readOnlyStateBySymbol": {
+        "AAPL": {
+          "atr": {
+            "average": 1,
+            "mutiplier": 2,
+            "minimumMultipler": 1,
+            "maxQuantity": 1000
+          }
+        }
+      }
+    }
+  },
+  {
+    "name": "accepted add preserves active state",
+    "kind": "store",
+    "args": [
+      "2026-10-01",
+      25000,
+      1790861400000,
+      {
+        "date": "10/1/2026",
+        "initialBalance": 25000,
+        "stateBySymbol": {
+          "AAPL": {
+            "breakoutTradeStateForLong": {
+              "hasValue": true,
+              "entryPrice": 10,
+              "stopLossPrice": 9,
+              "coreInvalidationLevel": -1,
+              "riskLevel": 9,
+              "initialQuantity": 100,
+              "submitTime": {
+                "seconds": 1790861400,
+                "nanoseconds": 123000000
+              },
+              "isLong": true,
+              "status": "Pending",
+              "isMarketOrder": true,
+              "lowestExitBatchCount": -1,
+              "sizeMultipler": 0.5,
+              "maxPullbackAllowed": 9.25,
+              "maxPullbackReached": 0,
+              "adjustedTargetDueToMaxPullback": false,
+              "exitDescription": "",
+              "closedOutsideRatio": -1,
+              "stopTightenPhase": "idle",
+              "coreTargetReminderShown": false,
+              "submitEntryResult": {
+                "totalQuantity": 100,
+                "isSingleOrder": false,
+                "profitTargets": [
+                  {
+                    "target": 11,
+                    "quantity": 100
+                  }
+                ],
+                "tradeBookID": "GapGiveAndGoBookmapReversal"
+              },
+              "plan": {
+                "planConfigs": {
+                  "requireReversal": true,
+                  "sizingCount": 5
+                },
+                "coreTarget": 13,
+                "coreCount": 3,
+                "runnerCount": 0,
+                "runnerTriggerCondition": ""
+              }
+            },
+            "breakoutTradeStateForShort": {
+              "hasValue": false,
+              "entryPrice": 0,
+              "stopLossPrice": 0,
+              "coreInvalidationLevel": -1,
+              "riskLevel": 0,
+              "initialQuantity": 0,
+              "submitTime": {
+                "seconds": 1790861400,
+                "nanoseconds": 0
+              },
+              "isLong": false,
+              "status": "None",
+              "isMarketOrder": false,
+              "lowestExitBatchCount": -1,
+              "sizeMultipler": 0,
+              "maxPullbackAllowed": 0,
+              "maxPullbackReached": 0,
+              "adjustedTargetDueToMaxPullback": false,
+              "exitDescription": "",
+              "closedOutsideRatio": -1,
+              "stopTightenPhase": "idle",
+              "coreTargetReminderShown": false,
+              "submitEntryResult": {
+                "isSingleOrder": false,
+                "profitTargets": [],
+                "totalQuantity": 0,
+                "tradeBookID": ""
+              },
+              "plan": {
+                "planConfigs": {
+                  "requireReversal": true
+                },
+                "coreTarget": 0,
+                "coreCount": 0,
+                "runnerCount": 0,
+                "runnerTriggerCondition": ""
+              }
+            },
+            "peakRiskMultiple": 0,
+            "activeBasePlan": {
+              "planConfigs": {
+                "requireReversal": true,
+                "sizingCount": 5
+              },
+              "coreTarget": 13,
+              "coreCount": 3,
+              "runnerCount": 0,
+              "runnerTriggerCondition": ""
+            }
+          }
+        },
+        "readOnlyStateBySymbol": {
+          "AAPL": {
+            "atr": {
+              "average": 1,
+              "mutiplier": 2,
+              "minimumMultipler": 1,
+              "maxQuantity": 1000
+            }
+          }
+        }
+      }
+    ],
+    "actions": [
+      [
+        "acceptEntry",
+        "AAPL",
+        {
+          "preserveExistingTrade": true
+        },
+        {},
+        1790861401000
+      ]
+    ],
+    "result": {
+      "date": "10/1/2026",
+      "initialBalance": 25000,
+      "stateBySymbol": {
+        "AAPL": {
+          "breakoutTradeStateForLong": {
+            "hasValue": true,
+            "entryPrice": 10,
+            "stopLossPrice": 9,
+            "coreInvalidationLevel": -1,
+            "riskLevel": 9,
+            "initialQuantity": 100,
+            "submitTime": {
+              "seconds": 1790861400,
+              "nanoseconds": 123000000
+            },
+            "isLong": true,
+            "status": "Pending",
+            "isMarketOrder": true,
+            "lowestExitBatchCount": -1,
+            "sizeMultipler": 0.5,
+            "maxPullbackAllowed": 9.25,
+            "maxPullbackReached": 0,
+            "adjustedTargetDueToMaxPullback": false,
+            "exitDescription": "",
+            "closedOutsideRatio": -1,
+            "stopTightenPhase": "idle",
+            "coreTargetReminderShown": false,
+            "submitEntryResult": {
+              "totalQuantity": 100,
+              "isSingleOrder": false,
+              "profitTargets": [
+                {
+                  "target": 11,
+                  "quantity": 100
+                }
+              ],
+              "tradeBookID": "GapGiveAndGoBookmapReversal"
+            },
+            "plan": {
+              "planConfigs": {
+                "requireReversal": true,
+                "sizingCount": 5
+              },
+              "coreTarget": 13,
+              "coreCount": 3,
+              "runnerCount": 0,
+              "runnerTriggerCondition": ""
+            }
+          },
+          "breakoutTradeStateForShort": {
+            "hasValue": false,
+            "entryPrice": 0,
+            "stopLossPrice": 0,
+            "coreInvalidationLevel": -1,
+            "riskLevel": 0,
+            "initialQuantity": 0,
+            "submitTime": {
+              "seconds": 1790861400,
+              "nanoseconds": 0
+            },
+            "isLong": false,
+            "status": "None",
+            "isMarketOrder": false,
+            "lowestExitBatchCount": -1,
+            "sizeMultipler": 0,
+            "maxPullbackAllowed": 0,
+            "maxPullbackReached": 0,
+            "adjustedTargetDueToMaxPullback": false,
+            "exitDescription": "",
+            "closedOutsideRatio": -1,
+            "stopTightenPhase": "idle",
+            "coreTargetReminderShown": false,
+            "submitEntryResult": {
+              "isSingleOrder": false,
+              "profitTargets": [],
+              "totalQuantity": 0,
+              "tradeBookID": ""
+            },
+            "plan": {
+              "planConfigs": {
+                "requireReversal": true
+              },
+              "coreTarget": 0,
+              "coreCount": 0,
+              "runnerCount": 0,
+              "runnerTriggerCondition": ""
+            }
+          },
+          "peakRiskMultiple": 0,
+          "activeBasePlan": {
+            "planConfigs": {
+              "requireReversal": true,
+              "sizingCount": 5
+            },
+            "coreTarget": 13,
+            "coreCount": 3,
+            "runnerCount": 0,
+            "runnerTriggerCondition": ""
+          }
+        }
+      },
+      "readOnlyStateBySymbol": {
+        "AAPL": {
+          "atr": {
+            "average": 1,
+            "mutiplier": 2,
+            "minimumMultipler": 1,
+            "maxQuantity": 1000
+          }
+        }
+      }
+    }
+  },
+  {
+    "name": "core update changes active and captured plan",
+    "kind": "store",
+    "args": [
+      "2026-10-01",
+      25000,
+      1790861400000,
+      {
+        "date": "10/1/2026",
+        "initialBalance": 25000,
+        "stateBySymbol": {
+          "AAPL": {
+            "breakoutTradeStateForLong": {
+              "hasValue": true,
+              "entryPrice": 10,
+              "stopLossPrice": 9,
+              "coreInvalidationLevel": -1,
+              "riskLevel": 9,
+              "initialQuantity": 100,
+              "submitTime": {
+                "seconds": 1790861400,
+                "nanoseconds": 123000000
+              },
+              "isLong": true,
+              "status": "Pending",
+              "isMarketOrder": true,
+              "lowestExitBatchCount": -1,
+              "sizeMultipler": 0.5,
+              "maxPullbackAllowed": 9.25,
+              "maxPullbackReached": 0,
+              "adjustedTargetDueToMaxPullback": false,
+              "exitDescription": "",
+              "closedOutsideRatio": -1,
+              "stopTightenPhase": "idle",
+              "coreTargetReminderShown": false,
+              "submitEntryResult": {
+                "totalQuantity": 100,
+                "isSingleOrder": false,
+                "profitTargets": [
+                  {
+                    "target": 11,
+                    "quantity": 100
+                  }
+                ],
+                "tradeBookID": "GapGiveAndGoBookmapReversal"
+              },
+              "plan": {
+                "planConfigs": {
+                  "requireReversal": true,
+                  "sizingCount": 5
+                },
+                "coreTarget": 13,
+                "coreCount": 3,
+                "runnerCount": 0,
+                "runnerTriggerCondition": ""
+              }
+            },
+            "breakoutTradeStateForShort": {
+              "hasValue": false,
+              "entryPrice": 0,
+              "stopLossPrice": 0,
+              "coreInvalidationLevel": -1,
+              "riskLevel": 0,
+              "initialQuantity": 0,
+              "submitTime": {
+                "seconds": 1790861400,
+                "nanoseconds": 0
+              },
+              "isLong": false,
+              "status": "None",
+              "isMarketOrder": false,
+              "lowestExitBatchCount": -1,
+              "sizeMultipler": 0,
+              "maxPullbackAllowed": 0,
+              "maxPullbackReached": 0,
+              "adjustedTargetDueToMaxPullback": false,
+              "exitDescription": "",
+              "closedOutsideRatio": -1,
+              "stopTightenPhase": "idle",
+              "coreTargetReminderShown": false,
+              "submitEntryResult": {
+                "isSingleOrder": false,
+                "profitTargets": [],
+                "totalQuantity": 0,
+                "tradeBookID": ""
+              },
+              "plan": {
+                "planConfigs": {
+                  "requireReversal": true
+                },
+                "coreTarget": 0,
+                "coreCount": 0,
+                "runnerCount": 0,
+                "runnerTriggerCondition": ""
+              }
+            },
+            "peakRiskMultiple": 0,
+            "activeBasePlan": {
+              "planConfigs": {
+                "requireReversal": true,
+                "sizingCount": 5
+              },
+              "coreTarget": 13,
+              "coreCount": 3,
+              "runnerCount": 0,
+              "runnerTriggerCondition": ""
+            }
+          }
+        },
+        "readOnlyStateBySymbol": {
+          "AAPL": {
+            "atr": {
+              "average": 1,
+              "mutiplier": 2,
+              "minimumMultipler": 1,
+              "maxQuantity": 1000
+            }
+          }
+        }
+      }
+    ],
+    "actions": [
+      [
+        "updateCorePlan",
+        "AAPL",
+        true,
+        14,
+        2
+      ]
+    ],
+    "result": {
+      "date": "10/1/2026",
+      "initialBalance": 25000,
+      "stateBySymbol": {
+        "AAPL": {
+          "breakoutTradeStateForLong": {
+            "hasValue": true,
+            "entryPrice": 10,
+            "stopLossPrice": 9,
+            "coreInvalidationLevel": -1,
+            "riskLevel": 9,
+            "initialQuantity": 100,
+            "submitTime": {
+              "seconds": 1790861400,
+              "nanoseconds": 123000000
+            },
+            "isLong": true,
+            "status": "Pending",
+            "isMarketOrder": true,
+            "lowestExitBatchCount": -1,
+            "sizeMultipler": 0.5,
+            "maxPullbackAllowed": 9.25,
+            "maxPullbackReached": 0,
+            "adjustedTargetDueToMaxPullback": false,
+            "exitDescription": "",
+            "closedOutsideRatio": -1,
+            "stopTightenPhase": "idle",
+            "coreTargetReminderShown": false,
+            "submitEntryResult": {
+              "totalQuantity": 100,
+              "isSingleOrder": false,
+              "profitTargets": [
+                {
+                  "target": 11,
+                  "quantity": 100
+                }
+              ],
+              "tradeBookID": "GapGiveAndGoBookmapReversal"
+            },
+            "plan": {
+              "planConfigs": {
+                "requireReversal": true,
+                "sizingCount": 5
+              },
+              "coreTarget": 14,
+              "coreCount": 2,
+              "runnerCount": 0,
+              "runnerTriggerCondition": ""
+            }
+          },
+          "breakoutTradeStateForShort": {
+            "hasValue": false,
+            "entryPrice": 0,
+            "stopLossPrice": 0,
+            "coreInvalidationLevel": -1,
+            "riskLevel": 0,
+            "initialQuantity": 0,
+            "submitTime": {
+              "seconds": 1790861400,
+              "nanoseconds": 0
+            },
+            "isLong": false,
+            "status": "None",
+            "isMarketOrder": false,
+            "lowestExitBatchCount": -1,
+            "sizeMultipler": 0,
+            "maxPullbackAllowed": 0,
+            "maxPullbackReached": 0,
+            "adjustedTargetDueToMaxPullback": false,
+            "exitDescription": "",
+            "closedOutsideRatio": -1,
+            "stopTightenPhase": "idle",
+            "coreTargetReminderShown": false,
+            "submitEntryResult": {
+              "isSingleOrder": false,
+              "profitTargets": [],
+              "totalQuantity": 0,
+              "tradeBookID": ""
+            },
+            "plan": {
+              "planConfigs": {
+                "requireReversal": true
+              },
+              "coreTarget": 0,
+              "coreCount": 0,
+              "runnerCount": 0,
+              "runnerTriggerCondition": ""
+            }
+          },
+          "peakRiskMultiple": 0,
+          "activeBasePlan": {
+            "planConfigs": {
+              "requireReversal": true,
+              "sizingCount": 5
+            },
+            "coreTarget": 14,
+            "coreCount": 2,
+            "runnerCount": 0,
+            "runnerTriggerCondition": ""
+          }
+        }
+      },
+      "readOnlyStateBySymbol": {
+        "AAPL": {
+          "atr": {
+            "average": 1,
+            "mutiplier": 2,
+            "minimumMultipler": 1,
+            "maxQuantity": 1000
+          }
+        }
+      }
+    }
+  },
+  {
+    "name": "bad core count rejected",
+    "kind": "store",
+    "args": [
+      "2026-10-01",
+      25000,
+      1790861400000,
+      {
+        "date": "10/1/2026",
+        "initialBalance": 25000,
+        "stateBySymbol": {
+          "AAPL": {
+            "breakoutTradeStateForLong": {
+              "hasValue": true,
+              "entryPrice": 10,
+              "stopLossPrice": 9,
+              "coreInvalidationLevel": -1,
+              "riskLevel": 9,
+              "initialQuantity": 100,
+              "submitTime": {
+                "seconds": 1790861400,
+                "nanoseconds": 123000000
+              },
+              "isLong": true,
+              "status": "Pending",
+              "isMarketOrder": true,
+              "lowestExitBatchCount": -1,
+              "sizeMultipler": 0.5,
+              "maxPullbackAllowed": 9.25,
+              "maxPullbackReached": 0,
+              "adjustedTargetDueToMaxPullback": false,
+              "exitDescription": "",
+              "closedOutsideRatio": -1,
+              "stopTightenPhase": "idle",
+              "coreTargetReminderShown": false,
+              "submitEntryResult": {
+                "totalQuantity": 100,
+                "isSingleOrder": false,
+                "profitTargets": [
+                  {
+                    "target": 11,
+                    "quantity": 100
+                  }
+                ],
+                "tradeBookID": "GapGiveAndGoBookmapReversal"
+              },
+              "plan": {
+                "planConfigs": {
+                  "requireReversal": true,
+                  "sizingCount": 5
+                },
+                "coreTarget": 13,
+                "coreCount": 3,
+                "runnerCount": 0,
+                "runnerTriggerCondition": ""
+              }
+            },
+            "breakoutTradeStateForShort": {
+              "hasValue": false,
+              "entryPrice": 0,
+              "stopLossPrice": 0,
+              "coreInvalidationLevel": -1,
+              "riskLevel": 0,
+              "initialQuantity": 0,
+              "submitTime": {
+                "seconds": 1790861400,
+                "nanoseconds": 0
+              },
+              "isLong": false,
+              "status": "None",
+              "isMarketOrder": false,
+              "lowestExitBatchCount": -1,
+              "sizeMultipler": 0,
+              "maxPullbackAllowed": 0,
+              "maxPullbackReached": 0,
+              "adjustedTargetDueToMaxPullback": false,
+              "exitDescription": "",
+              "closedOutsideRatio": -1,
+              "stopTightenPhase": "idle",
+              "coreTargetReminderShown": false,
+              "submitEntryResult": {
+                "isSingleOrder": false,
+                "profitTargets": [],
+                "totalQuantity": 0,
+                "tradeBookID": ""
+              },
+              "plan": {
+                "planConfigs": {
+                  "requireReversal": true
+                },
+                "coreTarget": 0,
+                "coreCount": 0,
+                "runnerCount": 0,
+                "runnerTriggerCondition": ""
+              }
+            },
+            "peakRiskMultiple": 0,
+            "activeBasePlan": {
+              "planConfigs": {
+                "requireReversal": true,
+                "sizingCount": 5
+              },
+              "coreTarget": 13,
+              "coreCount": 3,
+              "runnerCount": 0,
+              "runnerTriggerCondition": ""
+            }
+          }
+        },
+        "readOnlyStateBySymbol": {
+          "AAPL": {
+            "atr": {
+              "average": 1,
+              "mutiplier": 2,
+              "minimumMultipler": 1,
+              "maxQuantity": 1000
+            }
+          }
+        }
+      }
+    ],
+    "actions": [
+      [
+        "updateCorePlan",
+        "AAPL",
+        true,
+        14,
+        8
+      ]
+    ],
+    "error": "Invalid core target/count"
+  },
+  {
+    "name": "core target wrong direction rejected",
+    "kind": "store",
+    "args": [
+      "2026-10-01",
+      25000,
+      1790861400000,
+      {
+        "date": "10/1/2026",
+        "initialBalance": 25000,
+        "stateBySymbol": {
+          "AAPL": {
+            "breakoutTradeStateForLong": {
+              "hasValue": true,
+              "entryPrice": 10,
+              "stopLossPrice": 9,
+              "coreInvalidationLevel": -1,
+              "riskLevel": 9,
+              "initialQuantity": 100,
+              "submitTime": {
+                "seconds": 1790861400,
+                "nanoseconds": 123000000
+              },
+              "isLong": true,
+              "status": "Pending",
+              "isMarketOrder": true,
+              "lowestExitBatchCount": -1,
+              "sizeMultipler": 0.5,
+              "maxPullbackAllowed": 9.25,
+              "maxPullbackReached": 0,
+              "adjustedTargetDueToMaxPullback": false,
+              "exitDescription": "",
+              "closedOutsideRatio": -1,
+              "stopTightenPhase": "idle",
+              "coreTargetReminderShown": false,
+              "submitEntryResult": {
+                "totalQuantity": 100,
+                "isSingleOrder": false,
+                "profitTargets": [
+                  {
+                    "target": 11,
+                    "quantity": 100
+                  }
+                ],
+                "tradeBookID": "GapGiveAndGoBookmapReversal"
+              },
+              "plan": {
+                "planConfigs": {
+                  "requireReversal": true,
+                  "sizingCount": 5
+                },
+                "coreTarget": 13,
+                "coreCount": 3,
+                "runnerCount": 0,
+                "runnerTriggerCondition": ""
+              }
+            },
+            "breakoutTradeStateForShort": {
+              "hasValue": false,
+              "entryPrice": 0,
+              "stopLossPrice": 0,
+              "coreInvalidationLevel": -1,
+              "riskLevel": 0,
+              "initialQuantity": 0,
+              "submitTime": {
+                "seconds": 1790861400,
+                "nanoseconds": 0
+              },
+              "isLong": false,
+              "status": "None",
+              "isMarketOrder": false,
+              "lowestExitBatchCount": -1,
+              "sizeMultipler": 0,
+              "maxPullbackAllowed": 0,
+              "maxPullbackReached": 0,
+              "adjustedTargetDueToMaxPullback": false,
+              "exitDescription": "",
+              "closedOutsideRatio": -1,
+              "stopTightenPhase": "idle",
+              "coreTargetReminderShown": false,
+              "submitEntryResult": {
+                "isSingleOrder": false,
+                "profitTargets": [],
+                "totalQuantity": 0,
+                "tradeBookID": ""
+              },
+              "plan": {
+                "planConfigs": {
+                  "requireReversal": true
+                },
+                "coreTarget": 0,
+                "coreCount": 0,
+                "runnerCount": 0,
+                "runnerTriggerCondition": ""
+              }
+            },
+            "peakRiskMultiple": 0,
+            "activeBasePlan": {
+              "planConfigs": {
+                "requireReversal": true,
+                "sizingCount": 5
+              },
+              "coreTarget": 13,
+              "coreCount": 3,
+              "runnerCount": 0,
+              "runnerTriggerCondition": ""
+            }
+          }
+        },
+        "readOnlyStateBySymbol": {
+          "AAPL": {
+            "atr": {
+              "average": 1,
+              "mutiplier": 2,
+              "minimumMultipler": 1,
+              "maxQuantity": 1000
+            }
+          }
+        }
+      }
+    ],
+    "actions": [
+      [
+        "updateCorePlan",
+        "AAPL",
+        true,
+        9,
+        2
+      ]
+    ],
+    "error": "Core target must be on the profitable side of the active entry"
+  },
+  {
+    "name": "valid plan with live add target before history loads",
+    "kind": "config",
+    "method": "validateTradingPlan",
+    "args": [
+      {
+        "symbol": "AAPL",
+        "corePlan": "A specific momentum plan with support, risk, invalidation and follow-through rules.",
+        "analysis": {
+          "gap": {
+            "pdc": 10
+          },
+          "watchAreas": [],
+          "noTradeZones": []
+        },
+        "atr": {
+          "average": 1,
+          "mutiplier": 2,
+          "minimumMultipler": 1,
+          "maxQuantity": 1000
+        },
+        "vwapCorrection": {
+          "volumeSum": 0,
+          "tradingSum": 0
+        },
+        "marketCapInMillions": 10000,
+        "long": {
+          "enabled": true,
+          "firstTargetToAdd": "vwap",
+          "finalTargets": [
+            {
+              "partialCount": 5,
+              "rrr": 1,
+              "level": 0,
+              "atr": 0,
+              "text": "first"
+            },
+            {
+              "partialCount": 5,
+              "rrr": 2,
+              "level": 0,
+              "atr": 0,
+              "text": "second"
+            }
+          ],
+          "gapAndGoPlan": {
+            "planConfigs": {
+              "requireReversal": true,
+              "sizingCount": 5
+            },
+            "coreTarget": 13,
+            "coreCount": 3,
+            "runnerCount": 0,
+            "runnerTriggerCondition": "",
+            "support": {
+              "low": 9,
+              "high": 10
+            },
+            "recentPullback": 10
+          }
+        },
+        "short": {
+          "enabled": false,
+          "finalTargets": []
+        }
+      }
+    ],
+    "result": ""
+  },
+  {
+    "name": "missing core thesis",
+    "kind": "config",
+    "method": "validateTradingPlan",
+    "args": [
+      {
+        "symbol": "AAPL",
+        "corePlan": "short",
+        "analysis": {
+          "gap": {
+            "pdc": 10
+          },
+          "watchAreas": [],
+          "noTradeZones": []
+        },
+        "atr": {
+          "average": 1,
+          "mutiplier": 2,
+          "minimumMultipler": 1,
+          "maxQuantity": 1000
+        },
+        "vwapCorrection": {
+          "volumeSum": 0,
+          "tradingSum": 0
+        },
+        "marketCapInMillions": 10000,
+        "long": {
+          "enabled": true,
+          "firstTargetToAdd": "vwap",
+          "finalTargets": [
+            {
+              "partialCount": 5,
+              "rrr": 1,
+              "level": 0,
+              "atr": 0,
+              "text": "first"
+            },
+            {
+              "partialCount": 5,
+              "rrr": 2,
+              "level": 0,
+              "atr": 0,
+              "text": "second"
+            }
+          ],
+          "gapAndGoPlan": {
+            "planConfigs": {
+              "requireReversal": true,
+              "sizingCount": 5
+            },
+            "coreTarget": 13,
+            "coreCount": 3,
+            "runnerCount": 0,
+            "runnerTriggerCondition": "",
+            "support": {
+              "low": 9,
+              "high": 10
+            },
+            "recentPullback": 10
+          }
+        },
+        "short": {
+          "enabled": false,
+          "finalTargets": []
+        }
+      }
+    ],
+    "result": "AAPL core plan must contain more than 50 characters"
+  },
+  {
+    "name": "missing analysis",
+    "kind": "config",
+    "method": "validateTradingPlan",
+    "args": [
+      {
+        "symbol": "AAPL",
+        "corePlan": "A specific momentum plan with support, risk, invalidation and follow-through rules.",
+        "analysis": {},
+        "atr": {
+          "average": 1,
+          "mutiplier": 2,
+          "minimumMultipler": 1,
+          "maxQuantity": 1000
+        },
+        "vwapCorrection": {
+          "volumeSum": 0,
+          "tradingSum": 0
+        },
+        "marketCapInMillions": 10000,
+        "long": {
+          "enabled": true,
+          "firstTargetToAdd": "vwap",
+          "finalTargets": [
+            {
+              "partialCount": 5,
+              "rrr": 1,
+              "level": 0,
+              "atr": 0,
+              "text": "first"
+            },
+            {
+              "partialCount": 5,
+              "rrr": 2,
+              "level": 0,
+              "atr": 0,
+              "text": "second"
+            }
+          ],
+          "gapAndGoPlan": {
+            "planConfigs": {
+              "requireReversal": true,
+              "sizingCount": 5
+            },
+            "coreTarget": 13,
+            "coreCount": 3,
+            "runnerCount": 0,
+            "runnerTriggerCondition": "",
+            "support": {
+              "low": 9,
+              "high": 10
+            },
+            "recentPullback": 10
+          }
+        },
+        "short": {
+          "enabled": false,
+          "finalTargets": []
+        }
+      }
+    ],
+    "result": "AAPL missing gap pdc"
+  },
+  {
+    "name": "missing atr",
+    "kind": "config",
+    "method": "validateTradingPlan",
+    "args": [
+      {
+        "symbol": "AAPL",
+        "corePlan": "A specific momentum plan with support, risk, invalidation and follow-through rules.",
+        "analysis": {
+          "gap": {
+            "pdc": 10
+          },
+          "watchAreas": [],
+          "noTradeZones": []
+        },
+        "atr": {},
+        "vwapCorrection": {
+          "volumeSum": 0,
+          "tradingSum": 0
+        },
+        "marketCapInMillions": 10000,
+        "long": {
+          "enabled": true,
+          "firstTargetToAdd": "vwap",
+          "finalTargets": [
+            {
+              "partialCount": 5,
+              "rrr": 1,
+              "level": 0,
+              "atr": 0,
+              "text": "first"
+            },
+            {
+              "partialCount": 5,
+              "rrr": 2,
+              "level": 0,
+              "atr": 0,
+              "text": "second"
+            }
+          ],
+          "gapAndGoPlan": {
+            "planConfigs": {
+              "requireReversal": true,
+              "sizingCount": 5
+            },
+            "coreTarget": 13,
+            "coreCount": 3,
+            "runnerCount": 0,
+            "runnerTriggerCondition": "",
+            "support": {
+              "low": 9,
+              "high": 10
+            },
+            "recentPullback": 10
+          }
+        },
+        "short": {
+          "enabled": false,
+          "finalTargets": []
+        }
+      }
+    ],
+    "result": "AAPL missing atr"
+  },
+  {
+    "name": "missing rationale",
+    "kind": "config",
+    "method": "validateTradingPlan",
+    "args": [
+      {
+        "symbol": "AAPL",
+        "corePlan": "A specific momentum plan with support, risk, invalidation and follow-through rules.",
+        "analysis": {
+          "gap": {
+            "pdc": 10
+          },
+          "watchAreas": [],
+          "noTradeZones": []
+        },
+        "atr": {
+          "average": 1,
+          "mutiplier": 2,
+          "minimumMultipler": 1,
+          "maxQuantity": 1000
+        },
+        "vwapCorrection": {
+          "volumeSum": 0,
+          "tradingSum": 0
+        },
+        "marketCapInMillions": 10000,
+        "long": {
+          "enabled": true,
+          "firstTargetToAdd": "vwap",
+          "finalTargets": [
+            {
+              "partialCount": 5,
+              "rrr": 1,
+              "level": 0,
+              "atr": 0,
+              "text": "first"
+            },
+            {
+              "partialCount": 5,
+              "rrr": 2,
+              "level": 0,
+              "atr": 0,
+              "text": "second"
+            }
+          ],
+          "gapAndGoPlan": {
+            "planConfigs": {
+              "requireReversal": true,
+              "sizingCount": 5
+            },
+            "coreTarget": 13,
+            "coreCount": 3,
+            "runnerCount": 0,
+            "runnerTriggerCondition": "",
+            "support": {
+              "low": 9,
+              "high": 10
+            },
+            "recentPullback": 0
+          }
+        },
+        "short": {
+          "enabled": false,
+          "finalTargets": []
+        }
+      }
+    ],
+    "result": "AAPL missing one reason set for gapAndGoPlan"
+  },
+  {
+    "name": "entry flag must be boolean",
+    "kind": "config",
+    "method": "validateTradingPlan",
+    "args": [
+      {
+        "symbol": "AAPL",
+        "corePlan": "A specific momentum plan with support, risk, invalidation and follow-through rules.",
+        "analysis": {
+          "gap": {
+            "pdc": 10
+          },
+          "watchAreas": [],
+          "noTradeZones": []
+        },
+        "atr": {
+          "average": 1,
+          "mutiplier": 2,
+          "minimumMultipler": 1,
+          "maxQuantity": 1000
+        },
+        "vwapCorrection": {
+          "volumeSum": 0,
+          "tradingSum": 0
+        },
+        "marketCapInMillions": 10000,
+        "long": {
+          "enabled": true,
+          "firstTargetToAdd": "vwap",
+          "finalTargets": [
+            {
+              "partialCount": 5,
+              "rrr": 1,
+              "level": 0,
+              "atr": 0,
+              "text": "first"
+            },
+            {
+              "partialCount": 5,
+              "rrr": 2,
+              "level": 0,
+              "atr": 0,
+              "text": "second"
+            }
+          ],
+          "gapAndGoPlan": {
+            "planConfigs": {
+              "requireReversal": true,
+              "sizingCount": 5
+            },
+            "coreTarget": 13,
+            "coreCount": 3,
+            "runnerCount": 0,
+            "runnerTriggerCondition": "",
+            "support": {
+              "low": 9,
+              "high": 10,
+              "requireEntryWithinRange": "false"
+            },
+            "recentPullback": 10
+          }
+        },
+        "short": {
+          "enabled": false,
+          "finalTargets": []
+        }
+      }
+    ],
+    "result": "AAPL gapAndGoPlan support requireEntryWithinRange must be a boolean"
+  },
+  {
+    "name": "missing final targets",
+    "kind": "config",
+    "method": "validateTradingPlan",
+    "args": [
+      {
+        "symbol": "AAPL",
+        "corePlan": "A specific momentum plan with support, risk, invalidation and follow-through rules.",
+        "analysis": {
+          "gap": {
+            "pdc": 10
+          },
+          "watchAreas": [],
+          "noTradeZones": []
+        },
+        "atr": {
+          "average": 1,
+          "mutiplier": 2,
+          "minimumMultipler": 1,
+          "maxQuantity": 1000
+        },
+        "vwapCorrection": {
+          "volumeSum": 0,
+          "tradingSum": 0
+        },
+        "marketCapInMillions": 10000,
+        "long": {
+          "enabled": true,
+          "firstTargetToAdd": "vwap",
+          "finalTargets": [],
+          "gapAndGoPlan": {
+            "planConfigs": {
+              "requireReversal": true,
+              "sizingCount": 5
+            },
+            "coreTarget": 13,
+            "coreCount": 3,
+            "runnerCount": 0,
+            "runnerTriggerCondition": "",
+            "support": {
+              "low": 9,
+              "high": 10
+            },
+            "recentPullback": 10
+          }
+        },
+        "short": {
+          "enabled": false,
+          "finalTargets": []
+        }
+      }
+    ],
+    "result": "AAPL need at least 2 final targets"
+  },
+  {
+    "name": "tradebook definitions",
+    "kind": "config",
+    "method": "createTradebookDefinitions",
+    "args": [
+      {
+        "symbol": "AAPL",
+        "corePlan": "A specific momentum plan with support, risk, invalidation and follow-through rules.",
+        "analysis": {
+          "gap": {
+            "pdc": 10
+          },
+          "watchAreas": [],
+          "noTradeZones": []
+        },
+        "atr": {
+          "average": 1,
+          "mutiplier": 2,
+          "minimumMultipler": 1,
+          "maxQuantity": 1000
+        },
+        "vwapCorrection": {
+          "volumeSum": 0,
+          "tradingSum": 0
+        },
+        "marketCapInMillions": 10000,
+        "long": {
+          "enabled": true,
+          "firstTargetToAdd": "vwap",
+          "finalTargets": [
+            {
+              "partialCount": 5,
+              "rrr": 1,
+              "level": 0,
+              "atr": 0,
+              "text": "first"
+            },
+            {
+              "partialCount": 5,
+              "rrr": 2,
+              "level": 0,
+              "atr": 0,
+              "text": "second"
+            }
+          ],
+          "gapAndGoPlan": {
+            "planConfigs": {
+              "requireReversal": true,
+              "sizingCount": 5
+            },
+            "coreTarget": 13,
+            "coreCount": 3,
+            "runnerCount": 0,
+            "runnerTriggerCondition": "",
+            "support": {
+              "low": 9,
+              "high": 10
+            },
+            "recentPullback": 10
+          }
+        },
+        "short": {
+          "enabled": false,
+          "finalTargets": []
+        }
+      }
+    ],
+    "result": [
+      {
+        "tradebookID": "GapGiveAndGoBookmapReversal",
+        "isLong": true,
+        "enabled": true,
+        "basePlan": {
+          "planConfigs": {
+            "requireReversal": true,
+            "sizingCount": 5
+          },
+          "coreTarget": 13,
+          "coreCount": 3,
+          "runnerCount": 0,
+          "runnerTriggerCondition": "",
+          "support": {
+            "low": 9,
+            "high": 10
+          },
+          "recentPullback": 10
+        },
+        "entryArea": {
+          "low": 9,
+          "high": 10
+        }
+      }
+    ]
+  },
+  {
+    "name": "range normalized and constructed even for disabled directions",
+    "kind": "config",
+    "method": "createTradebookDefinitions",
+    "args": [
+      {
+        "symbol": "AAPL",
+        "corePlan": "A specific momentum plan with support, risk, invalidation and follow-through rules.",
+        "analysis": {
+          "gap": {
+            "pdc": 10
+          },
+          "watchAreas": [],
+          "noTradeZones": []
+        },
+        "atr": {
+          "average": 1,
+          "mutiplier": 2,
+          "minimumMultipler": 1,
+          "maxQuantity": 1000
+        },
+        "vwapCorrection": {
+          "volumeSum": 0,
+          "tradingSum": 0
+        },
+        "marketCapInMillions": 10000,
+        "long": {
+          "enabled": false
+        },
+        "short": {
+          "enabled": false,
+          "finalTargets": []
+        },
+        "rangeBoundReversalPlan": {
+          "planConfigs": {
+            "requireReversal": true,
+            "sizingCount": 5
+          },
+          "coreTarget": 13,
+          "coreCount": 3,
+          "runnerCount": 0,
+          "runnerTriggerCondition": "",
+          "support": {
+            "low": 9,
+            "high": 8,
+            "requireEntryWithinRange": true
+          },
+          "resistance": {
+            "low": 11,
+            "high": 12
+          },
+          "previousConsolidationArea": {
+            "low": 8,
+            "high": 12
+          }
+        }
+      }
+    ],
+    "result": [
+      {
+        "tradebookID": "RangeBoundBidReversal",
+        "isLong": true,
+        "enabled": true,
+        "basePlan": {
+          "planConfigs": {
+            "requireReversal": true,
+            "sizingCount": 5
+          },
+          "coreTarget": 13,
+          "coreCount": 3,
+          "runnerCount": 0,
+          "runnerTriggerCondition": "",
+          "support": {
+            "low": 9,
+            "high": 8,
+            "requireEntryWithinRange": true
+          },
+          "resistance": {
+            "low": 11,
+            "high": 12
+          },
+          "previousConsolidationArea": {
+            "low": 8,
+            "high": 12
+          }
+        },
+        "entryArea": {
+          "low": 8,
+          "high": 9,
+          "requireEntryWithinRange": true
+        }
+      },
+      {
+        "tradebookID": "RangeBoundOfferReversal",
+        "isLong": false,
+        "enabled": true,
+        "basePlan": {
+          "planConfigs": {
+            "requireReversal": true,
+            "sizingCount": 5
+          },
+          "coreTarget": 13,
+          "coreCount": 3,
+          "runnerCount": 0,
+          "runnerTriggerCondition": "",
+          "support": {
+            "low": 9,
+            "high": 8,
+            "requireEntryWithinRange": true
+          },
+          "resistance": {
+            "low": 11,
+            "high": 12
+          },
+          "previousConsolidationArea": {
+            "low": 8,
+            "high": 12
+          }
+        },
+        "entryArea": {
+          "low": 11,
+          "high": 12
+        }
+      }
+    ]
+  },
+  {
+    "name": "range overlap rejected",
+    "kind": "config",
+    "method": "validateTradingPlan",
+    "args": [
+      {
+        "symbol": "AAPL",
+        "corePlan": "A specific momentum plan with support, risk, invalidation and follow-through rules.",
+        "analysis": {
+          "gap": {
+            "pdc": 10
+          },
+          "watchAreas": [],
+          "noTradeZones": []
+        },
+        "atr": {
+          "average": 1,
+          "mutiplier": 2,
+          "minimumMultipler": 1,
+          "maxQuantity": 1000
+        },
+        "vwapCorrection": {
+          "volumeSum": 0,
+          "tradingSum": 0
+        },
+        "marketCapInMillions": 10000,
+        "long": {
+          "enabled": true,
+          "firstTargetToAdd": "vwap",
+          "finalTargets": [
+            {
+              "partialCount": 5,
+              "rrr": 1,
+              "level": 0,
+              "atr": 0,
+              "text": "first"
+            },
+            {
+              "partialCount": 5,
+              "rrr": 2,
+              "level": 0,
+              "atr": 0,
+              "text": "second"
+            }
+          ],
+          "gapAndGoPlan": {
+            "planConfigs": {
+              "requireReversal": true,
+              "sizingCount": 5
+            },
+            "coreTarget": 13,
+            "coreCount": 3,
+            "runnerCount": 0,
+            "runnerTriggerCondition": "",
+            "support": {
+              "low": 9,
+              "high": 10
+            },
+            "recentPullback": 10
+          }
+        },
+        "short": {
+          "enabled": false,
+          "finalTargets": []
+        },
+        "rangeBoundReversalPlan": {
+          "planConfigs": {
+            "requireReversal": true,
+            "sizingCount": 5
+          },
+          "coreTarget": 13,
+          "coreCount": 3,
+          "runnerCount": 0,
+          "runnerTriggerCondition": "",
+          "support": {
+            "low": 9,
+            "high": 8,
+            "requireEntryWithinRange": true
+          },
+          "resistance": {
+            "low": 8,
+            "high": 10
+          },
+          "previousConsolidationArea": {
+            "low": 8,
+            "high": 12
+          }
+        }
+      }
+    ],
+    "result": "AAPL range bound reversal support zone must be below resistance zone"
+  },
+  {
+    "name": "stock selections config",
+    "kind": "config",
+    "method": "readTradingConfig",
+    "args": [
+      {
+        "plans": [
+          {
+            "symbol": "AAPL",
+            "corePlan": "A specific momentum plan with support, risk, invalidation and follow-through rules.",
+            "analysis": {
+              "gap": {
+                "pdc": 10
+              },
+              "watchAreas": [],
+              "noTradeZones": []
+            },
+            "atr": {
+              "average": 1,
+              "mutiplier": 2,
+              "minimumMultipler": 1,
+              "maxQuantity": 1000
+            },
+            "vwapCorrection": {
+              "volumeSum": 0,
+              "tradingSum": 0
+            },
+            "marketCapInMillions": 10000,
+            "long": {
+              "enabled": true,
+              "firstTargetToAdd": "vwap",
+              "finalTargets": [
+                {
+                  "partialCount": 5,
+                  "rrr": 1,
+                  "level": 0,
+                  "atr": 0,
+                  "text": "first"
+                },
+                {
+                  "partialCount": 5,
+                  "rrr": 2,
+                  "level": 0,
+                  "atr": 0,
+                  "text": "second"
+                }
+              ],
+              "gapAndGoPlan": {
+                "planConfigs": {
+                  "requireReversal": true,
+                  "sizingCount": 5
+                },
+                "coreTarget": 13,
+                "coreCount": 3,
+                "runnerCount": 0,
+                "runnerTriggerCondition": "",
+                "support": {
+                  "low": 9,
+                  "high": 10
+                },
+                "recentPullback": 10
+              }
+            },
+            "short": {
+              "enabled": false,
+              "finalTargets": []
+            }
+          }
+        ],
+        "stockSelections": [
+          "AAPL"
+        ],
+        "activeProfileName": "schwab"
+      }
+    ],
+    "result": {
+      "plans": [
+        {
+          "symbol": "AAPL",
+          "corePlan": "A specific momentum plan with support, risk, invalidation and follow-through rules.",
+          "analysis": {
+            "gap": {
+              "pdc": 10
+            },
+            "watchAreas": [],
+            "noTradeZones": []
+          },
+          "atr": {
+            "average": 1,
+            "mutiplier": 2,
+            "minimumMultipler": 1,
+            "maxQuantity": 1000
+          },
+          "vwapCorrection": {
+            "volumeSum": 0,
+            "tradingSum": 0
+          },
+          "marketCapInMillions": 10000,
+          "long": {
+            "enabled": true,
+            "firstTargetToAdd": "vwap",
+            "finalTargets": [
+              {
+                "partialCount": 5,
+                "rrr": 1,
+                "level": 0,
+                "atr": 0,
+                "text": "first"
+              },
+              {
+                "partialCount": 5,
+                "rrr": 2,
+                "level": 0,
+                "atr": 0,
+                "text": "second"
+              }
+            ],
+            "gapAndGoPlan": {
+              "planConfigs": {
+                "requireReversal": true,
+                "sizingCount": 5
+              },
+              "coreTarget": 13,
+              "coreCount": 3,
+              "runnerCount": 0,
+              "runnerTriggerCondition": "",
+              "support": {
+                "low": 9,
+                "high": 10
+              },
+              "recentPullback": 10
+            }
+          },
+          "short": {
+            "enabled": false,
+            "finalTargets": []
+          }
+        }
+      ],
+      "symbols": [
+        "AAPL"
+      ],
+      "profile": "schwab",
+      "tradingSettings": {
+        "useSingleOrderForEntry": false,
+        "snapMode": true
+      }
+    }
+  },
+  {
+    "name": "watchlist attention limit",
+    "kind": "config",
+    "method": "readTradingConfig",
+    "args": [
+      {
+        "plans": [
+          {
+            "symbol": "AAPL",
+            "corePlan": "A specific momentum plan with support, risk, invalidation and follow-through rules.",
+            "analysis": {
+              "gap": {
+                "pdc": 10
+              },
+              "watchAreas": [],
+              "noTradeZones": []
+            },
+            "atr": {
+              "average": 1,
+              "mutiplier": 2,
+              "minimumMultipler": 1,
+              "maxQuantity": 1000
+            },
+            "vwapCorrection": {
+              "volumeSum": 0,
+              "tradingSum": 0
+            },
+            "marketCapInMillions": 10000,
+            "long": {
+              "enabled": true,
+              "firstTargetToAdd": "vwap",
+              "finalTargets": [
+                {
+                  "partialCount": 5,
+                  "rrr": 1,
+                  "level": 0,
+                  "atr": 0,
+                  "text": "first"
+                },
+                {
+                  "partialCount": 5,
+                  "rrr": 2,
+                  "level": 0,
+                  "atr": 0,
+                  "text": "second"
+                }
+              ],
+              "gapAndGoPlan": {
+                "planConfigs": {
+                  "requireReversal": true,
+                  "sizingCount": 5
+                },
+                "coreTarget": 13,
+                "coreCount": 3,
+                "runnerCount": 0,
+                "runnerTriggerCondition": "",
+                "support": {
+                  "low": 9,
+                  "high": 10
+                },
+                "recentPullback": 10
+              }
+            },
+            "short": {
+              "enabled": false,
+              "finalTargets": []
+            }
+          }
+        ],
+        "stockSelections": [
+          "AAPL",
+          "TSLA"
+        ],
+        "activeProfileName": "schwab"
+      }
+    ],
+    "error": "more than 1 stocks in watchlist: AAPL, TSLA"
+  },
+  {
+    "name": "missing selected plan",
+    "kind": "config",
+    "method": "readTradingConfig",
+    "args": [
+      {
+        "plans": [
+          {
+            "symbol": "AAPL",
+            "corePlan": "A specific momentum plan with support, risk, invalidation and follow-through rules.",
+            "analysis": {
+              "gap": {
+                "pdc": 10
+              },
+              "watchAreas": [],
+              "noTradeZones": []
+            },
+            "atr": {
+              "average": 1,
+              "mutiplier": 2,
+              "minimumMultipler": 1,
+              "maxQuantity": 1000
+            },
+            "vwapCorrection": {
+              "volumeSum": 0,
+              "tradingSum": 0
+            },
+            "marketCapInMillions": 10000,
+            "long": {
+              "enabled": true,
+              "firstTargetToAdd": "vwap",
+              "finalTargets": [
+                {
+                  "partialCount": 5,
+                  "rrr": 1,
+                  "level": 0,
+                  "atr": 0,
+                  "text": "first"
+                },
+                {
+                  "partialCount": 5,
+                  "rrr": 2,
+                  "level": 0,
+                  "atr": 0,
+                  "text": "second"
+                }
+              ],
+              "gapAndGoPlan": {
+                "planConfigs": {
+                  "requireReversal": true,
+                  "sizingCount": 5
+                },
+                "coreTarget": 13,
+                "coreCount": 3,
+                "runnerCount": 0,
+                "runnerTriggerCondition": "",
+                "support": {
+                  "low": 9,
+                  "high": 10
+                },
+                "recentPullback": 10
+              }
+            },
+            "short": {
+              "enabled": false,
+              "finalTargets": []
+            }
+          }
+        ],
+        "stockSelections": [
+          "TSLA"
+        ]
+      }
+    ],
+    "error": "TSLA missing trading plans"
+  },
+  {
+    "name": "missing config",
+    "kind": "config",
+    "method": "readTradingConfig",
+    "args": [
+      null
+    ],
+    "error": "Trading configuration missing plans/stockSelections"
+  },
+  {
+    "name": "local execution inputs long with captured sizing and stop-only pair",
+    "kind": "inputs",
+    "args": [
+      "AAPL",
+      {
+        "symbol": "AAPL",
+        "corePlan": "A specific momentum plan with support, risk, invalidation and follow-through rules.",
+        "analysis": {
+          "gap": {
+            "pdc": 10
+          },
+          "watchAreas": [],
+          "noTradeZones": []
+        },
+        "atr": {
+          "average": 1,
+          "mutiplier": 2,
+          "minimumMultipler": 1,
+          "maxQuantity": 1000
+        },
+        "vwapCorrection": {
+          "volumeSum": 0,
+          "tradingSum": 0
+        },
+        "marketCapInMillions": 10000,
+        "long": {
+          "enabled": true,
+          "firstTargetToAdd": "vwap",
+          "finalTargets": [
+            {
+              "partialCount": 5,
+              "rrr": 1,
+              "level": 0,
+              "atr": 0,
+              "text": "first"
+            },
+            {
+              "partialCount": 5,
+              "rrr": 2,
+              "level": 0,
+              "atr": 0,
+              "text": "second"
+            }
+          ],
+          "gapAndGoPlan": {
+            "planConfigs": {
+              "requireReversal": true,
+              "sizingCount": 5
+            },
+            "coreTarget": 13,
+            "coreCount": 3,
+            "runnerCount": 0,
+            "runnerTriggerCondition": "",
+            "support": {
+              "low": 9,
+              "high": 10
+            },
+            "recentPullback": 10
+          }
+        },
+        "short": {
+          "enabled": false,
+          "finalTargets": []
+        }
+      },
+      {
+        "symbol": "AAPL",
+        "date": "2026-10-01",
+        "candles": [
+          {
+            "datetime": 1790861340000,
+            "volume": 1000
+          },
+          {
+            "datetime": 1790861400000,
+            "volume": 2000
+          }
+        ],
+        "currentPrice": 11,
+        "vwap": 10.5,
+        "liquidityScale": 0.5,
+        "openPrice": 10,
+        "highOfDay": 12,
+        "lowOfDay": 9,
+        "premarketHigh": 11,
+        "premarketLow": 8
+      },
+      {
+        "bidPrice": 10.99,
+        "askPrice": 11.01
+      },
+      {
+        "positions": {
+          "AAPL": {
+            "netQuantity": 90,
+            "averagePrice": 10
+          }
+        },
+        "entryOrders": {},
+        "exitPairs": {
+          "AAPL": [
+            {
+              "symbol": "AAPL",
+              "source": "OCO",
+              "parentOrderID": "one",
+              "STOP": {
+                "orderID": "ones",
+                "quantity": 10,
+                "price": 9,
+                "isBuy": false
+              },
+              "LIMIT": {
+                "orderID": "onel",
+                "quantity": 10,
+                "price": 12,
+                "isBuy": false
+              }
+            },
+            {
+              "symbol": "AAPL",
+              "source": "OCO",
+              "parentOrderID": "two",
+              "STOP": {
+                "orderID": "twos",
+                "quantity": 10,
+                "price": 9,
+                "isBuy": false
+              },
+              "LIMIT": {
+                "orderID": "twol",
+                "quantity": 10,
+                "price": 11,
+                "isBuy": false
+              }
+            },
+            {
+              "symbol": "AAPL",
+              "source": "OCO",
+              "parentOrderID": "three",
+              "STOP": {
+                "orderID": "three",
+                "quantity": 10,
+                "price": 9,
+                "isBuy": false
+              }
+            }
+          ]
+        },
+        "currentBalance": 25000
+      },
+      {
+        "trades": {
+          "AAPL": [
+            {
+              "symbol": "AAPL",
+              "entries": [
+                {
+                  "symbol": "AAPL",
+                  "orderID": "0",
+                  "timestamp": 1790861400000,
+                  "quantity": 100,
+                  "price": 10,
+                  "isBuy": true,
+                  "positionEffectIsOpen": true
+                }
+              ],
+              "exits": [
+                {
+                  "symbol": "AAPL",
+                  "orderID": "60000",
+                  "timestamp": 1790861460000,
+                  "quantity": 10,
+                  "price": 11,
+                  "isBuy": false,
+                  "positionEffectIsOpen": false
+                }
+              ],
+              "realizedPnL": 10,
+              "isLong": true,
+              "isClosed": false
+            }
+          ]
+        },
+        "tradesCount": 1,
+        "nonBreakevenTradesCount": 0,
+        "realizedPnL": 10
+      },
+      {
+        "date": "10/1/2026",
+        "initialBalance": 25000,
+        "stateBySymbol": {
+          "AAPL": {
+            "breakoutTradeStateForLong": {
+              "hasValue": true,
+              "entryPrice": 10,
+              "stopLossPrice": 9,
+              "coreInvalidationLevel": -1,
+              "riskLevel": 9,
+              "initialQuantity": 100,
+              "submitTime": {
+                "seconds": 1790861400,
+                "nanoseconds": 123000000
+              },
+              "isLong": true,
+              "status": "Pending",
+              "isMarketOrder": true,
+              "lowestExitBatchCount": -1,
+              "sizeMultipler": 0.5,
+              "maxPullbackAllowed": 9.25,
+              "maxPullbackReached": 0,
+              "adjustedTargetDueToMaxPullback": false,
+              "exitDescription": "",
+              "closedOutsideRatio": -1,
+              "stopTightenPhase": "idle",
+              "coreTargetReminderShown": false,
+              "submitEntryResult": {
+                "totalQuantity": 100,
+                "isSingleOrder": false,
+                "profitTargets": [
+                  {
+                    "target": 11,
+                    "quantity": 100
+                  }
+                ],
+                "tradeBookID": "GapGiveAndGoBookmapReversal"
+              },
+              "plan": {
+                "planConfigs": {
+                  "requireReversal": true,
+                  "sizingCount": 5
+                },
+                "coreTarget": 13,
+                "coreCount": 3,
+                "runnerCount": 0,
+                "runnerTriggerCondition": ""
+              }
+            },
+            "breakoutTradeStateForShort": {
+              "hasValue": false,
+              "entryPrice": 0,
+              "stopLossPrice": 0,
+              "coreInvalidationLevel": -1,
+              "riskLevel": 0,
+              "initialQuantity": 0,
+              "submitTime": {
+                "seconds": 1790861400,
+                "nanoseconds": 0
+              },
+              "isLong": false,
+              "status": "None",
+              "isMarketOrder": false,
+              "lowestExitBatchCount": -1,
+              "sizeMultipler": 0,
+              "maxPullbackAllowed": 0,
+              "maxPullbackReached": 0,
+              "adjustedTargetDueToMaxPullback": false,
+              "exitDescription": "",
+              "closedOutsideRatio": -1,
+              "stopTightenPhase": "idle",
+              "coreTargetReminderShown": false,
+              "submitEntryResult": {
+                "isSingleOrder": false,
+                "profitTargets": [],
+                "totalQuantity": 0,
+                "tradeBookID": ""
+              },
+              "plan": {
+                "planConfigs": {
+                  "requireReversal": true
+                },
+                "coreTarget": 0,
+                "coreCount": 0,
+                "runnerCount": 0,
+                "runnerTriggerCondition": ""
+              }
+            },
+            "peakRiskMultiple": 0,
+            "activeBasePlan": {
+              "planConfigs": {
+                "requireReversal": true,
+                "sizingCount": 5
+              },
+              "coreTarget": 13,
+              "coreCount": 3,
+              "runnerCount": 0,
+              "runnerTriggerCondition": ""
+            }
+          }
+        },
+        "readOnlyStateBySymbol": {
+          "AAPL": {
+            "atr": {
+              "average": 1,
+              "mutiplier": 2,
+              "minimumMultipler": 1,
+              "maxQuantity": 1000
+            }
+          }
+        }
+      },
+      [
+        "AAPL"
+      ],
+      {
+        "AAPL": {
+          "symbol": "AAPL",
+          "date": "2026-10-01",
+          "candles": [
+            {
+              "datetime": 1790861340000,
+              "volume": 1000
+            },
+            {
+              "datetime": 1790861400000,
+              "volume": 2000
+            }
+          ],
+          "currentPrice": 11,
+          "vwap": 10.5,
+          "liquidityScale": 0.5,
+          "openPrice": 10,
+          "highOfDay": 12,
+          "lowOfDay": 9,
+          "premarketHigh": 11,
+          "premarketLow": 8
+        }
+      },
+      {
+        "customStopLong": 9.5,
+        "fixedQuantity": 0
+      },
+      1790861401000,
+      2,
+      {
+        "batchCount": 10,
+        "riskDollars": 1000,
+        "dailyMaxLoss": 4000,
+        "coreTargetEnabled": false,
+        "maxRiskMultipleWithExistingPosition": 1.2,
+        "allowAddIfBelow": 1000
+      }
+    ],
+    "result": {
+      "symbol": "AAPL",
+      "revision": 2,
+      "netQuantity": 90,
+      "averagePrice": 10,
+      "currentPrice": 11,
+      "bid": 10.99,
+      "ask": 11.01,
+      "batchCount": 10,
+      "splitPartials": true,
+      "hasPlan": true,
+      "entryPrice": 10,
+      "coreTarget": 13,
+      "coreCount": 3,
+      "coreRuleEnabled": false,
+      "rulesSupported": true,
+      "entries": [],
+      "pairs": [
+        {
+          "symbol": "AAPL",
+          "source": "OCO",
+          "parentOrderID": "two",
+          "STOP": {
+            "orderID": "twos",
+            "quantity": 10,
+            "price": 9,
+            "isBuy": false
+          },
+          "LIMIT": {
+            "orderID": "twol",
+            "quantity": 10,
+            "price": 11,
+            "isBuy": false
+          },
+          "originalPartial": 3
+        },
+        {
+          "symbol": "AAPL",
+          "source": "OCO",
+          "parentOrderID": "one",
+          "STOP": {
+            "orderID": "ones",
+            "quantity": 10,
+            "price": 9,
+            "isBuy": false
+          },
+          "LIMIT": {
+            "orderID": "onel",
+            "quantity": 10,
+            "price": 12,
+            "isBuy": false
+          },
+          "originalPartial": 4
+        },
+        {
+          "symbol": "AAPL",
+          "source": "OCO",
+          "parentOrderID": "three",
+          "STOP": {
+            "orderID": "three",
+            "quantity": 10,
+            "price": 9,
+            "isBuy": false
+          },
+          "originalPartial": 5
+        }
+      ],
+      "entryContext": {
+        "definitions": [
+          {
+            "tradebookID": "GapGiveAndGoBookmapReversal",
+            "isLong": true,
+            "enabled": true,
+            "basePlan": {
+              "planConfigs": {
+                "requireReversal": true,
+                "sizingCount": 5
+              },
+              "coreTarget": 13,
+              "coreCount": 3,
+              "runnerCount": 0,
+              "runnerTriggerCondition": "",
+              "support": {
+                "low": 9,
+                "high": 10
+              },
+              "recentPullback": 10
+            },
+            "entryArea": {
+              "low": 9,
+              "high": 10
+            }
+          }
+        ],
+        "attendanceAllowed": true,
+        "watchlistBlockReason": "",
+        "realizedPnl": 10,
+        "dailyMaxLoss": 4000,
+        "riskDollars": 1000,
+        "liquidityScale": 0.5,
+        "secondsSinceMarketOpen": 1,
+        "openPrice": 10,
+        "vwap": 10.5,
+        "atr": 1,
+        "maxQuantity": 1000,
+        "watchAreas": [],
+        "noTradeZones": [],
+        "volumes": [
+          2000
+        ],
+        "highOfDay": 12,
+        "lowOfDay": 9,
+        "customEntryPrice": 0,
+        "customStopLong": 9.5,
+        "customStopShort": 0,
+        "fixedQuantity": 0,
+        "availableBuyingPower": 96510,
+        "reloadIsLong": true,
+        "lastExitSize": 10,
+        "crosshairPrice": 0,
+        "todayRange": 2,
+        "longState": {
+          "initialQuantity": 100,
+          "partialsCount": 5,
+          "addCount": 0,
+          "tradebookID": "GapGiveAndGoBookmapReversal",
+          "stopTightenPhase": "idle"
+        },
+        "shortState": {
+          "initialQuantity": 0,
+          "partialsCount": 10,
+          "addCount": 0,
+          "tradebookID": "",
+          "stopTightenPhase": "idle"
+        },
+        "activeBasePlan": {
+          "planConfigs": {
+            "requireReversal": true,
+            "sizingCount": 5
+          },
+          "coreTarget": 13,
+          "coreCount": 3,
+          "runnerCount": 0,
+          "runnerTriggerCondition": ""
+        },
+        "isGappedUp": false,
+        "premarketHigh": 11,
+        "premarketLow": 8,
+        "addTargetLong": 10.5,
+        "addTargetShort": 0,
+        "maxRiskMultipleWithExistingPosition": 1.2,
+        "allowAddIfBelow": 1000
+      }
+    }
+  },
+  {
+    "name": "local execution inputs short ordered limits descending",
+    "kind": "inputs",
+    "args": [
+      "AAPL",
+      {
+        "symbol": "AAPL",
+        "corePlan": "A specific momentum plan with support, risk, invalidation and follow-through rules.",
+        "analysis": {
+          "gap": {
+            "pdc": 10
+          },
+          "watchAreas": [],
+          "noTradeZones": []
+        },
+        "atr": {
+          "average": 1,
+          "mutiplier": 2,
+          "minimumMultipler": 1,
+          "maxQuantity": 1000
+        },
+        "vwapCorrection": {
+          "volumeSum": 0,
+          "tradingSum": 0
+        },
+        "marketCapInMillions": 10000,
+        "long": {
+          "enabled": true,
+          "firstTargetToAdd": "vwap",
+          "finalTargets": [
+            {
+              "partialCount": 5,
+              "rrr": 1,
+              "level": 0,
+              "atr": 0,
+              "text": "first"
+            },
+            {
+              "partialCount": 5,
+              "rrr": 2,
+              "level": 0,
+              "atr": 0,
+              "text": "second"
+            }
+          ],
+          "gapAndGoPlan": {
+            "planConfigs": {
+              "requireReversal": true,
+              "sizingCount": 5
+            },
+            "coreTarget": 13,
+            "coreCount": 3,
+            "runnerCount": 0,
+            "runnerTriggerCondition": "",
+            "support": {
+              "low": 9,
+              "high": 10
+            },
+            "recentPullback": 10
+          }
+        },
+        "short": {
+          "enabled": false,
+          "finalTargets": []
+        }
+      },
+      {
+        "symbol": "AAPL",
+        "date": "2026-10-01",
+        "candles": [
+          {
+            "datetime": 1790861340000,
+            "volume": 1000
+          },
+          {
+            "datetime": 1790861400000,
+            "volume": 2000
+          }
+        ],
+        "currentPrice": 11,
+        "vwap": 10.5,
+        "liquidityScale": 0.5,
+        "openPrice": 10,
+        "highOfDay": 12,
+        "lowOfDay": 9,
+        "premarketHigh": 11,
+        "premarketLow": 8
+      },
+      {
+        "bidPrice": 10.99,
+        "askPrice": 11.01
+      },
+      {
+        "positions": {
+          "AAPL": {
+            "netQuantity": -90,
+            "averagePrice": 10
+          }
+        },
+        "entryOrders": {},
+        "exitPairs": {
+          "AAPL": [
+            {
+              "symbol": "AAPL",
+              "source": "OCO",
+              "parentOrderID": "one",
+              "STOP": {
+                "orderID": "ones",
+                "quantity": 10,
+                "price": 9,
+                "isBuy": true
+              },
+              "LIMIT": {
+                "orderID": "onel",
+                "quantity": 10,
+                "price": 12,
+                "isBuy": true
+              }
+            },
+            {
+              "symbol": "AAPL",
+              "source": "OCO",
+              "parentOrderID": "two",
+              "STOP": {
+                "orderID": "twos",
+                "quantity": 10,
+                "price": 9,
+                "isBuy": true
+              },
+              "LIMIT": {
+                "orderID": "twol",
+                "quantity": 10,
+                "price": 11,
+                "isBuy": true
+              }
+            },
+            {
+              "symbol": "AAPL",
+              "source": "OCO",
+              "parentOrderID": "three",
+              "STOP": {
+                "orderID": "three",
+                "quantity": 10,
+                "price": 9,
+                "isBuy": true
+              }
+            }
+          ]
+        },
+        "currentBalance": 25000
+      },
+      {
+        "trades": {
+          "AAPL": [
+            {
+              "symbol": "AAPL",
+              "entries": [
+                {
+                  "symbol": "AAPL",
+                  "orderID": "0",
+                  "timestamp": 1790861400000,
+                  "quantity": 100,
+                  "price": 10,
+                  "isBuy": false,
+                  "positionEffectIsOpen": true
+                }
+              ],
+              "exits": [
+                {
+                  "symbol": "AAPL",
+                  "orderID": "60000",
+                  "timestamp": 1790861460000,
+                  "quantity": 10,
+                  "price": 11,
+                  "isBuy": true,
+                  "positionEffectIsOpen": false
+                }
+              ],
+              "realizedPnL": -10,
+              "isLong": false,
+              "isClosed": false
+            }
+          ]
+        },
+        "tradesCount": 1,
+        "nonBreakevenTradesCount": 0,
+        "realizedPnL": -10
+      },
+      {
+        "date": "10/1/2026",
+        "initialBalance": 25000,
+        "stateBySymbol": {
+          "AAPL": {
+            "breakoutTradeStateForLong": {
+              "hasValue": true,
+              "entryPrice": 10,
+              "stopLossPrice": 9,
+              "coreInvalidationLevel": -1,
+              "riskLevel": 9,
+              "initialQuantity": 100,
+              "submitTime": {
+                "seconds": 1790861400,
+                "nanoseconds": 123000000
+              },
+              "isLong": true,
+              "status": "Pending",
+              "isMarketOrder": true,
+              "lowestExitBatchCount": -1,
+              "sizeMultipler": 0.5,
+              "maxPullbackAllowed": 9.25,
+              "maxPullbackReached": 0,
+              "adjustedTargetDueToMaxPullback": false,
+              "exitDescription": "",
+              "closedOutsideRatio": -1,
+              "stopTightenPhase": "idle",
+              "coreTargetReminderShown": false,
+              "submitEntryResult": {
+                "totalQuantity": 100,
+                "isSingleOrder": false,
+                "profitTargets": [
+                  {
+                    "target": 11,
+                    "quantity": 100
+                  }
+                ],
+                "tradeBookID": "GapGiveAndGoBookmapReversal"
+              },
+              "plan": {
+                "planConfigs": {
+                  "requireReversal": true,
+                  "sizingCount": 5
+                },
+                "coreTarget": 13,
+                "coreCount": 3,
+                "runnerCount": 0,
+                "runnerTriggerCondition": ""
+              }
+            },
+            "breakoutTradeStateForShort": {
+              "hasValue": true,
+              "entryPrice": 10,
+              "stopLossPrice": 11,
+              "coreInvalidationLevel": -1,
+              "riskLevel": 11,
+              "initialQuantity": 100,
+              "submitTime": {
+                "seconds": 1790861400,
+                "nanoseconds": 0
+              },
+              "isLong": false,
+              "status": "Pending",
+              "isMarketOrder": true,
+              "lowestExitBatchCount": -1,
+              "sizeMultipler": 0.5,
+              "maxPullbackAllowed": 10.75,
+              "maxPullbackReached": 0,
+              "adjustedTargetDueToMaxPullback": false,
+              "exitDescription": "",
+              "closedOutsideRatio": -1,
+              "stopTightenPhase": "idle",
+              "coreTargetReminderShown": false,
+              "submitEntryResult": {
+                "totalQuantity": 100,
+                "isSingleOrder": false,
+                "profitTargets": [
+                  {
+                    "target": 11,
+                    "quantity": 100
+                  }
+                ],
+                "tradeBookID": "GapGiveAndGoBookmapReversal"
+              },
+              "plan": {
+                "planConfigs": {
+                  "requireReversal": true,
+                  "sizingCount": 5
+                },
+                "coreTarget": 13,
+                "coreCount": 3,
+                "runnerCount": 0,
+                "runnerTriggerCondition": ""
+              }
+            },
+            "peakRiskMultiple": 0,
+            "activeBasePlan": {
+              "planConfigs": {
+                "requireReversal": true,
+                "sizingCount": 5
+              },
+              "coreTarget": 13,
+              "coreCount": 3,
+              "runnerCount": 0,
+              "runnerTriggerCondition": ""
+            }
+          }
+        },
+        "readOnlyStateBySymbol": {
+          "AAPL": {
+            "atr": {
+              "average": 1,
+              "mutiplier": 2,
+              "minimumMultipler": 1,
+              "maxQuantity": 1000
+            }
+          }
+        }
+      },
+      [
+        "AAPL"
+      ],
+      {
+        "AAPL": {
+          "symbol": "AAPL",
+          "date": "2026-10-01",
+          "candles": [
+            {
+              "datetime": 1790861340000,
+              "volume": 1000
+            },
+            {
+              "datetime": 1790861400000,
+              "volume": 2000
+            }
+          ],
+          "currentPrice": 11,
+          "vwap": 10.5,
+          "liquidityScale": 0.5,
+          "openPrice": 10,
+          "highOfDay": 12,
+          "lowOfDay": 9,
+          "premarketHigh": 11,
+          "premarketLow": 8
+        }
+      },
+      {
+        "customStopLong": 9.5,
+        "fixedQuantity": 0
+      },
+      1790861401000,
+      2,
+      {
+        "batchCount": 10,
+        "riskDollars": 1000,
+        "dailyMaxLoss": 4000,
+        "coreTargetEnabled": false,
+        "maxRiskMultipleWithExistingPosition": 1.2,
+        "allowAddIfBelow": 1000
+      }
+    ],
+    "result": {
+      "symbol": "AAPL",
+      "revision": 2,
+      "netQuantity": -90,
+      "averagePrice": 10,
+      "currentPrice": 11,
+      "bid": 10.99,
+      "ask": 11.01,
+      "batchCount": 10,
+      "splitPartials": true,
+      "hasPlan": true,
+      "entryPrice": 10,
+      "coreTarget": 13,
+      "coreCount": 3,
+      "coreRuleEnabled": false,
+      "rulesSupported": true,
+      "entries": [],
+      "pairs": [
+        {
+          "symbol": "AAPL",
+          "source": "OCO",
+          "parentOrderID": "one",
+          "STOP": {
+            "orderID": "ones",
+            "quantity": 10,
+            "price": 9,
+            "isBuy": true
+          },
+          "LIMIT": {
+            "orderID": "onel",
+            "quantity": 10,
+            "price": 12,
+            "isBuy": true
+          },
+          "originalPartial": 3
+        },
+        {
+          "symbol": "AAPL",
+          "source": "OCO",
+          "parentOrderID": "two",
+          "STOP": {
+            "orderID": "twos",
+            "quantity": 10,
+            "price": 9,
+            "isBuy": true
+          },
+          "LIMIT": {
+            "orderID": "twol",
+            "quantity": 10,
+            "price": 11,
+            "isBuy": true
+          },
+          "originalPartial": 4
+        },
+        {
+          "symbol": "AAPL",
+          "source": "OCO",
+          "parentOrderID": "three",
+          "STOP": {
+            "orderID": "three",
+            "quantity": 10,
+            "price": 9,
+            "isBuy": true
+          },
+          "originalPartial": 5
+        }
+      ],
+      "entryContext": {
+        "definitions": [
+          {
+            "tradebookID": "GapGiveAndGoBookmapReversal",
+            "isLong": true,
+            "enabled": true,
+            "basePlan": {
+              "planConfigs": {
+                "requireReversal": true,
+                "sizingCount": 5
+              },
+              "coreTarget": 13,
+              "coreCount": 3,
+              "runnerCount": 0,
+              "runnerTriggerCondition": "",
+              "support": {
+                "low": 9,
+                "high": 10
+              },
+              "recentPullback": 10
+            },
+            "entryArea": {
+              "low": 9,
+              "high": 10
+            }
+          }
+        ],
+        "attendanceAllowed": true,
+        "watchlistBlockReason": "",
+        "realizedPnl": -10,
+        "dailyMaxLoss": 4000,
+        "riskDollars": 1000,
+        "liquidityScale": 0.5,
+        "secondsSinceMarketOpen": 1,
+        "openPrice": 10,
+        "vwap": 10.5,
+        "atr": 1,
+        "maxQuantity": 1000,
+        "watchAreas": [],
+        "noTradeZones": [],
+        "volumes": [
+          2000
+        ],
+        "highOfDay": 12,
+        "lowOfDay": 9,
+        "customEntryPrice": 0,
+        "customStopLong": 9.5,
+        "customStopShort": 0,
+        "fixedQuantity": 0,
+        "availableBuyingPower": 96510,
+        "reloadIsLong": false,
+        "lastExitSize": 10,
+        "crosshairPrice": 0,
+        "todayRange": 2,
+        "longState": {
+          "initialQuantity": 100,
+          "partialsCount": 5,
+          "addCount": 0,
+          "tradebookID": "GapGiveAndGoBookmapReversal",
+          "stopTightenPhase": "idle"
+        },
+        "shortState": {
+          "initialQuantity": 100,
+          "partialsCount": 5,
+          "addCount": 0,
+          "tradebookID": "GapGiveAndGoBookmapReversal",
+          "stopTightenPhase": "idle"
+        },
+        "activeBasePlan": {
+          "planConfigs": {
+            "requireReversal": true,
+            "sizingCount": 5
+          },
+          "coreTarget": 13,
+          "coreCount": 3,
+          "runnerCount": 0,
+          "runnerTriggerCondition": ""
+        },
+        "isGappedUp": false,
+        "premarketHigh": 11,
+        "premarketLow": 8,
+        "addTargetLong": 10.5,
+        "addTargetShort": 0,
+        "maxRiskMultipleWithExistingPosition": 1.2,
+        "allowAddIfBelow": 1000
+      }
+    }
+  },
+  {
+    "name": "local execution inputs flat reload direction",
+    "kind": "inputs",
+    "args": [
+      "AAPL",
+      {
+        "symbol": "AAPL",
+        "corePlan": "A specific momentum plan with support, risk, invalidation and follow-through rules.",
+        "analysis": {
+          "gap": {
+            "pdc": 10
+          },
+          "watchAreas": [],
+          "noTradeZones": []
+        },
+        "atr": {
+          "average": 1,
+          "mutiplier": 2,
+          "minimumMultipler": 1,
+          "maxQuantity": 1000
+        },
+        "vwapCorrection": {
+          "volumeSum": 0,
+          "tradingSum": 0
+        },
+        "marketCapInMillions": 10000,
+        "long": {
+          "enabled": true,
+          "firstTargetToAdd": "vwap",
+          "finalTargets": [
+            {
+              "partialCount": 5,
+              "rrr": 1,
+              "level": 0,
+              "atr": 0,
+              "text": "first"
+            },
+            {
+              "partialCount": 5,
+              "rrr": 2,
+              "level": 0,
+              "atr": 0,
+              "text": "second"
+            }
+          ],
+          "gapAndGoPlan": {
+            "planConfigs": {
+              "requireReversal": true,
+              "sizingCount": 5
+            },
+            "coreTarget": 13,
+            "coreCount": 3,
+            "runnerCount": 0,
+            "runnerTriggerCondition": "",
+            "support": {
+              "low": 9,
+              "high": 10
+            },
+            "recentPullback": 10
+          }
+        },
+        "short": {
+          "enabled": false,
+          "finalTargets": []
+        }
+      },
+      {
+        "symbol": "AAPL",
+        "date": "2026-10-01",
+        "candles": [
+          {
+            "datetime": 1790861340000,
+            "volume": 1000
+          },
+          {
+            "datetime": 1790861400000,
+            "volume": 2000
+          }
+        ],
+        "currentPrice": 11,
+        "vwap": 10.5,
+        "liquidityScale": 0.5,
+        "openPrice": 10,
+        "highOfDay": 12,
+        "lowOfDay": 9,
+        "premarketHigh": 11,
+        "premarketLow": 8
+      },
+      {
+        "bidPrice": 10.99,
+        "askPrice": 11.01
+      },
+      {
+        "positions": {
+          "AAPL": {
+            "netQuantity": 0,
+            "averagePrice": 10
+          }
+        },
+        "entryOrders": {},
+        "exitPairs": {
+          "AAPL": [
+            {
+              "symbol": "AAPL",
+              "source": "OCO",
+              "parentOrderID": "one",
+              "STOP": {
+                "orderID": "ones",
+                "quantity": 10,
+                "price": 9,
+                "isBuy": false
+              },
+              "LIMIT": {
+                "orderID": "onel",
+                "quantity": 10,
+                "price": 12,
+                "isBuy": false
+              }
+            },
+            {
+              "symbol": "AAPL",
+              "source": "OCO",
+              "parentOrderID": "two",
+              "STOP": {
+                "orderID": "twos",
+                "quantity": 10,
+                "price": 9,
+                "isBuy": false
+              },
+              "LIMIT": {
+                "orderID": "twol",
+                "quantity": 10,
+                "price": 11,
+                "isBuy": false
+              }
+            },
+            {
+              "symbol": "AAPL",
+              "source": "OCO",
+              "parentOrderID": "three",
+              "STOP": {
+                "orderID": "three",
+                "quantity": 10,
+                "price": 9,
+                "isBuy": false
+              }
+            }
+          ]
+        },
+        "currentBalance": 25000
+      },
+      {
+        "trades": {
+          "AAPL": [
+            {
+              "symbol": "AAPL",
+              "entries": [
+                {
+                  "symbol": "AAPL",
+                  "orderID": "0",
+                  "timestamp": 1790861400000,
+                  "quantity": 100,
+                  "price": 10,
+                  "isBuy": true,
+                  "positionEffectIsOpen": true
+                }
+              ],
+              "exits": [
+                {
+                  "symbol": "AAPL",
+                  "orderID": "60000",
+                  "timestamp": 1790861460000,
+                  "quantity": 10,
+                  "price": 11,
+                  "isBuy": false,
+                  "positionEffectIsOpen": false
+                }
+              ],
+              "realizedPnL": 10,
+              "isLong": true,
+              "isClosed": false
+            }
+          ]
+        },
+        "tradesCount": 1,
+        "nonBreakevenTradesCount": 0,
+        "realizedPnL": 10
+      },
+      null,
+      [
+        "AAPL"
+      ],
+      {
+        "AAPL": {
+          "symbol": "AAPL",
+          "date": "2026-10-01",
+          "candles": [
+            {
+              "datetime": 1790861340000,
+              "volume": 1000
+            },
+            {
+              "datetime": 1790861400000,
+              "volume": 2000
+            }
+          ],
+          "currentPrice": 11,
+          "vwap": 10.5,
+          "liquidityScale": 0.5,
+          "openPrice": 10,
+          "highOfDay": 12,
+          "lowOfDay": 9,
+          "premarketHigh": 11,
+          "premarketLow": 8
+        }
+      },
+      {
+        "customStopLong": 9.5,
+        "fixedQuantity": 0
+      },
+      1790861401000,
+      2,
+      {
+        "batchCount": 10,
+        "riskDollars": 1000,
+        "dailyMaxLoss": 4000,
+        "coreTargetEnabled": false,
+        "maxRiskMultipleWithExistingPosition": 1.2,
+        "allowAddIfBelow": 1000
+      }
+    ],
+    "result": {
+      "symbol": "AAPL",
+      "revision": 2,
+      "netQuantity": 0,
+      "averagePrice": 10,
+      "currentPrice": 11,
+      "bid": 10.99,
+      "ask": 11.01,
+      "batchCount": 10,
+      "splitPartials": false,
+      "hasPlan": false,
+      "entryPrice": 0,
+      "coreTarget": 0,
+      "coreCount": 0,
+      "coreRuleEnabled": false,
+      "rulesSupported": true,
+      "entries": [],
+      "pairs": [
+        {
+          "symbol": "AAPL",
+          "source": "OCO",
+          "parentOrderID": "two",
+          "STOP": {
+            "orderID": "twos",
+            "quantity": 10,
+            "price": 9,
+            "isBuy": false
+          },
+          "LIMIT": {
+            "orderID": "twol",
+            "quantity": 10,
+            "price": 11,
+            "isBuy": false
+          },
+          "originalPartial": 8
+        },
+        {
+          "symbol": "AAPL",
+          "source": "OCO",
+          "parentOrderID": "one",
+          "STOP": {
+            "orderID": "ones",
+            "quantity": 10,
+            "price": 9,
+            "isBuy": false
+          },
+          "LIMIT": {
+            "orderID": "onel",
+            "quantity": 10,
+            "price": 12,
+            "isBuy": false
+          },
+          "originalPartial": 9
+        },
+        {
+          "symbol": "AAPL",
+          "source": "OCO",
+          "parentOrderID": "three",
+          "STOP": {
+            "orderID": "three",
+            "quantity": 10,
+            "price": 9,
+            "isBuy": false
+          },
+          "originalPartial": 10
+        }
+      ],
+      "entryContext": {
+        "definitions": [
+          {
+            "tradebookID": "GapGiveAndGoBookmapReversal",
+            "isLong": true,
+            "enabled": true,
+            "basePlan": {
+              "planConfigs": {
+                "requireReversal": true,
+                "sizingCount": 5
+              },
+              "coreTarget": 13,
+              "coreCount": 3,
+              "runnerCount": 0,
+              "runnerTriggerCondition": "",
+              "support": {
+                "low": 9,
+                "high": 10
+              },
+              "recentPullback": 10
+            },
+            "entryArea": {
+              "low": 9,
+              "high": 10
+            }
+          }
+        ],
+        "attendanceAllowed": true,
+        "watchlistBlockReason": "",
+        "realizedPnl": 10,
+        "dailyMaxLoss": 4000,
+        "riskDollars": 1000,
+        "liquidityScale": 0.5,
+        "secondsSinceMarketOpen": 1,
+        "openPrice": 10,
+        "vwap": 10.5,
+        "atr": 1,
+        "maxQuantity": 1000,
+        "watchAreas": [],
+        "noTradeZones": [],
+        "volumes": [
+          2000
+        ],
+        "highOfDay": 12,
+        "lowOfDay": 9,
+        "customEntryPrice": 0,
+        "customStopLong": 9.5,
+        "customStopShort": 0,
+        "fixedQuantity": 0,
+        "availableBuyingPower": 97500,
+        "reloadIsLong": true,
+        "lastExitSize": 10,
+        "crosshairPrice": 0,
+        "todayRange": 2,
+        "longState": {
+          "initialQuantity": 0,
+          "partialsCount": 10,
+          "addCount": 0,
+          "tradebookID": "",
+          "stopTightenPhase": "idle"
+        },
+        "shortState": {
+          "initialQuantity": 0,
+          "partialsCount": 10,
+          "addCount": 0,
+          "tradebookID": "",
+          "stopTightenPhase": "idle"
+        },
+        "isGappedUp": false,
+        "premarketHigh": 11,
+        "premarketLow": 8,
+        "addTargetLong": 10.5,
+        "addTargetShort": 0,
+        "maxRiskMultipleWithExistingPosition": 1.2,
+        "allowAddIfBelow": 1000
+      }
+    }
+  },
+  {
+    "name": "single large exit disables split partials",
+    "kind": "inputs",
+    "args": [
+      "AAPL",
+      {
+        "symbol": "AAPL",
+        "corePlan": "A specific momentum plan with support, risk, invalidation and follow-through rules.",
+        "analysis": {
+          "gap": {
+            "pdc": 10
+          },
+          "watchAreas": [],
+          "noTradeZones": []
+        },
+        "atr": {
+          "average": 1,
+          "mutiplier": 2,
+          "minimumMultipler": 1,
+          "maxQuantity": 1000
+        },
+        "vwapCorrection": {
+          "volumeSum": 0,
+          "tradingSum": 0
+        },
+        "marketCapInMillions": 10000,
+        "long": {
+          "enabled": true,
+          "firstTargetToAdd": "vwap",
+          "finalTargets": [
+            {
+              "partialCount": 5,
+              "rrr": 1,
+              "level": 0,
+              "atr": 0,
+              "text": "first"
+            },
+            {
+              "partialCount": 5,
+              "rrr": 2,
+              "level": 0,
+              "atr": 0,
+              "text": "second"
+            }
+          ],
+          "gapAndGoPlan": {
+            "planConfigs": {
+              "requireReversal": true,
+              "sizingCount": 5
+            },
+            "coreTarget": 13,
+            "coreCount": 3,
+            "runnerCount": 0,
+            "runnerTriggerCondition": "",
+            "support": {
+              "low": 9,
+              "high": 10
+            },
+            "recentPullback": 10
+          }
+        },
+        "short": {
+          "enabled": false,
+          "finalTargets": []
+        }
+      },
+      {
+        "symbol": "AAPL",
+        "date": "2026-10-01",
+        "candles": [
+          {
+            "datetime": 1790861340000,
+            "volume": 1000
+          },
+          {
+            "datetime": 1790861400000,
+            "volume": 2000
+          }
+        ],
+        "currentPrice": 11,
+        "vwap": 10.5,
+        "liquidityScale": 0.5,
+        "openPrice": 10,
+        "highOfDay": 12,
+        "lowOfDay": 9,
+        "premarketHigh": 11,
+        "premarketLow": 8
+      },
+      {
+        "bidPrice": 10.99,
+        "askPrice": 11.01
+      },
+      {
+        "positions": {
+          "AAPL": {
+            "netQuantity": 100,
+            "averagePrice": 10
+          }
+        },
+        "entryOrders": {},
+        "exitPairs": {
+          "AAPL": [
+            {
+              "STOP": {
+                "orderID": "large",
+                "quantity": 100,
+                "price": 9
+              }
+            }
+          ]
+        },
+        "currentBalance": 25000
+      },
+      {
+        "trades": {
+          "AAPL": [
+            {
+              "symbol": "AAPL",
+              "entries": [
+                {
+                  "symbol": "AAPL",
+                  "orderID": "0",
+                  "timestamp": 1790861400000,
+                  "quantity": 100,
+                  "price": 10,
+                  "isBuy": true,
+                  "positionEffectIsOpen": true
+                }
+              ],
+              "exits": [
+                {
+                  "symbol": "AAPL",
+                  "orderID": "60000",
+                  "timestamp": 1790861460000,
+                  "quantity": 10,
+                  "price": 11,
+                  "isBuy": false,
+                  "positionEffectIsOpen": false
+                }
+              ],
+              "realizedPnL": 10,
+              "isLong": true,
+              "isClosed": false
+            }
+          ]
+        },
+        "tradesCount": 1,
+        "nonBreakevenTradesCount": 0,
+        "realizedPnL": 10
+      },
+      {
+        "date": "10/1/2026",
+        "initialBalance": 25000,
+        "stateBySymbol": {
+          "AAPL": {
+            "breakoutTradeStateForLong": {
+              "hasValue": true,
+              "entryPrice": 10,
+              "stopLossPrice": 9,
+              "coreInvalidationLevel": -1,
+              "riskLevel": 9,
+              "initialQuantity": 10,
+              "submitTime": {
+                "seconds": 1790861400,
+                "nanoseconds": 0
+              },
+              "isLong": true,
+              "status": "Pending",
+              "isMarketOrder": true,
+              "lowestExitBatchCount": -1,
+              "sizeMultipler": 0.5,
+              "maxPullbackAllowed": 9.25,
+              "maxPullbackReached": 0,
+              "adjustedTargetDueToMaxPullback": false,
+              "exitDescription": "",
+              "closedOutsideRatio": -1,
+              "stopTightenPhase": "idle",
+              "coreTargetReminderShown": false,
+              "submitEntryResult": {
+                "totalQuantity": 10,
+                "isSingleOrder": true,
+                "profitTargets": [
+                  {
+                    "target": 11,
+                    "quantity": 100
+                  }
+                ],
+                "tradeBookID": "GapGiveAndGoBookmapReversal"
+              },
+              "plan": {
+                "planConfigs": {
+                  "requireReversal": true,
+                  "sizingCount": 5
+                },
+                "coreTarget": 13,
+                "coreCount": 3,
+                "runnerCount": 0,
+                "runnerTriggerCondition": ""
+              }
+            },
+            "breakoutTradeStateForShort": {
+              "hasValue": false,
+              "entryPrice": 0,
+              "stopLossPrice": 0,
+              "coreInvalidationLevel": -1,
+              "riskLevel": 0,
+              "initialQuantity": 0,
+              "submitTime": {
+                "seconds": 1790861400,
+                "nanoseconds": 0
+              },
+              "isLong": false,
+              "status": "None",
+              "isMarketOrder": false,
+              "lowestExitBatchCount": -1,
+              "sizeMultipler": 0,
+              "maxPullbackAllowed": 0,
+              "maxPullbackReached": 0,
+              "adjustedTargetDueToMaxPullback": false,
+              "exitDescription": "",
+              "closedOutsideRatio": -1,
+              "stopTightenPhase": "idle",
+              "coreTargetReminderShown": false,
+              "submitEntryResult": {
+                "isSingleOrder": false,
+                "profitTargets": [],
+                "totalQuantity": 0,
+                "tradeBookID": ""
+              },
+              "plan": {
+                "planConfigs": {
+                  "requireReversal": true
+                },
+                "coreTarget": 0,
+                "coreCount": 0,
+                "runnerCount": 0,
+                "runnerTriggerCondition": ""
+              }
+            },
+            "peakRiskMultiple": 0,
+            "activeBasePlan": {
+              "planConfigs": {
+                "requireReversal": true,
+                "sizingCount": 5
+              },
+              "coreTarget": 13,
+              "coreCount": 3,
+              "runnerCount": 0,
+              "runnerTriggerCondition": ""
+            }
+          }
+        },
+        "readOnlyStateBySymbol": {
+          "AAPL": {
+            "atr": {
+              "average": 1,
+              "mutiplier": 2,
+              "minimumMultipler": 1,
+              "maxQuantity": 1000
+            }
+          }
+        }
+      },
+      [
+        "AAPL"
+      ],
+      {
+        "AAPL": {
+          "symbol": "AAPL",
+          "date": "2026-10-01",
+          "candles": [
+            {
+              "datetime": 1790861340000,
+              "volume": 1000
+            },
+            {
+              "datetime": 1790861400000,
+              "volume": 2000
+            }
+          ],
+          "currentPrice": 11,
+          "vwap": 10.5,
+          "liquidityScale": 0.5,
+          "openPrice": 10,
+          "highOfDay": 12,
+          "lowOfDay": 9,
+          "premarketHigh": 11,
+          "premarketLow": 8
+        }
+      },
+      {
+        "customStopLong": 9.5,
+        "fixedQuantity": 0
+      },
+      1790861401000,
+      2,
+      {
+        "batchCount": 10,
+        "riskDollars": 1000,
+        "dailyMaxLoss": 4000,
+        "coreTargetEnabled": false,
+        "maxRiskMultipleWithExistingPosition": 1.2,
+        "allowAddIfBelow": 1000
+      }
+    ],
+    "result": {
+      "symbol": "AAPL",
+      "revision": 2,
+      "netQuantity": 100,
+      "averagePrice": 10,
+      "currentPrice": 11,
+      "bid": 10.99,
+      "ask": 11.01,
+      "batchCount": 10,
+      "splitPartials": false,
+      "hasPlan": true,
+      "entryPrice": 10,
+      "coreTarget": 13,
+      "coreCount": 3,
+      "coreRuleEnabled": false,
+      "rulesSupported": true,
+      "entries": [],
+      "pairs": [
+        {
+          "STOP": {
+            "orderID": "large",
+            "quantity": 100,
+            "price": 9
+          },
+          "originalPartial": 5
+        }
+      ],
+      "entryContext": {
+        "definitions": [
+          {
+            "tradebookID": "GapGiveAndGoBookmapReversal",
+            "isLong": true,
+            "enabled": true,
+            "basePlan": {
+              "planConfigs": {
+                "requireReversal": true,
+                "sizingCount": 5
+              },
+              "coreTarget": 13,
+              "coreCount": 3,
+              "runnerCount": 0,
+              "runnerTriggerCondition": "",
+              "support": {
+                "low": 9,
+                "high": 10
+              },
+              "recentPullback": 10
+            },
+            "entryArea": {
+              "low": 9,
+              "high": 10
+            }
+          }
+        ],
+        "attendanceAllowed": true,
+        "watchlistBlockReason": "",
+        "realizedPnl": 10,
+        "dailyMaxLoss": 4000,
+        "riskDollars": 1000,
+        "liquidityScale": 0.5,
+        "secondsSinceMarketOpen": 1,
+        "openPrice": 10,
+        "vwap": 10.5,
+        "atr": 1,
+        "maxQuantity": 1000,
+        "watchAreas": [],
+        "noTradeZones": [],
+        "volumes": [
+          2000
+        ],
+        "highOfDay": 12,
+        "lowOfDay": 9,
+        "customEntryPrice": 0,
+        "customStopLong": 9.5,
+        "customStopShort": 0,
+        "fixedQuantity": 0,
+        "availableBuyingPower": 96400,
+        "reloadIsLong": true,
+        "lastExitSize": 10,
+        "crosshairPrice": 0,
+        "todayRange": 2,
+        "longState": {
+          "initialQuantity": 10,
+          "partialsCount": 5,
+          "addCount": 0,
+          "tradebookID": "GapGiveAndGoBookmapReversal",
+          "stopTightenPhase": "idle"
+        },
+        "shortState": {
+          "initialQuantity": 0,
+          "partialsCount": 10,
+          "addCount": 0,
+          "tradebookID": "",
+          "stopTightenPhase": "idle"
+        },
+        "activeBasePlan": {
+          "planConfigs": {
+            "requireReversal": true,
+            "sizingCount": 5
+          },
+          "coreTarget": 13,
+          "coreCount": 3,
+          "runnerCount": 0,
+          "runnerTriggerCondition": ""
+        },
+        "isGappedUp": false,
+        "premarketHigh": 11,
+        "premarketLow": 8,
+        "addTargetLong": 10.5,
+        "addTargetShort": 0,
+        "maxRiskMultipleWithExistingPosition": 1.2,
+        "allowAddIfBelow": 1000
+      }
+    }
+  }
+]

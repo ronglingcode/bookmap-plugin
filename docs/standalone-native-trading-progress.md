@@ -26,7 +26,7 @@ Updated: 2026-10-01. Design: [standalone-native-trading-plan.md](standalone-nati
 | 3. Secrets, Firestore, OAuth | In progress | Matching OAuth, credential ports, Firestore REST codecs/config/state/log operations complete. Java local-file store and blank template added. Browser uses libraries. Java startup, periodic refresh and local authorization controls remain part of runtime/adapter phases. |
 | 4. Massive/history/market state | In progress | Matching REST clients and history/live loader, headless candles/VWAP/session levels, Camarilla, liquidity and eligibility implemented. Browser DB now renders headless state and preserves every worker-batched print. Java stream/runtime wiring remains. |
 | 5. Account/streams/runtime | In progress | Mirrored Schwab reads/account projection, vendor stream protocols and reconnecting two-stream runtime implemented. Java JDK socket adapter added. Wiring configuration/account cache/periodic refresh into the plugin lifecycle remains. |
-| 6. State/workflow completion | Pending | Four extended routes already implemented but flagged; state ownership/additional commands/jobs missing. |
+| 6. State/workflow completion | In progress | Mirrored trade ledger, persisted state, configuration validation/definitions and execution-input construction implemented; local runtime state ownership/additional commands/jobs remain. |
 | 7. Bookmap adapter | Pending | Runtime currently owned by WebSocket server; UI/config updates still come from ViteApp. |
 | 8. Remove bridge/flag, final verification | Pending | Must verify browser and proxy closed, token expiry, restore/reconnect, and obfuscated JAR. |
 
@@ -67,6 +67,29 @@ Updated: 2026-10-01. Design: [standalone-native-trading-plan.md](standalone-nati
 - No credentials copied, no live orders sent, no real state documents overwritten.
 
 ## Resume checkpoint
+
+Latest implemented slice: `core/account/TradeLedger`, `core/state/TradeState`,
+`core/configuration/TradingConfig`, `core/controllers/ExecutionInputs` in both
+languages. Browser fill grouping, accepted-state registration, tradebook factory
+and bridge entry-context adapter now call these pure modules. `test:state` and
+Java `StateParityTest` cover 39 production-core scenarios. Full browser build,
+direct/extended execution suites and full Java build (native-only and release
+JAR checks included) pass.
+
+Next concrete step: add native runtime startup from LocalCredentials, fetch config,
+account and restored state, schedule OAuth/account/config reads, start MarketStreams
+and MarketLoader, and feed ExecutionInputs directly to MiniViteApp. Keep callbacks
+and I/O outside state locks. Then port commands/jobs and local Bookmap view updates.
+Bookmap still relies on the ViteApp bridge at this checkpoint; do not remove it or
+claim standalone completion before lifecycle wiring and end-to-end fake validation.
+
+Core behavior corrections: a single fill crossing zero is split into closing the
+old trade and opening its opposite remainder; the old ledger misclassified that
+case. Dynamic add targets (`vwap`/premarket levels) validate before market history
+loads. Stop-only pairs sort after priced limits with stable ties. Captured sizing
+count and existing add-state preservation remain intact. Default missing add
+references are zero. Domain state snapshots are detached copies; same-day Firestore
+date labels and SDK timestamp shapes remain compatible.
 
 The first library extraction and Massive REST slice are implemented and verified.
 TS code: `ViteApp/src/trading`; Java: `miniviteapp/{core,libraries,models,ports,runtime}`.
