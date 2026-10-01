@@ -18,6 +18,7 @@ public final class MarketState {
     private final TreeMap<Long, Double> vwaps = new TreeMap<>();
     private final Set<String> seen = new HashSet<>();
     private long liveFrom, latestPriceTime;
+    private Long firstRegularBucketTime;
     private double totalVolume, totalDollars, premarketDollars, currentPrice, highOfDay, lowOfDay, premarketHigh, premarketLow, liquidityScale;
     private boolean lockedAtMax;
     private boolean corrected;
@@ -33,10 +34,10 @@ public final class MarketState {
         }
         Candle candle(String symbol) { return new Candle(symbol, datetime, open, high, low, close, volume, vwap); }
     }
-    public void initialize(List<Candle> history, long liveFrom, double correctionVolume, double correctionDollars) {
+    public synchronized void initialize(List<Candle> history, long liveFrom, double correctionVolume, double correctionDollars) {
         buckets.clear(); seen.clear(); vwaps.clear(); this.liveFrom = liveFrom;
         totalVolume = totalDollars = premarketDollars = currentPrice = highOfDay = lowOfDay = premarketHigh = premarketLow = liquidityScale = 0;
-        latestPriceTime = 0; lockedAtMax = false; corrected = false;
+        latestPriceTime = 0; firstRegularBucketTime = null; lockedAtMax = false; corrected = false;
         this.correctionVolume = correctionVolume; this.correctionDollars = correctionDollars;
         TreeMap<Long, Candle> bars = new TreeMap<>(); history.forEach(candle -> bars.put(candle.datetime, candle));
         for (Candle candle : bars.values()) {
@@ -45,6 +46,7 @@ public final class MarketState {
             applyCorrection(time.minutesSinceMarketOpen);
             double dollars = candle.volume * PremarketVolume.typicalPrice(candle);
             buckets.put(candle.datetime, new Bucket(candle, candle.datetime, candle.datetime + 59999, dollars));
+            if (!time.isPremarket && firstRegularBucketTime == null) firstRegularBucketTime = candle.datetime;
             totalVolume += candle.volume; totalDollars += dollars; if (time.isPremarket) premarketDollars += dollars;
             updateLevels(candle.high, candle.low, time.isPremarket);
             currentPrice = candle.close; latestPriceTime = candle.datetime + 59999;
@@ -52,7 +54,7 @@ public final class MarketState {
         }
         updateLiquidity();
     }
-    public boolean applyTrade(Trade trade) {
+    public synchronized boolean applyTrade(Trade trade) {
         MarketClock.Time time = MarketClock.marketTime(trade.timestamp); long bucketTime = trade.timestamp / 60000 * 60000;
         if (!trade.symbol.equals(symbol) || !time.date.equals(date) || time.minutesSinceMarketOpen < -510 || trade.timestamp < liveFrom || trade.price <= 0 || trade.size <= 0) return false;
         if (!buckets.isEmpty() && bucketTime < buckets.lastKey()) return false;
@@ -64,6 +66,7 @@ public final class MarketState {
         if (candle == null) {
             candle = new Bucket(new Candle(symbol, bucketTime, trade.price, trade.price, trade.price, trade.price, 0, 0), trade.timestamp, trade.timestamp, 0);
             buckets.put(bucketTime, candle);
+            if (!time.isPremarket && firstRegularBucketTime == null) firstRegularBucketTime = bucketTime;
         }
         if (trade.timestamp < candle.firstTradeTime) { candle.open = trade.price; candle.firstTradeTime = trade.timestamp; }
         if (trade.timestamp >= candle.lastTradeTime) { candle.close = trade.price; candle.lastTradeTime = trade.timestamp; }
@@ -93,7 +96,20 @@ public final class MarketState {
         liquidityScale = Liquidity.calculateLiquidityScale(currentPrice, regular, premarketVolume, marketCap, lockedAtMax);
         if (liquidityScale == 1) lockedAtMax = true;
     }
-    public JsonObject snapshot() {
+    public synchronized JsonObject metrics() {
+        JsonObject json = new JsonObject();
+        Bucket latest = buckets.isEmpty() ? null : buckets.lastEntry().getValue();
+        json.addProperty("currentPrice", currentPrice); json.addProperty("vwap", totalVolume != 0 ? totalDollars / totalVolume : 0);
+        json.addProperty("totalVolume", totalVolume); json.addProperty("totalTradingAmount", totalDollars);
+        json.addProperty("premarketDollarTraded", premarketDollars); json.addProperty("highOfDay", highOfDay); json.addProperty("lowOfDay", lowOfDay);
+        json.addProperty("premarketHigh", premarketHigh); json.addProperty("premarketLow", premarketLow);
+        json.addProperty("openPrice", firstRegularBucketTime == null ? currentPrice : buckets.get(firstRegularBucketTime).open);
+        json.addProperty("liquidityScale", liquidityScale); json.addProperty("liquidityScaleLockedAtMax", lockedAtMax);
+        if (latest != null) json.add("candle", latest.candle(symbol).toJson());
+        json.addProperty("firstTradeTime", latest == null ? 0 : latest.firstTradeTime); json.addProperty("latestPriceTime", latestPriceTime);
+        return json;
+    }
+    public synchronized JsonObject snapshot() {
         JsonObject json = new JsonObject(); json.addProperty("symbol", symbol); json.addProperty("date", date);
         JsonArray candles = new JsonArray(), series = new JsonArray(); double openPrice = currentPrice; boolean foundOpen = false;
         for (Bucket candle : buckets.values()) {

@@ -24,7 +24,7 @@ Updated: 2026-10-01. Design: [standalone-native-trading-plan.md](standalone-nati
 | 1. Contracts and parity baseline | In progress | Added matching domain candles, HTTP ports, market clock and 22 Massive/market scenarios generated from production TS; account/state contracts remain. |
 | 2. Mirrored module extraction | In progress | Extracted TS pure sizing/target/entry/core-target/exit-selection helpers and Schwab payload builders into `src/trading`; compatibility exports retained. Reorganized all Java decisions under `core` and existing broker code under `libraries/broker`. Other browser handlers still mix globals/UI. |
 | 3. Secrets, Firestore, OAuth | In progress | Matching OAuth, credential ports, Firestore REST codecs/config/state/log operations complete. Java local-file store and blank template added. Browser uses libraries. Java startup, periodic refresh and local authorization controls remain part of runtime/adapter phases. |
-| 4. Massive/history/market state | In progress | Matching REST clients/history/shares/premarket statistics plus headless candles/VWAP/session levels, Camarilla, liquidity, eligibility and trade mapper implemented. Browser uses extracted calculations/mappers and preserves every worker-batched print. History/live loader and Java stream/runtime wiring remain. |
+| 4. Massive/history/market state | In progress | Matching REST clients and history/live loader, headless candles/VWAP/session levels, Camarilla, liquidity and eligibility implemented. Browser DB now renders headless state and preserves every worker-batched print. Java stream/runtime wiring remains. |
 | 5. Account/streams/runtime | Pending | Java mutation client exists; ongoing account sync and vendor streams still depend on ViteApp. |
 | 6. State/workflow completion | Pending | Four extended routes already implemented but flagged; state ownership/additional commands/jobs missing. |
 | 7. Bookmap adapter | Pending | Runtime currently owned by WebSocket server; UI/config updates still come from ViteApp. |
@@ -51,6 +51,10 @@ Updated: 2026-10-01. Design: [standalone-native-trading-plan.md](standalone-nati
   and real browser worker batch regression passed. Browser build and existing
   direct/extended execution fixtures passed. Full Java build passed: 196 tests,
   including native-only compilation and actual obfuscated-JAR verification.
+- Market loader/adoption checkpoint: 39 shared scenarios plus browser DB startup/live
+  regression, loader overlap test and worker batching passed. Browser production
+  build and direct/extended execution checks passed. Full Java build passed,
+  including loader overlap test, native-only compile and released JAR checks.
 - Native Java target remains 11. Gradle builds use per-command
   `JAVA_HOME=C:\Users\lingr\trading\.tools\jdk-21.0.12.1+1`.
 - Browser validation: `npm run build`, relevant Node test scripts in package.json.
@@ -70,14 +74,16 @@ Java `runtime/LocalCredentials` reads user JSON, persists rotations without losi
 other sections, and supports `bmtrader.secrets` path override. Pure `MarketClock`
 now belongs under `core/marketdata`, so core never imports runtime.
 
-Headless market state and pure existing calculations are now implemented. Browser
+Headless market state and pure existing calculations are implemented. Browser
 liquidity, Camarilla, eligibility and trade parsing call these modules. Browser
-candle/VWAP arrays still use `data/db.ts`: the new `MarketState` is parity-tested
-but not installed as the browser's source of market state yet.
+`data/db.ts` now renders the headless state through `adapters/browserMarket`.
+Initialization reads the current core snapshot, including any trades arriving
+between the history promise and chart readiness; reload resets UI-derived arrays.
 
-Next: install a shared history/live loader (complete minute bars + individual-trade
-backfill + buffered stream prints), wire the browser market adapter, then broker
-account/order projection, direct account reads and vendor streams/local runtime.
+Matching history/live loaders now seed complete minute bars + individual-trade
+backfill + buffered stream prints, with concurrent loads coalesced. Native I/O runs
+on an injected executor; close prevents a pending read from reinstalling state.
+Next: broker account/order projection, direct account reads and vendor streams/local runtime.
 Native OAuth needs periodic startup/runtime scheduling; clients alone do not start
 background work. Do not remove the bridge/flag
 yet: Bookmap still obtains tokens, account snapshots, execution context and views
@@ -93,10 +99,15 @@ completion of the standalone migration.
 - The specified handoff excludes the incomplete aggregate bucket from history,
   backfills individual prints from its start, and deduplicates buffered prints by
   sequence. Added paginated Massive `/v3/trades` client with exact nanosecond parsing.
-  Loader/stream orchestration is the next step; it is not active in Bookmap yet.
+  Loader orchestration is implemented and browser-adopted; streams/runtime are
+  not active in Bookmap yet.
 - Headless state ignores already-closed-bucket late prints, counts a same-minute
   late print for volume/range/open, and keeps the timestamp-latest close/current
-  price. Its per-minute duplicate set is bounded. Browser adoption remains pending.
+  price. Its per-minute duplicate set is bounded. Browser now uses this policy.
+  This deliberately changes the former default browser behavior, which permitted
+  closed-bucket late prints unless `skipLateTimeAndSalesChartUpdates` was enabled.
+  Accepted same-minute late prints still update volume/range/earliest open while
+  keeping the latest timestamp's close. Native/TS tests cover both cases.
 - Browser worker now forwards all prints in its 100ms batch instead of last price
   with summed size. Existing DOM/chart render throttling remains. Regression proves
   10x100 + 12x200 + 9x100 produces OHLC 10/12/9/9 and $4,300, not $3,600.
@@ -149,7 +160,7 @@ no fixed vendor lifetime is assumed.
 - Preserve weighted-share fallback and prior-day median dollar RVOL. Preserve
   existing daily lookback range. Remove undocumented `extendedHours` query flag.
 - Replace a preexisting literal Massive streaming key with the configured key.
-- No OHLC/VWAP trade-batch correction yet; that remains a separate verified change.
+- OHLC/VWAP batch correction and history/live overlap are now verified (see above).
 
 Source verification: Massive [custom bars](https://massive.com/docs/rest/stocks/aggregates/custom-bars)
 and [trades](https://www.massive.com/docs/websocket/stocks/trades) docs checked
