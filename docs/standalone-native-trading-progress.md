@@ -24,7 +24,7 @@ Updated: 2026-10-01. Design: [standalone-native-trading-plan.md](standalone-nati
 | 1. Contracts and parity baseline | In progress | Added matching domain candles, HTTP ports, market clock and 22 Massive/market scenarios generated from production TS; account/state contracts remain. |
 | 2. Mirrored module extraction | In progress | Extracted TS pure sizing/target/entry/core-target/exit-selection helpers and Schwab payload builders into `src/trading`; compatibility exports retained. Reorganized all Java decisions under `core` and existing broker code under `libraries/broker`. Other browser handlers still mix globals/UI. |
 | 3. Secrets, Firestore, OAuth | In progress | Matching OAuth, credential ports, Firestore REST codecs/config/state/log operations complete. Java local-file store and blank template added. Browser uses libraries. Java startup, periodic refresh and local authorization controls remain part of runtime/adapter phases. |
-| 4. Massive/history/market state | In progress | Matching direct REST clients, history composition, shares reference and headless premarket statistics implemented; ViteApp uses extracted client. Java runtime wiring, trade streams and candle/VWAP/level state remain. |
+| 4. Massive/history/market state | In progress | Matching REST clients/history/shares/premarket statistics plus headless candles/VWAP/session levels, Camarilla, liquidity, eligibility and trade mapper implemented. Browser uses extracted calculations/mappers and preserves every worker-batched print. History/live loader and Java stream/runtime wiring remain. |
 | 5. Account/streams/runtime | Pending | Java mutation client exists; ongoing account sync and vendor streams still depend on ViteApp. |
 | 6. State/workflow completion | Pending | Four extended routes already implemented but flagged; state ownership/additional commands/jobs missing. |
 | 7. Bookmap adapter | Pending | Runtime currently owned by WebSocket server; UI/config updates still come from ViteApp. |
@@ -35,6 +35,7 @@ Updated: 2026-10-01. Design: [standalone-native-trading-plan.md](standalone-nati
 - Baseline: ViteApp `7dfd5a3`; bookmap-plugin `a080dbf`.
 - Cleanup commit: ViteApp `d4686b5`; plan/progress commit: bookmap-plugin `62e71f5`.
 - First library/Massive checkpoint: ViteApp `61b9006`; bookmap-plugin `570bb7a`.
+- Services checkpoint: ViteApp `a6e0bf6`; bookmap-plugin `bde33bd`.
 - Browser extraction: production build, direct execution (6 tests), extended execution
   (19 handler fixtures plus accepted-add state test), core-target exits (6 tests),
   and Massive (22 scenarios) passed.
@@ -46,6 +47,10 @@ Updated: 2026-10-01. Design: [standalone-native-trading-plan.md](standalone-nati
   full build passed with matching service scenarios, local credentials
   rotation/restart and concurrent expired-token calls. All existing release-JAR
   tests passed. No live Firestore write or OAuth request was used in tests.
+- Market checkpoint: 39 TS/Java headless market scenarios, 23 Massive scenarios,
+  and real browser worker batch regression passed. Browser build and existing
+  direct/extended execution fixtures passed. Full Java build passed: 196 tests,
+  including native-only compilation and actual obfuscated-JAR verification.
 - Native Java target remains 11. Gradle builds use per-command
   `JAVA_HOME=C:\Users\lingr\trading\.tools\jdk-21.0.12.1+1`.
 - Browser validation: `npm run build`, relevant Node test scripts in package.json.
@@ -65,14 +70,46 @@ Java `runtime/LocalCredentials` reads user JSON, persists rotations without losi
 other sections, and supports `bmtrader.secrets` path override. Pure `MarketClock`
 now belongs under `core/marketdata`, so core never imports runtime.
 
-Next: implement headless candle/VWAP/session-level state, broker account/order
-projection, direct account reads and vendor streams, then compose the local runtime.
+Headless market state and pure existing calculations are now implemented. Browser
+liquidity, Camarilla, eligibility and trade parsing call these modules. Browser
+candle/VWAP arrays still use `data/db.ts`: the new `MarketState` is parity-tested
+but not installed as the browser's source of market state yet.
+
+Next: install a shared history/live loader (complete minute bars + individual-trade
+backfill + buffered stream prints), wire the browser market adapter, then broker
+account/order projection, direct account reads and vendor streams/local runtime.
 Native OAuth needs periodic startup/runtime scheduling; clients alone do not start
 background work. Do not remove the bridge/flag
 yet: Bookmap still obtains tokens, account snapshots, execution context and views
 from ViteApp. The Java Massive client is verified independently but not wired into
 the plugin lifecycle. Keep implementing through phase 8; this checkpoint is not
 completion of the standalone migration.
+
+## Market checkpoint details
+
+- `core/marketdata/MarketState` is mirrored in TS/Java and works without a chart:
+  session date, 1am history filter, VWAP correction at/after 9am, sparse minute
+  candles, price/volume/dollars, day/premarket levels and sticky liquidity scale.
+- The specified handoff excludes the incomplete aggregate bucket from history,
+  backfills individual prints from its start, and deduplicates buffered prints by
+  sequence. Added paginated Massive `/v3/trades` client with exact nanosecond parsing.
+  Loader/stream orchestration is the next step; it is not active in Bookmap yet.
+- Headless state ignores already-closed-bucket late prints, counts a same-minute
+  late print for volume/range/open, and keeps the timestamp-latest close/current
+  price. Its per-minute duplicate set is bounded. Browser adoption remains pending.
+- Browser worker now forwards all prints in its 100ms batch instead of last price
+  with summed size. Existing DOM/chart render throttling remains. Regression proves
+  10x100 + 12x200 + 9x100 produces OHLC 10/12/9/9 and $4,300, not $3,600.
+- Regular-session trade-condition filter preserves the existing exact 4pm-inclusive
+  boundary and uses historical Eastern DST. Worker and nonworker browser paths share
+  the extracted mapper; Java has the matching mapper.
+- Eligibility uses shares/previous-days-average shares; display/quality RVOL uses
+  dollars/previous-days-median dollars. Corrected the plan's earlier conflation.
+  Existing 500k floor, 0.9M-or-4x volume policy, implied-cap rounding and last-three-
+  days consolidation logic are extracted without changing thresholds.
+
+Individual-trade backfill source: Massive [REST trades](https://massive.com/docs/rest/stocks/trades-quotes/trades),
+checked 2026-10-01 (nanosecond SIP time, per-symbol sequence, pagination, 50,000 limit).
 
 ## Services behavior and compatibility
 

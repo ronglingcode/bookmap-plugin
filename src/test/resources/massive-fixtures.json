@@ -368,6 +368,51 @@
     }
   },
   {
+    "name": "individual-trade backfill preserves nanoseconds and follows pagination",
+    "method": "getTrades",
+    "args": [
+      "AAPL",
+      1790861400000,
+      1790861460000
+    ],
+    "pages": [
+      {
+        "status": 200,
+        "body": "{\"results\":[{\"sip_timestamp\":1790861400000000001,\"price\":10,\"size\":100,\"sequence_number\":1,\"id\":\"abc\",\"exchange\":11,\"conditions\":[]}],\"next_url\":\"https://api.massive.com/trades-page?cursor=next\"}"
+      },
+      {
+        "status": 200,
+        "body": "{\"results\":[{\"sip_timestamp\":\"1790861400001000000\",\"price\":11,\"size\":200,\"sequence_number\":2,\"conditions\":[12]}]}"
+      }
+    ],
+    "paths": [
+      "/v3/trades/AAPL?timestamp.gte=1790861400000000000&timestamp.lt=1790861460000000000&order=asc&sort=timestamp&limit=50000",
+      "/trades-page?cursor=next"
+    ],
+    "result": [
+      {
+        "symbol": "AAPL",
+        "timestamp": 1790861400000,
+        "price": 10,
+        "size": 100,
+        "sequence": "1",
+        "id": "abc",
+        "exchange": 11,
+        "conditions": []
+      },
+      {
+        "symbol": "AAPL",
+        "timestamp": 1790861400001,
+        "price": 11,
+        "size": 200,
+        "sequence": "2",
+        "conditions": [
+          12
+        ]
+      }
+    ]
+  },
+  {
     "name": "premarket grouping uses historical DST, median dollars, and typical-price fallback",
     "method": "calculatePremarketVolume",
     "args": [
@@ -519,7 +564,7 @@
       "date": "2026-10-01",
       "minutesSinceMarketOpen": 390,
       "isPremarket": false,
-      "isRegularSession": false
+      "isRegularSession": true
     }
   },
   {

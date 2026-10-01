@@ -176,7 +176,7 @@ Direct Java requests must cover these current inputs:
 | --- | --- |
 | Today's adjusted 1-minute bars, ascending (`/v2/aggs/ticker/{symbol}/range/1/minute/{today}/{tomorrow}`; current limit 1000) | Intraday candles/volumes from the configured 01:00 ET start; premarket high/low; regular-session high/low/open/opening range; VWAP; current price; closed-candle rules and aggregated 5/15/30-minute bars |
 | Adjusted daily bars, approximately three calendar years, excluding today (`range/1/day`; current limit 50000) | Previous daily candle, Camarilla levels, maximum high over the loaded history, and the range-bound plan's previous-three-day consolidation check |
-| Adjusted 30-minute bars for the previous 20 calendar days through today (`range/30/minute`; current request includes `extendedHours=true`, limit 50000) | Per-day premarket dollar turnover and shares, prior averages/median, latest totals, and dollar-turnover RVOL used by eligibility/quality checks |
+| Adjusted 30-minute bars for the previous 20 calendar days through today (`range/30/minute`; limit 50000) | Per-day premarket dollar turnover and shares, prior averages/median, latest totals. Dollar-turnover RVOL feeds display/quality; the actual relative-volume eligibility gate compares shares against prior-day average shares. |
 | Ticker reference (`/v3/reference/tickers/{symbol}`) | `weighted_shares_outstanding`, falling back to `share_class_shares_outstanding`; implied market cap from shares × current price |
 | Live `T.{symbol}` trades on Massive stocks WSS | Price/size/time/conditions/sequence/trade ID; updates to candles, volume, cumulative VWAP, day extremes, liquidity, and tick/candle-close notifications |
 
@@ -184,7 +184,7 @@ The API client maps `t/o/h/l/c/v/vw`; core computes the rest. Preserve the valid
 bar-VWAP-versus-HLC typical-price rule, the Firestore VWAP correction seed near
 09:00 ET, outward cent rounding for highs/lows, current trade-condition filters,
 and late-data behavior. Preserve the sticky liquidity multiplier once it reaches
-1. RVOL uses previous dollar-turnover median despite a misleading comment about
+1. Display/quality RVOL uses previous dollar-turnover median despite a misleading comment about
 average. The so-called all-time high is the maximum over the loaded three-year
 history, not lifetime history.
 

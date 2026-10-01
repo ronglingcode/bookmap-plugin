@@ -2,6 +2,7 @@ package com.bookmap.plugin.rong.miniviteapp.libraries.massive;
 
 import com.bookmap.plugin.rong.miniviteapp.core.marketdata.PremarketVolume;
 import com.bookmap.plugin.rong.miniviteapp.models.Candle;
+import com.bookmap.plugin.rong.miniviteapp.models.Trade;
 import com.bookmap.plugin.rong.miniviteapp.ports.HttpPort;
 import com.bookmap.plugin.rong.miniviteapp.core.marketdata.MarketClock;
 import com.google.gson.JsonArray;
@@ -86,6 +87,23 @@ public final class Api {
         JsonObject result = json.getAsJsonObject("results");
         double weighted = numberOrZero(result, "weighted_shares_outstanding");
         return weighted != 0 ? weighted : numberOrZero(result, "share_class_shares_outstanding");
+    }
+    public List<Trade> getTrades(String symbol, long startMs, long endMsExcluded) throws Exception {
+        String start = java.math.BigInteger.valueOf(startMs).multiply(java.math.BigInteger.valueOf(1000000)).toString();
+        String end = java.math.BigInteger.valueOf(endMsExcluded).multiply(java.math.BigInteger.valueOf(1000000)).toString();
+        List<Trade> result = new ArrayList<>(); Set<String> seen = new HashSet<>();
+        String next = "/v3/trades/" + encode(symbol) + "?timestamp.gte=" + start + "&timestamp.lt=" + end + "&order=asc&sort=timestamp&limit=50000";
+        while (!next.isEmpty()) {
+            String page = authenticatedUri(next).toString();
+            if (!seen.add(page)) throw new IOException("Massive repeated pagination cursor");
+            JsonObject json = read(page);
+            if (json.has("results")) {
+                if (!json.get("results").isJsonArray()) throw new IOException("Massive read returned invalid results");
+                for (JsonElement value : json.getAsJsonArray("results")) result.add(Mapper.mapRestTrade(symbol, value.getAsJsonObject()));
+            }
+            next = string(json, "next_url");
+        }
+        result.sort(java.util.Comparator.comparingLong(trade -> trade.timestamp)); return result;
     }
     public JsonObject getFullPriceHistory(String symbol, String today) throws Exception {
         List<Candle> todayBars = getPriceHistory(symbol, 1, today);

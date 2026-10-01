@@ -1,0 +1,1782 @@
+[
+  {
+    "kind": "state",
+    "name": "each intrabatch price changes OHLC and true dollar VWAP",
+    "history": [],
+    "liveFrom": 1790861400000,
+    "trades": [
+      {
+        "symbol": "AAPL",
+        "timestamp": 1790861400000,
+        "price": 10,
+        "size": 100,
+        "conditions": [],
+        "sequence": "1"
+      },
+      {
+        "symbol": "AAPL",
+        "timestamp": 1790861400001,
+        "price": 12,
+        "size": 200,
+        "conditions": [],
+        "sequence": "2"
+      },
+      {
+        "symbol": "AAPL",
+        "timestamp": 1790861400002,
+        "price": 9,
+        "size": 100,
+        "conditions": [],
+        "sequence": "3"
+      }
+    ],
+    "marketCap": 10000,
+    "initial": {
+      "symbol": "AAPL",
+      "date": "2026-10-01",
+      "candles": [],
+      "vwaps": [],
+      "currentPrice": 0,
+      "vwap": 0,
+      "totalVolume": 0,
+      "totalTradingAmount": 0,
+      "premarketDollarTraded": 0,
+      "highOfDay": 0,
+      "lowOfDay": 0,
+      "premarketHigh": 0,
+      "premarketLow": 0,
+      "openPrice": 0,
+      "liquidityScale": 0,
+      "liquidityScaleLockedAtMax": false
+    },
+    "accepted": [
+      true,
+      true,
+      true
+    ],
+    "result": {
+      "symbol": "AAPL",
+      "date": "2026-10-01",
+      "candles": [
+        {
+          "symbol": "AAPL",
+          "datetime": 1790861400000,
+          "open": 10,
+          "high": 12,
+          "low": 9,
+          "close": 9,
+          "volume": 400,
+          "vwap": 10.75
+        }
+      ],
+      "vwaps": [
+        {
+          "datetime": 1790861400000,
+          "value": 10.75
+        }
+      ],
+      "currentPrice": 9,
+      "vwap": 10.75,
+      "totalVolume": 400,
+      "totalTradingAmount": 4300,
+      "premarketDollarTraded": 0,
+      "highOfDay": 12,
+      "lowOfDay": 9,
+      "premarketHigh": 0,
+      "premarketLow": 0,
+      "openPrice": 10,
+      "liquidityScale": 0,
+      "liquidityScaleLockedAtMax": false
+    }
+  },
+  {
+    "kind": "state",
+    "name": "duplicate stream/backfill sequences are counted once",
+    "history": [],
+    "liveFrom": 1790861400000,
+    "trades": [
+      {
+        "symbol": "AAPL",
+        "timestamp": 1790861400000,
+        "price": 10,
+        "size": 100,
+        "conditions": [],
+        "sequence": "1"
+      },
+      {
+        "symbol": "AAPL",
+        "timestamp": 1790861400000,
+        "price": 10,
+        "size": 100,
+        "conditions": [],
+        "sequence": "1"
+      },
+      {
+        "symbol": "AAPL",
+        "timestamp": 1790861400001,
+        "price": 11,
+        "size": 100,
+        "conditions": [],
+        "sequence": "2"
+      }
+    ],
+    "marketCap": 10000,
+    "initial": {
+      "symbol": "AAPL",
+      "date": "2026-10-01",
+      "candles": [],
+      "vwaps": [],
+      "currentPrice": 0,
+      "vwap": 0,
+      "totalVolume": 0,
+      "totalTradingAmount": 0,
+      "premarketDollarTraded": 0,
+      "highOfDay": 0,
+      "lowOfDay": 0,
+      "premarketHigh": 0,
+      "premarketLow": 0,
+      "openPrice": 0,
+      "liquidityScale": 0,
+      "liquidityScaleLockedAtMax": false
+    },
+    "accepted": [
+      true,
+      false,
+      true
+    ],
+    "result": {
+      "symbol": "AAPL",
+      "date": "2026-10-01",
+      "candles": [
+        {
+          "symbol": "AAPL",
+          "datetime": 1790861400000,
+          "open": 10,
+          "high": 11,
+          "low": 10,
+          "close": 11,
+          "volume": 200,
+          "vwap": 10.5
+        }
+      ],
+      "vwaps": [
+        {
+          "datetime": 1790861400000,
+          "value": 10.5
+        }
+      ],
+      "currentPrice": 11,
+      "vwap": 10.5,
+      "totalVolume": 200,
+      "totalTradingAmount": 2100,
+      "premarketDollarTraded": 0,
+      "highOfDay": 11,
+      "lowOfDay": 10,
+      "premarketHigh": 0,
+      "premarketLow": 0,
+      "openPrice": 10,
+      "liquidityScale": 0,
+      "liquidityScaleLockedAtMax": false
+    }
+  },
+  {
+    "kind": "state",
+    "name": "only completed history seeds the current minute",
+    "history": [
+      {
+        "symbol": "AAPL",
+        "datetime": 1790861340000,
+        "open": 10,
+        "high": 11,
+        "low": 9,
+        "close": 10,
+        "volume": 100,
+        "vwap": 10
+      },
+      {
+        "symbol": "AAPL",
+        "datetime": 1790861400000,
+        "open": 30,
+        "high": 31,
+        "low": 29,
+        "close": 30,
+        "volume": 1000,
+        "vwap": 30
+      }
+    ],
+    "liveFrom": 1790861400000,
+    "trades": [
+      {
+        "symbol": "AAPL",
+        "timestamp": 1790861400000,
+        "price": 10,
+        "size": 100,
+        "conditions": [],
+        "sequence": "1"
+      },
+      {
+        "symbol": "AAPL",
+        "timestamp": 1790861400001,
+        "price": 11,
+        "size": 100,
+        "conditions": [],
+        "sequence": "2"
+      }
+    ],
+    "marketCap": 10000,
+    "initial": {
+      "symbol": "AAPL",
+      "date": "2026-10-01",
+      "candles": [
+        {
+          "symbol": "AAPL",
+          "datetime": 1790861340000,
+          "open": 10,
+          "high": 11,
+          "low": 9,
+          "close": 10,
+          "volume": 100,
+          "vwap": 10
+        }
+      ],
+      "vwaps": [
+        {
+          "datetime": 1790861340000,
+          "value": 10
+        }
+      ],
+      "currentPrice": 10,
+      "vwap": 10,
+      "totalVolume": 100,
+      "totalTradingAmount": 1000,
+      "premarketDollarTraded": 1000,
+      "highOfDay": 0,
+      "lowOfDay": 0,
+      "premarketHigh": 11,
+      "premarketLow": 9,
+      "openPrice": 10,
+      "liquidityScale": 0,
+      "liquidityScaleLockedAtMax": false
+    },
+    "accepted": [
+      true,
+      true
+    ],
+    "result": {
+      "symbol": "AAPL",
+      "date": "2026-10-01",
+      "candles": [
+        {
+          "symbol": "AAPL",
+          "datetime": 1790861340000,
+          "open": 10,
+          "high": 11,
+          "low": 9,
+          "close": 10,
+          "volume": 100,
+          "vwap": 10
+        },
+        {
+          "symbol": "AAPL",
+          "datetime": 1790861400000,
+          "open": 10,
+          "high": 11,
+          "low": 10,
+          "close": 11,
+          "volume": 200,
+          "vwap": 10.5
+        }
+      ],
+      "vwaps": [
+        {
+          "datetime": 1790861340000,
+          "value": 10
+        },
+        {
+          "datetime": 1790861400000,
+          "value": 10.333333333333334
+        }
+      ],
+      "currentPrice": 11,
+      "vwap": 10.333333333333334,
+      "totalVolume": 300,
+      "totalTradingAmount": 3100,
+      "premarketDollarTraded": 1000,
+      "highOfDay": 11,
+      "lowOfDay": 10,
+      "premarketHigh": 11,
+      "premarketLow": 9,
+      "openPrice": 10,
+      "liquidityScale": 0,
+      "liquidityScaleLockedAtMax": false
+    }
+  },
+  {
+    "kind": "state",
+    "name": "history and buffered old trades do not overlap",
+    "history": [
+      {
+        "symbol": "AAPL",
+        "datetime": 1790861340000,
+        "open": 10,
+        "high": 11,
+        "low": 9,
+        "close": 10,
+        "volume": 100,
+        "vwap": 10
+      }
+    ],
+    "liveFrom": 1790861400000,
+    "trades": [
+      {
+        "symbol": "AAPL",
+        "timestamp": 1790861399999,
+        "price": 10,
+        "size": 100,
+        "conditions": [],
+        "sequence": "1"
+      },
+      {
+        "symbol": "AAPL",
+        "timestamp": 1790861400000,
+        "price": 11,
+        "size": 100,
+        "conditions": [],
+        "sequence": "2"
+      }
+    ],
+    "marketCap": 10000,
+    "initial": {
+      "symbol": "AAPL",
+      "date": "2026-10-01",
+      "candles": [
+        {
+          "symbol": "AAPL",
+          "datetime": 1790861340000,
+          "open": 10,
+          "high": 11,
+          "low": 9,
+          "close": 10,
+          "volume": 100,
+          "vwap": 10
+        }
+      ],
+      "vwaps": [
+        {
+          "datetime": 1790861340000,
+          "value": 10
+        }
+      ],
+      "currentPrice": 10,
+      "vwap": 10,
+      "totalVolume": 100,
+      "totalTradingAmount": 1000,
+      "premarketDollarTraded": 1000,
+      "highOfDay": 0,
+      "lowOfDay": 0,
+      "premarketHigh": 11,
+      "premarketLow": 9,
+      "openPrice": 10,
+      "liquidityScale": 0,
+      "liquidityScaleLockedAtMax": false
+    },
+    "accepted": [
+      false,
+      true
+    ],
+    "result": {
+      "symbol": "AAPL",
+      "date": "2026-10-01",
+      "candles": [
+        {
+          "symbol": "AAPL",
+          "datetime": 1790861340000,
+          "open": 10,
+          "high": 11,
+          "low": 9,
+          "close": 10,
+          "volume": 100,
+          "vwap": 10
+        },
+        {
+          "symbol": "AAPL",
+          "datetime": 1790861400000,
+          "open": 11,
+          "high": 11,
+          "low": 11,
+          "close": 11,
+          "volume": 100,
+          "vwap": 11
+        }
+      ],
+      "vwaps": [
+        {
+          "datetime": 1790861340000,
+          "value": 10
+        },
+        {
+          "datetime": 1790861400000,
+          "value": 10.5
+        }
+      ],
+      "currentPrice": 11,
+      "vwap": 10.5,
+      "totalVolume": 200,
+      "totalTradingAmount": 2100,
+      "premarketDollarTraded": 1000,
+      "highOfDay": 11,
+      "lowOfDay": 11,
+      "premarketHigh": 11,
+      "premarketLow": 9,
+      "openPrice": 11,
+      "liquidityScale": 0,
+      "liquidityScaleLockedAtMax": false
+    }
+  },
+  {
+    "kind": "state",
+    "name": "late closed-bucket print is ignored and empty intervals stay empty",
+    "history": [],
+    "liveFrom": 1790861400000,
+    "trades": [
+      {
+        "symbol": "AAPL",
+        "timestamp": 1790861400000,
+        "price": 10,
+        "size": 100,
+        "conditions": [],
+        "sequence": "1"
+      },
+      {
+        "symbol": "AAPL",
+        "timestamp": 1790861520000,
+        "price": 11,
+        "size": 100,
+        "conditions": [],
+        "sequence": "2"
+      },
+      {
+        "symbol": "AAPL",
+        "timestamp": 1790861400010,
+        "price": 12,
+        "size": 100,
+        "conditions": [],
+        "sequence": "3"
+      }
+    ],
+    "marketCap": 10000,
+    "initial": {
+      "symbol": "AAPL",
+      "date": "2026-10-01",
+      "candles": [],
+      "vwaps": [],
+      "currentPrice": 0,
+      "vwap": 0,
+      "totalVolume": 0,
+      "totalTradingAmount": 0,
+      "premarketDollarTraded": 0,
+      "highOfDay": 0,
+      "lowOfDay": 0,
+      "premarketHigh": 0,
+      "premarketLow": 0,
+      "openPrice": 0,
+      "liquidityScale": 0,
+      "liquidityScaleLockedAtMax": false
+    },
+    "accepted": [
+      true,
+      true,
+      false
+    ],
+    "result": {
+      "symbol": "AAPL",
+      "date": "2026-10-01",
+      "candles": [
+        {
+          "symbol": "AAPL",
+          "datetime": 1790861400000,
+          "open": 10,
+          "high": 10,
+          "low": 10,
+          "close": 10,
+          "volume": 100,
+          "vwap": 10
+        },
+        {
+          "symbol": "AAPL",
+          "datetime": 1790861520000,
+          "open": 11,
+          "high": 11,
+          "low": 11,
+          "close": 11,
+          "volume": 100,
+          "vwap": 11
+        }
+      ],
+      "vwaps": [
+        {
+          "datetime": 1790861400000,
+          "value": 10
+        },
+        {
+          "datetime": 1790861520000,
+          "value": 10.5
+        }
+      ],
+      "currentPrice": 11,
+      "vwap": 10.5,
+      "totalVolume": 200,
+      "totalTradingAmount": 2100,
+      "premarketDollarTraded": 0,
+      "highOfDay": 11,
+      "lowOfDay": 10,
+      "premarketHigh": 0,
+      "premarketLow": 0,
+      "openPrice": 10,
+      "liquidityScale": 0,
+      "liquidityScaleLockedAtMax": false
+    }
+  },
+  {
+    "kind": "state",
+    "name": "late same-bucket print changes open and range but keeps latest close/price",
+    "history": [],
+    "liveFrom": 1790861400000,
+    "trades": [
+      {
+        "symbol": "AAPL",
+        "timestamp": 1790861420000,
+        "price": 10,
+        "size": 100,
+        "conditions": [],
+        "sequence": "2"
+      },
+      {
+        "symbol": "AAPL",
+        "timestamp": 1790861410000,
+        "price": 8,
+        "size": 100,
+        "conditions": [],
+        "sequence": "1"
+      },
+      {
+        "symbol": "AAPL",
+        "timestamp": 1790861430000,
+        "price": 11,
+        "size": 100,
+        "conditions": [],
+        "sequence": "3"
+      }
+    ],
+    "marketCap": 10000,
+    "initial": {
+      "symbol": "AAPL",
+      "date": "2026-10-01",
+      "candles": [],
+      "vwaps": [],
+      "currentPrice": 0,
+      "vwap": 0,
+      "totalVolume": 0,
+      "totalTradingAmount": 0,
+      "premarketDollarTraded": 0,
+      "highOfDay": 0,
+      "lowOfDay": 0,
+      "premarketHigh": 0,
+      "premarketLow": 0,
+      "openPrice": 0,
+      "liquidityScale": 0,
+      "liquidityScaleLockedAtMax": false
+    },
+    "accepted": [
+      true,
+      true,
+      true
+    ],
+    "result": {
+      "symbol": "AAPL",
+      "date": "2026-10-01",
+      "candles": [
+        {
+          "symbol": "AAPL",
+          "datetime": 1790861400000,
+          "open": 8,
+          "high": 11,
+          "low": 8,
+          "close": 11,
+          "volume": 300,
+          "vwap": 9.666666666666666
+        }
+      ],
+      "vwaps": [
+        {
+          "datetime": 1790861400000,
+          "value": 9.666666666666666
+        }
+      ],
+      "currentPrice": 11,
+      "vwap": 9.666666666666666,
+      "totalVolume": 300,
+      "totalTradingAmount": 2900,
+      "premarketDollarTraded": 0,
+      "highOfDay": 11,
+      "lowOfDay": 8,
+      "premarketHigh": 0,
+      "premarketLow": 0,
+      "openPrice": 8,
+      "liquidityScale": 0,
+      "liquidityScaleLockedAtMax": false
+    }
+  },
+  {
+    "kind": "state",
+    "name": "premarket correction starts before first eligible historical bar",
+    "history": [
+      {
+        "symbol": "AAPL",
+        "datetime": 1790859300000,
+        "open": 10,
+        "high": 11,
+        "low": 9,
+        "close": 10,
+        "volume": 100,
+        "vwap": 10
+      },
+      {
+        "symbol": "AAPL",
+        "datetime": 1790859600000,
+        "open": 10,
+        "high": 11,
+        "low": 9,
+        "close": 10,
+        "volume": 100,
+        "vwap": 10
+      },
+      {
+        "symbol": "AAPL",
+        "datetime": 1790861340000,
+        "open": 10,
+        "high": 11,
+        "low": 9,
+        "close": 10,
+        "volume": 100,
+        "vwap": 10
+      }
+    ],
+    "liveFrom": 1790861400000,
+    "correction": {
+      "volumeSum": 1000,
+      "tradingSum": 12000
+    },
+    "trades": [
+      {
+        "symbol": "AAPL",
+        "timestamp": 1790861400000,
+        "price": 11,
+        "size": 100,
+        "conditions": [],
+        "sequence": "1"
+      }
+    ],
+    "marketCap": 10000,
+    "initial": {
+      "symbol": "AAPL",
+      "date": "2026-10-01",
+      "candles": [
+        {
+          "symbol": "AAPL",
+          "datetime": 1790859300000,
+          "open": 10,
+          "high": 11,
+          "low": 9,
+          "close": 10,
+          "volume": 100,
+          "vwap": 10
+        },
+        {
+          "symbol": "AAPL",
+          "datetime": 1790859600000,
+          "open": 10,
+          "high": 11,
+          "low": 9,
+          "close": 10,
+          "volume": 100,
+          "vwap": 10
+        },
+        {
+          "symbol": "AAPL",
+          "datetime": 1790861340000,
+          "open": 10,
+          "high": 11,
+          "low": 9,
+          "close": 10,
+          "volume": 100,
+          "vwap": 10
+        }
+      ],
+      "vwaps": [
+        {
+          "datetime": 1790859300000,
+          "value": 10
+        },
+        {
+          "datetime": 1790859600000,
+          "value": 11.818181818181818
+        },
+        {
+          "datetime": 1790861340000,
+          "value": 11.666666666666666
+        }
+      ],
+      "currentPrice": 10,
+      "vwap": 11.666666666666666,
+      "totalVolume": 1200,
+      "totalTradingAmount": 14000,
+      "premarketDollarTraded": 14000,
+      "highOfDay": 0,
+      "lowOfDay": 0,
+      "premarketHigh": 11,
+      "premarketLow": 9,
+      "openPrice": 10,
+      "liquidityScale": 0,
+      "liquidityScaleLockedAtMax": false
+    },
+    "accepted": [
+      true
+    ],
+    "result": {
+      "symbol": "AAPL",
+      "date": "2026-10-01",
+      "candles": [
+        {
+          "symbol": "AAPL",
+          "datetime": 1790859300000,
+          "open": 10,
+          "high": 11,
+          "low": 9,
+          "close": 10,
+          "volume": 100,
+          "vwap": 10
+        },
+        {
+          "symbol": "AAPL",
+          "datetime": 1790859600000,
+          "open": 10,
+          "high": 11,
+          "low": 9,
+          "close": 10,
+          "volume": 100,
+          "vwap": 10
+        },
+        {
+          "symbol": "AAPL",
+          "datetime": 1790861340000,
+          "open": 10,
+          "high": 11,
+          "low": 9,
+          "close": 10,
+          "volume": 100,
+          "vwap": 10
+        },
+        {
+          "symbol": "AAPL",
+          "datetime": 1790861400000,
+          "open": 11,
+          "high": 11,
+          "low": 11,
+          "close": 11,
+          "volume": 100,
+          "vwap": 11
+        }
+      ],
+      "vwaps": [
+        {
+          "datetime": 1790859300000,
+          "value": 10
+        },
+        {
+          "datetime": 1790859600000,
+          "value": 11.818181818181818
+        },
+        {
+          "datetime": 1790861340000,
+          "value": 11.666666666666666
+        },
+        {
+          "datetime": 1790861400000,
+          "value": 11.615384615384615
+        }
+      ],
+      "currentPrice": 11,
+      "vwap": 11.615384615384615,
+      "totalVolume": 1300,
+      "totalTradingAmount": 15100,
+      "premarketDollarTraded": 14000,
+      "highOfDay": 11,
+      "lowOfDay": 11,
+      "premarketHigh": 11,
+      "premarketLow": 9,
+      "openPrice": 11,
+      "liquidityScale": 0,
+      "liquidityScaleLockedAtMax": false
+    }
+  },
+  {
+    "kind": "state",
+    "name": "premarket correction can start on live data with no eligible history",
+    "history": [
+      {
+        "symbol": "AAPL",
+        "datetime": 1790859300000,
+        "open": 10,
+        "high": 11,
+        "low": 9,
+        "close": 10,
+        "volume": 100,
+        "vwap": 10
+      }
+    ],
+    "liveFrom": 1790859600000,
+    "correction": {
+      "volumeSum": 1000,
+      "tradingSum": 12000
+    },
+    "trades": [
+      {
+        "symbol": "AAPL",
+        "timestamp": 1790859600000,
+        "price": 11,
+        "size": 100,
+        "conditions": [],
+        "sequence": "1"
+      }
+    ],
+    "marketCap": 10000,
+    "initial": {
+      "symbol": "AAPL",
+      "date": "2026-10-01",
+      "candles": [
+        {
+          "symbol": "AAPL",
+          "datetime": 1790859300000,
+          "open": 10,
+          "high": 11,
+          "low": 9,
+          "close": 10,
+          "volume": 100,
+          "vwap": 10
+        }
+      ],
+      "vwaps": [
+        {
+          "datetime": 1790859300000,
+          "value": 10
+        }
+      ],
+      "currentPrice": 10,
+      "vwap": 10,
+      "totalVolume": 100,
+      "totalTradingAmount": 1000,
+      "premarketDollarTraded": 1000,
+      "highOfDay": 0,
+      "lowOfDay": 0,
+      "premarketHigh": 11,
+      "premarketLow": 9,
+      "openPrice": 10,
+      "liquidityScale": 0,
+      "liquidityScaleLockedAtMax": false
+    },
+    "accepted": [
+      true
+    ],
+    "result": {
+      "symbol": "AAPL",
+      "date": "2026-10-01",
+      "candles": [
+        {
+          "symbol": "AAPL",
+          "datetime": 1790859300000,
+          "open": 10,
+          "high": 11,
+          "low": 9,
+          "close": 10,
+          "volume": 100,
+          "vwap": 10
+        },
+        {
+          "symbol": "AAPL",
+          "datetime": 1790859600000,
+          "open": 11,
+          "high": 11,
+          "low": 11,
+          "close": 11,
+          "volume": 100,
+          "vwap": 11
+        }
+      ],
+      "vwaps": [
+        {
+          "datetime": 1790859300000,
+          "value": 10
+        },
+        {
+          "datetime": 1790859600000,
+          "value": 11.909090909090908
+        }
+      ],
+      "currentPrice": 11,
+      "vwap": 11.909090909090908,
+      "totalVolume": 1100,
+      "totalTradingAmount": 13100,
+      "premarketDollarTraded": 13100,
+      "highOfDay": 0,
+      "lowOfDay": 0,
+      "premarketHigh": 11,
+      "premarketLow": 9,
+      "openPrice": 11,
+      "liquidityScale": 0,
+      "liquidityScaleLockedAtMax": false
+    }
+  },
+  {
+    "kind": "state",
+    "name": "only current date and 1am-onward history affect market state",
+    "history": [
+      {
+        "symbol": "AAPL",
+        "datetime": 1790775000000,
+        "open": 10,
+        "high": 11,
+        "low": 9,
+        "close": 10,
+        "volume": 100,
+        "vwap": 10
+      },
+      {
+        "symbol": "AAPL",
+        "datetime": 1790829000000,
+        "open": 10,
+        "high": 11,
+        "low": 9,
+        "close": 10,
+        "volume": 100,
+        "vwap": 10
+      },
+      {
+        "symbol": "AAPL",
+        "datetime": 1790830800000,
+        "open": 10,
+        "high": 11,
+        "low": 9,
+        "close": 10,
+        "volume": 100,
+        "vwap": 10
+      }
+    ],
+    "liveFrom": 1790861400000,
+    "trades": [
+      {
+        "symbol": "AAPL",
+        "timestamp": 1790861400000,
+        "price": 10,
+        "size": 250000,
+        "conditions": [],
+        "sequence": "1"
+      }
+    ],
+    "marketCap": 10000,
+    "initial": {
+      "symbol": "AAPL",
+      "date": "2026-10-01",
+      "candles": [
+        {
+          "symbol": "AAPL",
+          "datetime": 1790830800000,
+          "open": 10,
+          "high": 11,
+          "low": 9,
+          "close": 10,
+          "volume": 100,
+          "vwap": 10
+        }
+      ],
+      "vwaps": [
+        {
+          "datetime": 1790830800000,
+          "value": 10
+        }
+      ],
+      "currentPrice": 10,
+      "vwap": 10,
+      "totalVolume": 100,
+      "totalTradingAmount": 1000,
+      "premarketDollarTraded": 1000,
+      "highOfDay": 0,
+      "lowOfDay": 0,
+      "premarketHigh": 11,
+      "premarketLow": 9,
+      "openPrice": 10,
+      "liquidityScale": 0,
+      "liquidityScaleLockedAtMax": false
+    },
+    "accepted": [
+      true
+    ],
+    "result": {
+      "symbol": "AAPL",
+      "date": "2026-10-01",
+      "candles": [
+        {
+          "symbol": "AAPL",
+          "datetime": 1790830800000,
+          "open": 10,
+          "high": 11,
+          "low": 9,
+          "close": 10,
+          "volume": 100,
+          "vwap": 10
+        },
+        {
+          "symbol": "AAPL",
+          "datetime": 1790861400000,
+          "open": 10,
+          "high": 10,
+          "low": 10,
+          "close": 10,
+          "volume": 250000,
+          "vwap": 10
+        }
+      ],
+      "vwaps": [
+        {
+          "datetime": 1790830800000,
+          "value": 10
+        },
+        {
+          "datetime": 1790861400000,
+          "value": 10
+        }
+      ],
+      "currentPrice": 10,
+      "vwap": 10,
+      "totalVolume": 250100,
+      "totalTradingAmount": 2501000,
+      "premarketDollarTraded": 1000,
+      "highOfDay": 10,
+      "lowOfDay": 10,
+      "premarketHigh": 11,
+      "premarketLow": 9,
+      "openPrice": 10,
+      "liquidityScale": 1,
+      "liquidityScaleLockedAtMax": true
+    }
+  },
+  {
+    "kind": "state",
+    "name": "liquidity locks at maximum despite later lower prices",
+    "history": [
+      {
+        "symbol": "AAPL",
+        "datetime": 1790861340000,
+        "open": 10,
+        "high": 11,
+        "low": 9,
+        "close": 10,
+        "volume": 250000,
+        "vwap": 10
+      }
+    ],
+    "liveFrom": 1790861400000,
+    "trades": [
+      {
+        "symbol": "AAPL",
+        "timestamp": 1790861400000,
+        "price": 100,
+        "size": 250000,
+        "conditions": [],
+        "sequence": "1"
+      },
+      {
+        "symbol": "AAPL",
+        "timestamp": 1790861460000,
+        "price": 10,
+        "size": 100,
+        "conditions": [],
+        "sequence": "2"
+      }
+    ],
+    "marketCap": 10000,
+    "initial": {
+      "symbol": "AAPL",
+      "date": "2026-10-01",
+      "candles": [
+        {
+          "symbol": "AAPL",
+          "datetime": 1790861340000,
+          "open": 10,
+          "high": 11,
+          "low": 9,
+          "close": 10,
+          "volume": 250000,
+          "vwap": 10
+        }
+      ],
+      "vwaps": [
+        {
+          "datetime": 1790861340000,
+          "value": 10
+        }
+      ],
+      "currentPrice": 10,
+      "vwap": 10,
+      "totalVolume": 250000,
+      "totalTradingAmount": 2500000,
+      "premarketDollarTraded": 2500000,
+      "highOfDay": 0,
+      "lowOfDay": 0,
+      "premarketHigh": 11,
+      "premarketLow": 9,
+      "openPrice": 10,
+      "liquidityScale": 0,
+      "liquidityScaleLockedAtMax": false
+    },
+    "accepted": [
+      true,
+      true
+    ],
+    "result": {
+      "symbol": "AAPL",
+      "date": "2026-10-01",
+      "candles": [
+        {
+          "symbol": "AAPL",
+          "datetime": 1790861340000,
+          "open": 10,
+          "high": 11,
+          "low": 9,
+          "close": 10,
+          "volume": 250000,
+          "vwap": 10
+        },
+        {
+          "symbol": "AAPL",
+          "datetime": 1790861400000,
+          "open": 100,
+          "high": 100,
+          "low": 100,
+          "close": 100,
+          "volume": 250000,
+          "vwap": 100
+        },
+        {
+          "symbol": "AAPL",
+          "datetime": 1790861460000,
+          "open": 10,
+          "high": 10,
+          "low": 10,
+          "close": 10,
+          "volume": 100,
+          "vwap": 10
+        }
+      ],
+      "vwaps": [
+        {
+          "datetime": 1790861340000,
+          "value": 10
+        },
+        {
+          "datetime": 1790861400000,
+          "value": 55
+        },
+        {
+          "datetime": 1790861460000,
+          "value": 54.991001799640074
+        }
+      ],
+      "currentPrice": 10,
+      "vwap": 54.991001799640074,
+      "totalVolume": 500100,
+      "totalTradingAmount": 27501000,
+      "premarketDollarTraded": 2500000,
+      "highOfDay": 100,
+      "lowOfDay": 10,
+      "premarketHigh": 11,
+      "premarketLow": 9,
+      "openPrice": 100,
+      "liquidityScale": 1,
+      "liquidityScaleLockedAtMax": true
+    }
+  },
+  {
+    "kind": "state",
+    "name": "missing history starts from the first accepted print",
+    "history": [],
+    "liveFrom": 1790861400000,
+    "trades": [
+      {
+        "symbol": "AAPL",
+        "timestamp": 1790861400000,
+        "price": 10,
+        "size": 100,
+        "conditions": [],
+        "sequence": "1"
+      }
+    ],
+    "marketCap": 10000,
+    "initial": {
+      "symbol": "AAPL",
+      "date": "2026-10-01",
+      "candles": [],
+      "vwaps": [],
+      "currentPrice": 0,
+      "vwap": 0,
+      "totalVolume": 0,
+      "totalTradingAmount": 0,
+      "premarketDollarTraded": 0,
+      "highOfDay": 0,
+      "lowOfDay": 0,
+      "premarketHigh": 0,
+      "premarketLow": 0,
+      "openPrice": 0,
+      "liquidityScale": 0,
+      "liquidityScaleLockedAtMax": false
+    },
+    "accepted": [
+      true
+    ],
+    "result": {
+      "symbol": "AAPL",
+      "date": "2026-10-01",
+      "candles": [
+        {
+          "symbol": "AAPL",
+          "datetime": 1790861400000,
+          "open": 10,
+          "high": 10,
+          "low": 10,
+          "close": 10,
+          "volume": 100,
+          "vwap": 10
+        }
+      ],
+      "vwaps": [
+        {
+          "datetime": 1790861400000,
+          "value": 10
+        }
+      ],
+      "currentPrice": 10,
+      "vwap": 10,
+      "totalVolume": 100,
+      "totalTradingAmount": 1000,
+      "premarketDollarTraded": 0,
+      "highOfDay": 10,
+      "lowOfDay": 10,
+      "premarketHigh": 0,
+      "premarketLow": 0,
+      "openPrice": 10,
+      "liquidityScale": 0,
+      "liquidityScaleLockedAtMax": false
+    }
+  },
+  {
+    "kind": "liquidity",
+    "name": "liquidity [10,[],0,10000,false]",
+    "args": [
+      10,
+      [],
+      0,
+      10000,
+      false
+    ],
+    "result": 0
+  },
+  {
+    "kind": "liquidity",
+    "name": "liquidity [10,[249999],100000,10000,false]",
+    "args": [
+      10,
+      [
+        249999
+      ],
+      100000,
+      10000,
+      false
+    ],
+    "result": 0
+  },
+  {
+    "kind": "liquidity",
+    "name": "liquidity [50,[250000],100000,10000,false]",
+    "args": [
+      50,
+      [
+        250000
+      ],
+      100000,
+      10000,
+      false
+    ],
+    "result": 1
+  },
+  {
+    "kind": "liquidity",
+    "name": "liquidity [10,[250000],300000,10000,false]",
+    "args": [
+      10,
+      [
+        250000
+      ],
+      300000,
+      10000,
+      false
+    ],
+    "result": 0
+  },
+  {
+    "kind": "liquidity",
+    "name": "liquidity [100,[250000],100000,10000,false]",
+    "args": [
+      100,
+      [
+        250000
+      ],
+      100000,
+      10000,
+      false
+    ],
+    "result": 1
+  },
+  {
+    "kind": "liquidity",
+    "name": "liquidity [10,[1000001],250000,100000,false]",
+    "args": [
+      10,
+      [
+        1000001
+      ],
+      250000,
+      100000,
+      false
+    ],
+    "result": 1
+  },
+  {
+    "kind": "liquidity",
+    "name": "liquidity [50,[300000,250000],100000,100000,false]",
+    "args": [
+      50,
+      [
+        300000,
+        250000
+      ],
+      100000,
+      100000,
+      false
+    ],
+    "result": 0.75
+  },
+  {
+    "kind": "liquidity",
+    "name": "liquidity [10,[300000,250000],100000,2000,false]",
+    "args": [
+      10,
+      [
+        300000,
+        250000
+      ],
+      100000,
+      2000,
+      false
+    ],
+    "result": 1
+  },
+  {
+    "kind": "liquidity",
+    "name": "liquidity [10,[1],100000,10000,true]",
+    "args": [
+      10,
+      [
+        1
+      ],
+      100000,
+      10000,
+      true
+    ],
+    "result": 1
+  },
+  {
+    "kind": "levels",
+    "name": "Camarilla 110,90,100",
+    "args": [
+      110,
+      90,
+      100
+    ],
+    "result": {
+      "R1": 101.83,
+      "R2": 103.67,
+      "R3": 105.5,
+      "R4": 111,
+      "R5": 116.5,
+      "R6": 122,
+      "S1": 98.17,
+      "S2": 96.33,
+      "S3": 94.5,
+      "S4": 89,
+      "S5": 83.5,
+      "S6": 78
+    }
+  },
+  {
+    "kind": "levels",
+    "name": "Camarilla 10.51,9.47,10.01",
+    "args": [
+      10.51,
+      9.47,
+      10.01
+    ],
+    "result": {
+      "R1": 10.11,
+      "R2": 10.2,
+      "R3": 10.3,
+      "R4": 10.58,
+      "R5": 10.87,
+      "R6": 11.15,
+      "S1": 9.91,
+      "S2": 9.82,
+      "S3": 9.72,
+      "S4": 9.44,
+      "S5": 9.15,
+      "S6": 8.87
+    }
+  },
+  {
+    "kind": "mapper",
+    "name": "condition boundary 2026-03-06T14:29:59.999Z",
+    "input": {
+      "ev": "T",
+      "sym": "AAPL",
+      "p": 10,
+      "s": 100,
+      "t": 1772807399999,
+      "q": 1,
+      "i": "a",
+      "x": 11,
+      "c": [
+        12
+      ]
+    },
+    "result": {
+      "symbol": "AAPL",
+      "timestamp": 1772807399999,
+      "price": 10,
+      "size": 100,
+      "sequence": "1",
+      "id": "a",
+      "exchange": 11,
+      "conditions": [
+        12
+      ]
+    },
+    "filtered": false
+  },
+  {
+    "kind": "mapper",
+    "name": "condition boundary 2026-03-06T14:30:00Z",
+    "input": {
+      "ev": "T",
+      "sym": "AAPL",
+      "p": 10,
+      "s": 100,
+      "t": 1772807400000,
+      "q": 1,
+      "i": "a",
+      "x": 11,
+      "c": [
+        12
+      ]
+    },
+    "result": {
+      "symbol": "AAPL",
+      "timestamp": 1772807400000,
+      "price": 10,
+      "size": 100,
+      "sequence": "1",
+      "id": "a",
+      "exchange": 11,
+      "conditions": [
+        12
+      ]
+    },
+    "filtered": true
+  },
+  {
+    "kind": "mapper",
+    "name": "condition boundary 2026-03-09T13:30:00Z",
+    "input": {
+      "ev": "T",
+      "sym": "AAPL",
+      "p": 10,
+      "s": 100,
+      "t": 1773063000000,
+      "q": 1,
+      "i": "a",
+      "x": 11,
+      "c": [
+        12
+      ]
+    },
+    "result": {
+      "symbol": "AAPL",
+      "timestamp": 1773063000000,
+      "price": 10,
+      "size": 100,
+      "sequence": "1",
+      "id": "a",
+      "exchange": 11,
+      "conditions": [
+        12
+      ]
+    },
+    "filtered": true
+  },
+  {
+    "kind": "mapper",
+    "name": "condition boundary 2026-10-01T20:00:00Z",
+    "input": {
+      "ev": "T",
+      "sym": "AAPL",
+      "p": 10,
+      "s": 100,
+      "t": 1790884800000,
+      "q": 1,
+      "i": "a",
+      "x": 11,
+      "c": [
+        12
+      ]
+    },
+    "result": {
+      "symbol": "AAPL",
+      "timestamp": 1790884800000,
+      "price": 10,
+      "size": 100,
+      "sequence": "1",
+      "id": "a",
+      "exchange": 11,
+      "conditions": [
+        12
+      ]
+    },
+    "filtered": true
+  },
+  {
+    "kind": "mapper",
+    "name": "condition boundary 2026-10-01T20:00:00.001Z",
+    "input": {
+      "ev": "T",
+      "sym": "AAPL",
+      "p": 10,
+      "s": 100,
+      "t": 1790884800001,
+      "q": 1,
+      "i": "a",
+      "x": 11,
+      "c": [
+        12
+      ]
+    },
+    "result": {
+      "symbol": "AAPL",
+      "timestamp": 1790884800001,
+      "price": 10,
+      "size": 100,
+      "sequence": "1",
+      "id": "a",
+      "exchange": 11,
+      "conditions": [
+        12
+      ]
+    },
+    "filtered": false
+  },
+  {
+    "kind": "premarketEligibility",
+    "name": "shares eligibility 499999,1000,500000,0.9,4",
+    "args": [
+      499999,
+      1000,
+      500000,
+      0.9,
+      4
+    ],
+    "result": {
+      "hardFloorPassed": false,
+      "absolutePassed": false,
+      "relativePassed": true
+    }
+  },
+  {
+    "kind": "premarketEligibility",
+    "name": "shares eligibility 500000,125000,500000,0.9,4",
+    "args": [
+      500000,
+      125000,
+      500000,
+      0.9,
+      4
+    ],
+    "result": {
+      "hardFloorPassed": true,
+      "absolutePassed": false,
+      "relativePassed": true
+    }
+  },
+  {
+    "kind": "premarketEligibility",
+    "name": "shares eligibility 899999,0,500000,0.9,4",
+    "args": [
+      899999,
+      0,
+      500000,
+      0.9,
+      4
+    ],
+    "result": {
+      "hardFloorPassed": true,
+      "absolutePassed": false,
+      "relativePassed": false
+    }
+  },
+  {
+    "kind": "premarketEligibility",
+    "name": "shares eligibility 900000,0,500000,0.9,4",
+    "args": [
+      900000,
+      0,
+      500000,
+      0.9,
+      4
+    ],
+    "result": {
+      "hardFloorPassed": true,
+      "absolutePassed": true,
+      "relativePassed": false
+    }
+  },
+  {
+    "kind": "marketCap",
+    "name": "implied cap 100000000,10",
+    "args": [
+      100000000,
+      10
+    ],
+    "result": 1
+  },
+  {
+    "kind": "marketCap",
+    "name": "implied cap 100000000,8.95",
+    "args": [
+      100000000,
+      8.95
+    ],
+    "result": 0.89
+  },
+  {
+    "kind": "marketCap",
+    "name": "implied cap 0,10",
+    "args": [
+      0,
+      10
+    ],
+    "result": 0
+  },
+  {
+    "kind": "consolidation",
+    "name": "consolidation [{\"low\":9,\"high\":11},[{\"symbol\":\"AAPL\",\"datetime\":1790775000000,\"open\":10,\"high\":11,\"low\":9,\"close\":12,\"volume\":100,\"vwap\":10}]]",
+    "area": {
+      "low": 9,
+      "high": 11
+    },
+    "candles": [
+      {
+        "symbol": "AAPL",
+        "datetime": 1790775000000,
+        "open": 10,
+        "high": 11,
+        "low": 9,
+        "close": 12,
+        "volume": 100,
+        "vwap": 10
+      }
+    ],
+    "result": "previous consolidation breakout on 2026-09-30: open 10 inside [9, 11], close 12"
+  },
+  {
+    "kind": "consolidation",
+    "name": "consolidation [{\"low\":11,\"high\":9},[{\"symbol\":\"AAPL\",\"datetime\":1790775000000,\"open\":10,\"high\":11,\"low\":9,\"close\":8,\"volume\":100,\"vwap\":10}]]",
+    "area": {
+      "low": 11,
+      "high": 9
+    },
+    "candles": [
+      {
+        "symbol": "AAPL",
+        "datetime": 1790775000000,
+        "open": 10,
+        "high": 11,
+        "low": 9,
+        "close": 8,
+        "volume": 100,
+        "vwap": 10
+      }
+    ],
+    "result": "previous consolidation breakdown on 2026-09-30: open 10 inside [9, 11], close 8"
+  },
+  {
+    "kind": "consolidation",
+    "name": "consolidation [{\"low\":9,\"high\":11},[{\"symbol\":\"AAPL\",\"datetime\":1790775000000,\"open\":12,\"high\":11,\"low\":9,\"close\":13,\"volume\":100,\"vwap\":10}]]",
+    "area": {
+      "low": 9,
+      "high": 11
+    },
+    "candles": [
+      {
+        "symbol": "AAPL",
+        "datetime": 1790775000000,
+        "open": 12,
+        "high": 11,
+        "low": 9,
+        "close": 13,
+        "volume": 100,
+        "vwap": 10
+      }
+    ],
+    "result": ""
+  },
+  {
+    "kind": "consolidation",
+    "name": "consolidation [null,[]]",
+    "area": null,
+    "candles": [],
+    "result": ""
+  },
+  {
+    "kind": "consolidation",
+    "name": "consolidation [null,[{\"symbol\":\"AAPL\",\"datetime\":1790775000000,\"open\":10,\"high\":11,\"low\":9,\"close\":10,\"volume\":100,\"vwap\":10}]]",
+    "area": null,
+    "candles": [
+      {
+        "symbol": "AAPL",
+        "datetime": 1790775000000,
+        "open": 10,
+        "high": 11,
+        "low": 9,
+        "close": 10,
+        "volume": 100,
+        "vwap": 10
+      }
+    ],
+    "result": "missing previous consolidation area for range bound reversal"
+  }
+]

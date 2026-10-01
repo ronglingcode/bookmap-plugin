@@ -17,7 +17,7 @@ public final class MarketClock {
             date = value.toLocalDate().toString();
             int minutes = value.getHour() * 60 + value.getMinute();
             minutesSinceMarketOpen = minutes - 570 + value.getSecond() / 60.0 + value.getNano() / 60_000_000_000.0;
-            isPremarket = minutes < 570; isRegularSession = minutes >= 570 && minutes < 960;
+            isPremarket = minutes < 570; isRegularSession = minutes >= 570 && (minutes < 960 || (minutes == 960 && value.getSecond() == 0 && value.getNano() == 0));
         }
     }
     public static Time marketTime(long epochMs) { return new Time(Instant.ofEpochMilli(epochMs).atZone(MARKET_ZONE)); }

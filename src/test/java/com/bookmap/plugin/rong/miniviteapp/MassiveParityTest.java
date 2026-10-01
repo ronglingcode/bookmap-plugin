@@ -41,6 +41,8 @@ class MassiveParityTest {
                     case "getPriceHistoryFromOldDateForHigherTimeframe": result = candles(api.getPriceHistoryFromOldDateForHigherTimeframe(args.get(0).getAsString(), args.get(1).getAsInt(), args.get(2).getAsString(), args.get(3).getAsString())); break;
                     case "getDailyCandlesForLastNDays": result = candles(api.getDailyCandlesForLastNDays(args.get(0).getAsString(), args.get(1).getAsInt(), args.get(2).getAsString())); break;
                     case "getSharesOutstanding": result = new com.google.gson.JsonPrimitive(api.getSharesOutstanding(args.get(0).getAsString())); break;
+                    case "getTrades":
+                        JsonArray trades = new JsonArray(); api.getTrades(args.get(0).getAsString(), args.get(1).getAsLong(), args.get(2).getAsLong()).forEach(trade -> trades.add(trade.toJson())); result = trades; break;
                     case "getFullPriceHistory": result = api.getFullPriceHistory(args.get(0).getAsString(), args.get(1).getAsString()); break;
                     case "calculatePremarketVolume": result = PremarketVolume.calculatePremarketVolume(parseCandles(args.get(0).getAsJsonArray())); break;
                     case "marketTime":
