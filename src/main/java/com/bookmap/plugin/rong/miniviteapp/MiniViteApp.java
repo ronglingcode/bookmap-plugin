@@ -125,7 +125,8 @@ public final class MiniViteApp implements AutoCloseable {
             if (state.entryContext != null && action.has("bookmapDayHighLow")) {
                 JsonObject day = action.getAsJsonObject("bookmapDayHighLow");
                 Models.require(!day.has("priceUnit") || Models.string(day, "priceUnit").equals("real"), "unsupported day-level price unit");
-                double high = Models.number(day, "high"), low = Models.number(day, "low");
+                double high = Models.number(day, day.has("highOfDay") ? "highOfDay" : "high");
+                double low = Models.number(day, day.has("lowOfDay") ? "lowOfDay" : "low");
                 if (Models.positive(high) && Models.positive(low)) {
                     JsonObject prices = new JsonObject();
                     prices.addProperty("currentPrice", state.currentPrice); prices.addProperty("bid", state.bid); prices.addProperty("ask", state.ask);

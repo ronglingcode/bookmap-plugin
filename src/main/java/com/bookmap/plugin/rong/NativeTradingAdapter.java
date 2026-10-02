@@ -4,7 +4,9 @@ import com.bookmap.plugin.rong.miniviteapp.runtime.NativeRuntime;
 import com.bookmap.plugin.rong.miniviteapp.runtime.LocalCredentials;
 import com.bookmap.plugin.rong.miniviteapp.runtime.TradingRuntime;
 import com.bookmap.plugin.rong.miniviteapp.core.controllers.NativeViews;
+import com.bookmap.plugin.rong.miniviteapp.models.Candle;
 import com.google.gson.JsonObject;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.time.Duration;
@@ -29,6 +31,10 @@ public final class NativeTradingAdapter implements AutoCloseable {
             NativeConnectionStatus connectionStatus) {
         this.display = display; this.settings = settings; this.connectionStatus = connectionStatus;
         display.setTradingDispatch(this::dispatch); display.setManualInputs(symbol -> runtime == null || closed ? new JsonObject() : runtime.trading.manualInputs(symbol)); display.setRetestNotification(this::notifyUser);
+        display.setSessionLevelsProvider(symbol -> {
+            NativeRuntime current = runtime;
+            return current == null || closed ? null : current.trading.sessionLevels(symbol);
+        });
     }
     public void attach(String symbol, Api api) { apis.put(symbol, api); }
     public void detach(String symbol) { apis.remove(symbol); }
@@ -39,10 +45,17 @@ public final class NativeTradingAdapter implements AutoCloseable {
             public void log(String symbol, String value) { PluginLog.action(symbol, value); }
             public void notify(String symbol, String value) { notifyUser(symbol, value); }
             public void status(String source, String value) { connectionStatus.update(source, value); }
+            public void minuteBarsLoaded(String symbol, String date, List<Candle> bars) {
+                if (!closed) display.updateRegularSessionMinuteBars(symbol, date, bars);
+            }
         }); runtime.start(); }
         catch (Exception error) { connectionStatus.setUnavailable("startup failed"); PluginLog.action("", "Native startup unavailable. Check local secrets at " + LocalCredentials.defaultPath() + "; then use Restart Native Trading."); }
     }
     public void dispatch(JsonObject action) { if (runtime == null || closed) PluginLog.action(string(action, "symbol"), "Native runtime unavailable; no action sent"); else runtime.trading.dispatch(action); }
+    public void observeBookmapTrade(String symbol, double price, long timestampNs) {
+        NativeRuntime current = runtime;
+        if (current != null && !closed) current.trading.observeBookmapTrade(symbol, price, timestampNs / 1_000_000L);
+    }
     public void authorize(String callbackUrl) { if (runtime != null && !closed) runtime.trading.exchangeAuthorizationCode(callbackUrl); }
     public void openAuthorization() {
         if (runtime == null || closed) { PluginLog.action("", "Load local secrets and restart native trading first"); return; }

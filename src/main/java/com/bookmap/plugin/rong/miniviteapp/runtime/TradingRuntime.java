@@ -12,6 +12,7 @@ import com.bookmap.plugin.rong.miniviteapp.core.marketdata.StartupEligibility;
 import com.bookmap.plugin.rong.miniviteapp.core.state.TradeState;
 import com.bookmap.plugin.rong.miniviteapp.libraries.broker.schwab.*;
 import com.bookmap.plugin.rong.miniviteapp.models.Trade;
+import com.bookmap.plugin.rong.miniviteapp.models.Candle;
 import com.bookmap.plugin.rong.miniviteapp.ports.*;
 import com.google.gson.*;
 import java.util.*;
@@ -27,6 +28,7 @@ public final class TradingRuntime implements AutoCloseable {
         void log(String symbol, String message);
         void notify(String symbol, String message);
         default void status(String source, String status) { }
+        default void minuteBarsLoaded(String symbol, String date, List<Candle> bars) { }
     }
     private final Object lock = new Object();
     private final OAuth oauth;
@@ -116,6 +118,16 @@ public final class TradingRuntime implements AutoCloseable {
     private JsonObject selectedPlan(String symbol) { return config != null && config.symbols.contains(symbol) ? config.plan(symbol) : null; }
     private String accountHash() throws Exception { String account = string(credentials.loadSchwab(), "accountHashValue"); if (account.isEmpty()) throw new IllegalArgumentException("Schwab accountHashValue missing from local secrets"); return account; }
     private double price(String symbol) { var value = market.getState(symbol); double price = value == null ? 0 : number(value.metrics(), "currentPrice"); if (price > 0) return price; synchronized (lock) { JsonObject quote = quotes.get(symbol); double bid = number(quote, "bidPrice"), ask = number(quote, "askPrice"); return bid > 0 && ask > 0 ? (bid + ask) / 2 : Math.max(bid, ask); } }
+    public void observeBookmapTrade(String symbol, double price, long timestampMs) {
+        if (stopped) return;
+        if (market.acceptBookmapTrade(symbol, price, timestampMs)) synchronized (lock) { dirty.add(symbol); }
+    }
+    public JsonObject sessionLevels(String symbol) {
+        var state = market.getState(symbol);
+        if (state == null) return null;
+        JsonObject levels = state.sessionLevels();
+        return string(levels, "sessionDate").equals(MarketClock.marketTime(now.getAsLong()).date) ? levels : null;
+    }
     private void publishToken() throws Exception {
         if (stopped) return; JsonObject value = credentials.loadSchwab(), token = message("execution_token"); token.addProperty("accountHash", accountHash()); token.addProperty("accessToken", string(value, "access_token")); token.addProperty("expiresAt", number(value, "expires_at")); execution.receive(this, token);
     }
@@ -166,6 +178,7 @@ public final class TradingRuntime implements AutoCloseable {
                 String reason = StartupEligibility.evaluate(plan, number(loaded.state.metrics(), "currentPrice"), shares, object(loaded.history, "premarketDollarCollection"), array(loaded.history, "dailyBars"));
                 loaded.history.addProperty("sharesOutstanding", shares);
                 synchronized (lock) { if (selectedPlan(symbol) == null || !string(loaded.state.snapshot(), "date").equals(MarketClock.marketTime(now.getAsLong()).date)) return; histories.put(symbol, loaded.history); eligibility.put(symbol, reason); dirty.add(symbol); }
+                events.minuteBarsLoaded(symbol, string(loaded.state.snapshot(), "date"), loaded.todayBars);
                 events.status("massiveHistory", "ready");
                 if (!reason.isEmpty()) events.notify(symbol, "Entry blocked: " + reason);
                 publishInputs(symbol); events.message(view(symbol, "market_ready"));
@@ -229,10 +242,11 @@ public final class TradingRuntime implements AutoCloseable {
         synchronized (lock) {
             if (stopped || state == null || config == null || account == null) return;
             JsonObject plan = selectedPlan(symbol);
-            if (plan == null || loaded == null) input = exitInputs(symbol);
+            if (plan == null || loaded == null || !string(loaded.sessionLevels(), "sessionDate")
+                    .equals(MarketClock.marketTime(now.getAsLong()).date)) input = exitInputs(symbol);
             else {
             JsonArray stocks = new JsonArray(); config.symbols.forEach(stocks::add); JsonObject markets = new JsonObject(); config.symbols.forEach(stock -> { JsonObject prices = new JsonObject(); prices.addProperty("currentPrice", price(stock)); markets.add(stock, prices); });
-            input = ExecutionInputs.create(symbol, plan, loaded.snapshot(), quotes.getOrDefault(symbol, new JsonObject()), account, ledger, state, stocks, markets, manual.getOrDefault(symbol, new JsonObject()), now.getAsLong(), ++revision, policy);
+            input = ExecutionInputs.create(symbol, plan, loaded.orderSnapshot(), quotes.getOrDefault(symbol, new JsonObject()), account, ledger, state, stocks, markets, manual.getOrDefault(symbol, new JsonObject()), now.getAsLong(), ++revision, policy);
             String reason = eligibility.getOrDefault(symbol, "startup eligibility pending");
             if (!reason.isEmpty()) input.getAsJsonObject("entryContext").addProperty("watchlistBlockReason", reason);
             }

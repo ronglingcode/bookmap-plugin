@@ -16,6 +16,7 @@ import org.java_websocket.server.WebSocketServer;
 
 import com.bookmap.plugin.rong.patterns.Direction;
 import com.bookmap.plugin.rong.patterns.PatternType;
+import com.bookmap.plugin.rong.miniviteapp.models.Candle;
 import com.bookmap.plugin.rong.tradebuttons.TradebookButtonGroup;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
@@ -99,6 +100,7 @@ public class SignalWebSocketServer extends WebSocketServer {
     private final Map<String, List<ExitOrderPairDefinition>> symbolToExitOrderPairs = new ConcurrentHashMap<>();
     private final Map<String, AccountStateDefinition> symbolToAccountState = new ConcurrentHashMap<>();
     private final Map<String, RegularSessionHighLowTracker> symbolToRegularSessionHighLow = new ConcurrentHashMap<>();
+    private volatile java.util.function.Function<String, JsonObject> sessionLevelsProvider = symbol -> null;
     private final Map<String, VwapUpdateDefinition> symbolToVwapUpdate = new ConcurrentHashMap<>();
     private final Map<String, CorePlanConfigDefinition> symbolToCorePlan = new ConcurrentHashMap<>();
     private final Map<String, Set<TradeButtonConfigListener>> symbolToTradeButtonListeners = new ConcurrentHashMap<>();
@@ -151,6 +153,18 @@ public class SignalWebSocketServer extends WebSocketServer {
                 .onTrade(price, timestampNs);
     }
 
+    public void updateRegularSessionMinuteBars(String symbol, String date, List<Candle> bars) {
+        String cleanSymbol = SymbolUtils.cleanSymbol(symbol);
+        if (cleanSymbol.isEmpty()) return;
+        symbolToRegularSessionHighLow
+                .computeIfAbsent(cleanSymbol, ignored -> new RegularSessionHighLowTracker())
+                .onMinuteBars(date, bars);
+    }
+
+    public void setSessionLevelsProvider(java.util.function.Function<String, JsonObject> provider) {
+        sessionLevelsProvider = provider;
+    }
+
     public boolean appendRegularSessionHighLow(String symbol, JsonObject target) {
         RegularSessionHighLowTracker.Snapshot snapshot = getRegularSessionHighLow(symbol);
         if (snapshot == null) {
@@ -163,9 +177,12 @@ public class SignalWebSocketServer extends WebSocketServer {
     public String describeRegularSessionHighLow(String symbol) {
         RegularSessionHighLowTracker.Snapshot snapshot = getRegularSessionHighLow(symbol);
         if (snapshot == null) {
-            return "HOD/LOD: waiting";
+            return "HOD/LOD: waiting | Open: waiting";
         }
-        return String.format(Locale.US, "HOD/LOD: %.2f/%.2f", snapshot.getHigh(), snapshot.getLow());
+        return String.format(Locale.US, "HOD/LOD: %.2f/%.2f | Open: %s",
+                snapshot.getHighOfDay(), snapshot.getLowOfDay(),
+                Double.isFinite(snapshot.getOpenPrice())
+                        ? String.format(Locale.US, "%.2f", snapshot.getOpenPrice()) : "waiting");
     }
 
     /**
@@ -193,13 +210,17 @@ public class SignalWebSocketServer extends WebSocketServer {
         }
     }
 
-    private RegularSessionHighLowTracker.Snapshot getRegularSessionHighLow(String symbol) {
+    RegularSessionHighLowTracker.Snapshot getRegularSessionHighLow(String symbol) {
         String cleanSymbol = SymbolUtils.cleanSymbol(symbol);
         if (cleanSymbol.isEmpty()) {
             return null;
         }
         RegularSessionHighLowTracker tracker = symbolToRegularSessionHighLow.get(cleanSymbol);
-        return tracker == null ? null : tracker.snapshot();
+        RegularSessionHighLowTracker.Snapshot local = tracker == null ? null : tracker.snapshot();
+        RegularSessionHighLowTracker.Snapshot market =
+                RegularSessionHighLowTracker.fromMarketState(sessionLevelsProvider.apply(cleanSymbol));
+        return market != null && (local == null || market.getSessionDate().compareTo(local.getSessionDate()) >= 0)
+                ? market : local;
     }
 
     public OrderbookWallThreshold getOrderbookWallThreshold(String symbol, int thresholdFloor) {

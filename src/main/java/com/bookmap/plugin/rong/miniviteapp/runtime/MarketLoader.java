@@ -1,6 +1,7 @@
 package com.bookmap.plugin.rong.miniviteapp.runtime;
 
 import com.bookmap.plugin.rong.miniviteapp.core.marketdata.MarketState;
+import com.bookmap.plugin.rong.miniviteapp.core.marketdata.MarketClock;
 import com.bookmap.plugin.rong.miniviteapp.libraries.massive.Api;
 import com.bookmap.plugin.rong.miniviteapp.libraries.massive.Mapper;
 import com.bookmap.plugin.rong.miniviteapp.models.Candle;
@@ -17,26 +18,47 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executor;
 import java.util.function.LongSupplier;
 
-/** Same orchestration as TS MarketLoader. Vendor reads run on an injected I/O executor. */
+/** Loads Massive history and retains Bookmap session extremes during asynchronous reads. */
 public final class MarketLoader implements AutoCloseable {
     private final Api api;
     private final Executor executor;
     private final LongSupplier now;
     private final Map<String, MarketState> states = new HashMap<>();
     private final Map<String, Loading> loading = new HashMap<>();
+    private final Map<String, BookmapLevels> bookmapLevels = new HashMap<>();
     private boolean closed;
     public MarketLoader(Api api, Executor executor, LongSupplier now) { this.api = api; this.executor = executor; this.now = now; }
     public static final class Loaded {
         public final MarketState state;
         public final JsonObject history;
-        private Loaded(MarketState state, JsonObject history) { this.state = state; this.history = history; }
+        public final List<Candle> todayBars;
+        private Loaded(MarketState state, JsonObject history, List<Candle> todayBars) {
+            this.state = state; this.history = history; this.todayBars = todayBars;
+        }
     }
     private static final class Loading {
         final List<Trade> buffer = new ArrayList<>();
         final CompletableFuture<Loaded> promise = new CompletableFuture<>();
     }
+    private static final class BookmapLevels {
+        final String date;
+        double highOfDay, lowOfDay;
+        BookmapLevels(String date, double price) { this.date = date; highOfDay = lowOfDay = price; }
+        void accept(double price) { highOfDay = Math.max(highOfDay, price); lowOfDay = Math.min(lowOfDay, price); }
+    }
     public synchronized MarketState getState(String symbol) { return states.get(symbol); }
-    public synchronized void forget(String symbol) { states.remove(symbol); loading.remove(symbol); }
+    public synchronized void forget(String symbol) { states.remove(symbol); loading.remove(symbol); bookmapLevels.remove(symbol); }
+    public synchronized boolean acceptBookmapTrade(String symbol, double price, long timestampMs) {
+        if (closed || symbol == null || symbol.isEmpty() || !Double.isFinite(price) || price <= 0 || timestampMs <= 0) return false;
+        MarketClock.Time time = MarketClock.marketTime(timestampMs);
+        if (time.minutesSinceMarketOpen < 0 || time.minutesSinceMarketOpen >= 390) return false;
+        BookmapLevels levels = bookmapLevels.get(symbol);
+        if (levels != null && time.date.compareTo(levels.date) < 0) return false;
+        if (levels == null || !levels.date.equals(time.date)) bookmapLevels.put(symbol, levels = new BookmapLevels(time.date, price));
+        else levels.accept(price);
+        MarketState state = states.get(symbol);
+        return state != null && state.applyBookmapLevels(time.date, price, price);
+    }
     public synchronized boolean acceptTrade(Trade trade) {
         if (closed || Mapper.shouldFilterTrade(trade)) return false;
         Loading pending = loading.get(trade.symbol); if (pending != null) pending.buffer.add(trade);
@@ -62,10 +84,13 @@ public final class MarketLoader implements AutoCloseable {
         JsonObject history = api.getFullPriceHistory(symbol, date); List<Trade> backfill = api.getTrades(symbol, liveFrom, now.getAsLong());
         synchronized (this) {
             if (closed || loading.get(symbol) != pending) throw new IllegalStateException("Market load replaced or stopped");
-            MarketState state = new MarketState(symbol, date, marketCap); state.initialize(candles(history.getAsJsonArray("today1MinuteBars")), liveFrom, correctionVolume, correctionDollars);
+            List<Candle> todayBars = candles(history.getAsJsonArray("today1MinuteBars"));
+            MarketState state = new MarketState(symbol, date, marketCap); state.initialize(todayBars, liveFrom, correctionVolume, correctionDollars);
             List<Trade> prints = new ArrayList<>(backfill); prints.addAll(pending.buffer); prints.sort(Comparator.comparingLong(trade -> trade.timestamp));
             for (Trade trade : prints) if (!Mapper.shouldFilterTrade(trade)) state.applyTrade(trade);
-            states.put(symbol, state); return new Loaded(state, history);
+            BookmapLevels levels = bookmapLevels.get(symbol);
+            if (levels != null) state.applyBookmapLevels(levels.date, levels.highOfDay, levels.lowOfDay);
+            states.put(symbol, state); return new Loaded(state, history, todayBars);
         }
     }
     private static List<Candle> candles(JsonArray values) {
@@ -75,5 +100,5 @@ public final class MarketLoader implements AutoCloseable {
         }
         return result;
     }
-    @Override public synchronized void close() { closed = true; states.clear(); loading.clear(); }
+    @Override public synchronized void close() { closed = true; states.clear(); loading.clear(); bookmapLevels.clear(); }
 }

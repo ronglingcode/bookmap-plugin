@@ -791,19 +791,20 @@ public class TradeButtonWindow {
         SignalWebSocketServer.OrderbookWallThreshold threshold =
                 server.getOrderbookWallThreshold(symbol, thresholdFloor);
         if (!threshold.isAvailable()) {
-            wallThresholdLabel.setText("Wall: waiting | " + getRegularSessionHighLowText());
+            wallThresholdLabel.setText("<html><center>Wall: waiting<br>"
+                    + getRegularSessionHighLowText() + "</center></html>");
             return;
         }
 
         String percentileSize = threshold.getPercentileMinSize() > 0
                 ? formatShareSize(threshold.getPercentileMinSize())
                 : "n/a";
-        wallThresholdLabel.setText("Wall: " + formatShareSize(threshold.getEffectiveMinSize())
+        wallThresholdLabel.setText("<html><center>Wall: " + formatShareSize(threshold.getEffectiveMinSize())
                 + " (P" + formatPercentile(threshold.getPercentile())
                 + "=" + percentileSize
                 + ", Top3=" + formatLargestSizes(threshold.getLargestLevelSizes())
                 + ", floor=" + formatShareSize(threshold.getAbsoluteMinSize()) + ")"
-                + " | " + getRegularSessionHighLowText());
+                + "<br>" + getRegularSessionHighLowText() + "</center></html>");
     }
 
     private String getRegularSessionHighLowText() {

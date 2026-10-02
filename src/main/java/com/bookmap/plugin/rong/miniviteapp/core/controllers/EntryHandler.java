@@ -50,7 +50,8 @@ public final class EntryHandler {
         if (action.has("bookmapDayHighLow")) {
             var day = action.getAsJsonObject("bookmapDayHighLow");
             Models.require(!day.has("priceUnit") || Models.string(day, "priceUnit").equals("real"), "unsupported day-level price unit");
-            double dayHigh = Models.number(day, "high"), dayLow = Models.number(day, "low");
+            double dayHigh = Models.number(day, day.has("highOfDay") ? "highOfDay" : "high");
+            double dayLow = Models.number(day, day.has("lowOfDay") ? "lowOfDay" : "low");
             if (Models.positive(dayHigh) && Models.positive(dayLow)) { high = Math.max(high, Math.ceil(dayHigh * 100) / 100); low = Math.min(low, Math.floor(dayLow * 100) / 100); }
         }
         boolean market = key.isEmpty() && (Models.bool(action, "use_market_order") || Models.bool(action, "useMarketOrder"));

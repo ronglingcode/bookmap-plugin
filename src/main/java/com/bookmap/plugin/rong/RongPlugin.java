@@ -107,7 +107,6 @@ public class RongPlugin implements CustomModuleAdapter,
     private OrderBookState orderBook;
     private OrderWallLabelTracker wallLabelTracker;
     private OrderWallChangeTracker wallChangeTracker;
-    private RegularSessionHighLowTracker wallChangeHighLowTracker;
     private BookmapPatternEngine patternEngine;
     private volatile boolean patternAutomationEnabled;
     private volatile boolean patternSnapshotComplete;
@@ -192,7 +191,6 @@ public class RongPlugin implements CustomModuleAdapter,
                 cleanAlias, info.pips, wallLabelStore, this::getEffectiveWallThreshold,
                 WALL_LABEL_RETAIN_TICKS,
                 this::handleWallLabelTrackerChange);
-        this.wallChangeHighLowTracker = new RegularSessionHighLowTracker();
         this.wallChangeTracker = new OrderWallChangeTracker(
                 cleanAlias,
                 info.pips,
@@ -327,7 +325,6 @@ public class RongPlugin implements CustomModuleAdapter,
             wallChangeTracker.shutdown();
             wallChangeTracker = null;
         }
-        wallChangeHighLowTracker = null;
         if (patternEngine != null) {
             patternEngine.shutdown();
             patternEngine = null;
@@ -554,9 +551,11 @@ public class RongPlugin implements CustomModuleAdapter,
         long eventTimeNs = getEventTimeNs();
         double realPrice = BookmapPriceNormalizer.toWirePrice(price, instrumentInfo.pips);
         int priceTick = (int) Math.round(price);
-        if (wallChangeHighLowTracker != null) {
-            wallChangeHighLowTracker.onTrade(realPrice, eventTimeNs);
+        if (sharedServer != null) {
+            sharedServer.updateRegularSessionHighLow(alias, realPrice, eventTimeNs);
         }
+        NativeTradingAdapter trading = nativeTrading;
+        if (trading != null) trading.observeBookmapTrade(alias, realPrice, eventTimeNs);
         if (wallChangeTracker != null) {
             wallChangeTracker.onTrade(priceTick, size, tradeInfo);
         }
@@ -566,9 +565,6 @@ public class RongPlugin implements CustomModuleAdapter,
             patternEngine.onTrade(price, size, tradeInfo, eventTimeNs);
         }
 
-        if (sharedServer != null) {
-            sharedServer.updateRegularSessionHighLow(alias, realPrice, eventTimeNs);
-        }
         if (wallLabelTracker != null && wallLabelTracker.cleanup(priceTick)) {
             wallLabelsDirty = true;
         }
@@ -702,15 +698,15 @@ public class RongPlugin implements CustomModuleAdapter,
     }
 
     private double getWallChangeDayHigh() {
-        RegularSessionHighLowTracker tracker = wallChangeHighLowTracker;
-        RegularSessionHighLowTracker.Snapshot snapshot = tracker == null ? null : tracker.snapshot();
-        return snapshot == null ? Double.NaN : snapshot.getHigh();
+        SignalWebSocketServer server = sharedServer;
+        RegularSessionHighLowTracker.Snapshot snapshot = server == null ? null : server.getRegularSessionHighLow(alias);
+        return snapshot == null ? Double.NaN : snapshot.getHighOfDay();
     }
 
     private double getWallChangeDayLow() {
-        RegularSessionHighLowTracker tracker = wallChangeHighLowTracker;
-        RegularSessionHighLowTracker.Snapshot snapshot = tracker == null ? null : tracker.snapshot();
-        return snapshot == null ? Double.NaN : snapshot.getLow();
+        SignalWebSocketServer server = sharedServer;
+        RegularSessionHighLowTracker.Snapshot snapshot = server == null ? null : server.getRegularSessionHighLow(alias);
+        return snapshot == null ? Double.NaN : snapshot.getLowOfDay();
     }
 
     private boolean shouldRunPatternAutomation() {

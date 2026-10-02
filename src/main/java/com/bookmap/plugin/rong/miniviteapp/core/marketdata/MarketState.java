@@ -10,7 +10,7 @@ import java.util.List;
 import java.util.Set;
 import java.util.TreeMap;
 
-/** Mirrors TS MarketState. Domain state has no UI, vendor, I/O, or scheduler dependency. */
+/** Per-symbol market state based on TS MarketState, with Bookmap session levels. */
 public final class MarketState {
     private final String symbol, date;
     private final double marketCap;
@@ -46,9 +46,10 @@ public final class MarketState {
             applyCorrection(time.minutesSinceMarketOpen);
             double dollars = candle.volume * PremarketVolume.typicalPrice(candle);
             buckets.put(candle.datetime, new Bucket(candle, candle.datetime, candle.datetime + 59999, dollars));
-            if (!time.isPremarket && firstRegularBucketTime == null) firstRegularBucketTime = candle.datetime;
+            if (time.minutesSinceMarketOpen >= 0 && time.minutesSinceMarketOpen < 390
+                    && firstRegularBucketTime == null) firstRegularBucketTime = candle.datetime;
             totalVolume += candle.volume; totalDollars += dollars; if (time.isPremarket) premarketDollars += dollars;
-            updateLevels(candle.high, candle.low, time.isPremarket);
+            updateLevels(candle.high, candle.low, time);
             currentPrice = candle.close; latestPriceTime = candle.datetime + 59999;
             vwaps.put(candle.datetime, totalVolume > 0 ? totalDollars / totalVolume : 0);
         }
@@ -66,26 +67,39 @@ public final class MarketState {
         if (candle == null) {
             candle = new Bucket(new Candle(symbol, bucketTime, trade.price, trade.price, trade.price, trade.price, 0, 0), trade.timestamp, trade.timestamp, 0);
             buckets.put(bucketTime, candle);
-            if (!time.isPremarket && firstRegularBucketTime == null) firstRegularBucketTime = bucketTime;
+            if (time.minutesSinceMarketOpen >= 0 && time.minutesSinceMarketOpen < 390
+                    && firstRegularBucketTime == null) firstRegularBucketTime = bucketTime;
         }
         if (trade.timestamp < candle.firstTradeTime) { candle.open = trade.price; candle.firstTradeTime = trade.timestamp; }
         if (trade.timestamp >= candle.lastTradeTime) { candle.close = trade.price; candle.lastTradeTime = trade.timestamp; }
         candle.high = Math.max(candle.high, trade.price); candle.low = Math.min(candle.low, trade.price);
         candle.volume += trade.size; candle.dollars += trade.price * trade.size; candle.vwap = candle.dollars / candle.volume;
         totalVolume += trade.size; totalDollars += trade.price * trade.size; if (time.isPremarket) premarketDollars += trade.price * trade.size;
-        updateLevels(trade.price, trade.price, time.isPremarket);
+        updateLevels(trade.price, trade.price, time);
         if (trade.timestamp >= latestPriceTime) { currentPrice = trade.price; latestPriceTime = trade.timestamp; }
         vwaps.put(bucketTime, totalDollars / totalVolume); updateLiquidity(); return true;
+    }
+    /** Bookmap prints extend session levels without duplicating Massive volume or candles. */
+    public synchronized boolean applyBookmapLevels(String sessionDate, double newHighOfDay, double newLowOfDay) {
+        if (!date.equals(sessionDate) || !Double.isFinite(newHighOfDay) || !Double.isFinite(newLowOfDay)
+                || newHighOfDay <= 0 || newLowOfDay <= 0 || newHighOfDay < newLowOfDay) return false;
+        double previousHigh = highOfDay, previousLow = lowOfDay;
+        updateRegularLevels(newHighOfDay, newLowOfDay);
+        return highOfDay != previousHigh || lowOfDay != previousLow;
     }
     private void applyCorrection(double minutesSinceMarketOpen) {
         if (!corrected && minutesSinceMarketOpen >= -30 && minutesSinceMarketOpen < 0 && correctionVolume > 0 && correctionDollars > 0) {
             totalVolume = correctionVolume; totalDollars = premarketDollars = correctionDollars; corrected = true;
         }
     }
-    private void updateLevels(double high, double low, boolean premarket) {
+    private void updateLevels(double high, double low, MarketClock.Time time) {
         high = Math.ceil(high * 100) / 100; low = Math.floor(low * 100) / 100;
-        if (premarket) { premarketHigh = Math.max(premarketHigh, high); premarketLow = premarketLow != 0 ? Math.min(premarketLow, low) : low; }
-        else { highOfDay = Math.max(highOfDay, high); lowOfDay = lowOfDay != 0 ? Math.min(lowOfDay, low) : low; }
+        if (time.isPremarket) { premarketHigh = Math.max(premarketHigh, high); premarketLow = premarketLow != 0 ? Math.min(premarketLow, low) : low; }
+        else if (time.minutesSinceMarketOpen < 390) updateRegularLevels(high, low);
+    }
+    private void updateRegularLevels(double high, double low) {
+        high = Math.ceil(high * 100) / 100; low = Math.floor(low * 100) / 100;
+        highOfDay = Math.max(highOfDay, high); lowOfDay = lowOfDay != 0 ? Math.min(lowOfDay, low) : low;
     }
     private void updateLiquidity() {
         if (lockedAtMax) { liquidityScale = 1; return; }
@@ -108,6 +122,28 @@ public final class MarketState {
         if (latest != null) json.add("candle", latest.candle(symbol).toJson());
         json.addProperty("firstTradeTime", latest == null ? 0 : latest.firstTradeTime); json.addProperty("latestPriceTime", latestPriceTime);
         if (latest != null) { var closed = vwaps.lowerEntry(latest.datetime); if (closed != null) { JsonObject point = new JsonObject(); point.addProperty("datetime", closed.getKey()); point.addProperty("value", closed.getValue()); json.add("closedVwap", point); } }
+        return json;
+    }
+    /** Small session view shared with Bookmap's display and order inputs. */
+    public synchronized JsonObject sessionLevels() {
+        JsonObject json = new JsonObject();
+        json.addProperty("sessionDate", date);
+        json.addProperty("highOfDay", highOfDay);
+        json.addProperty("lowOfDay", lowOfDay);
+        if (firstRegularBucketTime != null
+                && MarketClock.marketTime(firstRegularBucketTime).minutesSinceMarketOpen < 1
+                && Double.isFinite(buckets.get(firstRegularBucketTime).open)
+                && buckets.get(firstRegularBucketTime).open > 0) {
+            json.addProperty("openPrice", buckets.get(firstRegularBucketTime).open);
+        }
+        json.addProperty("timestamp", latestPriceTime);
+        return json;
+    }
+    /** Entry decisions require the actual opening minute, never a current-price fallback. */
+    public synchronized JsonObject orderSnapshot() {
+        JsonObject json = snapshot();
+        JsonObject levels = sessionLevels();
+        json.addProperty("openPrice", levels.has("openPrice") ? levels.get("openPrice").getAsDouble() : 0);
         return json;
     }
     public synchronized JsonObject snapshot() {
