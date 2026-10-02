@@ -12,8 +12,7 @@ import com.bookmap.plugin.rong.pricelines.PriceLineStore;
 /**
  * Renders market levels supplied by the websocket client.
  */
-public class MarketLevelManager implements SignalWebSocketServer.MarketLevelConfigListener,
-        IndicatorConfig.ChangeListener {
+public class MarketLevelManager implements SignalWebSocketServer.MarketLevelConfigListener {
 
     private static final Map<String, PriceLine.LineType> CAM_LEVEL_TYPES = new LinkedHashMap<>();
     static {
@@ -32,14 +31,11 @@ public class MarketLevelManager implements SignalWebSocketServer.MarketLevelConf
     }
 
     private final PriceLineStore store;
-    private final IndicatorConfig config;
     private final Map<String, Double> instrumentPips = new ConcurrentHashMap<>();
     private final Map<String, MarketLevelDefinition> levelsByInstrument = new ConcurrentHashMap<>();
 
-    public MarketLevelManager(PriceLineStore store, IndicatorConfig config) {
+    public MarketLevelManager(PriceLineStore store) {
         this.store = store;
-        this.config = config;
-        config.addChangeListener(this);
     }
 
     public void onInstrumentInitialized(String instrumentAlias, double pips) {
@@ -61,18 +57,7 @@ public class MarketLevelManager implements SignalWebSocketServer.MarketLevelConf
         redrawInstrument(instrumentAlias);
     }
 
-    @Override
-    public void onIndicatorConfigChanged(String indicatorKey, boolean enabled) {
-        if (!IndicatorConfig.PREMARKET_HIGH_LOW.equals(indicatorKey)) {
-            return;
-        }
-        for (String instrumentAlias : instrumentPips.keySet()) {
-            redrawInstrument(instrumentAlias);
-        }
-    }
-
     public void shutdown() {
-        config.removeChangeListener(this);
         for (String instrumentAlias : instrumentPips.keySet()) {
             removeAllLines(instrumentAlias);
         }
@@ -138,10 +123,6 @@ public class MarketLevelManager implements SignalWebSocketServer.MarketLevelConf
     }
 
     private int drawPremarketLevels(String instrumentAlias, double pips, MarketLevelDefinition levels) {
-        if (!config.isEnabled(IndicatorConfig.PREMARKET_HIGH_LOW)) {
-            return 0;
-        }
-
         int count = 0;
         count += drawLineIfValid(
                 instrumentAlias,

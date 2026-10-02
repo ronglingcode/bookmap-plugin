@@ -56,14 +56,6 @@ public class IndicatorSettingsPanel extends StrategyPanel {
         add(connectionPanel, gbc);
 
         gbc.gridy++;
-        JCheckBox premarketCheckbox = new JCheckBox(
-                "Premarket High / Low",
-                config.isEnabled(IndicatorConfig.PREMARKET_HIGH_LOW));
-        premarketCheckbox.addActionListener(e ->
-                config.setEnabled(IndicatorConfig.PREMARKET_HIGH_LOW, premarketCheckbox.isSelected()));
-        add(premarketCheckbox, gbc);
-
-        gbc.gridy++;
         JCheckBox vwapCheckbox = new JCheckBox(
                 "VWAP (closed-minute values from ViteApp)",
                 config.isEnabled(IndicatorConfig.VWAP));

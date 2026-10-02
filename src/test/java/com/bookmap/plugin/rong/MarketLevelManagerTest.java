@@ -18,8 +18,7 @@ class MarketLevelManagerTest {
     @Test
     void suppliedCamPivotsAreDrawnWithoutAFeatureFlag() {
         PriceLineStore store = new PriceLineStore();
-        IndicatorConfig config = new IndicatorConfig();
-        MarketLevelManager manager = new MarketLevelManager(store, config);
+        MarketLevelManager manager = new MarketLevelManager(store);
 
         manager.onInstrumentInitialized("MU:NASDAQ:STOCKS@BMD", 0.01);
         manager.onMarketLevelsChanged("MU", new MarketLevelDefinition(
@@ -41,8 +40,7 @@ class MarketLevelManagerTest {
     @Test
     void missingCamPivotsClearsPreviouslyDrawnPivotLines() {
         PriceLineStore store = new PriceLineStore();
-        IndicatorConfig config = new IndicatorConfig();
-        MarketLevelManager manager = new MarketLevelManager(store, config);
+        MarketLevelManager manager = new MarketLevelManager(store);
 
         manager.onInstrumentInitialized("MU:NASDAQ:STOCKS@BMD", 0.01);
         manager.onMarketLevelsChanged("MU", new MarketLevelDefinition(
@@ -66,6 +64,8 @@ class MarketLevelManagerTest {
         assertEquals(4, drawnLines.size());
         assertFalse(drawnLines.stream().anyMatch(line -> line.getType().name().startsWith("CAM_R")));
         assertFalse(drawnLines.stream().anyMatch(line -> line.getType().name().startsWith("CAM_S")));
+        assertEquals(1, drawnLines.stream().filter(line -> line.getType() == PriceLine.LineType.PREMARKET_HIGH).count());
+        assertEquals(1, drawnLines.stream().filter(line -> line.getType() == PriceLine.LineType.PREMARKET_LOW).count());
     }
 
     private Map<String, Double> camPivots() {
