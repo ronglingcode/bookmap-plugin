@@ -18,6 +18,7 @@ import java.util.Map;
 import java.util.Set;
 
 import javax.swing.BorderFactory;
+import javax.swing.JButton;
 import javax.swing.JFrame;
 import javax.swing.JLabel;
 import javax.swing.JPanel;
@@ -28,8 +29,7 @@ import javax.swing.SwingUtilities;
 import javax.swing.table.DefaultTableModel;
 
 /**
- * Small action-only log window. Messages are kept in memory and displayed only
- * in the UI, so the window shows trading actions worth glancing at.
+ * Small action log window. The UI keeps 20 entries; PluginLog separately persists history.
  */
 public class ActionLogWindow {
 
@@ -49,6 +49,8 @@ public class ActionLogWindow {
     private static DefaultTableModel positionTableModel;
     private static DefaultTableModel orderTableModel;
     private static JTextArea textArea;
+    private static JLabel persistenceStatusLabel;
+    private static String persistenceStatus = "Local logs: starting";
     private static volatile String highlightedSymbol = "";
 
     private ActionLogWindow() {}
@@ -57,15 +59,22 @@ public class ActionLogWindow {
         SwingUtilities.invokeLater(ActionLogWindow::ensureWindow);
     }
 
-    public static void append(String symbol, String source, String message) {
+    public static void append(String line) {
         SwingUtilities.invokeLater(() -> {
             ensureWindow();
             while (lines.size() >= MAX_LINES) {
                 lines.removeFirst();
             }
-            lines.addLast(formatLine(symbol, source, message));
+            lines.addLast(line);
             textArea.setText(String.join("\n", lines));
             textArea.setCaretPosition(textArea.getDocument().getLength());
+        });
+    }
+
+    public static void updatePersistenceStatus(String status) {
+        SwingUtilities.invokeLater(() -> {
+            persistenceStatus = status;
+            if (persistenceStatusLabel != null) persistenceStatusLabel.setText(status);
         });
     }
 
@@ -99,6 +108,7 @@ public class ActionLogWindow {
                 positionTableModel = null;
                 orderTableModel = null;
                 textArea = null;
+                persistenceStatusLabel = null;
             }
         });
     }
@@ -142,6 +152,19 @@ public class ActionLogWindow {
         JPanel logPanel = new JPanel(new BorderLayout());
         logPanel.setBorder(BorderFactory.createTitledBorder("Actions"));
         logPanel.add(new JScrollPane(textArea), BorderLayout.CENTER);
+        JPanel persistencePanel = new JPanel(new BorderLayout(0, 4));
+        persistenceStatusLabel = new JLabel(persistenceStatus);
+        persistencePanel.add(persistenceStatusLabel, BorderLayout.CENTER);
+        JButton openLogs = new JButton("Open Logs Folder");
+        openLogs.addActionListener(event -> {
+            Thread opener = new Thread(() -> {
+                try { java.awt.Desktop.getDesktop().open(PluginLog.directory().toFile()); }
+                catch (Exception error) { PluginLog.action("", "Logging", "Cannot open logs folder: " + error.getClass().getSimpleName()); }
+            }, "bmtrader-open-logs");
+            opener.setDaemon(true); opener.start();
+        });
+        persistencePanel.add(openLogs, BorderLayout.SOUTH);
+        logPanel.add(persistencePanel, BorderLayout.SOUTH);
 
         frame.getContentPane().setLayout(new BorderLayout());
         frame.getContentPane().add(accountPanel, BorderLayout.NORTH);
@@ -159,19 +182,6 @@ public class ActionLogWindow {
         }
         highlightedSymbolLabel.setText(
                 "Highlighted chart: " + (highlightedSymbol.isEmpty() ? "unknown" : highlightedSymbol));
-    }
-
-    private static String formatLine(String symbol, String source, String message) {
-        String cleanSymbol = symbol == null ? "" : symbol.trim();
-        String cleanSource = source == null ? "" : source.trim();
-        String prefix = LocalTime.now().format(TIME_FMT);
-        if (!cleanSymbol.isEmpty()) {
-            prefix += " " + cleanSymbol;
-        }
-        if (!cleanSource.isEmpty()) {
-            prefix += " [" + cleanSource + "]";
-        }
-        return prefix + " " + message;
     }
 
     private static DefaultTableModel createTableModel(String[] columns) {

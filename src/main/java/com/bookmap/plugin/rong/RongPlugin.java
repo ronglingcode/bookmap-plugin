@@ -134,6 +134,7 @@ public class RongPlugin implements CustomModuleAdapter,
 
         synchronized (RongPlugin.class) {
             if (sharedServer == null) {
+                PluginLog.start();
                 sharedServer = new SignalWebSocketServer(WS_PORT, ORDERBOOK_PERCENTILE);
                 sharedServer.start();
                 ActionLogWindow.showWindow();
@@ -483,8 +484,9 @@ public class RongPlugin implements CustomModuleAdapter,
                 }
                 if (nativeTrading != null) { nativeTrading.close(); nativeTrading = null; }
                 nativeApis.clear();
-                ActionLogWindow.dispose();
                 sharedServer.shutdown();
+                PluginLog.stop();
+                ActionLogWindow.dispose();
                 sharedServer = null;
                 chartHoverHotkeyHandler = null;
                 priceLineStore = null;

@@ -3,7 +3,6 @@ package com.bookmap.plugin.rong.miniviteapp;
 import com.bookmap.plugin.rong.miniviteapp.libraries.broker.schwab.OAuth;
 import com.bookmap.plugin.rong.miniviteapp.libraries.firestore.Api;
 import com.bookmap.plugin.rong.miniviteapp.libraries.firestore.DocumentCodec;
-import com.bookmap.plugin.rong.miniviteapp.libraries.firestore.LogRepository;
 import com.bookmap.plugin.rong.miniviteapp.ports.CredentialPort;
 import com.bookmap.plugin.rong.miniviteapp.ports.HttpPort;
 import com.google.gson.JsonArray;
@@ -26,6 +25,8 @@ class ServiceParityTest {
         for (JsonElement element : fixtures) {
             JsonObject fixture = element.getAsJsonObject();
             String name = fixture.get("name").getAsString(), kind = fixture.get("kind").getAsString(), method = fixture.get("method").getAsString();
+            // Archived TypeScript cloud-log fixtures no longer apply: plugin logs are local only.
+            if (kind.equals("log")) continue;
             JsonArray args = fixture.getAsJsonArray("args"), requests = new JsonArray(), saved = new JsonArray();
             HttpPort http = (uri, verb, headers, body) -> {
                 JsonObject request = new JsonObject(); request.addProperty("path", uri.getRawPath()); request.addProperty("method", verb);
@@ -36,7 +37,6 @@ class ServiceParityTest {
                 return new HttpPort.Response(page.get("status").getAsInt(), page.get("body").getAsString());
             };
             Api firestore = new Api(http, "test-project", () -> "test-firestore-key");
-            LogRepository logs = new LogRepository(firestore, () -> "schwab", () -> java.time.Instant.parse("2026-10-01T13:30:00Z").toEpochMilli());
             AtomicReference<JsonObject> stored = new AtomicReference<>(fixture.has("credentials") ? fixture.getAsJsonObject("credentials").deepCopy() : new JsonObject());
             CredentialPort credentials = new CredentialPort() {
                 public JsonObject loadSchwab() { return stored.get().deepCopy(); }
@@ -56,9 +56,6 @@ class ServiceParityTest {
                     case "oauth:refresh": result = oauth.refresh(); break;
                     case "oauth:accessToken": result = new JsonPrimitive(oauth.accessToken(false)); break;
                     case "oauth:exchangeAuthorizationCode": result = oauth.exchangeAuthorizationCode(args.get(0).getAsString()); break;
-                    case "log:log": logs.log(args.get(0).getAsString(), args.get(1), args.get(2).getAsJsonObject()); break;
-                    case "log:logOrder": logs.logOrder(args.get(0), args.get(1).getAsJsonObject()); break;
-                    case "log:logBreakoutTradeState": logs.logBreakoutTradeState(args.get(0).getAsString(), args.get(1).getAsJsonObject()); break;
                     default: fail("Unknown scenario " + kind + ":" + method);
                 }
             } catch (Exception failure) { error = failure.getMessage(); }

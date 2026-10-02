@@ -37,8 +37,6 @@ public final class TradingRuntime implements AutoCloseable {
     private final Executor executor;
     private final LongSupplier now;
     private final Events events;
-    private final Events sink;
-    private final AtomicBoolean auditFailed = new AtomicBoolean();
     private final MiniViteApp execution;
     private final MarketLoader market;
     private final String massiveKey;
@@ -60,12 +58,7 @@ public final class TradingRuntime implements AutoCloseable {
     private Runnable accountRetry;
     public TradingRuntime(HttpPort http, CredentialPort credentials, JsonObject sections, SocketPort sockets, SocketPort.Scheduler scheduler,
             Executor executor, LongSupplier now, Events events) {
-        this.credentials = credentials; this.sockets = sockets; this.scheduler = scheduler; this.executor = executor; this.now = now; this.sink = events;
-        this.events = new Events() {
-            public void message(JsonObject value) { events.message(value); }
-            public void log(String symbol, String text) { events.log(symbol, text); audit("log", symbol, new JsonPrimitive(text)); }
-            public void notify(String symbol, String text) { events.notify(symbol, text); audit("notification", symbol, new JsonPrimitive(text)); }
-        };
+        this.credentials = credentials; this.sockets = sockets; this.scheduler = scheduler; this.executor = executor; this.now = now; this.events = events;
         oauth = new OAuth(http, credentials, java.net.URI.create("https://api.schwabapi.com/v1/oauth/token"), now);
         HttpPort authenticatedReads = (uri, method, headers, body) -> {
             HttpPort.Response response = http.request(uri, method, headers, body);
@@ -78,8 +71,7 @@ public final class TradingRuntime implements AutoCloseable {
                 synchronized (lock) { nextAccountRead = Math.max(nextAccountRead, now.getAsLong() + delay); }
             }
             if (!method.equals("GET") && uri.getPath().contains("/orders")) {
-                JsonObject record = new JsonObject(); record.addProperty("method", method); record.addProperty("status", response.status);
-                if (body != null) record.add("order", JsonParser.parseString(body)); audit("order", "", record);
+                events.log("", "Broker order " + method + " returned HTTP " + response.status);
             }
             return response;
         };
@@ -262,7 +254,7 @@ public final class TradingRuntime implements AutoCloseable {
         if ((string(result, "type").equals("execution_result") && string(result, "action").equals("refresh_pending_entry") && !string(result, "outcome").equals("accepted") && !string(result, "outcome").equals("unknown")) || string(result, "type").equals("execution_blocked")) synchronized (lock) { pendingReplacements.remove(symbol); }
         if (result.has("entry")) {
             boolean changed; synchronized (lock) { JsonObject plan = config == null ? null : selectedPlan(symbol); changed = state != null && state.acceptEntry(symbol, object(result, "entry"), object(plan, "atr"), now.getAsLong()); }
-            if (changed) { persistState(); audit("breakout", symbol, view(symbol, "state").getAsJsonObject("state").getAsJsonObject("stateBySymbol").getAsJsonObject(symbol)); }
+            if (changed) persistState();
         }
         events.message(result.deepCopy());
         if (string(result, "type").equals("execution_result")) { publishInputs(symbol); refreshAccount(); }
@@ -350,13 +342,6 @@ public final class TradingRuntime implements AutoCloseable {
         events.log(symbol, operation + " failed: " + reason);
     }
     public CompletableFuture<Void> pendingPersistence() { synchronized (lock) { return persistence; } }
-    private void audit(String type, String symbol, JsonElement payload) {
-        String profile; synchronized (lock) { if (stopped || config == null) return; profile = config.profile; }
-        JsonElement captured = payload.deepCopy(); long timestamp = now.getAsLong();
-        executor.execute(() -> { try { var logs = new com.bookmap.plugin.rong.miniviteapp.libraries.firestore.LogRepository(firestore, () -> profile, () -> timestamp); JsonObject tags = new JsonObject(); tags.addProperty("symbol", symbol);
-            if (type.equals("order")) logs.logOrder(captured, tags); else if (type.equals("breakout")) logs.logBreakoutTradeState(symbol, captured.getAsJsonObject()); else logs.log(type, captured, tags); auditFailed.set(false);
-        } catch (Exception error) { if (!stopped && auditFailed.compareAndSet(false, true)) sink.log(symbol, "Firestore audit logging unavailable: " + error.getClass().getSimpleName()); } });
-    }
     @Override public void close() { MarketStreams previous; List<Runnable> cancel; synchronized (lock) { stopped = true; previous = streams; cancel = new ArrayList<>(timers); timers.clear(); if (accountRetry != null) { cancel.add(accountRetry); accountRetry = null; } } cancel.forEach(Runnable::run); if (previous != null) previous.close(); market.close(); execution.close(); }
 }
 

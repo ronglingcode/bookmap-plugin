@@ -32,7 +32,7 @@ profiles and the existing single-stock watchlist policy.
 - Local account/orders/fills and position-risk display, entry-input dialog,
   core-plan editor, new-position reminders, trading notifications and optional sound.
 - Automatic history/live overlap handling, account refresh, token renewal,
-  reconnecting streams and Firestore state/audit persistence.
+  reconnecting streams, Firestore trading-state persistence and local action logs.
 
 The execution routing flag and ViteApp fallback are removed. All supported trade
 operations run natively. The optional core-target rule is a separate trading policy,
@@ -46,7 +46,7 @@ The Bookmap-independent Java engine is under
 | Folder | Purpose | TypeScript counterpart in ViteApp |
 | --- | --- | --- |
 | `libraries/massive` | REST history/reference data and trade mapping | `src/trading/libraries/massive` |
-| `libraries/firestore` | Config/state REST codec and audit persistence | `src/trading/libraries/firestore` |
+| `libraries/firestore` | Config/state REST codec and trading-state persistence | `src/trading/libraries/firestore` |
 | `libraries/broker/schwab` | OAuth, account/orders, payloads and streams | `src/trading/libraries/broker/schwab` |
 | `core` | Trading decisions, market/account state, rules and sizing | `src/trading/core` |
 | `runtime` | Startup, timers, credentials, streams and lifecycle | `src/trading/runtime` |
@@ -63,6 +63,37 @@ broker preflight reads. Initial flat entries retain the existing broker exposure
 preflight. There are no session ownership checks, input-age cutoffs or execution
 coordination fences. Ambiguous mutation outcomes require broker review and manual
 reset; they are never automatically resent or forwarded to ViteApp.
+
+## Local logging
+
+Every action/runtime/notification message shown in **bmtrader Logs** is also
+queued for local UTF-8 files in `%USERPROFILE%\bmtrader\logs` (no hidden directory).
+Use **Open Logs Folder** in the window to browse them. The UI shows the latest
+20 entries and the current persistence status.
+
+Files use `bmtrader-YYYY-MM-DD.log`, followed by `-1.log`, `-2.log`, etc. when
+rotating at 10 MiB. Dates use the computer's local timezone. Each line includes
+the captured timestamp with milliseconds and timezone offset, session ID, symbol,
+optional source and message. Later sessions append to the day's latest segment.
+Retention keeps up to 30 calendar days and 100 MiB total, deleting only matching
+bmtrader log files, oldest first.
+
+One background writer serves all attached charts. It starts before native startup,
+stays active through **Restart Native Trading**, and drains after final detachment.
+Rapid detach/reattach waits for the previous writer on the background thread.
+Files flush at least once per second while storage is responsive; orderly shutdown
+flushes remaining entries. An abrupt crash may lose buffered entries; flush does
+not guarantee survival of an OS crash or power loss.
+
+The queue holds 4,096 entries. Queue overflow or storage failure reports a
+rate-limited warning in the window while screen logging continues; storage retries
+every five seconds. Unsaved entries are counted and are not replayed after a
+storage failure. Logging never blocks trading on file I/O. Existing credential
+redaction remains in place; both sinks additionally sanitize labeled tokens and
+credential URL parameters. Raw broker responses and market streams are not logged.
+
+Logs, notifications, order audits and breakout snapshots are **not sent to
+Firestore**. Firestore still supplies configuration and saves trading state.
 
 ## Verification and release
 
