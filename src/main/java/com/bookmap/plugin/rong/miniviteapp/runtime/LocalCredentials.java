@@ -24,6 +24,10 @@ public final class LocalCredentials implements CredentialPort {
         String override = System.getProperty("bmtrader.secrets", "");
         return override.isBlank() ? Path.of(System.getProperty("user.home"), "bmtrader", "secrets.json") : Path.of(override);
     }
+    public static boolean fileExists() {
+        try { return Files.isRegularFile(defaultPath()); }
+        catch (SecurityException | java.nio.file.InvalidPathException ignored) { return false; }
+    }
     public synchronized void reload() throws IOException {
         try {
             String content = Files.readString(path, StandardCharsets.UTF_8);

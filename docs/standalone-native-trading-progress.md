@@ -15,9 +15,27 @@ Updated: 2026-10-01. Design: [standalone-native-trading-plan.md](standalone-nati
   `scripts/importSecrets.mjs` populates the local JSON from the user's
   `storeSecrets.js` without printing values or overwriting rotated tokens. The
   tracked template retains empty credential values and matching source fields.
-  Do not copy or execute the existing secret provisioning script.
+  Runtime reads JSON only; provisioning stays in the offline importer.
+- If the secrets file is absent when attaching, silently leave the whole addon
+  inactive. No licensing service or owner identity check is required.
 - Document anything impossible to port and skip it; no such core trade operation identified yet.
 - Commit changes independently in each repository. Never test with live broker mutations.
+
+## Silent activation by secrets-file presence — 2026-10-01
+
+`RongPlugin.initialize` returns before starting any windows, indicators, logging,
+WebSocket server or native runtime if the configured secrets path is not a regular
+file. Settings return no panels. An inactive instance ignores all market/settings
+callbacks and `stop`, so it cannot detach another chart or decrement the shared
+instance count. Restart also ignores a missing file. Creating the file requires
+disabling and re-enabling the addon; there is no file watcher. Existing invalid
+credential files keep their normal diagnostics. The regular-file check respects
+the existing `bmtrader.secrets` override and does not read credential values.
+
+Verification: full `gradlew.bat build` passed, including native-only compilation,
+214 regular tests and ten obfuscated-release-JAR tests. New checks cover all
+inactive lifecycle callbacks, unchanged shared state, directory-versus-file
+presence, and the packaged addon. No live service requests were made.
 
 ## Trailing-stop removal — 2026-10-01
 

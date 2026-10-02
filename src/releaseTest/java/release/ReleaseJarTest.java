@@ -124,10 +124,42 @@ class ReleaseJarTest {
                 type.getMethod(callback.getName(), callback.getParameterTypes());
             }
         }
-        AtomicReference<StrategyPanel[]> panels = new AtomicReference<>();
-        SwingUtilities.invokeAndWait(() -> panels.set(((CustomSettingsPanelProvider) plugin).getCustomSettingsPanels()));
-        assertEquals(1, panels.get().length);
-        assertTrue(panels.get()[0].getComponentCount() > 0);
+        Path secrets = Files.createTempFile("bmtrader-release-settings-", ".json");
+        String previous = System.getProperty("bmtrader.secrets");
+        try {
+            System.setProperty("bmtrader.secrets", secrets.toString());
+            AtomicReference<StrategyPanel[]> panels = new AtomicReference<>();
+            SwingUtilities.invokeAndWait(() -> panels.set(((CustomSettingsPanelProvider) plugin).getCustomSettingsPanels()));
+            assertEquals(1, panels.get().length);
+            assertTrue(panels.get()[0].getComponentCount() > 0);
+        } finally {
+            if (previous == null) System.clearProperty("bmtrader.secrets"); else System.setProperty("bmtrader.secrets", previous);
+            Files.deleteIfExists(secrets);
+        }
+    }
+
+    @Test
+    void distributedAddonRemainsSilentAndInactiveWithoutSecrets() throws Exception {
+        Path directory = Files.createTempDirectory("bmtrader-release-inactive-");
+        String previous = System.getProperty("bmtrader.secrets");
+        try {
+            System.setProperty("bmtrader.secrets", directory.resolve("missing.json").toString());
+            Object plugin = Class.forName(ENTRY).getConstructor().newInstance();
+            assertEquals(0, ((CustomSettingsPanelProvider) plugin).getCustomSettingsPanels().length);
+            // Null API/instrument data prove no Bookmap calls or live startup are attempted.
+            ((CustomModuleAdapter) plugin).initialize("TEST", null, null, null);
+            ((DepthDataListener) plugin).onDepth(true, 100, 10);
+            ((TradeDataListener) plugin).onTrade(100, 10, null);
+            ((TimeListener) plugin).onTimestamp(123);
+            ((BboListener) plugin).onBbo(100, 10, 101, 10);
+            ((SnapshotEndListener) plugin).onSnapshotEnd();
+            ((HistoricalModeListener) plugin).onRealtimeStart();
+            ((CustomModuleAdapter) plugin).stop();
+            ((CustomModuleAdapter) plugin).stop();
+        } finally {
+            if (previous == null) System.clearProperty("bmtrader.secrets"); else System.setProperty("bmtrader.secrets", previous);
+            Files.deleteIfExists(directory);
+        }
     }
 
     @Test

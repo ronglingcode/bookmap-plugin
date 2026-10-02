@@ -6,6 +6,7 @@ import java.time.Duration;
 import com.bookmap.plugin.rong.executions.FilledExecutionManager;
 import com.bookmap.plugin.rong.executions.FilledExecutionPainter;
 import com.bookmap.plugin.rong.executions.FilledExecutionStore;
+import com.bookmap.plugin.rong.miniviteapp.runtime.LocalCredentials;
 import com.bookmap.plugin.rong.orderwall.OrderWallChangeEvent;
 import com.bookmap.plugin.rong.orderwall.OrderWallChangePainter;
 import com.bookmap.plugin.rong.orderwall.OrderWallChangeSound;
@@ -98,6 +99,7 @@ public class RongPlugin implements CustomModuleAdapter,
     private static PatternSignalPainter patternSignalPainter;
 
     private String rawAlias;
+    private volatile boolean initialized;
     private String alias;
     private Api api;
     private InstrumentInfo instrumentInfo;
@@ -118,6 +120,7 @@ public class RongPlugin implements CustomModuleAdapter,
 
     @Override
     public void initialize(String alias, InstrumentInfo info, Api api, InitialState initialState) {
+        if (!LocalCredentials.fileExists()) return;
         this.rawAlias = alias;
         String cleanAlias = SymbolUtils.cleanSymbol(alias);
         this.alias = cleanAlias;
@@ -179,6 +182,7 @@ public class RongPlugin implements CustomModuleAdapter,
             if (nativeTrading == null) { nativeTrading = new NativeTradingAdapter(sharedServer, indicatorConfig); nativeTrading.attach(cleanAlias, api); nativeTrading.start(); }
             else nativeTrading.attach(cleanAlias, api);
             instanceCount++;
+            initialized = true;
         }
         this.vwapIndicator = api.registerIndicatorModifiable("VWAP", GraphType.PRIMARY);
         this.vwapIndicator.setWidth(2);
@@ -309,6 +313,8 @@ public class RongPlugin implements CustomModuleAdapter,
 
     @Override
     public void stop() {
+        if (!initialized) return;
+        initialized = false;
         if (indicatorConfig != null) {
             indicatorConfig.removeChangeListener(this);
         }
@@ -511,6 +517,7 @@ public class RongPlugin implements CustomModuleAdapter,
 
     @Override
     public StrategyPanel[] getCustomSettingsPanels() {
+        if (!LocalCredentials.fileExists()) return new StrategyPanel[0];
         synchronized (RongPlugin.class) {
             if (indicatorConfig == null) {
                 indicatorConfig = new IndicatorConfig();
@@ -526,6 +533,7 @@ public class RongPlugin implements CustomModuleAdapter,
 
     @Override
     public void onDepth(boolean isBid, int price, int size) {
+        if (!initialized) return;
         if (wallChangeTracker != null) {
             wallChangeTracker.onDepth(isBid, price, size, getEventTimeNs());
         }
@@ -541,6 +549,7 @@ public class RongPlugin implements CustomModuleAdapter,
 
     @Override
     public void onTrade(double price, int size, TradeInfo tradeInfo) {
+        if (!initialized) return;
         long eventTimeNs = getEventTimeNs();
         double realPrice = BookmapPriceNormalizer.toWirePrice(price, instrumentInfo.pips);
         int priceTick = (int) Math.round(price);
@@ -567,6 +576,7 @@ public class RongPlugin implements CustomModuleAdapter,
 
     @Override
     public void onTimestamp(long timestampNs) {
+        if (!initialized) return;
         this.lastTimestampNs = timestampNs;
         flushPendingVwapPoints();
         if (shouldRunPatternAutomation()) {
@@ -580,6 +590,7 @@ public class RongPlugin implements CustomModuleAdapter,
 
     @Override
     public void onBbo(int bidPrice, int bidSize, int askPrice, int askSize) {
+        if (!initialized) return;
         if (shouldRunPatternAutomation()) {
             patternEngine.onBbo(bidPrice, bidSize, askPrice, askSize, getEventTimeNs());
         }
@@ -587,6 +598,7 @@ public class RongPlugin implements CustomModuleAdapter,
 
     @Override
     public void onSnapshotEnd() {
+        if (!initialized) return;
         patternSnapshotComplete = true;
         if (wallChangeTracker != null) {
             wallChangeTracker.markReady();
@@ -598,6 +610,7 @@ public class RongPlugin implements CustomModuleAdapter,
 
     @Override
     public void onRealtimeStart() {
+        if (!initialized) return;
         patternSnapshotComplete = true;
         if (wallChangeTracker != null) {
             wallChangeTracker.markReady();
@@ -612,6 +625,7 @@ public class RongPlugin implements CustomModuleAdapter,
     }
 
     public static synchronized void restartNativeTrading() {
+        if (!LocalCredentials.fileExists()) return;
         if (sharedServer == null) return;
         if (nativeTrading != null) nativeTrading.close();
         nativeTrading = new NativeTradingAdapter(sharedServer, indicatorConfig);
@@ -627,6 +641,7 @@ public class RongPlugin implements CustomModuleAdapter,
 
     @Override
     public void onIndicatorConfigChanged(String indicatorKey, boolean enabled) {
+        if (!initialized) return;
         if (IndicatorConfig.VWAP.equals(indicatorKey)) {
             updateVwapIndicatorVisibility();
             if (enabled && vwapTracker != null) {

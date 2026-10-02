@@ -5,6 +5,14 @@ Create `%USERPROFILE%\bmtrader\secrets.json` using
 `user.home/bmtrader/secrets.json`. The plugin reads JSON; it does not execute
 `storeSecrets.js`. The tracked template contains field names and defaults only.
 
+At attachment, the plugin checks whether this path (or the explicit override)
+is a regular file. If absent, it silently does nothing: no addon UI, indicators,
+WebSocket server, vendor requests or trading runtime. Settings return no panels,
+and market callbacks and detach are harmless. After creating the file, disable
+and re-enable the addon; there is no automatic file watcher. Existing but malformed
+or incomplete files retain the normal startup diagnostics. The check establishes
+file presence only, without a license or identity check.
+
 To populate the local file from your existing browser provisioning script, run
 this once from the `bookmap-plugin` directory:
 
