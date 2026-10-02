@@ -73,6 +73,15 @@ class IndicatorConfigTest {
     }
 
     @Test
+    void camPivotsAreDisabledByDefaultAndControllable() {
+        IndicatorConfig config = new IndicatorConfig();
+
+        assertFalse(config.isEnabled(IndicatorConfig.CAM_PIVOTS));
+        config.setEnabled(IndicatorConfig.CAM_PIVOTS, true);
+        assertTrue(config.isEnabled(IndicatorConfig.CAM_PIVOTS));
+    }
+
+    @Test
     void filledExecutionLabelsArePersistentByDefaultAndCanUseTimedMode() {
         IndicatorConfig config = new IndicatorConfig();
 

@@ -167,7 +167,7 @@ public class RongPlugin implements CustomModuleAdapter,
                 sharedServer.registerKeyLevelConfigListener(keyLevelManager);
                 keyZoneManager = new KeyZoneManager(priceZoneStore);
                 sharedServer.registerKeyZoneConfigListener(keyZoneManager);
-                marketLevelManager = new MarketLevelManager(priceLineStore);
+                marketLevelManager = new MarketLevelManager(priceLineStore, indicatorConfig);
                 sharedServer.registerMarketLevelConfigListener(marketLevelManager);
                 exitOrderManager = new ExitOrderManager(priceLineStore);
                 sharedServer.registerExitOrderPairsConfigListener(exitOrderManager);

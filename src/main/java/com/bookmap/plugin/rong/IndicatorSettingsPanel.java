@@ -56,6 +56,14 @@ public class IndicatorSettingsPanel extends StrategyPanel {
         add(connectionPanel, gbc);
 
         gbc.gridy++;
+        JCheckBox camPivotsCheckbox = new JCheckBox(
+                "Camarilla Pivots",
+                config.isEnabled(IndicatorConfig.CAM_PIVOTS));
+        camPivotsCheckbox.addActionListener(e ->
+                config.setEnabled(IndicatorConfig.CAM_PIVOTS, camPivotsCheckbox.isSelected()));
+        add(camPivotsCheckbox, gbc);
+
+        gbc.gridy++;
         JCheckBox vwapCheckbox = new JCheckBox(
                 "VWAP (closed-minute values from ViteApp)",
                 config.isEnabled(IndicatorConfig.VWAP));

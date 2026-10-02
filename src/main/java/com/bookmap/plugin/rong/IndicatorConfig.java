@@ -9,6 +9,7 @@ import java.util.concurrent.ConcurrentHashMap;
  */
 public class IndicatorConfig {
 
+    public static final String CAM_PIVOTS = "cam_pivots";
     public static final String ORDER_WALL_SIZE_LABELS = "order_wall_size_labels";
     public static final String ORDER_WALL_CHANGE_ALERTS = "order_wall_change_alerts";
     public static final String ORDER_WALL_BREAKOUT_SIGNALS = "order_wall_breakout_signals";
@@ -35,6 +36,7 @@ public class IndicatorConfig {
 
     public IndicatorConfig() {
         // Material, in-range wall-change alerts are filtered enough to be useful by default.
+        enabled.put(CAM_PIVOTS, false);
         enabled.put(ORDER_WALL_SIZE_LABELS, true);
         enabled.put(ORDER_WALL_CHANGE_ALERTS, true);
         enabled.put(ORDER_WALL_BREAKOUT_SIGNALS, false);

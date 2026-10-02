@@ -12,7 +12,8 @@ import com.bookmap.plugin.rong.pricelines.PriceLineStore;
 /**
  * Renders market levels supplied by the websocket client.
  */
-public class MarketLevelManager implements SignalWebSocketServer.MarketLevelConfigListener {
+public class MarketLevelManager implements SignalWebSocketServer.MarketLevelConfigListener,
+        IndicatorConfig.ChangeListener {
 
     private static final Map<String, PriceLine.LineType> CAM_LEVEL_TYPES = new LinkedHashMap<>();
     static {
@@ -31,11 +32,14 @@ public class MarketLevelManager implements SignalWebSocketServer.MarketLevelConf
     }
 
     private final PriceLineStore store;
+    private final IndicatorConfig config;
     private final Map<String, Double> instrumentPips = new ConcurrentHashMap<>();
     private final Map<String, MarketLevelDefinition> levelsByInstrument = new ConcurrentHashMap<>();
 
-    public MarketLevelManager(PriceLineStore store) {
+    public MarketLevelManager(PriceLineStore store, IndicatorConfig config) {
         this.store = store;
+        this.config = config;
+        config.addChangeListener(this);
     }
 
     public void onInstrumentInitialized(String instrumentAlias, double pips) {
@@ -57,7 +61,18 @@ public class MarketLevelManager implements SignalWebSocketServer.MarketLevelConf
         redrawInstrument(instrumentAlias);
     }
 
+    @Override
+    public void onIndicatorConfigChanged(String indicatorKey, boolean enabled) {
+        if (!IndicatorConfig.CAM_PIVOTS.equals(indicatorKey)) {
+            return;
+        }
+        for (String instrumentAlias : instrumentPips.keySet()) {
+            redrawInstrument(instrumentAlias);
+        }
+    }
+
     public void shutdown() {
+        config.removeChangeListener(this);
         for (String instrumentAlias : instrumentPips.keySet()) {
             removeAllLines(instrumentAlias);
         }
@@ -78,7 +93,7 @@ public class MarketLevelManager implements SignalWebSocketServer.MarketLevelConf
             return;
         }
 
-        if (levels.hasCamPivots()) {
+        if (config.isEnabled(IndicatorConfig.CAM_PIVOTS) && levels.hasCamPivots()) {
             drawCamPivots(instrumentAlias, pips, levels.getCamPivots());
         }
         drawPreviousDayLevels(instrumentAlias, pips, levels);

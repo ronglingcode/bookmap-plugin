@@ -16,9 +16,10 @@ import com.bookmap.plugin.rong.pricelines.PriceLineStore;
 class MarketLevelManagerTest {
 
     @Test
-    void suppliedCamPivotsAreDrawnWithoutAFeatureFlag() {
+    void camPivotsAreHiddenByDefaultAndRedrawWhenEnabled() {
         PriceLineStore store = new PriceLineStore();
-        MarketLevelManager manager = new MarketLevelManager(store);
+        IndicatorConfig config = new IndicatorConfig();
+        MarketLevelManager manager = new MarketLevelManager(store, config);
 
         manager.onInstrumentInitialized("MU:NASDAQ:STOCKS@BMD", 0.01);
         manager.onMarketLevelsChanged("MU", new MarketLevelDefinition(
@@ -29,18 +30,25 @@ class MarketLevelManagerTest {
                 Double.NaN,
                 Double.NaN));
 
+        assertEquals(0, store.getLines("MU").size());
+        config.setEnabled(IndicatorConfig.CAM_PIVOTS, true);
+
         List<PriceLine> drawnLines = store.getLines("MU");
         assertEquals(12, drawnLines.size());
         assertEquals(6, drawnLines.stream()
                 .filter(line -> line.getType().name().startsWith("CAM_R")).count());
         assertEquals(6, drawnLines.stream()
                 .filter(line -> line.getType().name().startsWith("CAM_S")).count());
+        config.setEnabled(IndicatorConfig.CAM_PIVOTS, false);
+        assertEquals(0, store.getLines("MU").size());
     }
 
     @Test
     void missingCamPivotsClearsPreviouslyDrawnPivotLines() {
         PriceLineStore store = new PriceLineStore();
-        MarketLevelManager manager = new MarketLevelManager(store);
+        IndicatorConfig config = new IndicatorConfig();
+        config.setEnabled(IndicatorConfig.CAM_PIVOTS, true);
+        MarketLevelManager manager = new MarketLevelManager(store, config);
 
         manager.onInstrumentInitialized("MU:NASDAQ:STOCKS@BMD", 0.01);
         manager.onMarketLevelsChanged("MU", new MarketLevelDefinition(
