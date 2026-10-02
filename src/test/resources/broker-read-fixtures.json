@@ -60,6 +60,219 @@
     }
   },
   {
+    "name": "option positions and order history are excluded",
+    "kind": "projection",
+    "args": [
+      {
+        "currentBalances": {
+          "liquidationValue": 25000
+        },
+        "positions": [
+          {
+            "instrument": {
+              "symbol": "AAPL",
+              "assetType": "EQUITY"
+            },
+            "longQuantity": 100,
+            "shortQuantity": 0
+          },
+          {
+            "instrument": {
+              "symbol": "AAPL 261016C00250000",
+              "assetType": "OPTION"
+            },
+            "longQuantity": 1,
+            "shortQuantity": 0
+          }
+        ]
+      },
+      [
+        {
+          "orderId": 1,
+          "orderType": "LIMIT",
+          "orderStrategyType": "SINGLE",
+          "status": "WORKING",
+          "quantity": 100,
+          "price": 10,
+          "stopPrice": 9,
+          "orderLegCollection": [
+            {
+              "legId": 1,
+              "instrument": {
+                "symbol": "AAPL",
+                "assetType": "EQUITY"
+              },
+              "instruction": "BUY",
+              "positionEffect": "OPENING",
+              "quantity": 100
+            }
+          ]
+        },
+        {
+          "orderId": 2,
+          "orderType": "LIMIT",
+          "orderStrategyType": "SINGLE",
+          "status": "WORKING",
+          "quantity": 1,
+          "price": 10,
+          "stopPrice": 9,
+          "orderLegCollection": [
+            {
+              "legId": 1,
+              "orderLegType": "OPTION",
+              "instrument": {
+                "symbol": "AAPL 261016C00250000",
+                "assetType": "OPTION"
+              },
+              "instruction": "BUY_TO_OPEN",
+              "positionEffect": "OPENING",
+              "quantity": 1
+            }
+          ]
+        },
+        {
+          "orderId": 3,
+          "orderType": "MARKET",
+          "orderStrategyType": "SINGLE",
+          "status": "FILLED",
+          "quantity": 1,
+          "price": 10,
+          "stopPrice": 9,
+          "orderLegCollection": [
+            {
+              "legId": 1,
+              "orderLegType": "OPTION",
+              "instrument": {
+                "symbol": "AAPL 261016C00250000",
+                "assetType": "OPTION"
+              },
+              "instruction": "BUY_TO_OPEN",
+              "positionEffect": "OPENING",
+              "quantity": 1
+            }
+          ],
+          "orderActivityCollection": [
+            {
+              "activityType": "EXECUTION",
+              "executionType": "FILL",
+              "executionLegs": [
+                {
+                  "legId": 1,
+                  "quantity": 1,
+                  "price": 5,
+                  "time": "2026-10-01T13:30:01Z"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "orderId": 4,
+          "orderStrategyType": "OCO",
+          "childOrderStrategies": [
+            {
+              "orderId": 5,
+              "orderType": "STOP",
+              "orderStrategyType": "SINGLE",
+              "status": "WORKING",
+              "quantity": 1,
+              "price": 10,
+              "stopPrice": 9,
+              "orderLegCollection": [
+                {
+                  "legId": 1,
+                  "orderLegType": "OPTION",
+                  "instrument": {
+                    "symbol": "AAPL 261016C00250000",
+                    "assetType": "OPTION"
+                  },
+                  "instruction": "BUY_TO_OPEN",
+                  "positionEffect": "OPENING",
+                  "quantity": 1
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "2026-10-01"
+    ],
+    "result": {
+      "positions": {
+        "AAPL": {
+          "instrument": {
+            "symbol": "AAPL",
+            "assetType": "EQUITY"
+          },
+          "longQuantity": 100,
+          "shortQuantity": 0,
+          "symbol": "AAPL",
+          "netQuantity": 100
+        }
+      },
+      "entryOrders": {
+        "AAPL": [
+          {
+            "symbol": "AAPL",
+            "orderID": "1",
+            "orderType": "LIMIT",
+            "quantity": 100,
+            "isBuy": true,
+            "positionEffectIsOpen": true,
+            "price": 10,
+            "rawOrder": {
+              "orderId": 1,
+              "orderType": "LIMIT",
+              "orderStrategyType": "SINGLE",
+              "status": "WORKING",
+              "quantity": 100,
+              "price": 10,
+              "stopPrice": 9,
+              "orderLegCollection": [
+                {
+                  "legId": 1,
+                  "instrument": {
+                    "symbol": "AAPL",
+                    "assetType": "EQUITY"
+                  },
+                  "instruction": "BUY",
+                  "positionEffect": "OPENING",
+                  "quantity": 100
+                }
+              ]
+            }
+          }
+        ]
+      },
+      "exitPairs": {},
+      "executions": {},
+      "currentBalance": 25000,
+      "rawOrders": [
+        {
+          "orderId": 1,
+          "orderType": "LIMIT",
+          "orderStrategyType": "SINGLE",
+          "status": "WORKING",
+          "quantity": 100,
+          "price": 10,
+          "stopPrice": 9,
+          "orderLegCollection": [
+            {
+              "legId": 1,
+              "instrument": {
+                "symbol": "AAPL",
+                "assetType": "EQUITY"
+              },
+              "instruction": "BUY",
+              "positionEffect": "OPENING",
+              "quantity": 100
+            }
+          ]
+        }
+      ]
+    }
+  },
+  {
     "name": "pending bracket and exit prices",
     "kind": "projection",
     "args": [

@@ -18,6 +18,17 @@ public final class AccountProjection {
     private static double number(JsonObject object, String key) { return object.has(key) && !object.get(key).isJsonNull() ? object.get(key).getAsDouble() : 0; }
     private static JsonArray array(JsonObject object, String key) { return object.has(key) && object.get(key).isJsonArray() ? object.getAsJsonArray(key) : new JsonArray(); }
     private static JsonObject leg(JsonObject order) { JsonArray legs = array(order, "orderLegCollection"); return legs.size() > 0 ? legs.get(0).getAsJsonObject() : null; }
+    private static boolean isEquityLeg(JsonObject leg) {
+        JsonObject instrument = leg.has("instrument") && leg.get("instrument").isJsonObject()
+                ? leg.getAsJsonObject("instrument") : new JsonObject();
+        return (!instrument.has("assetType") || string(instrument, "assetType").equals("EQUITY"))
+                && (!leg.has("orderLegType") || string(leg, "orderLegType").equals("EQUITY"));
+    }
+    private static boolean isEquityOrder(JsonObject order) {
+        for (JsonElement value : array(order, "orderLegCollection")) if (!isEquityLeg(value.getAsJsonObject())) return false;
+        for (JsonElement value : array(order, "childOrderStrategies")) if (!isEquityOrder(value.getAsJsonObject())) return false;
+        return true;
+    }
     public static String orderSymbol(JsonObject order) {
         JsonObject leg = leg(order);
         if (leg != null && leg.has("instrument")) return string(leg.getAsJsonObject("instrument"), "symbol");
@@ -86,11 +97,16 @@ public final class AccountProjection {
         JsonObject positions = new JsonObject(), entries = new JsonObject(), pairs = new JsonObject(), executions = new JsonObject();
         for (JsonElement value : array(account, "positions")) {
             JsonObject position = value.getAsJsonObject().deepCopy();
-            String symbol = position.has("instrument") ? string(position.getAsJsonObject("instrument"), "symbol") : "";
+            JsonObject instrument = position.has("instrument") && position.get("instrument").isJsonObject()
+                    ? position.getAsJsonObject("instrument") : new JsonObject();
+            if (instrument.has("assetType") && !string(instrument, "assetType").equals("EQUITY")) continue;
+            String symbol = string(instrument, "symbol");
             if (symbol.isEmpty()) throw new IllegalArgumentException("Schwab position missing symbol");
             position.addProperty("symbol", symbol); position.addProperty("netQuantity", number(position, "longQuantity") - number(position, "shortQuantity")); positions.add(symbol, position);
         }
-        for (JsonElement value : orders) {
+        JsonArray equityOrders = new JsonArray();
+        for (JsonElement value : orders) if (isEquityOrder(value.getAsJsonObject())) equityOrders.add(value.deepCopy());
+        for (JsonElement value : equityOrders) {
             JsonObject order = value.getAsJsonObject(); visitFills(order, date, executions); String symbol = orderSymbol(order);
             if (symbol.isEmpty()) continue;
             String type = string(order, "orderStrategyType"); JsonObject leg = leg(order);
@@ -119,6 +135,6 @@ public final class AccountProjection {
         if (!account.has("currentBalances") || !account.getAsJsonObject("currentBalances").has("liquidationValue")) throw new IllegalArgumentException("Schwab account missing liquidationValue");
         double balance = number(account.getAsJsonObject("currentBalances"), "liquidationValue"); if (!Double.isFinite(balance)) throw new IllegalArgumentException("Schwab account missing liquidationValue");
         JsonObject result = new JsonObject(); result.add("positions", positions); result.add("entryOrders", entries); result.add("exitPairs", pairs); result.add("executions", executions);
-        result.addProperty("currentBalance", balance); result.add("rawOrders", orders.deepCopy()); return result;
+        result.addProperty("currentBalance", balance); result.add("rawOrders", equityOrders); return result;
     }
 }
