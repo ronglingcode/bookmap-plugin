@@ -151,7 +151,7 @@ Verification completed:
 
 The current operation/setup source of truth is [direct-broker-execution.md](direct-broker-execution.md).
 Secrets/setup: [config/README.md](../config/README.md). Release artifact:
-`build/libs/lingrong1988_bmtrader_1.30.jar`.
+`build/libs/lingrong1988_bmtrader_1.31.jar`.
 
 TS TradingRuntime is a headless mirror; production browser code still uses its
 chart/global bootstrap with extracted libraries/core. Other brokers/futures,
