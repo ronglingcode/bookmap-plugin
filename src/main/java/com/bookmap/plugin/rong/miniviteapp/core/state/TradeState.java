@@ -12,7 +12,7 @@ public final class TradeState {
     public static JsonObject defaultBreakout(boolean isLong, long now) {
         JsonObject value = new JsonObject();
         for (String field : new String[]{"entryPrice", "stopLossPrice", "riskLevel", "initialQuantity", "sizeMultipler", "maxPullbackAllowed", "maxPullbackReached"}) value.addProperty(field, 0);
-        for (String field : new String[]{"coreInvalidationLevel", "lowestExitBatchCount", "closedOutsideRatio"}) value.addProperty(field, -1);
+        for (String field : new String[]{"coreInvalidationLevel", "lowestExitBatchCount"}) value.addProperty(field, -1);
         for (String field : new String[]{"hasValue", "isMarketOrder", "adjustedTargetDueToMaxPullback", "coreTargetReminderShown"}) value.addProperty(field, false);
         value.addProperty("status", "None"); value.addProperty("exitDescription", ""); value.addProperty("stopTightenPhase", "idle");
         JsonObject result = new JsonObject(); result.addProperty("isSingleOrder", false); result.add("profitTargets", new JsonArray()); result.addProperty("totalQuantity", 0); result.addProperty("tradeBookID", ""); value.add("submitEntryResult", result);

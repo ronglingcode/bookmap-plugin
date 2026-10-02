@@ -613,7 +613,6 @@
       "maxPullbackReached": 0,
       "adjustedTargetDueToMaxPullback": false,
       "exitDescription": "",
-      "closedOutsideRatio": -1,
       "stopTightenPhase": "idle",
       "coreTargetReminderShown": false,
       "submitEntryResult": {
@@ -661,7 +660,6 @@
       "maxPullbackReached": 0,
       "adjustedTargetDueToMaxPullback": false,
       "exitDescription": "",
-      "closedOutsideRatio": -1,
       "stopTightenPhase": "idle",
       "coreTargetReminderShown": false,
       "submitEntryResult": {
@@ -736,7 +734,6 @@
       "maxPullbackReached": 0,
       "adjustedTargetDueToMaxPullback": false,
       "exitDescription": "",
-      "closedOutsideRatio": -1,
       "stopTightenPhase": "idle",
       "coreTargetReminderShown": false,
       "submitEntryResult": {
@@ -817,7 +814,6 @@
       "maxPullbackReached": 0,
       "adjustedTargetDueToMaxPullback": false,
       "exitDescription": "",
-      "closedOutsideRatio": -1,
       "stopTightenPhase": "idle",
       "coreTargetReminderShown": false,
       "submitEntryResult": {
@@ -918,7 +914,6 @@
             "maxPullbackReached": 0,
             "adjustedTargetDueToMaxPullback": false,
             "exitDescription": "",
-            "closedOutsideRatio": -1,
             "stopTightenPhase": "idle",
             "coreTargetReminderShown": false,
             "submitEntryResult": {
@@ -963,7 +958,6 @@
             "maxPullbackReached": 0,
             "adjustedTargetDueToMaxPullback": false,
             "exitDescription": "",
-            "closedOutsideRatio": -1,
             "stopTightenPhase": "idle",
             "coreTargetReminderShown": false,
             "submitEntryResult": {
@@ -1039,7 +1033,6 @@
               "maxPullbackReached": 0,
               "adjustedTargetDueToMaxPullback": false,
               "exitDescription": "",
-              "closedOutsideRatio": -1,
               "stopTightenPhase": "idle",
               "coreTargetReminderShown": false,
               "submitEntryResult": {
@@ -1084,7 +1077,6 @@
               "maxPullbackReached": 0,
               "adjustedTargetDueToMaxPullback": false,
               "exitDescription": "",
-              "closedOutsideRatio": -1,
               "stopTightenPhase": "idle",
               "coreTargetReminderShown": false,
               "submitEntryResult": {
@@ -1154,7 +1146,6 @@
             "maxPullbackReached": 0,
             "adjustedTargetDueToMaxPullback": false,
             "exitDescription": "",
-            "closedOutsideRatio": -1,
             "stopTightenPhase": "idle",
             "coreTargetReminderShown": false,
             "submitEntryResult": {
@@ -1199,7 +1190,6 @@
             "maxPullbackReached": 0,
             "adjustedTargetDueToMaxPullback": false,
             "exitDescription": "",
-            "closedOutsideRatio": -1,
             "stopTightenPhase": "idle",
             "coreTargetReminderShown": false,
             "submitEntryResult": {
@@ -1275,7 +1265,6 @@
               "maxPullbackReached": 0,
               "adjustedTargetDueToMaxPullback": false,
               "exitDescription": "",
-              "closedOutsideRatio": -1,
               "stopTightenPhase": "idle",
               "coreTargetReminderShown": false,
               "submitEntryResult": {
@@ -1320,7 +1309,6 @@
               "maxPullbackReached": 0,
               "adjustedTargetDueToMaxPullback": false,
               "exitDescription": "",
-              "closedOutsideRatio": -1,
               "stopTightenPhase": "idle",
               "coreTargetReminderShown": false,
               "submitEntryResult": {
@@ -1404,7 +1392,6 @@
               "maxPullbackReached": 0,
               "adjustedTargetDueToMaxPullback": false,
               "exitDescription": "",
-              "closedOutsideRatio": -1,
               "stopTightenPhase": "idle",
               "coreTargetReminderShown": false,
               "submitEntryResult": {
@@ -1449,7 +1436,6 @@
               "maxPullbackReached": 0,
               "adjustedTargetDueToMaxPullback": false,
               "exitDescription": "",
-              "closedOutsideRatio": -1,
               "stopTightenPhase": "idle",
               "coreTargetReminderShown": false,
               "submitEntryResult": {
@@ -1519,7 +1505,6 @@
             "maxPullbackReached": 0,
             "adjustedTargetDueToMaxPullback": false,
             "exitDescription": "",
-            "closedOutsideRatio": -1,
             "stopTightenPhase": "idle",
             "coreTargetReminderShown": false,
             "submitEntryResult": {
@@ -1564,7 +1549,6 @@
             "maxPullbackReached": 0,
             "adjustedTargetDueToMaxPullback": false,
             "exitDescription": "",
-            "closedOutsideRatio": -1,
             "stopTightenPhase": "idle",
             "coreTargetReminderShown": false,
             "submitEntryResult": {
@@ -1640,7 +1624,6 @@
               "maxPullbackReached": 0,
               "adjustedTargetDueToMaxPullback": false,
               "exitDescription": "",
-              "closedOutsideRatio": -1,
               "stopTightenPhase": "idle",
               "coreTargetReminderShown": false,
               "submitEntryResult": {
@@ -1685,7 +1668,6 @@
               "maxPullbackReached": 0,
               "adjustedTargetDueToMaxPullback": false,
               "exitDescription": "",
-              "closedOutsideRatio": -1,
               "stopTightenPhase": "idle",
               "coreTargetReminderShown": false,
               "submitEntryResult": {
@@ -1765,7 +1747,6 @@
             "maxPullbackReached": 0,
             "adjustedTargetDueToMaxPullback": false,
             "exitDescription": "",
-            "closedOutsideRatio": -1,
             "stopTightenPhase": "idle",
             "coreTargetReminderShown": false,
             "submitEntryResult": {
@@ -1810,7 +1791,6 @@
             "maxPullbackReached": 0,
             "adjustedTargetDueToMaxPullback": false,
             "exitDescription": "",
-            "closedOutsideRatio": -1,
             "stopTightenPhase": "idle",
             "coreTargetReminderShown": false,
             "submitEntryResult": {
@@ -1886,7 +1866,6 @@
               "maxPullbackReached": 0,
               "adjustedTargetDueToMaxPullback": false,
               "exitDescription": "",
-              "closedOutsideRatio": -1,
               "stopTightenPhase": "idle",
               "coreTargetReminderShown": false,
               "submitEntryResult": {
@@ -1931,7 +1910,6 @@
               "maxPullbackReached": 0,
               "adjustedTargetDueToMaxPullback": false,
               "exitDescription": "",
-              "closedOutsideRatio": -1,
               "stopTightenPhase": "idle",
               "coreTargetReminderShown": false,
               "submitEntryResult": {
@@ -2009,7 +1987,6 @@
             "maxPullbackReached": 0,
             "adjustedTargetDueToMaxPullback": false,
             "exitDescription": "",
-            "closedOutsideRatio": -1,
             "stopTightenPhase": "idle",
             "coreTargetReminderShown": false,
             "submitEntryResult": {
@@ -2054,7 +2031,6 @@
             "maxPullbackReached": 0,
             "adjustedTargetDueToMaxPullback": false,
             "exitDescription": "",
-            "closedOutsideRatio": -1,
             "stopTightenPhase": "idle",
             "coreTargetReminderShown": false,
             "submitEntryResult": {
@@ -2130,7 +2106,6 @@
               "maxPullbackReached": 0,
               "adjustedTargetDueToMaxPullback": false,
               "exitDescription": "",
-              "closedOutsideRatio": -1,
               "stopTightenPhase": "idle",
               "coreTargetReminderShown": false,
               "submitEntryResult": {
@@ -2175,7 +2150,6 @@
               "maxPullbackReached": 0,
               "adjustedTargetDueToMaxPullback": false,
               "exitDescription": "",
-              "closedOutsideRatio": -1,
               "stopTightenPhase": "idle",
               "coreTargetReminderShown": false,
               "submitEntryResult": {
@@ -2262,7 +2236,6 @@
               "maxPullbackReached": 0,
               "adjustedTargetDueToMaxPullback": false,
               "exitDescription": "",
-              "closedOutsideRatio": -1,
               "stopTightenPhase": "idle",
               "coreTargetReminderShown": false,
               "submitEntryResult": {
@@ -2307,7 +2280,6 @@
               "maxPullbackReached": 0,
               "adjustedTargetDueToMaxPullback": false,
               "exitDescription": "",
-              "closedOutsideRatio": -1,
               "stopTightenPhase": "idle",
               "coreTargetReminderShown": false,
               "submitEntryResult": {
@@ -3657,7 +3629,6 @@
               "maxPullbackReached": 0,
               "adjustedTargetDueToMaxPullback": false,
               "exitDescription": "",
-              "closedOutsideRatio": -1,
               "stopTightenPhase": "idle",
               "coreTargetReminderShown": false,
               "submitEntryResult": {
@@ -3702,7 +3673,6 @@
               "maxPullbackReached": 0,
               "adjustedTargetDueToMaxPullback": false,
               "exitDescription": "",
-              "closedOutsideRatio": -1,
               "stopTightenPhase": "idle",
               "coreTargetReminderShown": false,
               "submitEntryResult": {
@@ -3875,7 +3845,6 @@
           "maxPullbackReached": 0,
           "adjustedTargetDueToMaxPullback": false,
           "exitDescription": "",
-          "closedOutsideRatio": -1,
           "stopTightenPhase": "idle",
           "coreTargetReminderShown": false,
           "submitEntryResult": {
@@ -3920,7 +3889,6 @@
           "maxPullbackReached": 0,
           "adjustedTargetDueToMaxPullback": false,
           "exitDescription": "",
-          "closedOutsideRatio": -1,
           "stopTightenPhase": "idle",
           "coreTargetReminderShown": false,
           "submitEntryResult": {
@@ -3965,7 +3933,6 @@
           "maxPullbackReached": 0,
           "adjustedTargetDueToMaxPullback": false,
           "exitDescription": "",
-          "closedOutsideRatio": -1,
           "stopTightenPhase": "idle",
           "coreTargetReminderShown": false,
           "submitEntryResult": {
@@ -4294,7 +4261,6 @@
               "maxPullbackReached": 0,
               "adjustedTargetDueToMaxPullback": false,
               "exitDescription": "",
-              "closedOutsideRatio": -1,
               "stopTightenPhase": "idle",
               "coreTargetReminderShown": false,
               "submitEntryResult": {
@@ -4339,7 +4305,6 @@
               "maxPullbackReached": 0,
               "adjustedTargetDueToMaxPullback": false,
               "exitDescription": "",
-              "closedOutsideRatio": -1,
               "stopTightenPhase": "idle",
               "coreTargetReminderShown": false,
               "submitEntryResult": {
@@ -4518,7 +4483,6 @@
           "maxPullbackReached": 0,
           "adjustedTargetDueToMaxPullback": false,
           "exitDescription": "",
-          "closedOutsideRatio": -1,
           "stopTightenPhase": "idle",
           "coreTargetReminderShown": false,
           "submitEntryResult": {
@@ -4563,7 +4527,6 @@
           "maxPullbackReached": 0,
           "adjustedTargetDueToMaxPullback": false,
           "exitDescription": "",
-          "closedOutsideRatio": -1,
           "stopTightenPhase": "idle",
           "coreTargetReminderShown": false,
           "submitEntryResult": {
@@ -4608,7 +4571,6 @@
           "maxPullbackReached": 0,
           "adjustedTargetDueToMaxPullback": false,
           "exitDescription": "",
-          "closedOutsideRatio": -1,
           "stopTightenPhase": "idle",
           "coreTargetReminderShown": false,
           "submitEntryResult": {
@@ -5049,7 +5011,6 @@
           "maxPullbackReached": 0,
           "adjustedTargetDueToMaxPullback": false,
           "exitDescription": "",
-          "closedOutsideRatio": -1,
           "stopTightenPhase": "idle",
           "coreTargetReminderShown": false,
           "submitEntryResult": {
@@ -5088,7 +5049,6 @@
           "maxPullbackReached": 0,
           "adjustedTargetDueToMaxPullback": false,
           "exitDescription": "",
-          "closedOutsideRatio": -1,
           "stopTightenPhase": "idle",
           "coreTargetReminderShown": false,
           "submitEntryResult": {
@@ -5127,7 +5087,6 @@
           "maxPullbackReached": 0,
           "adjustedTargetDueToMaxPullback": false,
           "exitDescription": "",
-          "closedOutsideRatio": -1,
           "stopTightenPhase": "idle",
           "coreTargetReminderShown": false,
           "submitEntryResult": {
@@ -5408,7 +5367,6 @@
               "maxPullbackReached": 0,
               "adjustedTargetDueToMaxPullback": false,
               "exitDescription": "",
-              "closedOutsideRatio": -1,
               "stopTightenPhase": "idle",
               "coreTargetReminderShown": false,
               "submitEntryResult": {
@@ -5453,7 +5411,6 @@
               "maxPullbackReached": 0,
               "adjustedTargetDueToMaxPullback": false,
               "exitDescription": "",
-              "closedOutsideRatio": -1,
               "stopTightenPhase": "idle",
               "coreTargetReminderShown": false,
               "submitEntryResult": {
@@ -5586,7 +5543,6 @@
           "maxPullbackReached": 0,
           "adjustedTargetDueToMaxPullback": false,
           "exitDescription": "",
-          "closedOutsideRatio": -1,
           "stopTightenPhase": "idle",
           "coreTargetReminderShown": false,
           "submitEntryResult": {
@@ -5631,7 +5587,6 @@
           "maxPullbackReached": 0,
           "adjustedTargetDueToMaxPullback": false,
           "exitDescription": "",
-          "closedOutsideRatio": -1,
           "stopTightenPhase": "idle",
           "coreTargetReminderShown": false,
           "submitEntryResult": {
@@ -5676,7 +5631,6 @@
           "maxPullbackReached": 0,
           "adjustedTargetDueToMaxPullback": false,
           "exitDescription": "",
-          "closedOutsideRatio": -1,
           "stopTightenPhase": "idle",
           "coreTargetReminderShown": false,
           "submitEntryResult": {
@@ -6746,7 +6700,6 @@
                 "maxPullbackReached": 0,
                 "adjustedTargetDueToMaxPullback": false,
                 "exitDescription": "",
-                "closedOutsideRatio": -1,
                 "stopTightenPhase": "idle",
                 "coreTargetReminderShown": false,
                 "submitEntryResult": {
@@ -6791,7 +6744,6 @@
                 "maxPullbackReached": 0,
                 "adjustedTargetDueToMaxPullback": false,
                 "exitDescription": "",
-                "closedOutsideRatio": -1,
                 "stopTightenPhase": "idle",
                 "coreTargetReminderShown": false,
                 "submitEntryResult": {
@@ -7365,7 +7317,6 @@
                 "maxPullbackReached": 0,
                 "adjustedTargetDueToMaxPullback": false,
                 "exitDescription": "",
-                "closedOutsideRatio": -1,
                 "stopTightenPhase": "idle",
                 "coreTargetReminderShown": false,
                 "submitEntryResult": {
@@ -7410,7 +7361,6 @@
                 "maxPullbackReached": 0,
                 "adjustedTargetDueToMaxPullback": false,
                 "exitDescription": "",
-                "closedOutsideRatio": -1,
                 "stopTightenPhase": "idle",
                 "coreTargetReminderShown": false,
                 "submitEntryResult": {
@@ -8442,7 +8392,6 @@
                 "maxPullbackReached": 0,
                 "adjustedTargetDueToMaxPullback": false,
                 "exitDescription": "",
-                "closedOutsideRatio": -1,
                 "stopTightenPhase": "idle",
                 "coreTargetReminderShown": false,
                 "submitEntryResult": {
@@ -8487,7 +8436,6 @@
                 "maxPullbackReached": 0,
                 "adjustedTargetDueToMaxPullback": false,
                 "exitDescription": "",
-                "closedOutsideRatio": -1,
                 "stopTightenPhase": "idle",
                 "coreTargetReminderShown": false,
                 "submitEntryResult": {

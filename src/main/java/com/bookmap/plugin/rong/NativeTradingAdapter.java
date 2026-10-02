@@ -41,6 +41,11 @@ public final class NativeTradingAdapter implements AutoCloseable {
         catch (Exception error) { PluginLog.action("", "Cannot open Schwab authorization: " + error.getClass().getSimpleName()); }
     }
     public void resetAfterBrokerReview() { if (runtime != null && !closed) runtime.trading.resetAfterBrokerReview(); }
+    public String exportExecutions(com.bookmap.plugin.rong.miniviteapp.core.account.ExecutionExports.Format format) {
+        NativeRuntime current = runtime;
+        if (current == null || closed) throw new IllegalStateException("Native trading is unavailable");
+        return current.trading.exportExecutions(format);
+    }
     private void accept(JsonObject value) {
         if (closed) return; String type = string(value, "type");
         if (type.equals("account_ready") || type.equals("market_ready") || type.equals("market_update") || type.equals("command_state")) {

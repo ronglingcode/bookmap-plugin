@@ -142,7 +142,10 @@ public class ActionLogWindow {
         JPanel statusPanel = new JPanel(new GridLayout(2, 1, 0, 2));
         statusPanel.add(highlightedSymbolLabel);
         statusPanel.add(accountStatusLabel);
-        accountPanel.add(statusPanel, BorderLayout.NORTH);
+        JPanel headerPanel = new JPanel(new BorderLayout(8, 0));
+        headerPanel.add(statusPanel, BorderLayout.CENTER);
+        headerPanel.add(ExecutionExportMenu.create(frame, RongPlugin::exportNativeExecutions), BorderLayout.EAST);
+        accountPanel.add(headerPanel, BorderLayout.NORTH);
 
         JPanel tablesPanel = new JPanel(new GridLayout(2, 1, 0, 6));
         tablesPanel.add(createSection("Positions", positionStatusLabel, positionTable, 82));

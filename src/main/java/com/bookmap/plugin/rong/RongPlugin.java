@@ -619,6 +619,11 @@ public class RongPlugin implements CustomModuleAdapter,
     }
     public static void authorizeNativeTrading(String callback) { if (nativeTrading != null) nativeTrading.authorize(callback); }
     public static void openNativeAuthorization() { if (nativeTrading != null) nativeTrading.openAuthorization(); }
+    public static String exportNativeExecutions(com.bookmap.plugin.rong.miniviteapp.core.account.ExecutionExports.Format format) {
+        NativeTradingAdapter current = nativeTrading;
+        if (current == null) throw new IllegalStateException("Native trading is unavailable");
+        return current.exportExecutions(format);
+    }
 
     @Override
     public void onIndicatorConfigChanged(String indicatorKey, boolean enabled) {

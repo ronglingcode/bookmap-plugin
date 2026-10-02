@@ -3,6 +3,7 @@ package com.bookmap.plugin.rong.miniviteapp.runtime;
 import com.bookmap.plugin.rong.miniviteapp.MiniViteApp;
 import com.bookmap.plugin.rong.miniviteapp.ExecutionDiagnostics;
 import com.bookmap.plugin.rong.miniviteapp.core.account.TradeLedger;
+import com.bookmap.plugin.rong.miniviteapp.core.account.ExecutionExports;
 import com.bookmap.plugin.rong.miniviteapp.core.configuration.TradingConfig;
 import com.bookmap.plugin.rong.miniviteapp.core.controllers.ExecutionInputs;
 import com.bookmap.plugin.rong.miniviteapp.core.controllers.Workflows;
@@ -248,6 +249,20 @@ public final class TradingRuntime implements AutoCloseable {
         } catch (RuntimeException error) { failure(symbol, "Native command", error); if (type.equals("core_plan_update")) { JsonObject view = view(symbol, "command_state"); view.addProperty("requestId", string(action, "requestId")); view.addProperty("updateStatus", "error"); view.addProperty("error", error.getMessage()); events.message(view); } return true; }
     }
     public JsonObject manualInputs(String symbol) { synchronized (lock) { return manual.getOrDefault(symbol, new JsonObject()).deepCopy(); } }
+    /** Snapshot the whole cached account, including symbols with no attached chart. No vendor reads. */
+    public String exportExecutions(ExecutionExports.Format format) {
+        JsonObject executions;
+        synchronized (lock) {
+            if (stopped || account == null) throw new IllegalStateException("Native account is not ready");
+            executions = object(account, "executions").deepCopy();
+        }
+        long timestamp = now.getAsLong(); String date = MarketClock.marketTime(timestamp).date;
+        JsonArray fills = new JsonArray();
+        for (JsonElement values : executions.asMap().values()) for (JsonElement fill : values.getAsJsonArray())
+            if (MarketClock.marketTime(fill.getAsJsonObject().get("timestamp").getAsLong()).date.equals(date)) fills.add(fill);
+        if (fills.isEmpty()) throw new IllegalStateException("No cached executions for today's market session");
+        return ExecutionExports.export(fills, format, timestamp, java.time.ZoneId.systemDefault());
+    }
     public void resetAfterBrokerReview() { execution.resetAfterBrokerReview(); }
     private void executionEvent(JsonObject result) {
         String symbol = string(result, "symbol");

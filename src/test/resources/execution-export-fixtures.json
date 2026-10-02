@@ -1,0 +1,469 @@
+[
+  {
+    "name": "weighted summary separates side symbol and minute",
+    "method": "executionScript",
+    "args": [
+      [
+        {
+          "symbol": "AAPL",
+          "orderID": "0",
+          "timestamp": 1790861400000,
+          "price": 201.01,
+          "quantity": 10,
+          "isBuy": true,
+          "positionEffectIsOpen": true
+        },
+        {
+          "symbol": "AAPL",
+          "orderID": "1000",
+          "timestamp": 1790861401000,
+          "price": 201.04,
+          "quantity": 30,
+          "isBuy": true,
+          "positionEffectIsOpen": true
+        },
+        {
+          "symbol": "AAPL",
+          "orderID": "2000",
+          "timestamp": 1790861402000,
+          "price": 201.08,
+          "quantity": 20,
+          "isBuy": true,
+          "positionEffectIsOpen": true
+        },
+        {
+          "symbol": "AAPL",
+          "orderID": "3000",
+          "timestamp": 1790861403000,
+          "price": 202,
+          "quantity": 15,
+          "isBuy": false,
+          "positionEffectIsOpen": false
+        },
+        {
+          "symbol": "MSFT",
+          "orderID": "0",
+          "timestamp": 1790861400000,
+          "price": 40.01,
+          "quantity": 5,
+          "isBuy": true,
+          "positionEffectIsOpen": true
+        },
+        {
+          "symbol": "AAPL",
+          "orderID": "60000",
+          "timestamp": 1790861460000,
+          "price": 203,
+          "quantity": 5,
+          "isBuy": true,
+          "positionEffectIsOpen": true
+        }
+      ],
+      false
+    ],
+    "result": "AddChartBubble(GetSymbol() == \"AAPL\" and time == 0, 201.05, \"+60\", GlobalColor(\"BubbleGreen\"), 0);\nAddChartBubble(GetSymbol() == \"AAPL\" and time == 0, 202, \"-15\", GlobalColor(\"BubbleRed\"), 1);\nAddChartBubble(GetSymbol() == \"MSFT\" and time == 0, 40.01, \"+5\", GlobalColor(\"BubbleGreen\"), 0);\nAddChartBubble(GetSymbol() == \"AAPL\" and time == 60, 203, \"+5\", GlobalColor(\"BubbleGreen\"), 0);\n"
+  },
+  {
+    "name": "detailed price clusters retain weighted price",
+    "method": "executionScript",
+    "args": [
+      [
+        {
+          "symbol": "AAPL",
+          "orderID": "0",
+          "timestamp": 1790861400000,
+          "price": 201.01,
+          "quantity": 10,
+          "isBuy": true,
+          "positionEffectIsOpen": true
+        },
+        {
+          "symbol": "AAPL",
+          "orderID": "1000",
+          "timestamp": 1790861401000,
+          "price": 201.04,
+          "quantity": 30,
+          "isBuy": true,
+          "positionEffectIsOpen": true
+        },
+        {
+          "symbol": "AAPL",
+          "orderID": "2000",
+          "timestamp": 1790861402000,
+          "price": 201.08,
+          "quantity": 20,
+          "isBuy": true,
+          "positionEffectIsOpen": true
+        },
+        {
+          "symbol": "AAPL",
+          "orderID": "3000",
+          "timestamp": 1790861403000,
+          "price": 202,
+          "quantity": 15,
+          "isBuy": false,
+          "positionEffectIsOpen": false
+        },
+        {
+          "symbol": "MSFT",
+          "orderID": "0",
+          "timestamp": 1790861400000,
+          "price": 40.01,
+          "quantity": 5,
+          "isBuy": true,
+          "positionEffectIsOpen": true
+        },
+        {
+          "symbol": "AAPL",
+          "orderID": "60000",
+          "timestamp": 1790861460000,
+          "price": 203,
+          "quantity": 5,
+          "isBuy": true,
+          "positionEffectIsOpen": true
+        }
+      ],
+      true
+    ],
+    "result": "AddChartBubble(GetSymbol() == \"AAPL\" and time == 0, 201.03, \"+40\", GlobalColor(\"BubbleGreen\"), 0);\nAddChartBubble(GetSymbol() == \"AAPL\" and time == 0, 201.08, \"+20\", GlobalColor(\"BubbleGreen\"), 0);\nAddChartBubble(GetSymbol() == \"AAPL\" and time == 0, 202, \"-15\", GlobalColor(\"BubbleRed\"), 1);\nAddChartBubble(GetSymbol() == \"MSFT\" and time == 0, 40.01, \"+5\", GlobalColor(\"BubbleGreen\"), 0);\nAddChartBubble(GetSymbol() == \"AAPL\" and time == 60, 203, \"+5\", GlobalColor(\"BubbleGreen\"), 0);\n"
+  },
+  {
+    "name": "price threshold 25",
+    "method": "executionScript",
+    "args": [
+      [
+        {
+          "symbol": "TEST",
+          "orderID": "0",
+          "timestamp": 1790861400000,
+          "price": 25,
+          "quantity": 10,
+          "isBuy": true,
+          "positionEffectIsOpen": true
+        },
+        {
+          "symbol": "TEST",
+          "orderID": "1",
+          "timestamp": 1790861400001,
+          "price": 25.01,
+          "quantity": 10,
+          "isBuy": true,
+          "positionEffectIsOpen": true
+        }
+      ],
+      true
+    ],
+    "result": "AddChartBubble(GetSymbol() == \"TEST\" and time == 0, 25.01, \"+20\", GlobalColor(\"BubbleGreen\"), 0);\n"
+  },
+  {
+    "name": "price threshold 50.01",
+    "method": "executionScript",
+    "args": [
+      [
+        {
+          "symbol": "TEST",
+          "orderID": "0",
+          "timestamp": 1790861400000,
+          "price": 50.01,
+          "quantity": 10,
+          "isBuy": true,
+          "positionEffectIsOpen": true
+        },
+        {
+          "symbol": "TEST",
+          "orderID": "1",
+          "timestamp": 1790861400001,
+          "price": 50.02,
+          "quantity": 10,
+          "isBuy": true,
+          "positionEffectIsOpen": true
+        }
+      ],
+      true
+    ],
+    "result": "AddChartBubble(GetSymbol() == \"TEST\" and time == 0, 50.02, \"+20\", GlobalColor(\"BubbleGreen\"), 0);\n"
+  },
+  {
+    "name": "price threshold 100.01",
+    "method": "executionScript",
+    "args": [
+      [
+        {
+          "symbol": "TEST",
+          "orderID": "0",
+          "timestamp": 1790861400000,
+          "price": 100.01,
+          "quantity": 10,
+          "isBuy": true,
+          "positionEffectIsOpen": true
+        },
+        {
+          "symbol": "TEST",
+          "orderID": "1",
+          "timestamp": 1790861400001,
+          "price": 100.02,
+          "quantity": 10,
+          "isBuy": true,
+          "positionEffectIsOpen": true
+        }
+      ],
+      true
+    ],
+    "result": "AddChartBubble(GetSymbol() == \"TEST\" and time == 0, 100.02, \"+20\", GlobalColor(\"BubbleGreen\"), 0);\n"
+  },
+  {
+    "name": "price threshold 200.01",
+    "method": "executionScript",
+    "args": [
+      [
+        {
+          "symbol": "TEST",
+          "orderID": "0",
+          "timestamp": 1790861400000,
+          "price": 200.01,
+          "quantity": 10,
+          "isBuy": true,
+          "positionEffectIsOpen": true
+        },
+        {
+          "symbol": "TEST",
+          "orderID": "1",
+          "timestamp": 1790861400001,
+          "price": 200.04,
+          "quantity": 10,
+          "isBuy": true,
+          "positionEffectIsOpen": true
+        }
+      ],
+      true
+    ],
+    "result": "AddChartBubble(GetSymbol() == \"TEST\" and time == 0, 200.03, \"+20\", GlobalColor(\"BubbleGreen\"), 0);\n"
+  },
+  {
+    "name": "price threshold 24.01",
+    "method": "executionScript",
+    "args": [
+      [
+        {
+          "symbol": "TEST",
+          "orderID": "0",
+          "timestamp": 1790861400000,
+          "price": 24.01,
+          "quantity": 10,
+          "isBuy": true,
+          "positionEffectIsOpen": true
+        },
+        {
+          "symbol": "TEST",
+          "orderID": "1",
+          "timestamp": 1790861400001,
+          "price": 24.02,
+          "quantity": 10,
+          "isBuy": true,
+          "positionEffectIsOpen": true
+        }
+      ],
+      true
+    ],
+    "result": "AddChartBubble(GetSymbol() == \"TEST\" and time == 0, 24.01, \"+10\", GlobalColor(\"BubbleGreen\"), 0);\nAddChartBubble(GetSymbol() == \"TEST\" and time == 0, 24.02, \"+10\", GlobalColor(\"BubbleGreen\"), 0);\n"
+  },
+  {
+    "name": "winter premarket minute uses Eastern DST",
+    "method": "executionScript",
+    "args": [
+      [
+        {
+          "symbol": "AAPL",
+          "orderID": "0",
+          "timestamp": 1767623399000,
+          "price": 10,
+          "quantity": 10,
+          "isBuy": true,
+          "positionEffectIsOpen": true
+        }
+      ],
+      false
+    ],
+    "result": "AddChartBubble(GetSymbol() == \"AAPL\" and time == -60, 10, \"+10\", GlobalColor(\"BubbleGreen\"), 0);\n"
+  },
+  {
+    "name": "different sessions never aggregate together",
+    "method": "executionScript",
+    "args": [
+      [
+        {
+          "symbol": "AAPL",
+          "orderID": "0",
+          "timestamp": 1790861400000,
+          "price": 201.01,
+          "quantity": 10,
+          "isBuy": true,
+          "positionEffectIsOpen": true
+        },
+        {
+          "symbol": "AAPL",
+          "orderID": "0",
+          "timestamp": 1790947800000,
+          "price": 201.01,
+          "quantity": 10,
+          "isBuy": true,
+          "positionEffectIsOpen": true
+        }
+      ],
+      false
+    ],
+    "result": "AddChartBubble(GetSymbol() == \"AAPL\" and time == 0, 201.01, \"+10\", GlobalColor(\"BubbleGreen\"), 0);\nAddChartBubble(GetSymbol() == \"AAPL\" and time == 0, 201.01, \"+10\", GlobalColor(\"BubbleGreen\"), 0);\n"
+  },
+  {
+    "name": "empty ThinkScript",
+    "method": "executionScript",
+    "args": [
+      [],
+      false
+    ],
+    "result": ""
+  },
+  {
+    "name": "Pacific CSV signed quantities open close and afternoon clock",
+    "method": "executionTradesCsv",
+    "args": [
+      [
+        {
+          "symbol": "AAPL",
+          "orderID": "0",
+          "timestamp": 1790861400000,
+          "price": 201.01,
+          "quantity": 10,
+          "isBuy": true,
+          "positionEffectIsOpen": true
+        },
+        {
+          "symbol": "AAPL",
+          "orderID": "1000",
+          "timestamp": 1790861401000,
+          "price": 201.04,
+          "quantity": 30,
+          "isBuy": true,
+          "positionEffectIsOpen": true
+        },
+        {
+          "symbol": "AAPL",
+          "orderID": "2000",
+          "timestamp": 1790861402000,
+          "price": 201.08,
+          "quantity": 20,
+          "isBuy": true,
+          "positionEffectIsOpen": true
+        },
+        {
+          "symbol": "AAPL",
+          "orderID": "3000",
+          "timestamp": 1790861403000,
+          "price": 202,
+          "quantity": 15,
+          "isBuy": false,
+          "positionEffectIsOpen": false
+        },
+        {
+          "symbol": "MSFT",
+          "orderID": "0",
+          "timestamp": 1790861400000,
+          "price": 40.01,
+          "quantity": 5,
+          "isBuy": true,
+          "positionEffectIsOpen": true
+        },
+        {
+          "symbol": "AAPL",
+          "orderID": "60000",
+          "timestamp": 1790861460000,
+          "price": 203,
+          "quantity": 5,
+          "isBuy": true,
+          "positionEffectIsOpen": true
+        },
+        {
+          "symbol": "AFTER",
+          "orderID": "18000000",
+          "timestamp": 1790879400000,
+          "price": 9.1234,
+          "quantity": 3,
+          "isBuy": false,
+          "positionEffectIsOpen": false
+        }
+      ],
+      1790861400000,
+      "America/Los_Angeles"
+    ],
+    "result": "Account Statement since 10/1/2026 through 10/1/2026\nCash Balance\nDATE,TIME,TYPE,REF #,DESCRIPTION,Misc Fees,Commissions & Fees,AMOUNT,BALANCE\nFutures Statements\nTrade Date,Exec Date,Exec Time,Type,Ref #,Description,Misc Fees,Commissions & Fees,Amount,Balance\nForex Statements\n,Date,Time,Type,Ref #,Description,Commissions & Fees,Amount,Amount(USD),Balance\nTotal Cash **************\nAccount Order History\nNotes,,Time Placed,Spread,Side,Qty,Pos Effect,Symbol,Exp,Strike,Type,PRICE,,TIF,Status\n,,10/1/2026 06:30:00,BUY,+10,TO OPEN,AAPL,,,ETF,~,MKT,DAY,FILLED\n,,10/1/2026 06:30:01,BUY,+30,TO OPEN,AAPL,,,ETF,~,MKT,DAY,FILLED\n,,10/1/2026 06:30:02,BUY,+20,TO OPEN,AAPL,,,ETF,~,MKT,DAY,FILLED\n,,10/1/2026 06:30:03,SELL,-15,TO CLOSE,AAPL,,,ETF,~,MKT,DAY,FILLED\n,,10/1/2026 06:30:00,BUY,+5,TO OPEN,MSFT,,,ETF,~,MKT,DAY,FILLED\n,,10/1/2026 06:31:00,BUY,+5,TO OPEN,AAPL,,,ETF,~,MKT,DAY,FILLED\n,,10/1/2026 11:30:00,SELL,-3,TO CLOSE,AFTER,,,ETF,~,MKT,DAY,FILLED\nAccount Trade History\n,Exec Time,Spread,Side,Qty,Pos Effect,Symbol,Exp,Strike,Type,Price,Net Price,Order Type\n,10/1/2026 06:30:00,STOCK,BUY,+10,TO OPEN,AAPL,,,ETF,201.01,201.01,MKT\n,10/1/2026 06:30:01,STOCK,BUY,+30,TO OPEN,AAPL,,,ETF,201.04,201.04,MKT\n,10/1/2026 06:30:02,STOCK,BUY,+20,TO OPEN,AAPL,,,ETF,201.08,201.08,MKT\n,10/1/2026 06:30:03,STOCK,SELL,-15,TO CLOSE,AAPL,,,ETF,202,202,MKT\n,10/1/2026 06:30:00,STOCK,BUY,+5,TO OPEN,MSFT,,,ETF,40.01,40.01,MKT\n,10/1/2026 06:31:00,STOCK,BUY,+5,TO OPEN,AAPL,,,ETF,203,203,MKT\n,10/1/2026 11:30:00,STOCK,SELL,-3,TO CLOSE,AFTER,,,ETF,9.1234,9.1234,MKT\nProfits and Losses\nSymbol,Description,P/L Open,P/L %,P/L Day,Margin Req,Mark Value\nAccount Summary\nNet Liquidating Value,**************\nStock Buying Power,**************\nOption Buying Power,**************\nEquity Commissions & Fees YTD,**************\nFutures Commissions & Fees YTD,**************\nTotal Commissions & Fees YTD,**************\n"
+  },
+  {
+    "name": "winter CSV timezone",
+    "method": "executionTradesCsv",
+    "args": [
+      [
+        {
+          "symbol": "AAPL",
+          "orderID": "0",
+          "timestamp": 1767623399000,
+          "price": 10,
+          "quantity": 10,
+          "isBuy": true,
+          "positionEffectIsOpen": true
+        }
+      ],
+      1767623399000,
+      "America/New_York"
+    ],
+    "result": "Account Statement since 1/5/2026 through 1/5/2026\nCash Balance\nDATE,TIME,TYPE,REF #,DESCRIPTION,Misc Fees,Commissions & Fees,AMOUNT,BALANCE\nFutures Statements\nTrade Date,Exec Date,Exec Time,Type,Ref #,Description,Misc Fees,Commissions & Fees,Amount,Balance\nForex Statements\n,Date,Time,Type,Ref #,Description,Commissions & Fees,Amount,Amount(USD),Balance\nTotal Cash **************\nAccount Order History\nNotes,,Time Placed,Spread,Side,Qty,Pos Effect,Symbol,Exp,Strike,Type,PRICE,,TIF,Status\n,,1/5/2026 09:29:59,BUY,+10,TO OPEN,AAPL,,,ETF,~,MKT,DAY,FILLED\nAccount Trade History\n,Exec Time,Spread,Side,Qty,Pos Effect,Symbol,Exp,Strike,Type,Price,Net Price,Order Type\n,1/5/2026 09:29:59,STOCK,BUY,+10,TO OPEN,AAPL,,,ETF,10,10,MKT\nProfits and Losses\nSymbol,Description,P/L Open,P/L %,P/L Day,Margin Req,Mark Value\nAccount Summary\nNet Liquidating Value,**************\nStock Buying Power,**************\nOption Buying Power,**************\nEquity Commissions & Fees YTD,**************\nFutures Commissions & Fees YTD,**************\nTotal Commissions & Fees YTD,**************\n"
+  },
+  {
+    "name": "CSV escapes fields",
+    "method": "executionTradesCsv",
+    "args": [
+      [
+        {
+          "symbol": "A,\"B\\C",
+          "orderID": "0",
+          "timestamp": 1790861400000,
+          "price": 10,
+          "quantity": 1,
+          "isBuy": true,
+          "positionEffectIsOpen": true
+        }
+      ],
+      1790861400000,
+      "UTC"
+    ],
+    "result": "Account Statement since 10/1/2026 through 10/1/2026\nCash Balance\nDATE,TIME,TYPE,REF #,DESCRIPTION,Misc Fees,Commissions & Fees,AMOUNT,BALANCE\nFutures Statements\nTrade Date,Exec Date,Exec Time,Type,Ref #,Description,Misc Fees,Commissions & Fees,Amount,Balance\nForex Statements\n,Date,Time,Type,Ref #,Description,Commissions & Fees,Amount,Amount(USD),Balance\nTotal Cash **************\nAccount Order History\nNotes,,Time Placed,Spread,Side,Qty,Pos Effect,Symbol,Exp,Strike,Type,PRICE,,TIF,Status\n,,10/1/2026 13:30:00,BUY,+1,TO OPEN,\"A,\"\"B\\C\",,,ETF,~,MKT,DAY,FILLED\nAccount Trade History\n,Exec Time,Spread,Side,Qty,Pos Effect,Symbol,Exp,Strike,Type,Price,Net Price,Order Type\n,10/1/2026 13:30:00,STOCK,BUY,+1,TO OPEN,\"A,\"\"B\\C\",,,ETF,10,10,MKT\nProfits and Losses\nSymbol,Description,P/L Open,P/L %,P/L Day,Margin Req,Mark Value\nAccount Summary\nNet Liquidating Value,**************\nStock Buying Power,**************\nOption Buying Power,**************\nEquity Commissions & Fees YTD,**************\nFutures Commissions & Fees YTD,**************\nTotal Commissions & Fees YTD,**************\n"
+  },
+  {
+    "name": "ThinkScript escapes symbol",
+    "method": "executionScript",
+    "args": [
+      [
+        {
+          "symbol": "A,\"B\\C",
+          "orderID": "0",
+          "timestamp": 1790861400000,
+          "price": 10,
+          "quantity": 1,
+          "isBuy": true,
+          "positionEffectIsOpen": true
+        }
+      ],
+      false
+    ],
+    "result": "AddChartBubble(GetSymbol() == \"A,\\\"B\\\\C\" and time == 0, 10, \"+1\", GlobalColor(\"BubbleGreen\"), 0);\n"
+  },
+  {
+    "name": "empty CSV template",
+    "method": "executionTradesCsv",
+    "args": [
+      [],
+      1790861400000,
+      "UTC"
+    ],
+    "result": "Account Statement since 10/1/2026 through 10/1/2026\nCash Balance\nDATE,TIME,TYPE,REF #,DESCRIPTION,Misc Fees,Commissions & Fees,AMOUNT,BALANCE\nFutures Statements\nTrade Date,Exec Date,Exec Time,Type,Ref #,Description,Misc Fees,Commissions & Fees,Amount,Balance\nForex Statements\n,Date,Time,Type,Ref #,Description,Commissions & Fees,Amount,Amount(USD),Balance\nTotal Cash **************\nAccount Order History\nNotes,,Time Placed,Spread,Side,Qty,Pos Effect,Symbol,Exp,Strike,Type,PRICE,,TIF,Status\nAccount Trade History\n,Exec Time,Spread,Side,Qty,Pos Effect,Symbol,Exp,Strike,Type,Price,Net Price,Order Type\nProfits and Losses\nSymbol,Description,P/L Open,P/L %,P/L Day,Margin Req,Mark Value\nAccount Summary\nNet Liquidating Value,**************\nStock Buying Power,**************\nOption Buying Power,**************\nEquity Commissions & Fees YTD,**************\nFutures Commissions & Fees YTD,**************\nTotal Commissions & Fees YTD,**************\n"
+  }
+]

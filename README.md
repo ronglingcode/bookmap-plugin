@@ -31,6 +31,8 @@ profiles and the existing single-stock watchlist policy.
   configured key levels/zones, liquidity-wall labels and retest signals.
 - Local account/orders/fills and position-risk display, entry-input dialog,
   core-plan editor, new-position reminders, trading notifications and optional sound.
+- One **Export** menu in Logs copies summary/detailed ThinkScript bubbles or trade
+  CSV from cached account fills to the clipboard. [Formats and usage](docs/execution-exports-and-alert-cleanup.md).
 - Automatic history/live overlap handling, account refresh, token renewal,
   reconnecting streams, Firestore trading-state persistence and local action logs.
 
