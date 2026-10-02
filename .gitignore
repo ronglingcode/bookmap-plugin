@@ -2,4 +2,4 @@ build/
 .gradle/
 bin/
 secrets.json
-.secrets-*.tmp
+secrets-*.tmp

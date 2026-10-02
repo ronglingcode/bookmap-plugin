@@ -295,8 +295,9 @@ Schwab blocks; schema inspection confirmed app key/secret, account identifiers,
 and access/refresh token fields. It also contains unrelated providers' secrets.
 No script execution or credential copying occurred during planning.
 
-The user will supply `%USERPROFILE%\\.bmtrader\\secrets.json` (Java resolves it as
-`user.home/.bmtrader/secrets.json`). Do not copy or execute the provisioning script.
+The user will supply `%USERPROFILE%\\bmtrader\\secrets.json` (Java resolves it as
+`user.home/bmtrader/secrets.json`). Runtime reads only JSON. At the user's request,
+an offline importer can populate that file from the local provisioning script.
 Publish a blank template/schema and permit an explicit path override. The private
 file stays outside the repo, classpath and JAR. Never include credentials in
 distributables or sanitized fixtures.

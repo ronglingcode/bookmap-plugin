@@ -23,6 +23,15 @@ import static org.junit.jupiter.api.Assertions.*;
 
 class LocalCredentialsTest {
     @TempDir Path directory;
+    @Test void defaultCredentialLocationUsesVisibleUserFolderAndHonorsOverride() {
+        String previous = System.getProperty("bmtrader.secrets");
+        try {
+            System.clearProperty("bmtrader.secrets");
+            assertEquals(Path.of(System.getProperty("user.home"), "bmtrader", "secrets.json"), LocalCredentials.defaultPath());
+            Path custom = directory.resolve("secrets.json"); System.setProperty("bmtrader.secrets", custom.toString());
+            assertEquals(custom, LocalCredentials.defaultPath());
+        } finally { if (previous == null) System.clearProperty("bmtrader.secrets"); else System.setProperty("bmtrader.secrets", previous); }
+    }
     @Test void rotationSurvivesRestartAndPreservesOtherSecrets() throws Exception {
         Path file = directory.resolve("secrets.json");
         Files.writeString(file, "\uFEFF{\"massive\":{\"apiKey\":\"test-massive\"},\"firebaseConfig\":{\"projectId\":\"test\"},\"extra\":true,\"schwab\":{\"appKey\":\"test\",\"secret\":\"test\",\"refresh_token\":\"old\",\"custom\":1}}");

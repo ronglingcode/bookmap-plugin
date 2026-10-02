@@ -22,7 +22,7 @@ public final class LocalCredentials implements CredentialPort {
     public LocalCredentials(Path path) throws IOException { this.path = path.toAbsolutePath().normalize(); reload(); }
     public static Path defaultPath() {
         String override = System.getProperty("bmtrader.secrets", "");
-        return override.isBlank() ? Path.of(System.getProperty("user.home"), ".bmtrader", "secrets.json") : Path.of(override);
+        return override.isBlank() ? Path.of(System.getProperty("user.home"), "bmtrader", "secrets.json") : Path.of(override);
     }
     public synchronized void reload() throws IOException {
         try {
@@ -40,7 +40,7 @@ public final class LocalCredentials implements CredentialPort {
         reload();
         JsonObject merged = section("schwab"); credentials.entrySet().forEach(entry -> merged.add(entry.getKey(), entry.getValue().deepCopy()));
         JsonObject updated = values.deepCopy(); updated.add("schwab", merged);
-        Path temporary = Files.createTempFile(path.getParent(), ".secrets-", ".tmp");
+        Path temporary = Files.createTempFile(path.getParent(), "secrets-", ".tmp");
         try {
             byte[] data = (new GsonBuilder().setPrettyPrinting().create().toJson(updated) + "\n").getBytes(StandardCharsets.UTF_8);
             try (FileChannel file = FileChannel.open(temporary, StandardOpenOption.WRITE, StandardOpenOption.TRUNCATE_EXISTING)) {

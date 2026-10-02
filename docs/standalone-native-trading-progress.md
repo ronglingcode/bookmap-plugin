@@ -11,7 +11,10 @@ Updated: 2026-10-01. Design: [standalone-native-trading-plan.md](standalone-nati
 - Preserve Bookmap's existing indicator subset; do not port additional browser indicators.
 - Bookmap supports sound (`Layer1ApiSoundAlertMessage` already used for wall changes).
   Port notification messages/sounds; skip browser speech synthesis and DOM blinking.
-- User supplies `%USERPROFILE%\.bmtrader\secrets.json`; publish an empty schema/template.
+- Credentials use the visible `%USERPROFILE%\bmtrader\secrets.json` folder;
+  `scripts/importSecrets.mjs` populates the local JSON from the user's
+  `storeSecrets.js` without printing values or overwriting rotated tokens. The
+  tracked template retains empty credential values and matching source fields.
   Do not copy or execute the existing secret provisioning script.
 - Document anything impossible to port and skip it; no such core trade operation identified yet.
 - Commit changes independently in each repository. Never test with live broker mutations.

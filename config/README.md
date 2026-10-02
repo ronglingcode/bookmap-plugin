@@ -1,9 +1,27 @@
 # Local credentials
 
-Create `%USERPROFILE%\.bmtrader\secrets.json` using
+Create `%USERPROFILE%\bmtrader\secrets.json` using
 [secrets.template.json](secrets.template.json). Java resolves this as
-`user.home/.bmtrader/secrets.json`. The plugin reads JSON; it does not execute
-`storeSecrets.js`. You supply the real values locally.
+`user.home/bmtrader/secrets.json`. The plugin reads JSON; it does not execute
+`storeSecrets.js`. The tracked template contains field names and defaults only.
+
+To populate the local file from your existing browser provisioning script, run
+this once from the `bookmap-plugin` directory:
+
+```powershell
+node scripts/importSecrets.mjs ..\secrets\storeSecrets.js
+```
+
+This creates `%USERPROFILE%\bmtrader\secrets.json`, copying the Massive, Firebase
+and Schwab sections without printing their values. Optional unused vendors are
+excluded. It preserves the Firebase fields from the source, adds the registered
+redirect URL default and sets missing token expiry to zero so startup refreshes
+the token. The importer refuses to overwrite an existing file, including tokens
+rotated by the plugin. An optional second argument selects another destination.
+
+For another computer, copy the plugin JAR and this populated local JSON to that
+computer's `%USERPROFILE%\bmtrader\secrets.json`. The JSON and its parent folder
+must be writable for token renewal. Use the latest JSON when switching computers.
 
 | Section / fields | Purpose |
 | --- | --- |
@@ -13,6 +31,7 @@ Create `%USERPROFILE%\.bmtrader\secrets.json` using
 | `schwab.access_token`, `expires_at` | Optional current access token and expiry in epoch milliseconds |
 | `schwab.redirectUrl` | Your registered OAuth callback URL; template uses https://127.0.0.1 |
 | `schwab.accountId` | Preserved for compatibility; requests use accountHashValue |
+| `schwab.token_type` | Preserved from the provisioning file; broker requests use Bearer tokens |
 | `tradingPolicy.coreTargetEnabled` | Optional core-target exit protection, default false |
 
 To choose another location, set Java property

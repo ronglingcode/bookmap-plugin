@@ -8,7 +8,9 @@ credentials, and executes trades without ViteApp or ProxyServer running.
 
 1. Build with a JDK 11+ using `gradlew.bat build` (Windows) or `./gradlew build`.
 2. Copy [config/secrets.template.json](config/secrets.template.json) to
-   `%USERPROFILE%\.bmtrader\secrets.json` and fill in your local credentials.
+   `%USERPROFILE%\bmtrader\secrets.json` and fill in your local credentials.
+   Or import your existing `storeSecrets.js`:
+   `node scripts/importSecrets.mjs ..\secrets\storeSecrets.js`.
    See [credential setup](config/README.md).
 3. In Bookmap, open API Plugins Configuration, add
    `build/libs/lingrong1988_bmtrader_1.30.jar`, and attach bmtrader to a chart.
