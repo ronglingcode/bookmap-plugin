@@ -173,6 +173,7 @@ public class FilledExecutionPainter implements ScreenSpacePainterFactory,
                     .computeIfAbsent(instrumentAlias, ignored -> new CopyOnWriteArrayList<>())
                     .add(instance);
         }
+        instance.rebuildMarkers();
         return instance;
     }
 
@@ -190,6 +191,16 @@ public class FilledExecutionPainter implements ScreenSpacePainterFactory,
             this.painterAlias = painterAlias;
             this.instrumentAlias = instrumentAlias;
             this.canvas = canvas;
+        }
+
+        @Override
+        public void onHeatmapFullPixelsWidth(int width) {
+            rebuildMarkers();
+        }
+
+        @Override
+        public void onMoveEnd() {
+            rebuildMarkers();
         }
 
         private void rebuildMarkers() {

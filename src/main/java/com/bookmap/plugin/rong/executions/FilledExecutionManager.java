@@ -12,7 +12,7 @@ import com.bookmap.plugin.rong.SignalWebSocketServer;
 import com.bookmap.plugin.rong.SymbolUtils;
 
 /**
- * Bridges ViteApp account execution snapshots to Bookmap fill markers.
+ * Bridges native Schwab account execution snapshots to Bookmap fill markers.
  */
 public class FilledExecutionManager implements SignalWebSocketServer.AccountStateListener {
 
