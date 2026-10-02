@@ -413,6 +413,35 @@
     ]
   },
   {
+    "name": "fractional trade backfill uses exact size when integer size is zero",
+    "method": "getTrades",
+    "args": [
+      "NVDA",
+      1790861400000,
+      1790861460000
+    ],
+    "pages": [
+      {
+        "status": 200,
+        "body": "{\"results\":[{\"sip_timestamp\":1790861400000000001,\"price\":237.32,\"size\":0,\"decimal_size\":\"0.25\",\"conditions\":[37]}]}"
+      }
+    ],
+    "paths": [
+      "/v3/trades/NVDA?timestamp.gte=1790861400000000000&timestamp.lt=1790861460000000000&order=asc&sort=timestamp&limit=50000"
+    ],
+    "result": [
+      {
+        "symbol": "NVDA",
+        "timestamp": 1790861400000,
+        "price": 237.32,
+        "size": 0.25,
+        "conditions": [
+          37
+        ]
+      }
+    ]
+  },
+  {
     "name": "premarket grouping uses historical DST, median dollars, and typical-price fallback",
     "method": "calculatePremarketVolume",
     "args": [

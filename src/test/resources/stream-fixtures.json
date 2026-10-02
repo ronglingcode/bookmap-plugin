@@ -404,6 +404,39 @@
     }
   },
   {
+    "name": "premarket fractional print uses exact size",
+    "kind": "massive",
+    "method": "parseStreamMessage",
+    "args": [
+      [
+        {
+          "ev": "T",
+          "sym": "AAPL",
+          "p": 10,
+          "s": 0,
+          "ds": "0.25",
+          "t": 1790861399999,
+          "c": [
+            37
+          ]
+        }
+      ]
+    ],
+    "result": {
+      "trades": [
+        {
+          "symbol": "AAPL",
+          "timestamp": 1790861399999,
+          "price": 10,
+          "size": 0.25,
+          "conditions": [
+            37
+          ]
+        }
+      ]
+    }
+  },
+  {
     "name": "null identifiers and malformed prints",
     "kind": "massive",
     "method": "parseStreamMessage",

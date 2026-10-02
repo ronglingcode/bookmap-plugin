@@ -59,6 +59,11 @@ The Bookmap-independent Java engine is under
 | `runtime` | Startup, timers, credentials, streams and lifecycle | `src/trading/runtime` |
 | `ports`, `adapters` | Injected I/O contracts and JDK transports | `src/trading/ports`, `adapters` |
 
+For changes in either mirrored engine, check the corresponding module in the
+other repository. The TypeScript fixture generators in `ViteApp/scripts` write
+matching REST and stream cases into both repositories; run the Java parity tests
+after regenerating them.
+
 `NativeTradingAdapter` owns Bookmap views, logs and sound. `RongPlugin` owns the
 first/last-attachment lifecycle. Existing rendering remains under `pricelines`,
 `orderwall` and `tradebuttons`. `SignalWebSocketServer.acceptLocalMessage`
