@@ -62,7 +62,7 @@ class ChartHoverHotkeyHandlerTest {
         assertTrue(ChartHoverHotkeyHandler.isPriceIndependentHotkey("w"));
         assertEquals("KeyW", ChartHoverHotkeyHandler.toViteKeyCode("w"));
 
-        for (String key : new String[]{"q", "p", "j", "k", "l", "m", "space", "numpad1", "numpad0"}) {
+        for (String key : new String[]{"q", "p", "m", "space", "numpad1", "numpad0"}) {
             assertTrue(ChartHoverHotkeyHandler.isChartHotkey(key));
             assertTrue(ChartHoverHotkeyHandler.isPriceIndependentHotkey(key));
         }
@@ -70,6 +70,14 @@ class ChartHoverHotkeyHandlerTest {
         assertEquals("Space", ChartHoverHotkeyHandler.toViteKeyCode("space"));
         assertFalse(ChartHoverHotkeyHandler.isPriceIndependentHotkey("b"));
         assertFalse(ChartHoverHotkeyHandler.isPriceIndependentHotkey("1"));
+    }
+
+    @Test
+    void removedTrailingKeysAreNotConsumedAsChartHotkeys() {
+        for (String key : new String[]{"j", "k", "l"}) {
+            assertFalse(ChartHoverHotkeyHandler.isChartHotkey(key));
+            assertFalse(ChartHoverHotkeyHandler.isPriceIndependentHotkey(key));
+        }
     }
 
     @Test

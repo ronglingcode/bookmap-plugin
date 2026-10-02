@@ -80,7 +80,7 @@ public class ChartHoverHotkeyHandler implements ScreenSpacePainterFactory {
     /** Chart hotkeys dispatched from the currently hovered Bookmap chart. */
     private static final Set<String> CHART_HOTKEYS =
             Set.of(
-                    "a", "b", "c", "f", "g", "h", "m", "s", "t", "w", "q", "p", "j", "k", "l", "z", "space",
+                    "a", "b", "c", "f", "g", "h", "m", "s", "t", "w", "q", "p", "z", "space",
                     "1", "2", "3", "4", "5", "6", "7", "8", "9", "0",
                     "numpad1", "numpad2", "numpad3", "numpad4", "numpad5",
                     "numpad6", "numpad7", "numpad8", "numpad9", "numpad0");
@@ -635,7 +635,7 @@ public class ChartHoverHotkeyHandler implements ScreenSpacePainterFactory {
     static boolean isPriceIndependentHotkey(String normalizedKey) {
         return "c".equals(normalizedKey)
                 || "f".equals(normalizedKey)
-                || Set.of("w", "q", "p", "j", "k", "l", "m", "space").contains(normalizedKey)
+                || Set.of("w", "q", "p", "m", "space").contains(normalizedKey)
                 || normalizedKey != null && normalizedKey.matches("numpad[0-9]");
     }
 

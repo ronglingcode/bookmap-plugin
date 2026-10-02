@@ -25,8 +25,8 @@ profiles and the existing single-stock watchlist policy.
 
 - Native wall-reversal market/breakout entries, same-direction adds, pending-entry
   replacements, opposite-position entries, partial reload and Swap.
-- Cancel, flatten, partial exits, stop/target adjustments, Q/P workflows and
-  5/15/30-minute trailing stops. [Exact operation table](docs/direct-broker-execution.md).
+- Cancel, flatten, partial exits, stop/target adjustments and Q/P workflows.
+  [Exact operation table](docs/direct-broker-execution.md).
 - Existing indicator subset: VWAP, premarket/previous-day levels, Camarilla pivots,
   configured key levels/zones, liquidity-wall labels and retest signals.
 - Local account/orders/fills and position-risk display, entry-input dialog,

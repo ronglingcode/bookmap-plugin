@@ -30,15 +30,15 @@ class NativeTradingActionRoutingTest {
         SignalWebSocketServer server = new SignalWebSocketServer(0, 97) { @Override public void broadcast(String text) { broadcasts.add(text); } };
         try {
             server.setTradingDispatch(actions::add);
-            for (String key : new String[]{"KeyC", "KeyF", "KeyB", "KeyS", "KeyA", "KeyW", "KeyQ", "KeyP", "KeyJ", "KeyK", "KeyL", "KeyZ", "Space", "Digit1", "Numpad1"}) {
+            for (String key : new String[]{"KeyC", "KeyF", "KeyB", "KeyS", "KeyA", "KeyW", "KeyQ", "KeyP", "KeyZ", "Space", "Digit1", "Numpad1"}) {
                 JsonObject action = new JsonObject(); action.addProperty("type", "custom_button_click"); action.addProperty("symbol", "AAPL"); action.addProperty("keyCode", key); server.dispatchTradingAction(action);
             }
-            assertEquals(15, actions.size()); assertTrue(broadcasts.isEmpty());
+            assertEquals(12, actions.size()); assertTrue(broadcasts.isEmpty());
             List<CorePlanConfigDefinition> received = new ArrayList<>(); server.registerCorePlanConfigListener("AAPL", received::add);
             String json = "{\"type\":\"core_plan_config\",\"symbol\":\"AAPL\",\"hasActiveTrade\":false}";
             server.onMessage(null, json); assertTrue(received.isEmpty());
             server.acceptLocalMessage(com.google.gson.JsonParser.parseString(json).getAsJsonObject()); assertEquals(1, received.size());
-            server.onMessage(null, "{\"type\":\"execution_token\",\"accessToken\":\"untrusted\"}"); assertEquals(15, actions.size());
+            server.onMessage(null, "{\"type\":\"execution_token\",\"accessToken\":\"untrusted\"}"); assertEquals(12, actions.size());
         } finally { server.shutdown(); }
     }
 }

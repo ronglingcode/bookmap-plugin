@@ -1,6 +1,7 @@
 package com.bookmap.plugin.rong.miniviteapp;
 
 import com.bookmap.plugin.rong.miniviteapp.core.controllers.WorkflowHandler;
+import com.bookmap.plugin.rong.miniviteapp.core.controllers.KeyboardHandler;
 import com.bookmap.plugin.rong.miniviteapp.models.Models.*;
 import com.google.gson.*;
 import org.junit.jupiter.api.Test;
@@ -30,11 +31,15 @@ class WorkflowExecutionTest {
         Plan plan = WorkflowHandler.handle(new Snapshot(state), "RefreshEntryStop", false); assertEquals(1, plan.requests.size()); assertEquals("PUT", plan.requests.get(0).method); assertEquals("101", plan.requests.get(0).orderId); assertEquals("TRIGGER", plan.requests.get(0).body.get("orderStrategyType").getAsString());
         assertEquals(1, plan.entry.getAsJsonObject("basePlan").getAsJsonObject("planConfigs").get("sizingCount").getAsInt()); assertEquals(9, plan.entry.get("stopOutPrice").getAsDouble()); assertFalse(plan.requireFlatEntry);
     }
-    @Test void trailQuoteClampCannotBypassRestrictedCorePartial() {
-        JsonObject state = ExtendedExecutionPlanTest.longState(); state.addProperty("coreRuleEnabled", true); state.addProperty("hasPlan", true); state.addProperty("coreCount", 10); state.addProperty("coreTarget", 15); state.addProperty("entryPrice", 10);
-        JsonArray candles = new JsonArray(); for (int minute = 0; minute <= 5; minute++) { JsonObject candle = json("{\"high\":12,\"low\":11}"); candle.addProperty("datetime", 1790861400000L + minute * 60000); candles.add(candle); }
-        state.getAsJsonObject("entryContext").add("candles", candles); state.addProperty("bid", 10.5);
-        state.getAsJsonArray("pairs").get(0).getAsJsonObject().addProperty("originalPartial", 10);
-        assertThrows(IllegalArgumentException.class, () -> WorkflowHandler.handle(new Snapshot(state), "KeyJ", false));
+    @Test void removedTrailingKeysCannotFallThroughToAnotherExitWorkflow() {
+        Snapshot state = new Snapshot(ExtendedExecutionPlanTest.longState());
+        for (String key : new String[]{"KeyJ", "KeyK", "KeyL"}) for (boolean shift : new boolean[]{false, true}) {
+            assertFalse(WorkflowHandler.supports(key));
+            assertFalse(KeyboardHandler.supports(key, shift));
+            assertEquals("unsupported native workflow: " + key,
+                    assertThrows(IllegalArgumentException.class, () -> WorkflowHandler.handle(state, key, shift)).getMessage());
+            assertEquals("unsupported native action: " + key,
+                    assertThrows(IllegalArgumentException.class, () -> KeyboardHandler.handleKeyPressed(state, key, shift, 11)).getMessage());
+        }
     }
 }

@@ -1,5 +1,6 @@
 package com.bookmap.plugin.rong.miniviteapp.core.controllers;
 
+import com.bookmap.plugin.rong.miniviteapp.models.Models;
 import com.bookmap.plugin.rong.miniviteapp.models.Models.Plan;
 import com.bookmap.plugin.rong.miniviteapp.models.Models.Snapshot;
 
@@ -12,6 +13,7 @@ public final class KeyboardHandler {
                 || code.equals("KeyG") || code.equals("KeyH") || code.equals("KeyT");
     }
     public static Plan handleKeyPressed(Snapshot state, String code, boolean shift, double price) {
+        Models.require(supports(code, shift), "unsupported native action: " + code);
         if (WorkflowHandler.supports(code)) return WorkflowHandler.handle(state, code, shift);
         if (Double.isFinite(price)) price = Math.round(price * 100) / 100.0;
         if (code.equals("KeyC")) return Handler.cancelKeyPressed(state);

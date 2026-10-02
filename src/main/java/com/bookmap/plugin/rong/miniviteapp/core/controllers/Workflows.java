@@ -1,25 +1,11 @@
 package com.bookmap.plugin.rong.miniviteapp.core.controllers;
 
-import com.bookmap.plugin.rong.miniviteapp.core.marketdata.MarketClock;
 import com.google.gson.*;
-import java.util.*;
 import static com.bookmap.plugin.rong.miniviteapp.models.DomainJson.*;
 
 /** Mirrors TS workflows; no I/O, timers, globals or Bookmap API. */
 public final class Workflows {
     private Workflows() { }
-    public static double trailStopPrice(JsonArray candles, boolean isLong, int timeframe, boolean shift) {
-        if (timeframe != 5 && timeframe != 15 && timeframe != 30) throw new IllegalArgumentException("Unsupported trailing timeframe");
-        List<JsonObject> regular = new ArrayList<>(); for (JsonElement item : candles) if (MarketClock.marketTime((long) number(item.getAsJsonObject(), "datetime")).isRegularSession) regular.add(item.getAsJsonObject());
-        regular.sort(Comparator.comparingDouble(candle -> number(candle, "datetime"))); Map<Integer, double[]> groups = new LinkedHashMap<>(); boolean pattern = false;
-        for (int index = 0; index < regular.size(); index++) { JsonObject candle = regular.get(index); int key = (int) Math.floor(MarketClock.marketTime((long) number(candle, "datetime")).minutesSinceMarketOpen / timeframe);
-            double[] value = groups.computeIfAbsent(key, id -> new double[]{number(candle, "high"), number(candle, "low")}); value[0] = Math.max(value[0], number(candle, "high")); value[1] = Math.min(value[1], number(candle, "low"));
-            if (index > 0 && (isLong ? number(candle, "low") < number(regular.get(index - 1), "low") : number(candle, "high") > number(regular.get(index - 1), "high"))) pattern = true;
-        }
-        if (groups.size() < 2) throw new IllegalArgumentException("Not enough trailing bars");
-        if (shift && !pattern) throw new IllegalArgumentException(isLong ? "No lower low for market trailing exit" : "No higher high for market trailing exit");
-        List<double[]> bars = new ArrayList<>(groups.values()); double[] closed = bars.get(bars.size() - 2); return isLong ? (Math.floor(closed[1] * 100) - 1) / 100 : (Math.ceil(closed[0] * 100) + 1) / 100;
-    }
     public static JsonArray profitResetTargets(JsonArray targets, double remaining) {
         if (targets.size() <= 1) throw new IllegalArgumentException("Profit reset requires multiple captured targets");
         if (!(remaining > 0)) throw new IllegalArgumentException("No position for profit reset"); JsonArray result = new JsonArray();

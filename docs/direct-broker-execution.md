@@ -27,8 +27,6 @@ The earlier flag-based rollout is historical; this document supersedes it.
 | Top-row digits | Move the selected stop/limit to hover price; Digit1 uses the first smallest pair, remaining digits are positional. |
 | G / H / T | Move half / half / all exit pairs at hover price; Shift+G/H markets out the first half, rounding pair count up. |
 | P / Reset Targets | Cancel current exit legs and rebuild captured profit targets with the captured stop. Reverse target order as in the browser, cap to actual remaining position and reject insufficient captured coverage. |
-| J / K / L | Move the first differing protective stop behind the penultimate 5/15/30-minute regular-session bar. Long: bar low minus a cent; short: high plus a cent. Quote clamping and core rules apply. |
-| Shift+J/K/L | Market out one partial after the browser's lower-low/higher-high condition; core rules still apply. |
 | Z | Set long/short custom stops to hover price and update the captured invalidation reference. |
 | Space | Clear manual entry and stop prices; preserve fixed quantity, matching browser price-line clearing. |
 | Entry Inputs dialog | Set custom entry, long/short stop and fixed share quantity locally; zero restores automatic selection. |
@@ -110,6 +108,9 @@ contracts, not a dependency on ViteApp executionEntryContext.
 
 ## Intentional exclusions and operational limits
 
+- J/K/L and Shift+J/K/L trailing-stop/conditional market-exit workflows were
+  removed from both applications. Bookmap no longer consumes those chart keys;
+  direct native requests for them are rejected before broker access.
 - R and E are disabled in the active browser profile; V has no constructed active
   VWAP-bounce/fail tradebook; U is unused. They were not reenabled during this port.
 - Partial market/target actions retain the split-protective-order requirement.

@@ -204,6 +204,21 @@ class NativeExecutionTest {
             assertEquals(0, rig.mutations.get());
         }
     }
+    @Test void removedTrailingActionsNeverReachBrokerWithAnOpenPosition() throws Exception {
+        try (var rig = new Rig()) {
+            rig.state = ExtendedExecutionPlanTest.longState(); rig.connect();
+            for (String key : new String[]{"KeyJ", "KeyK", "KeyL"}) for (boolean shift : new boolean[]{false, true}) {
+                JsonObject command = action(key); command.addProperty("shiftKey", shift); command.addProperty("price", 11);
+                assertTrue(rig.engine.route(command));
+                JsonObject blocked = rig.events.get(rig.events.size() - 1);
+                assertEquals("execution_blocked", blocked.get("type").getAsString());
+                assertTrue(blocked.get("reason").getAsString().contains("unsupported native action: " + key));
+            }
+            assertTrue(rig.requests.isEmpty());
+            assertEquals(0, rig.mutations.get());
+            assertTrue(rig.events.stream().noneMatch(event -> event.get("type").getAsString().equals("execution_started")));
+        }
+    }
     @Test void initialEntryPostsProtectedBracketWithoutWaitingForUiOrAccountReconciliation() throws Exception {
         try (var rig = new Rig()) {
             var entry = rig.connectEntry();

@@ -16,6 +16,26 @@ Updated: 2026-10-01. Design: [standalone-native-trading-plan.md](standalone-nati
 - Document anything impossible to port and skip it; no such core trade operation identified yet.
 - Commit changes independently in each repository. Never test with live broker mutations.
 
+## Trailing-stop removal — 2026-10-01
+
+Mirrored the user's uncommitted ViteApp trailing-stop removal. Deleted the native
+5/15/30-minute stop-price calculation and J/K/L stop-adjustment / Shift market-exit
+branches. Removed those keys from the Bookmap chart hotkey sets. Direct controller
+and executor requests reject them rather than falling through to another exit.
+Q/P, pending-entry stop widening, manual stop/target adjustments and stop-discipline
+reminders remain. The removed ViteApp five-minute trailing reminder had no native
+counterpart. The existing uncommitted shared fixture change was preserved; removed
+its obsolete Java dispatch case. Operation docs and the implementation plan reflect
+the current supported workflows.
+
+Verification: `gradlew.bat build` passes with native-only compilation, 203 regular
+tests and nine obfuscated-release-JAR tests. The shared TS state-fixture check
+passes all 85 remaining scenarios. Regression checks cover unconsumed chart keys,
+both Shift variants, controller rejection and zero broker requests with an open
+position. No live orders or Firestore writes were sent. ViteApp source was not
+edited; its uncommitted trailing-stop removal remains owned by the user. The
+Bookmap removal was committed after the user requested it.
+
 ## Phase checklist
 
 | Phase | Status | Evidence / remaining work |
@@ -26,7 +46,7 @@ Updated: 2026-10-01. Design: [standalone-native-trading-plan.md](standalone-nati
 | 3. Secrets, Firestore, OAuth | Complete | Local JSON/template, direct config/state/audit REST, coalesced refresh/rotation and native manual OAuth controls. |
 | 4. Massive/history/market state | Complete | Direct REST/reference/trades + stream, history/live overlap, eligibility, local indicators and closed-minute VWAP history/projection. |
 | 5. Account/streams/runtime | Complete | Direct account/orders/preferences, ledger, two reconnecting vendor streams, 3s read coalescing/429 delay, periodic config/account/OAuth jobs. |
-| 6. State/workflow completion | Complete | Local accepted state, core edits, Q/P/J/K/L/Z/Space/manual inputs, pending-stop job, risk/volume/VWAP/discipline/core reminders and Firestore audits. |
+| 6. State/workflow completion | Complete | Local accepted state, core edits, Q/P/Z/Space/manual inputs, pending-stop job, risk/volume/VWAP/discipline/core reminders and Firestore audits. |
 | 7. Bookmap adapter | Complete | First/last attachment runtime ownership, existing display parsers in process, local controls and optional sound. |
 | 8. Remove bridge/flag, final verification | Complete | Old flag/forwarding and browser bridge/context removed. External inputs ignored. Both builds and fake-service/parity/release suites pass; docs revised. |
 | Manual live smoke | Not run | User supplies local JSON. Actual Bookmap attachment, live vendor order acceptance and real Firestore writes were not exercised. |
@@ -80,7 +100,7 @@ browser executionBridge/executionEntryContext/market publishers are gone. The
 optional core-target protection remains a separate false-by-default trading policy.
 
 Current final slice adds mirrored workflow decisions and local view projection,
-Q/P/trailing/pending-stop requests, accepted PUT state, manual entry/stop/fixed-share
+Q/P/pending-stop requests, accepted PUT state, manual entry/stop/fixed-share
 controls, notifications/audits and lifecycle. Runtime handles removed selections,
 held/unselected exit state, clearing closed positions, day rollover and obsolete
 history loads. Read coalescing respects a three-second minimum and Retry-After.

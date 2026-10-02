@@ -35,7 +35,6 @@ class StateParityTest {
                     case "views:nativeViews": { JsonArray messages = new JsonArray(); NativeViews.project(args.get(0).getAsJsonObject()).forEach(messages::add); result = messages; break; }
                     case "views:positionRisk": result = new JsonPrimitive(NativeViews.positionRisk(args.get(0).getAsDouble(), args.get(1).getAsDouble(), args.get(2).getAsJsonArray(), args.get(3).getAsDouble(), args.get(4).getAsDouble())); break;
                     case "workflow:buyingPowerTargets": result = Workflows.buyingPowerTargets(args.get(0).getAsJsonArray(), args.get(1).getAsDouble(), args.get(2).getAsDouble()); break;
-                    case "workflow:trailStopPrice": result = new JsonPrimitive(Workflows.trailStopPrice(args.get(0).getAsJsonArray(), args.get(1).getAsBoolean(), args.get(2).getAsInt(), args.get(3).getAsBoolean())); break;
                     case "workflow:firstVwapTouch": result = Workflows.firstVwapTouch(args.get(0).getAsJsonObject(), args.get(1).isJsonNull() ? null : args.get(1).getAsJsonObject(), args.get(2).getAsDouble(), args.get(3).getAsDouble()); break;
                     case "workflow:completedPartials": result = new JsonPrimitive(Workflows.completedPartials(args.get(0).getAsDouble(), args.get(1).getAsDouble(), args.get(2).getAsInt(), args.get(3).getAsDouble())); break;
                     case "workflow:profitResetTargets": result = Workflows.profitResetTargets(args.get(0).getAsJsonArray(), args.get(1).getAsDouble()); break;

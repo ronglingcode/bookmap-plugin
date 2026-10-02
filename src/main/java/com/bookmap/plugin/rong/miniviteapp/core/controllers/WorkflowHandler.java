@@ -10,8 +10,9 @@ import static com.bookmap.plugin.rong.miniviteapp.models.DomainJson.*;
 /** Additional manual/periodic workflows. Decisions mirror TS core, requests remain explicit. */
 public final class WorkflowHandler {
     private WorkflowHandler() { }
-    public static boolean supports(String key) { return key.equals("KeyQ") || key.equals("KeyP") || key.equals("KeyJ") || key.equals("KeyK") || key.equals("KeyL") || key.equals("RefreshEntryStop"); }
+    public static boolean supports(String key) { return key.equals("KeyQ") || key.equals("KeyP") || key.equals("RefreshEntryStop"); }
     public static Plan handle(Snapshot state, String key, boolean shift) {
+        Models.require(supports(key), "unsupported native workflow: " + key);
         if (key.equals("KeyQ")) { Plan plan = new Plan("cancel_breakout_entries"); plan.clearPending = true; state.entries.stream().filter(order -> order.type.equals("STOP")).forEach(order -> Broker.cancelOrders(plan, order)); return plan; }
         Models.require(state.entryContext != null, "workflow inputs unavailable");
         JsonObject active = object(state.entryContext, "activeTrade");
@@ -42,16 +43,6 @@ public final class WorkflowHandler {
             }
             return plan;
         }
-        Models.require(!state.pairs.isEmpty(), "no exit pairs for trailing stop");
-        int timeframe = key.equals("KeyJ") ? 5 : key.equals("KeyK") ? 15 : 30;
-        double price = Workflows.trailStopPrice(array(state.entryContext, "candles"), state.netQuantity > 0, timeframe, shift);
-        Plan plan = new Plan(shift ? "trail_market_partial" : "trail_stop_partial");
-        for (ExitPair pair : state.pairs) if (pair.stop != null && pair.stop.price != price) {
-            Models.require(pair.stop.isBuy == (state.netQuantity < 0), "exit side disagrees with position");
-            if (shift) { CoreTargetExitRules.check(state, pair, state.currentPrice, true); Broker.instantOutOneExitPair(plan, pair); }
-            else { boolean isLong = state.netQuantity > 0; double clamped = isLong ? Math.min(price, state.bid) : Math.max(price, state.ask); Models.require(Models.positive(clamped), "quote unavailable for trailing stop"); CoreTargetExitRules.check(state, pair, price, isLong ? price > pair.stop.price : price < pair.stop.price); CoreTargetExitRules.check(state, pair, clamped, isLong ? clamped > pair.stop.price : clamped < pair.stop.price); plan.requests.add(new Request("PUT", pair.stop, OrderFactory.createSingleOrder(state.symbol, "STOP", pair.stop.quantity, clamped, pair.stop.isBuy))); }
-            break;
-        }
-        return plan;
+        throw new IllegalArgumentException("unsupported native workflow: " + key);
     }
 }

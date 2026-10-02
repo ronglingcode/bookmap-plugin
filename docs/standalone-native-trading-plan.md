@@ -343,8 +343,6 @@ available only in ViteApp, with explicit Bookmap buttons/hotkeys or local contro
 - Q: cancel breakout entries and clear the pending timer.
 - P: replace protective exits from the saved profit-target plan, preserving its
   current cancel/submit ordering and delay.
-- J/K/L (and Shift): 5/15/30-minute trailing-stop/conditional market-out workflows
-  using closed candles and the current higher-high/lower-low rule.
 - Z/custom-stop and custom-entry/fixed-quantity edits: update domain manual inputs
   and core invalidation levels, not browser chart objects.
 - Clear manual chart overrides, and preserve risk-line controls when their
