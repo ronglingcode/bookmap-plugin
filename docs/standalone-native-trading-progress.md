@@ -144,7 +144,7 @@ Verification completed:
   and teardown, without browser or proxy.
 - Full Java Gradle build passes: 201 regular tests and nine actual obfuscated-JAR
   release tests; native-only engine compilation passes without Bookmap API.
-- Browser price/VWAP, exit-pair selection and new-position regressions also pass.
+- Browser price/VWAP and exit-pair selection regressions also pass.
 - No live broker mutations, real Firestore writes or real secrets used by checks.
 - Existing nonblocking build notices: Vite large bundle/missing runtime stylesheet;
   Java deprecated API/Gradle usage. Both builds succeed.

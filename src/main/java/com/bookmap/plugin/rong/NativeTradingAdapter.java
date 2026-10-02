@@ -17,7 +17,6 @@ import static com.bookmap.plugin.rong.miniviteapp.models.DomainJson.*;
 public final class NativeTradingAdapter implements AutoCloseable {
     private final SignalWebSocketServer display;
     private final Map<String, Api> apis = new ConcurrentHashMap<>();
-    private final Map<String, Double> positions = new ConcurrentHashMap<>();
     private final byte[] sound = OrderWallChangeSound.createAlertSound();
     private final IndicatorConfig settings;
     private final NativeConnectionStatus connectionStatus;
@@ -61,9 +60,6 @@ public final class NativeTradingAdapter implements AutoCloseable {
         if (type.equals("account_ready") || type.equals("market_ready") || type.equals("market_update") || type.equals("command_state")) {
             if (type.equals("market_update")) display.acceptLocalMessage(NativeViews.premarketLevels(value));
             NativeViews.project(value).forEach(display::acceptLocalMessage);
-            if (type.equals("account_ready")) { String symbol = string(value, "symbol"); JsonObject position = object(object(object(value, "account"), "positions"), symbol); double net = number(position, "netQuantity"); Double previous = positions.put(symbol, net);
-                if (previous != null && net != 0 && (previous == 0 || Math.signum(previous) != Math.signum(net))) { JsonObject signal = message("new_position"); signal.addProperty("symbol", symbol); signal.addProperty("isLong", net > 0); signal.addProperty("netQuantity", net); signal.addProperty("averagePrice", number(position, "averagePrice")); signal.addProperty("timestamp", number(value, "timestamp")); signal.addProperty("eventId", symbol + ":" + number(value, "timestamp")); display.acceptLocalMessage(signal); }
-            }
         } else if (type.equals("execution_result") || type.equals("execution_blocked")) {
             PluginLog.action(string(value, "symbol"), type + " " + string(value, "action") + " " + string(value, "outcome") + " " + string(value, "reason"));
         }

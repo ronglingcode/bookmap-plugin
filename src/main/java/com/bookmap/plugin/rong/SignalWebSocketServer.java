@@ -84,11 +84,6 @@ public class SignalWebSocketServer extends WebSocketServer {
     }
 
     @FunctionalInterface
-    public interface NewPositionListener {
-        void onNewPosition(NewPositionDefinition position);
-    }
-
-    @FunctionalInterface
     public interface EntryRetestStateListener {
         void onEntryRetestStateChanged(EntryRetestState state);
     }
@@ -109,7 +104,6 @@ public class SignalWebSocketServer extends WebSocketServer {
     private final Map<String, Set<TradeButtonConfigListener>> symbolToTradeButtonListeners = new ConcurrentHashMap<>();
     private final Map<String, Set<VwapUpdateListener>> symbolToVwapUpdateListeners = new ConcurrentHashMap<>();
     private final Map<String, Set<CorePlanConfigListener>> symbolToCorePlanListeners = new ConcurrentHashMap<>();
-    private final Map<String, Set<NewPositionListener>> symbolToNewPositionListeners = new ConcurrentHashMap<>();
     private final Map<String, Set<EntryRetestStateListener>> symbolToEntryRetestStateListeners =
             new ConcurrentHashMap<>();
     private final Object entryRetestStateLock = new Object();
@@ -466,25 +460,6 @@ public class SignalWebSocketServer extends WebSocketServer {
         }
     }
 
-    public void registerNewPositionListener(String symbol, NewPositionListener listener) {
-        String cleanSymbol = SymbolUtils.cleanSymbol(symbol);
-        symbolToNewPositionListeners
-                .computeIfAbsent(cleanSymbol, ignored -> Collections.newSetFromMap(new ConcurrentHashMap<>()))
-                .add(listener);
-    }
-
-    public void unregisterNewPositionListener(String symbol, NewPositionListener listener) {
-        String cleanSymbol = SymbolUtils.cleanSymbol(symbol);
-        Set<NewPositionListener> listeners = symbolToNewPositionListeners.get(cleanSymbol);
-        if (listeners == null) {
-            return;
-        }
-        listeners.remove(listener);
-        if (listeners.isEmpty()) {
-            symbolToNewPositionListeners.remove(cleanSymbol, listeners);
-        }
-    }
-
     public void unregisterKeyZoneConfigListener(KeyZoneConfigListener listener) {
         keyZoneConfigListeners.remove(listener);
     }
@@ -580,10 +555,6 @@ public class SignalWebSocketServer extends WebSocketServer {
                 handleCorePlanConfig(json);
                 return;
             }
-            if ("new_position".equals(type)) {
-                handleNewPosition(json);
-                return;
-            }
         }
     }
 
@@ -643,30 +614,6 @@ public class SignalWebSocketServer extends WebSocketServer {
                     getLong(json, "timestamp"));
             symbolToCorePlan.put(symbol, config);
             notifyCorePlanListeners(symbol, config);
-        } catch (IllegalArgumentException ignored) {
-            // Ignore invalid messages without writing diagnostic logs.
-        }
-    }
-
-    private void handleNewPosition(JsonObject json) {
-        String symbol = SymbolUtils.cleanSymbol(getString(json, "symbol"));
-        if (symbol.isEmpty()) {
-            return;
-        }
-
-        try {
-            double averagePrice = getWirePrice(json, "averagePrice");
-            if (!Double.isFinite(averagePrice)) {
-                averagePrice = 0;
-            }
-            NewPositionDefinition position = new NewPositionDefinition(
-                    symbol,
-                    getBoolean(json, "isLong"),
-                    getDouble(json, "netQuantity"),
-                    averagePrice,
-                    getString(json, "eventId"),
-                    getLong(json, "timestamp"));
-            notifyNewPositionListeners(symbol, position);
         } catch (IllegalArgumentException ignored) {
             // Ignore invalid messages without writing diagnostic logs.
         }
@@ -1249,20 +1196,6 @@ public class SignalWebSocketServer extends WebSocketServer {
         }
     }
 
-    private void notifyNewPositionListeners(String symbol, NewPositionDefinition position) {
-        Set<NewPositionListener> listeners = symbolToNewPositionListeners.get(symbol);
-        if (listeners == null) {
-            return;
-        }
-        for (NewPositionListener listener : listeners) {
-            try {
-                listener.onNewPosition(position);
-            } catch (RuntimeException ignored) {
-                // Continue notifying other listeners without writing diagnostic logs.
-            }
-        }
-    }
-
     private void notifyEntryRetestStateListeners(String symbol, EntryRetestState state) {
         Set<EntryRetestStateListener> listeners = symbolToEntryRetestStateListeners.get(symbol);
         if (listeners == null) {
@@ -1385,8 +1318,7 @@ public class SignalWebSocketServer extends WebSocketServer {
                 || "exit_order_pair_config".equals(type)
                 || "account_state".equals(type)
                 || "vwap_update".equals(type)
-                || "core_plan_config".equals(type)
-                || "new_position".equals(type);
+                || "core_plan_config".equals(type);
     }
 
     private String getString(JsonObject json, String field) {

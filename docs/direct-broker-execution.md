@@ -80,7 +80,7 @@ entry context/manual inputs and stop loading history; held symbols keep exit
 inputs. Cleared positions/orders publish clearing views. Async history from an
 old load cannot overwrite replacement data.
 
-Notifications cover local retest completion, new positions, first VWAP touch per captured position, live
+Notifications cover local retest completion, first VWAP touch per captured position, live
 and closed-entry-candle volume, over-risk exposure, stop-tightening discipline
 and the third-partial core-plan reminder. They appear in bmtrader Logs; optional
 **Native Trading Notification Sound** uses the existing Bookmap sound API. Browser
