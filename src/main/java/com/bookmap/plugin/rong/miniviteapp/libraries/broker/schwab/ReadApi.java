@@ -46,15 +46,21 @@ public final class ReadApi {
         return result;
     }
     public JsonArray getOrders(String account, String token, String date, boolean useTimeWindows) throws Exception {
-        long start = Instant.parse(date + "T00:00:00Z").toEpochMilli(), end = Instant.parse(LocalDate.parse(date).plusDays(1) + "T00:00:00Z").toEpochMilli();
+        return getOrders(account, token, date, useTimeWindows, 0);
+    }
+    /** Include older working orders that can receive fills during today's session. */
+    public JsonArray getOrders(String account, String token, String date, boolean useTimeWindows, int lookbackDays) throws Exception {
+        if (lookbackDays < 0 || lookbackDays > 59) throw new IllegalArgumentException("Order lookback must be 0-59 days");
+        long start = Instant.parse(LocalDate.parse(date).minusDays(lookbackDays) + "T00:00:00Z").toEpochMilli(), end = Instant.parse(LocalDate.parse(date).plusDays(1) + "T00:00:00Z").toEpochMilli();
         Map<String, JsonObject> orders = new LinkedHashMap<>();
-        if (!useTimeWindows) window(account, token, start, end, 3600000, orders);
+        if (!useTimeWindows) {
+            if (lookbackDays == 0) window(account, token, start, end, 3600000, orders);
+            else wideWindow(account, token, start, end, orders);
+        }
         else {
-            int openHour = -1;
-            for (int hour = 0; hour < 24; hour++) if (MarketClock.marketTime(start + hour * 3600000L + 1800000).minutesSinceMarketOpen == 0) openHour = hour;
-            for (int hour = 0; hour < 24; hour++) {
-                long from = start + hour * 3600000L, to = from + 3600000;
-                if (hour != openHour) window(account, token, from, to, 600000, orders);
+            for (long from = start; from < end; from += 3600000L) {
+                long to = from + 3600000L;
+                if (MarketClock.marketTime(from + 1800000L).minutesSinceMarketOpen != 0) window(account, token, from, to, 600000, orders);
                 else {
                     window(account, token, from, from + 1800000, 60000, orders);
                     for (long cursor = from + 1800000; cursor < to; cursor += 300000) window(account, token, cursor, cursor + 300000, 60000, orders);
@@ -64,16 +70,33 @@ public final class ReadApi {
         JsonArray result = new JsonArray(); orders.values().forEach(result::add); return result;
     }
     private void window(String account, String token, long from, long to, long subdivision, Map<String, JsonObject> orders) throws Exception {
-        String query = "fromEnteredTime=" + encode(ISO.format(Instant.ofEpochMilli(from))) + "&toEnteredTime=" + encode(ISO.format(Instant.ofEpochMilli(to))) + "&maxResults=500";
-        JsonElement data = read("accounts/" + encode(account) + "/orders?" + query, token);
-        JsonElement list = data.isJsonArray() ? data : data.isJsonObject() ? data.getAsJsonObject().get("orders") : null;
-        if (list == null || !list.isJsonArray()) throw new IOException("Schwab order response is not an array");
-        JsonArray array = list.getAsJsonArray();
+        JsonArray array = readOrderWindow(account, token, from, to);
         if (array.size() >= 500) {
             if (to - from <= 60000) throw new IOException("Schwab orders reached 500 in a one-minute window; read may be incomplete");
             for (long cursor = from; cursor < to; cursor += subdivision) window(account, token, cursor, Math.min(to, cursor + subdivision), subdivision >= 3600000 ? 600000 : 60000, orders);
             return;
         }
+        collectOrders(array, orders);
+    }
+    private void wideWindow(String account, String token, long from, long to, Map<String, JsonObject> orders) throws Exception {
+        JsonArray array = readOrderWindow(account, token, from, to);
+        if (array.size() >= 500) {
+            if (to - from <= 60000) throw new IOException("Schwab orders reached 500 in a one-minute window; read may be incomplete");
+            long middle = from + (to - from) / 2;
+            wideWindow(account, token, from, middle, orders);
+            wideWindow(account, token, middle, to, orders);
+            return;
+        }
+        collectOrders(array, orders);
+    }
+    private JsonArray readOrderWindow(String account, String token, long from, long to) throws Exception {
+        String query = "fromEnteredTime=" + encode(ISO.format(Instant.ofEpochMilli(from))) + "&toEnteredTime=" + encode(ISO.format(Instant.ofEpochMilli(to))) + "&maxResults=500";
+        JsonElement data = read("accounts/" + encode(account) + "/orders?" + query, token);
+        JsonElement list = data.isJsonArray() ? data : data.isJsonObject() ? data.getAsJsonObject().get("orders") : null;
+        if (list == null || !list.isJsonArray()) throw new IOException("Schwab order response is not an array");
+        return list.getAsJsonArray();
+    }
+    private void collectOrders(JsonArray array, Map<String, JsonObject> orders) throws IOException {
         for (JsonElement element : array) {
             JsonObject order = element.getAsJsonObject(); JsonElement id = order.has("orderId") ? order.get("orderId") : order.get("orderID");
             if (id == null || id.isJsonNull()) throw new IOException("Schwab order missing orderId");

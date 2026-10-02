@@ -95,7 +95,7 @@ public final class TradingRuntime implements AutoCloseable {
                 validateProfile(loaded.profile);
                 String token = oauth.accessToken(false), date = MarketClock.marketTime(now.getAsLong()).date;
                 JsonObject raw = reads.getAccount(token);
-                JsonArray orders = reads.getOrders(accountHash(), token, date, false);
+                JsonArray orders = reads.getOrders(accountHash(), token, date, false, 59);
                 JsonObject projected = AccountProjection.projectAccount(raw, orders, date, this::price);
                 JsonObject restored = firestore.getTradingState(loaded.profile);
                 synchronized (lock) {
@@ -195,7 +195,7 @@ public final class TradingRuntime implements AutoCloseable {
         executor.execute(() -> {
             try {
                 String token = oauth.accessToken(false), date = MarketClock.marketTime(now.getAsLong()).date;
-                JsonObject raw = reads.getAccount(token); JsonArray orders = reads.getOrders(accountHash(), token, date, false);
+                JsonObject raw = reads.getAccount(token); JsonArray orders = reads.getOrders(accountHash(), token, date, false, 59);
                 JsonObject projected = AccountProjection.projectAccount(raw, orders, date, this::price);
                 synchronized (lock) { if (stopped) return; account = projected; ledger = TradeLedger.projectTradeLedger(object(projected, "executions"), number(policy, "dailyMaxLoss")); }
                 publishToken(); publishAccount(); disciplineJobs(); accountNotifications();

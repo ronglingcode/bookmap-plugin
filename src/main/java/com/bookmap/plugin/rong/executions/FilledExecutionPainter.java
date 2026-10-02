@@ -184,40 +184,12 @@ public class FilledExecutionPainter implements ScreenSpacePainterFactory,
         private final List<CanvasIcon> activeShapes = new ArrayList<>();
         private final Object shapeLock = new Object();
 
-        private volatile long priceBottom;
-        private volatile long priceHeight;
-        private volatile long timeLeft;
-        private volatile long timeWidth;
         private boolean disposed;
 
         PainterInstance(String painterAlias, String instrumentAlias, ScreenSpaceCanvas canvas) {
             this.painterAlias = painterAlias;
             this.instrumentAlias = instrumentAlias;
             this.canvas = canvas;
-        }
-
-        @Override
-        public void onHeatmapPriceBottom(long priceBottom) {
-            this.priceBottom = priceBottom;
-            rebuildMarkers();
-        }
-
-        @Override
-        public void onHeatmapPriceHeight(long priceHeight) {
-            this.priceHeight = priceHeight;
-            rebuildMarkers();
-        }
-
-        @Override
-        public void onHeatmapTimeLeft(long timeLeft) {
-            this.timeLeft = timeLeft;
-            rebuildMarkers();
-        }
-
-        @Override
-        public void onHeatmapFullTimeWidth(long width) {
-            this.timeWidth = width;
-            rebuildMarkers();
         }
 
         private void rebuildMarkers() {
@@ -239,39 +211,15 @@ public class FilledExecutionPainter implements ScreenSpacePainterFactory,
         }
 
         private List<FilledExecutionMarker> selectMarkersToDraw() {
-            List<FilledExecutionMarker> visible = new ArrayList<>();
-            List<FilledExecutionMarker> markers = store.getMarkersForDisplay(
+            List<FilledExecutionMarker> markers = new ArrayList<>(store.getMarkersForDisplay(
                     instrumentAlias,
                     areLabelsPersistent(),
-                    TimeUnit.MILLISECONDS.toNanos(System.currentTimeMillis()));
-            for (FilledExecutionMarker marker : markers) {
-                if (isVisible(marker)) {
-                    visible.add(marker);
-                }
+                    TimeUnit.MILLISECONDS.toNanos(System.currentTimeMillis())));
+            markers.sort(Comparator.comparingLong(FilledExecutionMarker::getTimeNs));
+            if (markers.size() <= MAX_VISIBLE_MARKERS) {
+                return markers;
             }
-            visible.sort(Comparator.comparingLong(FilledExecutionMarker::getTimeNs));
-            if (visible.size() <= MAX_VISIBLE_MARKERS) {
-                return visible;
-            }
-            return new ArrayList<>(visible.subList(visible.size() - MAX_VISIBLE_MARKERS, visible.size()));
-        }
-
-        private boolean isVisible(FilledExecutionMarker marker) {
-            if (marker.getTimeNs() <= 0) {
-                return false;
-            }
-            if (timeWidth > 0) {
-                long timeRight = timeLeft + timeWidth;
-                if (marker.getTimeNs() < timeLeft || marker.getTimeNs() > timeRight) {
-                    return false;
-                }
-            }
-            if (priceHeight <= 0) {
-                return true;
-            }
-            double top = priceBottom + priceHeight;
-            return marker.getPriceInTicks() >= priceBottom - 1
-                    && marker.getPriceInTicks() <= top + 1;
+            return new ArrayList<>(markers.subList(markers.size() - MAX_VISIBLE_MARKERS, markers.size()));
         }
 
         private CanvasIcon createMarkerIcon(FilledExecutionMarker marker) {
