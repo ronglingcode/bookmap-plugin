@@ -552,6 +552,10 @@ public class SignalWebSocketServer extends WebSocketServer {
                 handleKeyLevelsConfig(json);
                 return;
             }
+            if ("premarket_levels_update".equals(type)) {
+                handlePremarketLevelsUpdate(json);
+                return;
+            }
             if ("exit_order_pairs_config".equals(type) || "exit_order_pair_config".equals(type)) {
                 handleExitOrderPairsConfig(json);
                 return;
@@ -768,6 +772,22 @@ public class SignalWebSocketServer extends WebSocketServer {
         MarketLevelDefinition marketLevels = parseMarketLevels(symbol, json);
         symbolToMarketLevels.put(symbol, marketLevels);
         notifyMarketLevelConfigListeners(symbol, marketLevels);
+    }
+
+    private void handlePremarketLevelsUpdate(JsonObject json) {
+        String symbol = SymbolUtils.cleanSymbol(getString(json, "symbol"));
+        if (symbol.isEmpty()) return;
+        JsonObject premarket = getObjectField(json, "premarket");
+        double high = getPairPrice(json, premarket, "high", "premarketHigh", "pmHigh");
+        double low = getPairPrice(json, premarket, "low", "premarketLow", "pmLow");
+        if (!Double.isFinite(high) || high <= 0 || !Double.isFinite(low) || low <= 0) return;
+        MarketLevelDefinition previous = symbolToMarketLevels.get(symbol);
+        MarketLevelDefinition updated = previous == null
+                ? new MarketLevelDefinition(symbol, Collections.emptyMap(), Double.NaN, Double.NaN, high, low)
+                : new MarketLevelDefinition(symbol, previous.getCamPivots(),
+                        previous.getPreviousDayHigh(), previous.getPreviousDayLow(), high, low);
+        symbolToMarketLevels.put(symbol, updated);
+        notifyMarketLevelConfigListeners(symbol, updated);
     }
 
     private KeyLevelDefinition parseKeyLevel(String symbol, JsonElement element) {
@@ -1360,6 +1380,7 @@ public class SignalWebSocketServer extends WebSocketServer {
     private boolean isPriceBearingMessageType(String type) {
         return "key_levels_config".equals(type)
                 || "key_level_config".equals(type)
+                || "premarket_levels_update".equals(type)
                 || "exit_order_pairs_config".equals(type)
                 || "exit_order_pair_config".equals(type)
                 || "account_state".equals(type)

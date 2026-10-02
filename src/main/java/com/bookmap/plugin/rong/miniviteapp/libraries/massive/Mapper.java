@@ -13,13 +13,15 @@ public final class Mapper {
         return MarketClock.marketTime(trade.timestamp).isRegularSession && trade.conditions.stream().anyMatch(NON_UPDATING_CONDITIONS::contains);
     }
     public static Trade mapWebSocketTrade(JsonObject value) {
-        if (!value.has("ev") || !value.get("ev").isJsonPrimitive() || !value.get("ev").getAsString().equals("T") || !value.has("sym") || !value.get("sym").isJsonPrimitive() || !value.get("sym").getAsJsonPrimitive().isString() || !valid(value, "t") || !valid(value, "p") || !valid(value, "s") || number(value, "p") <= 0 || number(value, "s") <= 0) return null;
-        return new Trade(value.get("sym").getAsString(), (long) number(value, "t"), number(value, "p"), number(value, "s"), optional(value, "q"), optional(value, "i"), valid(value, "x") ? value.get("x").getAsInt() : null, conditions(value, "c"));
+        double size = decimalSize(value, "ds", "s");
+        if (!value.has("ev") || !value.get("ev").isJsonPrimitive() || !value.get("ev").getAsString().equals("T") || !value.has("sym") || !value.get("sym").isJsonPrimitive() || !value.get("sym").getAsJsonPrimitive().isString() || !valid(value, "t") || !valid(value, "p") || number(value, "p") <= 0 || size <= 0) return null;
+        return new Trade(value.get("sym").getAsString(), (long) number(value, "t"), number(value, "p"), size, optional(value, "q"), optional(value, "i"), valid(value, "x") ? value.get("x").getAsInt() : null, conditions(value, "c"));
     }
     public static Trade mapRestTrade(String symbol, JsonObject value) {
         long timestamp = new java.math.BigInteger(value.get("sip_timestamp").getAsString()).divide(java.math.BigInteger.valueOf(1000000)).longValueExact();
-        if (!valid(value, "price") || !valid(value, "size") || number(value, "price") <= 0 || number(value, "size") <= 0) throw new IllegalArgumentException("Massive trade missing price/size");
-        return new Trade(symbol, timestamp, number(value, "price"), number(value, "size"), optional(value, "sequence_number"), optional(value, "id"), valid(value, "exchange") ? value.get("exchange").getAsInt() : null, conditions(value, "conditions"));
+        double size = decimalSize(value, "decimal_size", "size");
+        if (!valid(value, "price") || number(value, "price") <= 0 || size <= 0) throw new IllegalArgumentException("Massive trade missing price/size");
+        return new Trade(symbol, timestamp, number(value, "price"), size, optional(value, "sequence_number"), optional(value, "id"), valid(value, "exchange") ? value.get("exchange").getAsInt() : null, conditions(value, "conditions"));
     }
     private static boolean valid(JsonObject value, String name) { return value.has(name) && isNumber(value.get(name)); }
     private static String optional(JsonObject value, String name) { return value.has(name) && !value.get(name).isJsonNull() ? value.get(name).getAsString() : null; }
@@ -27,6 +29,15 @@ public final class Mapper {
         java.util.List<Integer> result = new java.util.ArrayList<>();
         if (value.has(name) && value.get(name).isJsonArray()) for (JsonElement element : value.getAsJsonArray(name)) if (isNumber(element)) result.add(element.getAsInt());
         return result;
+    }
+    private static double decimalSize(JsonObject value, String decimalName, String integerName) {
+        if (value.has(decimalName) && !value.get(decimalName).isJsonNull()) {
+            try {
+                double parsed = new java.math.BigDecimal(value.get(decimalName).getAsString()).doubleValue();
+                if (Double.isFinite(parsed) && parsed > 0) return parsed;
+            } catch (RuntimeException ignored) { }
+        }
+        return valid(value, integerName) ? number(value, integerName) : 0;
     }
     public static Candle mapAggregate(String symbol, JsonObject value) {
         double vwap = value.has("vw") && isNumber(value.get("vw")) ? value.get("vw").getAsDouble() : 0;

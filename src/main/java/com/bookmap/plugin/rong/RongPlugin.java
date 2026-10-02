@@ -74,6 +74,7 @@ public class RongPlugin implements CustomModuleAdapter,
     // Shared WebSocket server across all symbol instances
     private static SignalWebSocketServer sharedServer;
     private static NativeTradingAdapter nativeTrading;
+    private static final NativeConnectionStatus nativeConnectionStatus = new NativeConnectionStatus();
     private static final java.util.Map<String, Api> nativeApis = new java.util.LinkedHashMap<>();
     private static int instanceCount = 0;
     private static ChartHoverHotkeyHandler chartHoverHotkeyHandler;
@@ -179,7 +180,7 @@ public class RongPlugin implements CustomModuleAdapter,
                 sharedServer.registerAccountStateListener(filledExecutionManager);
             }
             nativeApis.put(cleanAlias, api);
-            if (nativeTrading == null) { nativeTrading = new NativeTradingAdapter(sharedServer, indicatorConfig); nativeTrading.attach(cleanAlias, api); nativeTrading.start(); }
+            if (nativeTrading == null) { nativeTrading = new NativeTradingAdapter(sharedServer, indicatorConfig, nativeConnectionStatus); nativeTrading.attach(cleanAlias, api); nativeTrading.start(); }
             else nativeTrading.attach(cleanAlias, api);
             instanceCount++;
             initialized = true;
@@ -299,7 +300,7 @@ public class RongPlugin implements CustomModuleAdapter,
         }
 
         tradeButtonWindow = new TradeButtonWindow(
-                cleanAlias, sharedServer, wallThresholdConfig::getThresholdFloor);
+                cleanAlias, sharedServer, wallThresholdConfig::getThresholdFloor, nativeConnectionStatus);
     }
 
     static AliasFilter exactAliasFilter(String expectedAlias) {
@@ -527,7 +528,7 @@ public class RongPlugin implements CustomModuleAdapter,
             }
         }
         return new StrategyPanel[] {
-            new IndicatorSettingsPanel(indicatorConfig, wallThresholdConfig)
+            new IndicatorSettingsPanel(indicatorConfig, wallThresholdConfig, nativeConnectionStatus)
         };
     }
 
@@ -628,7 +629,7 @@ public class RongPlugin implements CustomModuleAdapter,
         if (!LocalCredentials.fileExists()) return;
         if (sharedServer == null) return;
         if (nativeTrading != null) nativeTrading.close();
-        nativeTrading = new NativeTradingAdapter(sharedServer, indicatorConfig);
+        nativeTrading = new NativeTradingAdapter(sharedServer, indicatorConfig, nativeConnectionStatus);
         nativeApis.forEach(nativeTrading::attach); nativeTrading.start();
     }
     public static void authorizeNativeTrading(String callback) { if (nativeTrading != null) nativeTrading.authorize(callback); }

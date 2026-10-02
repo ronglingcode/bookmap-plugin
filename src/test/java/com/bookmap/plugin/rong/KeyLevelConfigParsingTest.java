@@ -168,5 +168,24 @@ class KeyLevelConfigParsingTest {
         assertFalse(state.isBidRetestPending());
         assertFalse(state.isOfferRetestPending());
     }
+
+    @Test
+    void livePremarketUpdatePreservesOtherMarketLevels() {
+        SignalWebSocketServer server = new SignalWebSocketServer(0, 90);
+        AtomicReference<MarketLevelDefinition> levelsRef = new AtomicReference<>();
+        server.registerMarketLevelConfigListener((symbol, levels) -> levelsRef.set(levels));
+
+        localMessage(server, "{\"type\":\"key_levels_config\",\"symbol\":\"AAPL\",\"levels\":[],"
+                + "\"previousDay\":{\"high\":190,\"low\":180},\"camPivots\":{\"R1\":191},"
+                + "\"premarket\":{\"high\":188,\"low\":183}}");
+        localMessage(server, "{\"type\":\"premarket_levels_update\",\"priceUnit\":\"real\","
+                + "\"symbol\":\"AAPL\",\"premarket\":{\"high\":189.25,\"low\":182.75}}");
+
+        MarketLevelDefinition levels = levelsRef.get();
+        assertEquals(189.25, levels.getPremarketHigh(), 0.00001);
+        assertEquals(182.75, levels.getPremarketLow(), 0.00001);
+        assertEquals(190, levels.getPreviousDayHigh(), 0.00001);
+        assertEquals(191, levels.getCamPivots().get("R1"), 0.00001);
+    }
     private static void localMessage(com.bookmap.plugin.rong.SignalWebSocketServer server, String json) { server.acceptLocalMessage(com.google.gson.JsonParser.parseString(json).getAsJsonObject()); }
 }

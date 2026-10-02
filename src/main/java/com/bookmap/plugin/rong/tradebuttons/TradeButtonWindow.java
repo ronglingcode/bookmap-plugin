@@ -25,6 +25,7 @@ import java.util.Locale;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.IntSupplier;
+import java.util.function.Consumer;
 
 import javax.swing.BorderFactory;
 import javax.swing.BoxLayout;
@@ -44,6 +45,7 @@ import javax.swing.border.EmptyBorder;
 import com.bookmap.plugin.rong.BookmapPriceNormalizer;
 import com.bookmap.plugin.rong.CorePlanConfigDefinition;
 import com.bookmap.plugin.rong.NewPositionDefinition;
+import com.bookmap.plugin.rong.NativeConnectionStatus;
 import com.bookmap.plugin.rong.PluginLog;
 import com.bookmap.plugin.rong.SignalWebSocketServer;
 import com.bookmap.plugin.rong.WallThresholdConfig;
@@ -82,6 +84,8 @@ public class TradeButtonWindow {
     private final String symbol;
     private final SignalWebSocketServer server;
     private final IntSupplier wallThresholdFloorSupplier;
+    private final NativeConnectionStatus connectionStatus;
+    private final Consumer<NativeConnectionStatus.Snapshot> connectionStatusListener;
     private final SignalWebSocketServer.TradeButtonConfigListener buttonConfigListener;
     private final SignalWebSocketServer.CorePlanConfigListener corePlanConfigListener;
     private final SignalWebSocketServer.NewPositionListener newPositionListener;
@@ -94,6 +98,9 @@ public class TradeButtonWindow {
     private JPanel buttonPanel;
     private JLabel shiftModeLabel;
     private JLabel wallThresholdLabel;
+    private JLabel schwabStatusLabel;
+    private JLabel massiveHistoryStatusLabel;
+    private JLabel massiveStreamStatusLabel;
     private Timer wallThresholdTimer;
     private volatile CorePlanConfigDefinition corePlanConfig;
     private JDialog corePlanDialog;
@@ -110,11 +117,19 @@ public class TradeButtonWindow {
 
     public TradeButtonWindow(String symbol, SignalWebSocketServer server,
                              IntSupplier wallThresholdFloorSupplier) {
+        this(symbol, server, wallThresholdFloorSupplier, new NativeConnectionStatus());
+    }
+
+    public TradeButtonWindow(String symbol, SignalWebSocketServer server,
+                             IntSupplier wallThresholdFloorSupplier,
+                             NativeConnectionStatus connectionStatus) {
         this.symbol = symbol;
         this.server = server;
         this.wallThresholdFloorSupplier = wallThresholdFloorSupplier == null
                 ? () -> WallThresholdConfig.DEFAULT_THRESHOLD_FLOOR
                 : wallThresholdFloorSupplier;
+        this.connectionStatus = connectionStatus;
+        this.connectionStatusListener = this::setConnectionStatus;
         this.buttonConfigListener = this::setButtons;
         this.corePlanConfigListener = this::setCorePlanConfig;
         this.newPositionListener = this::onNewPosition;
@@ -150,6 +165,7 @@ public class TradeButtonWindow {
         server.registerCorePlanConfigListener(symbol, corePlanConfigListener);
         server.registerNewPositionListener(symbol, newPositionListener);
         server.registerEntryRetestStateListener(symbol, entryRetestStateListener);
+        connectionStatus.addListener(connectionStatusListener);
     }
 
     private void setButtons(List<TradebookButtonGroup> tradebooks) {
@@ -594,12 +610,44 @@ public class TradeButtonWindow {
         wallThresholdLabel.setBorder(BorderFactory.createEmptyBorder(4, 8, 4, 8));
         updateWallThresholdLabel();
 
+        JPanel connectionPanel = new JPanel(new GridLayout(1, 3, 4, 0));
+        schwabStatusLabel = createConnectionLabel();
+        massiveHistoryStatusLabel = createConnectionLabel();
+        massiveStreamStatusLabel = createConnectionLabel();
+        connectionPanel.add(schwabStatusLabel);
+        connectionPanel.add(massiveHistoryStatusLabel);
+        connectionPanel.add(massiveStreamStatusLabel);
+        setConnectionStatus(connectionStatus.snapshot());
+
+        modePanel.add(connectionPanel);
         modePanel.add(shiftModeLabel);
         modePanel.add(wallThresholdLabel);
         attachShiftMouseRefresh(modePanel);
         attachShiftMouseRefresh(shiftModeLabel);
         attachShiftMouseRefresh(wallThresholdLabel);
         return modePanel;
+    }
+
+    private void setConnectionStatus(NativeConnectionStatus.Snapshot status) {
+        SwingUtilities.invokeLater(() -> {
+            if (disposed || schwabStatusLabel == null) return;
+            updateConnectionLabel(schwabStatusLabel, "Schwab", status.getSchwab(), status.isSchwabConnected());
+            updateConnectionLabel(massiveHistoryStatusLabel, "History", status.getMassiveHistory(), status.isMassiveHistoryReady());
+            updateConnectionLabel(massiveStreamStatusLabel, "Stream", status.getMassiveStream(), status.isMassiveStreamReceiving());
+        });
+    }
+
+    private JLabel createConnectionLabel() {
+        JLabel label = new JLabel("", SwingConstants.CENTER);
+        label.setOpaque(true); label.setForeground(Color.WHITE);
+        label.setFont(label.getFont().deriveFont(Font.BOLD, 11f));
+        label.setBorder(BorderFactory.createEmptyBorder(4, 4, 4, 4));
+        return label;
+    }
+
+    private void updateConnectionLabel(JLabel label, String name, String value, boolean healthy) {
+        label.setText(name + ": " + value);
+        label.setBackground(healthy ? MODE_BREAKOUT_BACKGROUND : SHORT_TRADEBOOK_BUTTON_COLOR);
     }
 
     private JPanel createTradebookPanel(TradebookButtonGroup tradebook) {
@@ -1035,6 +1083,7 @@ public class TradeButtonWindow {
         server.unregisterCorePlanConfigListener(symbol, corePlanConfigListener);
         server.unregisterNewPositionListener(symbol, newPositionListener);
         server.unregisterEntryRetestStateListener(symbol, entryRetestStateListener);
+        connectionStatus.removeListener(connectionStatusListener);
         SwingUtilities.invokeLater(() -> {
             closeCorePlanDialog();
             closeNewPositionReminder();
@@ -1045,6 +1094,9 @@ public class TradeButtonWindow {
             buttonPanel = null;
             shiftModeLabel = null;
             wallThresholdLabel = null;
+            schwabStatusLabel = null;
+            massiveHistoryStatusLabel = null;
+            massiveStreamStatusLabel = null;
             longEntryButtons.clear();
             shortEntryButtons.clear();
         });

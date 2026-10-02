@@ -26,6 +26,7 @@ public final class TradingRuntime implements AutoCloseable {
         void message(JsonObject message);
         void log(String symbol, String message);
         void notify(String symbol, String message);
+        default void status(String source, String status) { }
     }
     private final Object lock = new Object();
     private final OAuth oauth;
@@ -103,7 +104,12 @@ public final class TradingRuntime implements AutoCloseable {
                 repeat(30000, this::refreshToken); repeat(15000, this::refreshAccount); repeat(60000, this::refreshConfig); repeat(100, this::publishDirty);
                 repeat(1000, this::pendingJobs); repeat(20000, this::disciplineJobs);
                 events.log("", "Native trading runtime started; local credentials, Firestore, Massive and Schwab");
-            } catch (Exception error) { failure("", "Native startup", error); throw new CompletionException(error); }
+            } catch (Exception error) {
+                events.status("schwab", "startup failed");
+                events.status("massive", "startup failed");
+                failure("", "Native startup", error);
+                throw new CompletionException(error);
+            }
         }, executor);
     }
     private static void validateProfile(String profile) { if (!profile.equals("schwab") && !profile.equals("momentumSimple")) throw new IllegalArgumentException("Native equity runtime requires schwab or momentumSimple profile"); }
@@ -126,14 +132,22 @@ public final class TradingRuntime implements AutoCloseable {
         List<String> symbols; synchronized (lock) { if (stopped) return; symbols = new ArrayList<>(config.symbols); }
         // Register loading buffers before subscribing, so history/live overlap never loses prints.
         symbols.forEach(this::loadMarket);
-        AtomicBoolean massiveReady = new AtomicBoolean();
+        AtomicBoolean massiveReady = new AtomicBoolean(), massiveTradeReceived = new AtomicBoolean();
         MarketStreams next = new MarketStreams(sockets, scheduler, executor, symbols, () -> massiveKey,
             () -> { String token = oauth.accessToken(false); publishToken(); return new MarketStreams.Credentials(reads.getStreamerInfo(token), token); }, new MarketStreams.Events() {
-                public void trade(Trade trade) { if (market.acceptTrade(trade)) synchronized (lock) { dirty.add(trade.symbol); } }
+                public void trade(Trade trade) {
+                    if (massiveTradeReceived.compareAndSet(false, true)) events.status("massiveStream", "receiving trades");
+                    if (market.acceptTrade(trade)) synchronized (lock) { dirty.add(trade.symbol); }
+                }
                 public void quote(JsonObject quote) { String symbol = string(quote, "symbol"); synchronized (lock) { JsonObject value = quotes.computeIfAbsent(symbol, key -> new JsonObject()); quote.entrySet().forEach(entry -> value.add(entry.getKey(), entry.getValue())); dirty.add(symbol); } }
                 public void activity(JsonArray values) { refreshAccount(); }
-                public void ready(String source) { if (source.equals("massive")) { if (massiveReady.getAndSet(true)) symbols.forEach(TradingRuntime.this::loadMarket); } else refreshAccount(); }
-                public void status(String source, String status) { if (!stopped) events.log("", source + ": " + status); }
+                public void ready(String source) { if (source.equals("massive")) { massiveTradeReceived.set(false); events.status("massiveStream", "connected; waiting for trades"); if (massiveReady.getAndSet(true)) symbols.forEach(TradingRuntime.this::loadMarket); } else refreshAccount(); }
+                public void status(String source, String status) {
+                    if (!stopped) {
+                        events.status(source.equals("massive") ? "massiveStream" : source, status);
+                        events.log("", source + ": " + status);
+                    }
+                }
             });
         synchronized (lock) { if (stopped) { next.close(); return; } streams = next; }
         next.start();
@@ -142,15 +156,17 @@ public final class TradingRuntime implements AutoCloseable {
         JsonObject plan; synchronized (lock) { if (stopped || config == null) return; plan = selectedPlan(symbol); }
         if (plan == null) return;
         synchronized (lock) { eligibility.put(symbol, "startup eligibility pending"); }
+        events.status("massiveHistory", "loading");
         JsonObject correction = object(plan, "vwapCorrection");
         market.load(symbol, MarketClock.marketTime(now.getAsLong()).date, number(plan, "marketCapInMillions"), number(correction, "volumeSum"), number(correction, "tradingSum"))
             .whenComplete((loaded, error) -> {
-                if (stopped) return; if (error != null) { failure(symbol, "Market history", error); return; }
+                if (stopped) return; if (error != null) { events.status("massiveHistory", "failed"); failure(symbol, "Market history", error); return; }
                 double shares = 0; try { shares = massive.getSharesOutstanding(symbol); } catch (Exception referenceError) { failure(symbol, "Shares reference (using zero fallback)", referenceError); }
                 if (stopped) return;
                 String reason = StartupEligibility.evaluate(plan, number(loaded.state.metrics(), "currentPrice"), shares, object(loaded.history, "premarketDollarCollection"), array(loaded.history, "dailyBars"));
                 loaded.history.addProperty("sharesOutstanding", shares);
                 synchronized (lock) { if (selectedPlan(symbol) == null || !string(loaded.state.snapshot(), "date").equals(MarketClock.marketTime(now.getAsLong()).date)) return; histories.put(symbol, loaded.history); eligibility.put(symbol, reason); dirty.add(symbol); }
+                events.status("massiveHistory", "ready");
                 if (!reason.isEmpty()) events.notify(symbol, "Entry blocked: " + reason);
                 publishInputs(symbol); events.message(view(symbol, "market_ready"));
             });

@@ -10,6 +10,7 @@ import javax.swing.JFormattedTextField;
 import javax.swing.JLabel;
 import javax.swing.JPanel;
 import javax.swing.JSpinner;
+import javax.swing.SwingUtilities;
 import javax.swing.SpinnerNumberModel;
 
 import velox.gui.StrategyPanel;
@@ -20,6 +21,11 @@ import velox.gui.StrategyPanel;
 public class IndicatorSettingsPanel extends StrategyPanel {
 
     public IndicatorSettingsPanel(IndicatorConfig config, WallThresholdConfig wallThresholdConfig) {
+        this(config, wallThresholdConfig, new NativeConnectionStatus());
+    }
+
+    public IndicatorSettingsPanel(IndicatorConfig config, WallThresholdConfig wallThresholdConfig,
+            NativeConnectionStatus connectionStatus) {
         super("Indicators");
         setLayout(new GridBagLayout());
 
@@ -33,6 +39,21 @@ public class IndicatorSettingsPanel extends StrategyPanel {
 
         JLabel versionLabel = new JLabel(PluginVersion.NAME + " Version: " + PluginVersion.VERSION);
         add(versionLabel, gbc);
+
+        gbc.gridy++;
+        JPanel connectionPanel = new JPanel(new java.awt.GridLayout(0, 1, 0, 3));
+        JLabel schwabStatus = connectionLabel();
+        JLabel massiveHistoryStatus = connectionLabel();
+        JLabel massiveStreamStatus = connectionLabel();
+        connectionPanel.add(schwabStatus);
+        connectionPanel.add(massiveHistoryStatus);
+        connectionPanel.add(massiveStreamStatus);
+        connectionStatus.addListener(status -> SwingUtilities.invokeLater(() -> {
+            updateConnectionLabel(schwabStatus, "Schwab", status.getSchwab(), status.isSchwabConnected());
+            updateConnectionLabel(massiveHistoryStatus, "Massive price history", status.getMassiveHistory(), status.isMassiveHistoryReady());
+            updateConnectionLabel(massiveStreamStatus, "Massive stream", status.getMassiveStream(), status.isMassiveStreamReceiving());
+        }));
+        add(connectionPanel, gbc);
 
         gbc.gridy++;
         JCheckBox premarketCheckbox = new JCheckBox(
@@ -158,5 +179,19 @@ public class IndicatorSettingsPanel extends StrategyPanel {
         resetNative.setToolTipText("Use only after checking unresolved orders at the broker. Does not resend orders.");
         resetNative.addActionListener(e -> RongPlugin.resetNativeExecutionAfterBrokerReview());
         add(resetNative, gbc);
+    }
+
+    private static JLabel connectionLabel() {
+        JLabel label = new JLabel();
+        label.setOpaque(true);
+        label.setForeground(java.awt.Color.WHITE);
+        label.setBorder(javax.swing.BorderFactory.createEmptyBorder(5, 8, 5, 8));
+        return label;
+    }
+
+    private static void updateConnectionLabel(JLabel label, String name, String value, boolean healthy) {
+        label.setText(name + ": " + value);
+        label.setBackground(healthy ? new java.awt.Color(38, 139, 88) : new java.awt.Color(180, 62, 62));
+        label.setToolTipText("Native connection status. Details are also written to the action log.");
     }
 }

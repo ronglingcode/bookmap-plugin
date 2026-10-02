@@ -46,15 +46,14 @@ public final class NativeViews {
         if (plan.has("long") && plan.has("short")) for (JsonElement item : TradingConfig.createTradebookDefinitions(plan)) { JsonObject definition = item.getAsJsonObject(), group = new JsonObject(); String id = string(definition, "tradebookID"); String[] names = NAMES.getOrDefault(id, new String[]{id, id});
             group.addProperty("id", symbol + ":" + id); group.addProperty("label", names[1]); group.addProperty("sideIsLong", bool(definition, "isLong")); group.addProperty("tradebookId", id); group.addProperty("tradebookName", names[0]); JsonArray methods = new JsonArray(); methods.add("1 R"); methods.add("0.1 R"); group.add("entryMethods", methods); groups.add(group); }
         buttons.add("tradebooks", groups); result.add(buttons);
-        JsonObject keys = msg(view, "key_levels_config"); JsonArray levels = new JsonArray(), zones = new JsonArray(); Set<Double> seen = new HashSet<>(); Set<String> zoneKeys = new HashSet<>();
+        JsonObject keys = marketLevels(view); JsonArray levels = keys.getAsJsonArray("levels"), zones = keys.getAsJsonArray("zones"); Set<Double> seen = new HashSet<>(); Set<String> zoneKeys = new HashSet<>();
         for (JsonElement item : array(object(plan, "keyLevels"), "otherLevels")) { JsonObject level = item.getAsJsonObject(); double price = number(level, "price"); if (price > 0 && seen.add(price)) levels.add(level.deepCopy()); }
         for (JsonElement item : array(object(plan, "keyLevels"), "zones")) zone(zones, zoneKeys, item.getAsJsonObject(), "", "");
         zone(zones, zoneKeys, object(object(plan, "rangeBoundReversalPlan"), "support"), "support", "green"); zone(zones, zoneKeys, object(object(plan, "rangeBoundReversalPlan"), "resistance"), "resistance", "red");
         zone(zones, zoneKeys, object(object(object(plan, "long"), "gapAndGoPlan"), "support"), "gap & go support", "green"); zone(zones, zoneKeys, object(object(object(plan, "long"), "gapDownAndGoUpPlan"), "support"), "gap down & go up support", "green");
         zone(zones, zoneKeys, object(object(object(plan, "short"), "gapAndCrapPlan"), "resistance"), "gap & crap resistance", "red"); zone(zones, zoneKeys, object(object(object(plan, "short"), "gapDownAndGoDownPlan"), "resistance"), "gap down & go down resistance", "red");
         keys.add("levels", levels); keys.add("zones", zones); keys.addProperty("waitForBidRetest", mode(object(plan, "analysis"), "waitForBidRetest")); keys.addProperty("waitForOfferRetest", mode(object(plan, "analysis"), "waitForOfferRetest"));
-        JsonArray daily = array(object(view, "history"), "dailyBars"); if (daily.size() > 0) { JsonObject previous = daily.get(daily.size() - 1).getAsJsonObject(), day = new JsonObject(); day.addProperty("high", number(previous, "high")); day.addProperty("low", number(previous, "low")); keys.add("previousDay", day); keys.add("camPivots", Levels.calculateCamPivots(number(previous, "high"), number(previous, "low"), number(previous, "close"))); }
-        JsonObject pre = new JsonObject(); pre.addProperty("high", number(market, "premarketHigh")); pre.addProperty("low", number(market, "premarketLow")); keys.add("premarket", pre); result.add(keys);
+        result.add(keys);
         JsonObject exits = msg(view, "exit_order_pairs_config"); JsonArray indexed = pairs.deepCopy(); for (int i = 0; i < indexed.size(); i++) indexed.get(i).getAsJsonObject().addProperty("index", i + 1); exits.add("pairs", indexed); result.add(exits);
         JsonObject accountView = msg(view, "account_state"); JsonArray open = new JsonArray(); entries.forEach(item -> order(open, item.getAsJsonObject(), "ENTRY", null, 0)); for (int i = 0; i < pairs.size(); i++) { JsonObject pair = pairs.get(i).getAsJsonObject(); order(open, object(pair, "STOP"), "STOP", pair, i + 1); order(open, object(pair, "LIMIT"), "LIMIT", pair, i + 1); }
         double risk = positionRisk(net, number(position, "averagePrice"), pairs, number(market, "lowOfDay"), number(market, "highOfDay")), multiple = Math.round(risk / (number(policy, "riskDollars") > 0 ? number(policy, "riskDollars") : 1000) * 1000) / 1000.0;
@@ -66,6 +65,27 @@ public final class NativeViews {
             for (JsonElement item : fills) if (!bool(item.getAsJsonObject(), "positionEffectIsOpen") && number(item.getAsJsonObject(), "timestamp") >= submitMs) exited += number(item.getAsJsonObject(), "quantity");
             core.addProperty("isLong", net > 0); core.addProperty("entryPrice", number(active, "entryPrice")); core.addProperty("coreTarget", number(captured, "coreTarget")); core.addProperty("coreCount", number(captured, "coreCount")); core.addProperty("runnerCondition", string(captured, "runnerTriggerCondition")); core.addProperty("runnerCount", number(captured, "runnerCount")); core.addProperty("corePlan", string(plan, "corePlan")); core.addProperty("bufferedTarget", number(active, "entryPrice") + .9 * (number(captured, "coreTarget") - number(active, "entryPrice"))); core.addProperty("partialsTaken", Workflows.completedPartials(number(active, "initialQuantity"), exited, pairs.size(), count)); core.addProperty("tradeId", symbol + ":" + (net > 0 ? "long" : "short") + ":" + submitMs); }
         result.add(core); result.addAll(vwapPoints(view)); return result;
+    }
+    private static JsonObject marketLevels(JsonObject view) {
+        JsonObject market = object(view, "market"), keys = msg(view, "key_levels_config");
+        keys.add("levels", new JsonArray()); keys.add("zones", new JsonArray());
+        JsonArray daily = array(object(view, "history"), "dailyBars");
+        if (daily.size() > 0) {
+            JsonObject previous = daily.get(daily.size() - 1).getAsJsonObject(), day = new JsonObject();
+            day.addProperty("high", number(previous, "high")); day.addProperty("low", number(previous, "low"));
+            keys.add("previousDay", day);
+            keys.add("camPivots", Levels.calculateCamPivots(number(previous, "high"), number(previous, "low"), number(previous, "close")));
+        }
+        JsonObject pre = new JsonObject(); pre.addProperty("high", number(market, "premarketHigh")); pre.addProperty("low", number(market, "premarketLow")); keys.add("premarket", pre);
+        return keys;
+    }
+    /** Lightweight refresh used for live Massive updates without replacing plan levels or pivots. */
+    public static JsonObject premarketLevels(JsonObject view) {
+        JsonObject market = object(view, "market"), result = msg(view, "premarket_levels_update"), pre = new JsonObject();
+        pre.addProperty("high", number(market, "premarketHigh"));
+        pre.addProperty("low", number(market, "premarketLow"));
+        result.add("premarket", pre);
+        return result;
     }
     private static List<JsonObject> vwapPoints(JsonObject view) {
         JsonObject market = object(view, "market"); JsonArray points = array(market, "vwaps"); if (!market.has("vwaps") && market.has("closedVwap")) { points = new JsonArray(); points.add(market.get("closedVwap")); }
