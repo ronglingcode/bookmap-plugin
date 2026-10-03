@@ -294,8 +294,7 @@ public class FilledExecutionPainter implements ScreenSpacePainterFactory,
         }
 
         private BufferedImage renderMarkerImage(FilledExecutionMarker marker) {
-            String text = (marker.isBuy() ? "B " : "S ")
-                    + formatQuantity(marker.getQuantity())
+            String text = formatQuantity(marker.getQuantity())
                     + " @ "
                     + formatPrice(marker.getRealPrice());
 
