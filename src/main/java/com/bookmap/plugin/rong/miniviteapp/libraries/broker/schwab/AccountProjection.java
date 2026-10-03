@@ -2,7 +2,6 @@ package com.bookmap.plugin.rong.miniviteapp.libraries.broker.schwab;
 
 import com.bookmap.plugin.rong.miniviteapp.core.marketdata.MarketClock;
 import com.google.gson.*;
-import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
@@ -84,7 +83,7 @@ public final class AccountProjection {
                 }
                 if (quantity == 0) continue;
                 long timestamp;
-                try { timestamp = Instant.parse(string(first, "time")).toEpochMilli(); } catch (RuntimeException error) { continue; }
+                try { timestamp = SchwabTime.executionMillis(string(first, "time")); } catch (RuntimeException error) { continue; }
                 if (!MarketClock.marketTime(timestamp).date.equals(date)) continue;
                 JsonObject fill = new JsonObject(); fill.addProperty("symbol", symbol); fill.addProperty("orderID", string(order, "orderId"));
                 fill.addProperty("timestamp", timestamp); fill.addProperty("quantity", quantity); fill.addProperty("price", dollars / quantity);

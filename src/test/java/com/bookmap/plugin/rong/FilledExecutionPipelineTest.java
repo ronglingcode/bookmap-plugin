@@ -48,7 +48,7 @@ class FilledExecutionPipelineTest {
                 + "\"instrument\":{\"symbol\":\"NVDA\",\"assetType\":\"EQUITY\"}}],"
                 + "\"orderActivityCollection\":[{\"activityType\":\"EXECUTION\","
                 + "\"executionType\":\"FILL\",\"executionLegs\":[{\"legId\":1,"
-                + "\"time\":\"2026-10-02T13:35:00Z\",\"quantity\":10,\"price\":237.12}]}]}";
+                + "\"time\":\"2026-10-02T13:35:00+0000\",\"quantity\":10,\"price\":237.12}]}]}";
         AtomicReference<String> fromEnteredTime = new AtomicReference<>();
         HttpPort http = (uri, method, headers, body) -> {
             for (String parameter : uri.getRawQuery().split("&")) {

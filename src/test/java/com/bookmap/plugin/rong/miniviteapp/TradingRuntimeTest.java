@@ -52,6 +52,8 @@ class TradingRuntimeTest {
             new TradingRuntime.Events() { public void message(JsonObject value) { emitted.add(value.deepCopy()); } public void log(String symbol, String value) { logs.add(value); } public void notify(String symbol, String value) { logs.add(value); } })) {
             assertThrows(IllegalStateException.class, () -> runtime.exportExecutions(Format.CSV));
             runtime.start().get(2, TimeUnit.SECONDS); assertEquals(1, refreshes.get()); assertEquals(1, accountReads.get()); assertEquals(2, sockets.size());
+            assertTrue(logs.stream().anyMatch(value -> value.contains("Native broker orders: sessionDate=2026-10-01 fetched=0")));
+            assertTrue(logs.stream().anyMatch(value -> value.contains("Native Bookmap fills to draw: sessionDate=2026-10-01 count=0")));
             assertThrows(IllegalStateException.class, () -> runtime.exportExecutions(Format.CSV));
             JsonObject view = runtime.view("AAPL", "test"); assertEquals(100, view.getAsJsonObject("state").getAsJsonObject("stateBySymbol").getAsJsonObject("AAPL").getAsJsonObject("breakoutTradeStateForLong").get("initialQuantity").getAsInt());
             runtime.persistState(); runtime.pendingPersistence().get(2, TimeUnit.SECONDS); assertEquals(1, writes.get());
@@ -76,6 +78,9 @@ class TradingRuntimeTest {
                 order.getAsJsonArray("orderLegCollection").get(0).getAsJsonObject().getAsJsonObject("instrument").addProperty("symbol", symbol); orders.add(order);
             }
             orderData.set(orders.toString()); now.addAndGet(3000); runtime.refreshAccount();
+            assertTrue(logs.stream().anyMatch(value -> value.contains("Native broker orders: sessionDate=2026-10-01 fetched=2")));
+            assertTrue(logs.stream().anyMatch(value -> value.contains("Native Bookmap fills to draw: sessionDate=2026-10-01 count=2")));
+            assertTrue(logs.stream().anyMatch(value -> value.contains("Native Bookmap fill: symbol=MSFT orderId=43")));
             int callsBeforeExport = httpCalls.get(); JsonObject beforeExport = runtime.view("MSFT", "test");
             for (Format format : Format.values()) { String report = runtime.exportExecutions(format); assertTrue(report.contains("AAPL")); assertTrue(report.contains("MSFT")); }
             assertEquals(callsBeforeExport, httpCalls.get()); assertEquals(beforeExport, runtime.view("MSFT", "test"));

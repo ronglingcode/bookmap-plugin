@@ -60,6 +60,7 @@ public final class TradingRuntime implements AutoCloseable {
     private volatile boolean stopped;
     private long revision, nextAccountRead;
     private Runnable accountRetry;
+    private String lastNativeOrdersLog, lastNativeFillsLog;
     public TradingRuntime(HttpPort http, CredentialPort credentials, JsonObject sections, SocketPort sockets, SocketPort.Scheduler scheduler,
             Executor executor, LongSupplier now, Events events) {
         this.credentials = credentials; this.sockets = sockets; this.scheduler = scheduler; this.executor = executor; this.now = now; this.events = events;
@@ -96,7 +97,9 @@ public final class TradingRuntime implements AutoCloseable {
                 String token = oauth.accessToken(false), date = MarketClock.marketTime(now.getAsLong()).date;
                 JsonObject raw = reads.getAccount(token);
                 JsonArray orders = reads.getOrders(accountHash(), token, date, false, 59);
+                logNativeOrders(orders, date);
                 JsonObject projected = AccountProjection.projectAccount(raw, orders, date, this::price);
+                logNativeFills(projected, date);
                 JsonObject restored = firestore.getTradingState(loaded.profile);
                 synchronized (lock) {
                     if (stopped) return; config = loaded; account = projected; ledger = TradeLedger.projectTradeLedger(object(projected, "executions"), number(policy, "dailyMaxLoss"));
@@ -196,12 +199,28 @@ public final class TradingRuntime implements AutoCloseable {
             try {
                 String token = oauth.accessToken(false), date = MarketClock.marketTime(now.getAsLong()).date;
                 JsonObject raw = reads.getAccount(token); JsonArray orders = reads.getOrders(accountHash(), token, date, false, 59);
+                logNativeOrders(orders, date);
                 JsonObject projected = AccountProjection.projectAccount(raw, orders, date, this::price);
+                logNativeFills(projected, date);
                 synchronized (lock) { if (stopped) return; account = projected; ledger = TradeLedger.projectTradeLedger(object(projected, "executions"), number(policy, "dailyMaxLoss")); }
                 publishToken(); publishAccount(); disciplineJobs(); accountNotifications();
             } catch (Exception error) { failure("", "Account refresh", error); accountAgain.set(true); }
             finally { accountReading.set(false); if (accountAgain.getAndSet(false)) refreshAccount(); }
         });
+    }
+    private void logNativeOrders(JsonArray orders, String date) {
+        List<String> lines = NativeAccountDiagnostics.rawOrders(orders, date);
+        String snapshot = String.join("\n", lines);
+        if (snapshot.equals(lastNativeOrdersLog)) return;
+        lastNativeOrdersLog = snapshot;
+        lines.forEach(line -> events.log("", line));
+    }
+    private void logNativeFills(JsonObject projected, String date) {
+        List<String> lines = NativeAccountDiagnostics.projectedFills(projected, date);
+        String snapshot = String.join("\n", lines);
+        if (snapshot.equals(lastNativeFillsLog)) return;
+        lastNativeFillsLog = snapshot;
+        lines.forEach(line -> events.log("", line));
     }
     public void refreshConfig() {
         if (stopped || !configReading.compareAndSet(false, true)) return;
