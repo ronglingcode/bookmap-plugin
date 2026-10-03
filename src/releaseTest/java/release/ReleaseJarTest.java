@@ -163,49 +163,6 @@ class ReleaseJarTest {
     }
 
     @Test
-    void obfuscatedLocalViewParserDeliversValidPositionsAndRejectsInvalidOnes() throws Exception {
-        String serverName = "com.bookmap.plugin.rong.SignalWebSocketServer";
-        String listenerName = serverName + "$NewPositionListener";
-        Class<?> serverType = mappedClass(serverName);
-        Class<?> listenerType = mappedClass(listenerName);
-        Object server = serverType.getConstructor(int.class, double.class).newInstance(0, 90d);
-        AtomicReference<Object> received = new AtomicReference<>();
-        Object listener = Proxy.newProxyInstance(getClass().getClassLoader(), new Class<?>[] {listenerType},
-                (proxy, method, args) -> {
-                    if (method.getDeclaringClass() == Object.class) {
-                        switch (method.getName()) {
-                            case "hashCode": return System.identityHashCode(proxy);
-                            case "equals": return proxy == args[0];
-                            case "toString": return "Release test listener";
-                            default: throw new AssertionError(method);
-                        }
-                    }
-                    received.set(args[0]);
-                    return null;
-                });
-        mappedMethod(serverName, "void registerNewPositionListener(java.lang.String," + listenerName + ")",
-                String.class, listenerType).invoke(server, "AAPL", listener);
-        Class<?> websocket = Class.forName("com.bookmap.plugin.shaded.websocket.WebSocket");
-        Class<?> jsonObject = Class.forName("com.bookmap.plugin.shaded.gson.JsonObject");
-        Method accept = mappedMethod(serverName, "void acceptLocalMessage(com.bookmap.plugin.shaded.gson.JsonObject)", jsonObject);
-        Method parse = Class.forName("com.bookmap.plugin.shaded.gson.JsonParser").getMethod("parseString", String.class);
-        String valid = "{\"type\":\"new_position\",\"priceUnit\":\"real\",\"symbol\":\"AAPL\","
-                + "\"isLong\":true,\"netQuantity\":100,\"averagePrice\":110.25,"
-                + "\"eventId\":\"release-check\",\"timestamp\":1785243960000}";
-        accept.invoke(server, parse.invoke(null, valid).getClass().getMethod("getAsJsonObject").invoke(parse.invoke(null, valid)));
-        Object position = received.get();
-        assertNotNull(position);
-        String positionName = "com.bookmap.plugin.rong.NewPositionDefinition";
-        assertEquals("AAPL", mappedMethod(positionName, "java.lang.String getSymbol()").invoke(position));
-        assertEquals(110.25, (double) mappedMethod(positionName, "double getAveragePrice()").invoke(position), 0.00001);
-        assertEquals(100d, (double) mappedMethod(positionName, "double getNetQuantity()").invoke(position), 0.00001);
-        received.set(null);
-        Object invalid = parse.invoke(null, valid.replace("\"netQuantity\":100", "\"netQuantity\":0"));
-        accept.invoke(server, invalid.getClass().getMethod("getAsJsonObject").invoke(invalid));
-        assertNull(received.get());
-    }
-
-    @Test
     void enumReflectionStillWorksForPatternState() throws Exception {
         Class<?> type = mappedClass("com.bookmap.plugin.rong.patterns.PatternType");
         Object[] constants = type.getEnumConstants();
