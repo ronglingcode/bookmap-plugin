@@ -339,14 +339,15 @@ class NativeExecutionTest {
             assertTrue(rig.engine.resetAfterBrokerReview()); assertTrue(rig.engine.route(command));
         }
     }
-    @Test void initialEntryPreflightBlocksPositionAndPendingOrderChanges() throws Exception {
+    @Test void initialEntryDoesNotAddBrokerPositionOrPendingOrderRestrictions() throws Exception {
         for (int scenario = 0; scenario < 3; scenario++) try (var rig = new Rig()) {
             var entry = rig.connectEntry();
             if (scenario == 0) rig.brokerQuantity = 1;
             if (scenario == 1) rig.pendingSymbolOrder = true;
             if (scenario == 2) { rig.pendingSymbolOrder = true; rig.pendingStatus = "NEW_BROKER_STATE"; }
-            rig.engine.route(entry); assertEquals("rejected", rig.finish().get("outcome").getAsString());
-            assertEquals(0, rig.mutations.get());
+            rig.engine.route(entry); assertEquals("accepted", rig.finish().get("outcome").getAsString());
+            assertEquals(1, rig.mutations.get());
+            assertTrue(rig.requests.stream().noneMatch(request -> request.startsWith("GET ")));
         }
     }
     @Test void insufficientBuyingPowerReachesBrokerWithHalfSizedEntry() throws Exception {
@@ -543,38 +544,24 @@ class NativeExecutionTest {
             assertTrue(rig.requests.stream().noneMatch(request -> request.startsWith("GET ")));
         }
     }
-    @Test void diagnosticsNameTheFailedPreflightReadAndBrokerErrorWithoutSendingAnOrder() throws Exception {
-        for (boolean ordersRead : new boolean[]{false, true}) try (var rig = new Rig()) {
+    @Test void initialEntriesSubmitWithoutExperimentalBrokerPreflight() throws Exception {
+        try (var rig = new Rig()) {
             var entry = rig.connectEntry();
-            if (ordersRead) rig.ordersReadStatus = 503; else rig.readStatus = 401;
-            rig.readFailureBody = "{\"message\":\"token invalid or service unavailable\",\"access_token\":\"fake-access-token\"}";
+            rig.readStatus = 401; rig.ordersReadStatus = 503;
+            rig.positionsBodyOverride = "{not valid JSON"; rig.ordersBodyOverride = "{not valid JSON";
             rig.engine.route(entry); var result = rig.finish();
-            String reason = result.get("reason").getAsString();
-            assertEquals("rejected", result.get("outcome").getAsString());
-            assertTrue(reason.contains(ordersRead ? "GET pending symbol orders" : "GET account positions"));
-            assertTrue(reason.contains(ordersRead ? "HTTP 503" : "HTTP 401"));
-            assertTrue(reason.contains("token invalid or service unavailable"));
-            assertTrue(reason.contains("order not sent")); assertFalse(reason.contains("fake-access-token"));
-            assertEquals(0, rig.mutations.get()); assertFalse(result.get("requiresReview").getAsBoolean());
-        }
-    }
-    @Test void malformedPreflightResponsesShowRequestStatusAndActualParsingCause() throws Exception {
-        for (boolean ordersRead : new boolean[]{false, true}) try (var rig = new Rig()) {
-            var entry = rig.connectEntry();
-            if (ordersRead) rig.ordersBodyOverride = "{not valid JSON"; else rig.positionsBodyOverride = "{not valid JSON";
-            rig.engine.route(entry); String reason = rig.finish().get("reason").getAsString();
-            assertTrue(reason.contains(ordersRead ? "pending symbol orders" : "account positions"));
-            assertTrue(reason.contains("HTTP 200")); assertTrue(reason.contains("JsonSyntaxException"));
-            assertEquals(0, rig.mutations.get());
+            assertEquals("accepted", result.get("outcome").getAsString());
+            assertEquals(1, rig.mutations.get());
+            assertTrue(rig.requests.stream().noneMatch(request -> request.startsWith("GET ")));
         }
     }
     @Test void connectionFailureShowsTheUnderlyingCauseAndConfirmsNoEntrySent() throws Exception {
         try (var rig = new Rig()) {
             var entry = rig.connectEntry(); rig.server.stop(0); rig.engine.route(entry);
             var result = rig.finish(); String reason = result.get("reason").getAsString();
-            assertEquals("rejected", result.get("outcome").getAsString());
-            assertTrue(reason.contains("GET account positions")); assertTrue(reason.contains("ConnectException"));
-            assertTrue(reason.contains("order not sent")); assertEquals(0, rig.mutations.get());
+            assertEquals("unknown", result.get("outcome").getAsString());
+            assertTrue(reason.contains("POST new order")); assertTrue(reason.contains("ConnectException"));
+            assertTrue(reason.contains("broker outcome unknown")); assertEquals(0, rig.mutations.get());
         }
     }
     @Test void lostMutationResponseNamesTheOrderAndPreservesUnknownOutcome() throws Exception {

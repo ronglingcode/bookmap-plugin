@@ -33,7 +33,7 @@ The earlier flag-based rollout is historical; this document supersedes it.
 | Update Plan / third-partial reminder | Edit and persist active core target/count locally, with success/error feedback. |
 | Pending-entry stop job | During the first five minutes, widen a single unfilled entry's protective stop to a new day extreme and recalculate the protected entry via PUT. Suppress another replacement of the old order ID while it remains in the account snapshot. |
 
-Local risk policy keeps regular-session and entry-area boundaries, watchlist/startup
+Local risk policy mirrors ViteApp entry-area boundaries, watchlist/startup
 eligibility, liquidity, daily loss and no-trade-zone rules. Native sizing includes
 ATR caps, one-cent slippage, fixed quantity, risk-method partial counts and even
 splits. If estimated buying power is insufficient, both apps halve targets once;
@@ -126,9 +126,10 @@ contracts, not a dependency on ViteApp executionEntryContext.
   order acceptance are not exercised by automated checks. They remain a manual
   smoke check after you provide the local JSON. Existing Firestore rules apply.
 
-Exits submit from the current local account cache without position/protective-order
-preflight GETs. The initial flat-entry broker exposure preflight remains. There
-are no input-age cutoffs, session ownership, action coordination fences or waits
+Entries and exits submit from the current local account cache without experimental
+position/pending-order preflight GETs. Trading restrictions follow ViteApp; see
+[viteapp-rule-parity-audit.md](viteapp-rule-parity-audit.md). There are no input-age
+cutoffs, session ownership, action coordination fences or waits
 for reconciliation. Broker rejections stop the remaining requests. An ambiguous
 mutation outcome requires broker review; use **Reset After Broker Review** only
 after checking the account. It never triggers automatic resend or a browser fallback.

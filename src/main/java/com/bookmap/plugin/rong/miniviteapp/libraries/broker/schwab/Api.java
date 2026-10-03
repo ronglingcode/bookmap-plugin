@@ -95,49 +95,6 @@ public final class Api {
         return ExecutionDiagnostics.sanitize(operation + " HTTP " + response.status + ": " +
                 (body == null || body.isBlank() ? "empty broker response body" : body), token, account);
     }
-    private JsonObject read(String account, String token, String path) throws Exception {
-        HttpPort.Response response = send(account, token, path, "GET", null);
-        Models.require(response.status == 200, httpFailure("GET account positions", response, token, account));
-        try { return JsonParser.parseString(response.body).getAsJsonObject(); }
-        catch (RuntimeException error) { throw new java.io.IOException("GET account positions HTTP 200 response parsing failed", error); }
-    }
-    public void validateFlatEntry(String account, String token, String symbol) throws Exception {
-        String operation = "GET account positions";
-        try {
-            JsonObject data = read(account, token, "?fields=positions").getAsJsonObject("securitiesAccount");
-            operation = "inspect GET account positions response (HTTP 200)";
-            if (data.has("positions")) for (var element : data.getAsJsonArray("positions")) {
-                JsonObject position = element.getAsJsonObject();
-                if (symbol.equals(Models.string(position.getAsJsonObject("instrument"), "symbol"))) {
-                    Models.require(Models.number(position, "longQuantity") == 0 && Models.number(position, "shortQuantity") == 0,
-                            "initial entry requires a flat broker position: long=" + Models.number(position, "longQuantity")
-                                    + ", short=" + Models.number(position, "shortQuantity"));
-                }
-            }
-            var now = java.time.Instant.now().truncatedTo(java.time.temporal.ChronoUnit.MILLIS);
-            operation = "GET pending symbol orders";
-            HttpPort.Response response = send(account, token, "/orders?maxResults=3000&fromEnteredTime=" +
-                    now.minusSeconds(59L * 86400) + "&toEnteredTime=" + now, "GET", null);
-            Models.require(response.status == 200, httpFailure(operation, response, token, account));
-            operation = "parse GET pending symbol orders response (HTTP 200)";
-            var list = JsonParser.parseString(response.body).getAsJsonArray();
-            operation = "inspect GET pending symbol orders response (HTTP 200)";
-            Models.require(list.size() < 3000, "entry order read reached 3000 results and may be truncated");
-            for (var element : list) requireNoSymbolOrders(element.getAsJsonObject(), symbol);
-        } catch (Exception error) {
-            if (error instanceof InterruptedException) Thread.currentThread().interrupt();
-            throw new java.io.IOException(operation + " failed", error);
-        }
-    }
-    private void requireNoSymbolOrders(JsonObject order, String symbol) {
-        String status = Models.string(order, "status");
-        boolean working = !(status.equals("FILLED") || status.equals("CANCELED") || status.equals("REJECTED")
-            || status.equals("EXPIRED") || status.equals("REPLACED"));
-        if (working && order.has("orderLegCollection")) for (var leg : order.getAsJsonArray("orderLegCollection"))
-            Models.require(!symbol.equals(Models.string(leg.getAsJsonObject().getAsJsonObject("instrument"), "symbol")),
-                    "broker has pending symbol order: orderId=" + Models.string(order, "orderId") + ", status=" + status);
-        if (order.has("childOrderStrategies")) for (var child : order.getAsJsonArray("childOrderStrategies")) requireNoSymbolOrders(child.getAsJsonObject(), symbol);
-    }
     public Result mutate(String account, String token, Request request) throws Exception {
         return new Result(request, send(account, token, "/orders" +
                 (request.orderId.isEmpty() ? "" : "/" + request.orderId), request.method, request.body), token, account);

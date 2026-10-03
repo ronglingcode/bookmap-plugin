@@ -26,7 +26,7 @@ public final class ExtendedHandler {
         double stop = Models.number(context, isLong ? "customStopLong" : "customStopShort");
         if (stop == 0) stop = Models.number(context, isLong ? "lowOfDay" : "highOfDay");
         stop = (isLong ? Math.floor(stop * 100) : Math.ceil(stop * 100)) / 100;
-        Models.require(Models.positive(stop) && (isLong ? stop < price : stop > price), "invalid partial protective stop");
+        Models.require(Models.positive(stop), "invalid partial protective stop");
         double count = Models.number(direction, "partialsCount");
         double initial = Models.number(direction, "initialQuantity");
         Models.require(Models.positive(count), "partial count unavailable");

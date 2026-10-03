@@ -20,6 +20,16 @@ class WorkflowExecutionTest {
         assertEquals(50, shares);
         state.addProperty("netQuantity", 100); assertThrows(IllegalArgumentException.class, () -> WorkflowHandler.handle(new Snapshot(state), "KeyP", false));
     }
+    @Test void profitResetLeavesTargetStopRelationshipToBrokerLikeViteApp() {
+        JsonObject state = ExtendedExecutionPlanTest.longState(); state.addProperty("netQuantity", 50);
+        JsonObject trade = active(); trade.addProperty("stopLossPrice", 13);
+        state.getAsJsonObject("entryContext").add("activeTrade", trade);
+        Plan plan = WorkflowHandler.handle(new Snapshot(state), "KeyP", false);
+        var order = plan.requests.stream().filter(request -> request.method.equals("POST")).findFirst().orElseThrow().body;
+        var children = order.getAsJsonArray("childOrderStrategies");
+        assertEquals(13, children.get(0).getAsJsonObject().get("stopPrice").getAsDouble());
+        assertEquals(12, children.get(1).getAsJsonObject().get("price").getAsDouble());
+    }
     @Test void qCancelsOnlyStopEntries() {
         JsonObject state = ExtendedExecutionPlanTest.longState(); state.add("entries", JsonParser.parseString("[{\"orderID\":\"101\",\"orderType\":\"STOP\",\"quantity\":10,\"price\":11,\"isBuy\":true},{\"orderID\":\"102\",\"orderType\":\"LIMIT\",\"quantity\":10,\"price\":9,\"isBuy\":true}]").getAsJsonArray());
         Plan plan = WorkflowHandler.handle(new Snapshot(state), "KeyQ", false); assertEquals(1, plan.requests.size()); assertEquals("101", plan.requests.get(0).orderId); assertEquals("DELETE", plan.requests.get(0).method); assertTrue(plan.clearPending);
@@ -29,7 +39,7 @@ class WorkflowExecutionTest {
         state.add("entries", JsonParser.parseString("[{\"orderID\":\"101\",\"orderType\":\"STOP\",\"quantity\":10,\"price\":10.5,\"exitStopPrice\":9.5,\"isBuy\":true}]").getAsJsonArray());
         state.getAsJsonObject("entryContext").add("longTrade", active()); state.getAsJsonObject("entryContext").addProperty("lowOfDay", 9);
         Plan plan = WorkflowHandler.handle(new Snapshot(state), "RefreshEntryStop", false); assertEquals(1, plan.requests.size()); assertEquals("PUT", plan.requests.get(0).method); assertEquals("101", plan.requests.get(0).orderId); assertEquals("TRIGGER", plan.requests.get(0).body.get("orderStrategyType").getAsString());
-        assertEquals(1, plan.entry.getAsJsonObject("basePlan").getAsJsonObject("planConfigs").get("sizingCount").getAsInt()); assertEquals(9, plan.entry.get("stopOutPrice").getAsDouble()); assertFalse(plan.requireFlatEntry);
+        assertEquals(1, plan.entry.getAsJsonObject("basePlan").getAsJsonObject("planConfigs").get("sizingCount").getAsInt()); assertEquals(9, plan.entry.get("stopOutPrice").getAsDouble());
     }
     @Test void removedTrailingKeysCannotFallThroughToAnotherExitWorkflow() {
         Snapshot state = new Snapshot(ExtendedExecutionPlanTest.longState());

@@ -37,7 +37,6 @@ class ExtendedExecutionPlanTest {
         assertEquals("DELETE", plan.requests.get(1).method);
         assertEquals("101", plan.requests.get(1).orderId);
         assertTrue(plan.entry.get("preserveExistingTrade").getAsBoolean());
-        assertFalse(plan.requireFlatEntry);
     }
     @Test void oppositeMarketEntryClosesOldExitsBeforeProtectedOpening() {
         JsonObject json = longState();
@@ -83,6 +82,5 @@ class ExtendedExecutionPlanTest {
         Plan plan = EntryHandler.handleEntry(new Snapshot(json), action, "");
         assertEquals(0.25, Models.number(plan.entry, "multiplier"));
         assertEquals(3, plan.requests.get(0).body.getAsJsonArray("childOrderStrategies").size());
-        assertTrue(plan.requireFlatEntry);
     }
 }

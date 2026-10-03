@@ -195,10 +195,6 @@ public final class MiniViteApp implements AutoCloseable {
                 if (request.delayBeforeMs > 0) Thread.sleep(request.delayBeforeMs);
                 accessToken = guard(plan);
                 boolean opening = request.body != null && Models.string(request.body, "orderStrategyType").equals("TRIGGER");
-                if (opening && plan.requireFlatEntry) {
-                    operation = "initial-entry broker preflight";
-                    api.validateFlatEntry(accountHash, accessToken, state.symbol);
-                }
                 operation = requestOperation;
                 accessToken = guard(plan);
                 dispatched = true;

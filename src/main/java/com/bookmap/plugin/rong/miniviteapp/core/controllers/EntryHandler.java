@@ -30,8 +30,6 @@ public final class EntryHandler {
         return handleEntry(state, action, key, false);
     }
     public static Plan handleEntry(Snapshot state, JsonObject action, String key, boolean allowExposure) {
-        boolean flat = state.netQuantity == 0 && state.entries.isEmpty() && state.pairs.isEmpty();
-        Models.require(allowExposure || flat, "initial native entry requires flat symbol with no pending orders");
         Models.require(!Models.bool(action, "retest_blocked") && !Models.bool(action, "retestBlocked"), "Bookmap retest blocks entry");
         Models.require(!action.has("priceUnit") || Models.string(action, "priceUnit").equals("real"), "unsupported entry price unit");
         JsonObject context = state.entryContext;
@@ -42,7 +40,6 @@ public final class EntryHandler {
         for (var element : context.getAsJsonArray("definitions")) if (Models.string(element.getAsJsonObject(), "tradebookID").equals(id)) definition = element.getAsJsonObject();
         Models.require(definition != null && Models.bool(definition, "enabled") && Models.bool(definition, "isLong") == isLong, "entry tradebook disabled or unsupported");
         double high = Models.number(context, "highOfDay"), low = Models.number(context, "lowOfDay");
-        Models.require(Models.positive(high) && Models.positive(low) && high >= low, "day levels unavailable");
         if (action.has("orderbook")) {
             var walls = action.getAsJsonObject("orderbook");
             Models.require(!walls.has("priceUnit") || Models.string(walls, "priceUnit").equals("real"), "unsupported wall price unit");
@@ -60,7 +57,7 @@ public final class EntryHandler {
         entry = key.isEmpty() && !market ? (isLong ? Math.ceil(entry * 100) : Math.floor(entry * 100)) / 100 : TakeProfit.round(entry);
         double stop = Models.number(context, isLong ? "customStopLong" : "customStopShort");
         if (stop == 0) stop = isLong ? low : high;
-        Models.require(Models.positive(entry) && Models.positive(stop) && (isLong ? stop < entry : stop > entry), "invalid entry or protective stop");
+        Models.require(Models.positive(entry) && Models.positive(stop), "invalid entry or protective stop");
         BookmapWallReversal.checkEntryPrice(definition, entry, isLong);
         String method = field(action, "entry_method", "entryMethod");
         double methodMultiplier = 1;
@@ -82,9 +79,8 @@ public final class EntryHandler {
             if (!Models.positive(estimate)) estimate = Models.number(action, "estimatedEntryPrice");
             if (Models.positive(estimate)) entry = isLong ? Math.max(state.currentPrice, estimate) : Math.min(state.currentPrice, estimate);
         } else entry = isLong ? Math.max(entry, state.ask) : Math.min(entry, state.bid);
-        Models.require(Models.positive(entry) && (isLong ? stop < entry : stop > entry), "quote crosses protective stop");
+        Models.require(Models.positive(entry), "entry price unavailable");
         Plan plan = OrderFlow.submitEntry(state, context, definition, action, isLong, market, entry, stop, multiplier, count, method);
-        plan.requireFlatEntry = flat;
         plan.entry.addProperty("preserveExistingTrade", state.netQuantity != 0 && (state.netQuantity > 0) == isLong);
         if (allowExposure) {
             var opening = plan.requests.remove(0);

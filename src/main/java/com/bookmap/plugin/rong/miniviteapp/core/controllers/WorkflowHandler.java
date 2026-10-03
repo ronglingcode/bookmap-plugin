@@ -24,7 +24,7 @@ public final class WorkflowHandler {
             Models.require(bool(saved, "hasValue"), "pending entry has no captured trading state");
             JsonObject definition = new JsonObject(); definition.addProperty("tradebookID", string(object(saved, "submitEntryResult"), "tradeBookID")); definition.add("basePlan", object(saved, "plan"));
             double entry = isLong ? Math.max(existing.price, state.ask) : Math.min(existing.price, state.bid);
-            Models.require(Models.positive(entry) && (isLong ? stop < entry : stop > entry), "invalid pending replacement prices");
+            Models.require(Models.positive(entry), "invalid pending replacement prices");
             Plan sized = OrderFlow.submitEntry(state, state.entryContext, definition, new JsonObject(), isLong, false, entry, stop, number(saved, "sizeMultipler"), state.batchCount, "");
             Plan plan = new Plan("refresh_pending_entry"); plan.entry = sized.entry; plan.warnings.addAll(sized.warnings); plan.requests.add(new Request("PUT", existing, sized.requests.get(0).body)); return plan;
         }
@@ -36,7 +36,7 @@ public final class WorkflowHandler {
             Plan plan = new Plan("reset_profit_targets");
             for (ExitPair pair : state.pairs) { Models.require(pair.marketLeg().isBuy == (state.netQuantity < 0), "exit side disagrees with position"); if (pair.limit != null) Broker.cancelOrders(plan, pair.limit); if (pair.stop != null) Broker.cancelOrders(plan, pair.stop); }
             boolean first = true; for (JsonElement item : targets) {
-                JsonObject target = item.getAsJsonObject(); double price = number(target, "target"); Models.require(state.netQuantity > 0 ? price > stop : price < stop, "profit target crosses protective stop");
+                JsonObject target = item.getAsJsonObject(); double price = number(target, "target");
                 JsonObject oco = new JsonObject(); oco.addProperty("orderStrategyType", "OCO"); JsonArray children = new JsonArray();
                 children.add(OrderFactory.createSingleOrder(state.symbol, "STOP", number(target, "quantity"), stop, state.netQuantity < 0)); children.add(OrderFactory.createSingleOrder(state.symbol, "LIMIT", number(target, "quantity"), price, state.netQuantity < 0)); oco.add("childOrderStrategies", children);
                 Request request = new Request("POST", null, oco); request.delayBeforeMs = first ? 800 : 0; first = false; plan.requests.add(request);
