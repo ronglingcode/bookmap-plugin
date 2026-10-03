@@ -13,6 +13,97 @@ import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.*;
 
 class NativeExecutionTest {
+    @Test void oneParentEntryWithTenProtectivePairsProducesOneScreenResult() throws Exception {
+        try (var rig = new Rig()) {
+            JsonObject entry = rig.connectEntry();
+            rig.mutationStatus = 201;
+            rig.engine.route(entry);
+            var result = rig.finish();
+            assertEquals("accepted", result.get("outcome").getAsString());
+            assertEquals(1, rig.mutations.get());
+            assertEquals(10, rig.bodies.get(0).getAsJsonArray("childOrderStrategies").size());
+            assertEquals(1, rig.screen.size(), rig.screen.toString());
+            assertTrue(rig.screen.get(0).contains("1 request(s) (10 planned exit pairs)"));
+            assertTrue(rig.screen.get(0).contains("final order state unconfirmed"));
+            assertTrue(rig.logs.stream().anyMatch(line -> line.contains("plannedExitPairs=10")));
+            assertTrue(rig.logs.stream().anyMatch(line -> line.contains("POST new order returned HTTP 201")));
+        }
+    }
+
+    @Test void tenRequestsInOneActionRetainEveryRequestDetailAndOneScreenResult() throws Exception {
+        try (var rig = new Rig()) {
+            JsonObject template = rig.state.getAsJsonArray("entries").get(0).getAsJsonObject();
+            JsonArray entries = new JsonArray();
+            for (int i = 0; i < 10; i++) {
+                JsonObject order = template.deepCopy(); order.addProperty("orderID", "" + (101 + i)); entries.add(order);
+            }
+            rig.state.add("entries", entries); rig.connect();
+            rig.engine.route(action("KeyC"));
+            var result = rig.finish();
+            assertEquals(10, result.get("acknowledgedRequestCount").getAsInt());
+            assertEquals(10, rig.mutations.get());
+            assertEquals(1, rig.screen.size());
+            assertTrue(rig.screen.get(0).contains("broker acknowledged 10 request(s)"));
+            for (int i = 0; i < 10; i++) {
+                String id = "" + (101 + i);
+                assertTrue(rig.logs.stream().anyMatch(line -> line.contains("attempting DELETE order " + id)));
+                assertTrue(rig.logs.stream().anyMatch(line -> line.contains("DELETE order " + id + " returned HTTP 204")));
+            }
+        }
+    }
+
+    @Test void emptyCancelPlanDoesNotClaimBrokerAcceptance() throws Exception {
+        try (var rig = new Rig()) {
+            rig.state.add("entries", new JsonArray()); rig.connect();
+            rig.engine.route(action("KeyC"));
+            var result = rig.finish();
+            assertEquals("no_op", result.get("outcome").getAsString());
+            assertTrue(result.get("reason").getAsString().contains("No pending entry orders"));
+            assertEquals(0, rig.mutations.get());
+            assertEquals(0, result.get("attemptedRequestCount").getAsInt());
+            assertTrue(rig.logs.stream().anyMatch(line -> line.contains("planned=0; attempted=0; acknowledged=0")));
+            assertFalse(rig.logs.stream().anyMatch(line -> line.contains("broker acknowledged")));
+            assertEquals(1, rig.screen.size());
+            assertTrue(rig.screen.get(0).contains("no requests sent"));
+        }
+    }
+    @Test void cancelLogsHttpAcknowledgmentWithoutClaimingCancellationConfirmed() throws Exception {
+        try (var rig = new Rig()) {
+            rig.connect(); rig.engine.route(action("KeyC")); var result = rig.finish();
+            assertEquals(2, result.get("acknowledgedRequestCount").getAsInt());
+            assertTrue(rig.logs.stream().anyMatch(line -> line.contains("DELETE order 101 returned HTTP 204; broker acknowledged request; final order state not confirmed")));
+            assertTrue(rig.logs.stream().anyMatch(line -> line.contains("DELETE order 102 returned HTTP 204")));
+            assertTrue(rig.logs.stream().anyMatch(line -> line.contains("planned=2; attempted=2; acknowledged=2; rejected=0; unknown=0; notAttempted=0")));
+            assertFalse(rig.logs.stream().anyMatch(line -> line.contains("cancellation confirmed")));
+            assertEquals(1, rig.screen.size());
+            assertTrue(rig.screen.get(0).contains("broker acknowledged 2 request(s); final order state unconfirmed"));
+            assertFalse(rig.screen.get(0).contains("actionId="));
+        }
+    }
+    @Test void rejectedAndUnknownRequestsReportUnattemptedRemainder() throws Exception {
+        for (int status : new int[]{400, 202, 408, 503}) try (var rig = new Rig()) {
+            rig.connect(); rig.mutationStatus = status; rig.engine.route(action("KeyC")); var result = rig.finish();
+            assertEquals(status == 400 ? "rejected" : "unknown", result.get("outcome").getAsString());
+            assertEquals(1, result.get("attemptedRequestCount").getAsInt());
+            assertEquals(0, result.get("acknowledgedRequestCount").getAsInt());
+            assertEquals(1, result.get("notAttemptedRequestCount").getAsInt());
+            assertEquals(status == 400 ? 0 : 1, result.get("unknownRequestCount").getAsInt());
+            assertEquals(status == 400 ? 1 : 0, result.get("rejectedRequestCount").getAsInt());
+            assertTrue(rig.logs.stream().anyMatch(line -> line.contains("DELETE order 101 returned HTTP " + status)));
+            assertFalse(rig.logs.stream().anyMatch(line -> line.contains("attempting DELETE order 102")));
+            assertEquals(1, rig.screen.size());
+            assertTrue(rig.screen.get(0).contains(status == 400 ? "rejected" : "review broker orders before resetting"));
+        }
+    }
+    @Test void stopOnlyPolicyExplainsWhyLimitEntriesWereNotCanceled() throws Exception {
+        try (var rig = new Rig()) {
+            rig.state = fixture("cancel only stop entries at threshold");
+            rig.state.getAsJsonArray("entries").remove(0); rig.connect(); rig.engine.route(action("KeyC"));
+            var result = rig.finish(); assertEquals("no_op", result.get("outcome").getAsString());
+            assertTrue(result.get("reason").getAsString().contains("stop-only cancellation rule"));
+            assertEquals(0, rig.mutations.get());
+        }
+    }
     private static JsonObject json(String contents) { return JsonParser.parseString(contents).getAsJsonObject(); }
     private static JsonObject action(String key) {
         JsonObject json = new JsonObject(); json.addProperty("keyCode", key); json.addProperty("symbol", "AAPL"); return json;
@@ -33,6 +124,7 @@ class NativeExecutionTest {
         final List<String> authorizations = new CopyOnWriteArrayList<>();
         final List<JsonObject> bodies = new CopyOnWriteArrayList<>();
         final List<String> logs = new CopyOnWriteArrayList<>();
+        final List<String> screen = new CopyOnWriteArrayList<>();
         final AtomicInteger mutations = new AtomicInteger();
         final HttpServer server;
         final MiniViteApp engine;
@@ -109,8 +201,12 @@ class NativeExecutionTest {
                 finally { exchange.close(); }
             });
             server.start();
-            java.util.function.BiConsumer<String, String> log = (symbol, message) -> logs.add(symbol + ": " + message);
-            engine = new MiniViteApp(new Api(URI.create("http://127.0.0.1:" + server.getAddress().getPort() + "/"), log),
+            ExecutionLog log = new ExecutionLog() {
+                public void accept(String symbol, String message) { detail(symbol, message); screen.add(symbol + ": " + message); }
+                public void detail(String symbol, String message) { logs.add(symbol + ": " + message); }
+                public void summary(String symbol, String message, String screenMessage) { detail(symbol, message); screen.add(symbol + ": " + screenMessage); }
+            };
+            engine = new MiniViteApp(new Api(URI.create("http://127.0.0.1:" + server.getAddress().getPort() + "/"), log::detail),
                     (client, event) -> { eventConnections.add(client); events.add(event.deepCopy()); },
                     log, com.bookmap.plugin.rong.SymbolUtils::cleanSymbol);
         }
@@ -270,7 +366,7 @@ class NativeExecutionTest {
             assertTrue(rig.engine.route(command));
             assertEquals("accepted", rig.finish().get("outcome").getAsString());
             assertTrue(rig.logs.stream().anyMatch(line -> line.contains("estimated buying power insufficient")));
-            assertTrue(rig.logs.stream().anyMatch(line -> line.startsWith("AAPL: Native entry POST sending")));
+            assertTrue(rig.logs.stream().anyMatch(line -> line.startsWith("AAPL: Native entry POST attempting HTTP request")));
             assertTrue(rig.logs.stream().anyMatch(line -> line.startsWith("AAPL: Native entry POST response received")));
             assertTrue(rig.logs.stream().noneMatch(line -> line.contains("fake-access-token")));
         }
@@ -315,8 +411,11 @@ class NativeExecutionTest {
             rig.connect(); rig.rejectMutationNumber = 2;
             var command = action(""); command.addProperty("tradebook_id", "RangeBoundBidReversal");
             rig.engine.route(command); var result = rig.finish();
-            assertEquals("rejected", result.get("outcome").getAsString());
+            assertEquals("partial", result.get("outcome").getAsString());
             assertTrue(result.has("entry"));
+            assertEquals(1, result.get("acknowledgedRequestCount").getAsInt());
+            assertEquals(1, result.get("rejectedRequestCount").getAsInt());
+            assertTrue(rig.logs.stream().anyMatch(line -> line.contains("planned=2; attempted=2; acknowledged=1; rejected=1; unknown=0; notAttempted=0")));
             assertEquals(2, rig.mutations.get());
             assertTrue(rig.requests.get(0).startsWith("POST ")); assertTrue(rig.requests.get(1).startsWith("DELETE "));
         }
@@ -572,6 +671,8 @@ class NativeExecutionTest {
             assertTrue(reason.contains("POST new order failed")); assertTrue(reason.contains("IOException"));
             assertTrue(reason.contains("broker outcome unknown")); assertTrue(result.get("requiresReview").getAsBoolean());
             assertEquals(1, rig.mutations.get());
+            assertEquals(1, result.get("unknownRequestCount").getAsInt());
+            assertEquals(0, result.get("acknowledgedRequestCount").getAsInt());
         }
     }
     @Test void brokerMutationDetailsAndReviewReasonReachLifecycleLogs() throws Exception {

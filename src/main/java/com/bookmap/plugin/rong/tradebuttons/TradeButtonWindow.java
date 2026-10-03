@@ -188,7 +188,7 @@ public class TradeButtonWindow {
             if (!pendingCorePlanRequestId.isEmpty()
                     && pendingCorePlanRequestId.equals(config.getRequestId())) {
                 if ("success".equalsIgnoreCase(config.getUpdateStatus())) {
-                    PluginLog.action(symbol, "Exit plan updated: target "
+                    PluginLog.action(symbol, "Local exit plan updated (no broker request; persistence requested): target "
                             + formatPrice(config.getCoreTarget()) + ", count " + config.getCoreCount());
                     closeCorePlanDialog();
                 } else if ("error".equalsIgnoreCase(config.getUpdateStatus())) {
@@ -388,7 +388,7 @@ public class TradeButtonWindow {
         json.addProperty("requestId", pendingCorePlanRequestId);
         json.addProperty("timestamp", System.currentTimeMillis());
         server.dispatchTradingAction(json);
-        PluginLog.action(symbol, "Requested exit plan update: target "
+        PluginLog.detail(symbol, "Requested exit plan update: target "
                 + formatPrice(target) + ", count " + count);
     }
 
@@ -905,9 +905,9 @@ public class TradeButtonWindow {
             }
         }
         server.appendRegularSessionHighLow(symbol, json);
+        PluginLog.detail(symbol, "Button clicked " + orderType + " " + tradebook.getLabel() + " " + entryMethod
+                + "; requesting native action");
         server.dispatchTradingAction(json);
-        PluginLog.action(symbol, (retestBlocked ? "Button blocked " : "Button send ")
-                + orderType + " " + tradebook.getLabel() + " " + entryMethod);
     }
 
     private void sendHotkeyButtonMessage(String buttonId, String buttonName, String keyCode, boolean shiftKey) {

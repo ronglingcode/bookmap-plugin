@@ -7,10 +7,8 @@ import java.awt.GridLayout;
 import java.math.BigDecimal;
 import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
-import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Comparator;
-import java.util.Deque;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -37,7 +35,7 @@ public class ActionLogWindow {
     private static final int WINDOW_WIDTH = 570;
     private static final int CONTENT_WIDTH = 540;
     private static final DateTimeFormatter TIME_FMT = DateTimeFormatter.ofPattern("HH:mm:ss");
-    private static final Deque<String> lines = new ArrayDeque<>();
+    private static final ScreenLogBuffer lines = new ScreenLogBuffer(MAX_LINES);
     private static final Map<String, AccountStateDefinition> accountStates = new LinkedHashMap<>();
     private static final String[] POSITION_COLUMNS = {"Symbol", "Side", "Risk (R)", "Avg"};
     private static final String[] ORDER_COLUMNS = {"Symbol", "Role", "Side", "Qty", "Type", "Price", "Ref"};
@@ -60,13 +58,15 @@ public class ActionLogWindow {
     }
 
     public static void append(String line) {
+        appendSummary(line, null);
+    }
+
+    static void appendSummary(String line, String group) {
+        long captured = System.nanoTime();
         SwingUtilities.invokeLater(() -> {
             ensureWindow();
-            while (lines.size() >= MAX_LINES) {
-                lines.removeFirst();
-            }
-            lines.addLast(line);
-            textArea.setText(String.join("\n", lines));
+            lines.append(line, group, captured);
+            textArea.setText(String.join("\n", lines.lines()));
             textArea.setCaretPosition(textArea.getDocument().getLength());
         });
     }
@@ -153,7 +153,7 @@ public class ActionLogWindow {
         accountPanel.add(tablesPanel, BorderLayout.CENTER);
 
         JPanel logPanel = new JPanel(new BorderLayout());
-        logPanel.setBorder(BorderFactory.createTitledBorder("Actions"));
+        logPanel.setBorder(BorderFactory.createTitledBorder("Important events (full details in log files)"));
         logPanel.add(new JScrollPane(textArea), BorderLayout.CENTER);
         JPanel persistencePanel = new JPanel(new BorderLayout(0, 4));
         persistenceStatusLabel = new JLabel(persistenceStatus);

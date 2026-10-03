@@ -4,7 +4,7 @@ import java.nio.file.Path;
 import java.time.OffsetDateTime;
 import java.util.UUID;
 
-/** Displays action messages and queues the same captured events for local persistence. */
+/** Persists full events; only important messages and concise summaries reach the action window. */
 public class PluginLog {
 
     private static LocalLogWriter writer;
@@ -12,6 +12,7 @@ public class PluginLog {
     private static String session = "inactive";
     private static Thread shutdownHook;
     private static volatile String activeSession;
+    private static final ScreenLogPolicy screen = new ScreenLogPolicy();
 
     private PluginLog() {}
 
@@ -23,10 +24,39 @@ public class PluginLog {
         action(symbol, "", msg);
     }
 
-    public static synchronized void action(String symbol, String source, String msg) {
-        PluginLogEvent event = new PluginLogEvent(OffsetDateTime.now(), session, symbol, source, msg);
-        ActionLogWindow.append(event.screenLine());
+    public static void action(String symbol, String source, String msg) {
+        summary(symbol, source, msg, msg);
+    }
+
+    public static void detail(String symbol, String msg) { detail(symbol, "", msg); }
+
+    public static void detail(String symbol, String source, String msg) {
+        summary(symbol, source, msg, null);
+    }
+
+    public static void summary(String symbol, String msg, String screenMessage) {
+        summary(symbol, "", msg, screenMessage);
+    }
+
+    public static void summary(String symbol, String source, String msg, String screenMessage) {
+        emit(symbol, source, msg, screenMessage, true, null);
+    }
+
+    /** Related updates share a screen row during a burst; every full event still reaches the file. */
+    public static void aggregate(String symbol, String group, String msg, String screenMessage) {
+        emit(symbol, "", msg, screenMessage, true, symbol + "\n" + group);
+    }
+
+    /** State transitions, including a quick disconnect/recovery, must always remain visible. */
+    public static void transition(String symbol, String msg) {
+        emit(symbol, "", msg, msg, false, null);
+    }
+
+    private static synchronized void emit(String symbol, String source, String msg, String screenMessage, boolean suppressRepeats, String group) {
+        PluginLogEvent event = new PluginLogEvent(OffsetDateTime.now(), session, symbol, source, msg, screenMessage);
         if (writer != null) writer.append(event);
+        String line = screen.line(event, System.nanoTime(), suppressRepeats);
+        if (line != null) ActionLogWindow.appendSummary(line, group);
     }
 
     public static Path directory() {
@@ -35,6 +65,7 @@ public class PluginLog {
 
     public static synchronized void start() {
         if (writer != null) return;
+        screen.clear();
         session = UUID.randomUUID().toString();
         String id = session; activeSession = id;
         writer = new LocalLogWriter(directory(), message -> {

@@ -78,10 +78,23 @@ reset; they are never automatically resent or forwarded to ViteApp.
 
 ## Local logging
 
-Every action/runtime/notification message shown in **bmtrader Logs** is also
-queued for local UTF-8 files in `%USERPROFILE%\bmtrader\logs` (no hidden directory).
-Use **Open Logs Folder** in the window to browse them. The UI shows the latest
-20 entries and the current persistence status.
+All action/runtime/notification logs are queued for local UTF-8 files in
+`%USERPROFILE%\bmtrader\logs` (no hidden directory), including diagnostics that
+are omitted from the screen. Use **Open Logs Folder** to browse them.
+The UI keeps the latest 20 important events: concise trading results, fill-count
+summaries, startup/connection changes, warnings, errors and notifications.
+One action gets one result summary even when it creates ten protective exit pairs
+or sends ten broker requests. Entry summaries include the number of planned exit
+pairs, without claiming they are active. Related fill-count updates arriving within
+five seconds of each other update one screen row with the latest count. Every
+underlying snapshot and leg diagnostic is still delivered to the file sink.
+Broker order snapshots, individual fills, time samples, button/hotkey intent,
+request planning, per-request HTTP results and timing go to files only.
+External reports go to files; explicitly labeled warnings/errors also reach the UI.
+Identical screen events are suppressed for 30 seconds; the next occurrence reports
+the repeat count. Separate trading actions and connection transitions remain visible. Long screen messages
+are shortened with a pointer to the full file entry. Filtering never removes file
+entries. The persistence status remains visible below the feed.
 
 Files use `bmtrader-YYYY-MM-DD.log`, followed by `-1.log`, `-2.log`, etc. when
 rotating at 10 MiB. Dates use the computer's local timezone. Each line includes

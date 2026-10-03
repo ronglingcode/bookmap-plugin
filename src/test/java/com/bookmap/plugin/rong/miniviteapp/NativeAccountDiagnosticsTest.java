@@ -39,6 +39,14 @@ class NativeAccountDiagnosticsTest {
         assertTrue(projected.contains("pacific=2026-10-02 06:30:00 PDT"));
         assertTrue(projected.contains("eastern=2026-10-02 09:30:00 EDT"));
         assertFalse(raw.contains("private-token"));
+        assertTrue(raw.contains("Native broker order observed: orderId=42 symbol=NVDA status=FILLED"));
+    }
+
+    @Test void reportsObservedCanceledStatusRatherThanInferringItFromHttpAcknowledgment() {
+        JsonArray orders = JsonParser.parseString("[{\"orderId\":101,\"status\":\"CANCELED\",\"orderType\":\"LIMIT\",\"quantity\":10,\"orderLegCollection\":[{\"instrument\":{\"symbol\":\"NVDA\"}}]}]").getAsJsonArray();
+        String raw = String.join("\n", NativeAccountDiagnostics.rawOrders(orders, "2026-10-02"));
+        assertTrue(raw.contains("orderId=101 symbol=NVDA status=CANCELED type=LIMIT"));
+        assertFalse(raw.contains("broker acknowledged"));
     }
 
     @Test

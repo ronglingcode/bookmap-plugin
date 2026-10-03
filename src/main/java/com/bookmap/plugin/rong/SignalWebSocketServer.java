@@ -926,7 +926,7 @@ public class SignalWebSocketServer extends WebSocketServer {
         String symbol = SymbolUtils.cleanSymbol(getString(json, "symbol"));
         String source = getString(json, "source").trim();
         if (!message.isEmpty()) {
-            PluginLog.action(symbol, source, message);
+            PluginLog.detail(symbol, "External report" + (source.isEmpty() ? "" : " " + source), message);
         }
     }
 
@@ -1145,7 +1145,13 @@ public class SignalWebSocketServer extends WebSocketServer {
         String level = getString(json, "level").trim();
         if (!message.isEmpty()) {
             String displaySource = level.isEmpty() ? source : source + " " + level.toUpperCase();
-            PluginLog.action(symbol, displaySource.trim(), message);
+            String logSource = "External report " + displaySource.trim();
+            if (level.equalsIgnoreCase("warn") || level.equalsIgnoreCase("warning")
+                    || level.equalsIgnoreCase("error") || level.equalsIgnoreCase("fatal")) {
+                PluginLog.action(symbol, logSource, message);
+            } else {
+                PluginLog.detail(symbol, logSource, message);
+            }
         }
     }
 

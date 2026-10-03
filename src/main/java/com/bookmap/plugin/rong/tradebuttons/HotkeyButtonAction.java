@@ -23,10 +23,8 @@ public final class HotkeyButtonAction {
         JsonObject json = createMessage(
                 symbol, buttonId, buttonName, keyCode, shiftKey, System.currentTimeMillis());
         server.appendRegularSessionHighLow(symbol, json);
+        PluginLog.detail(symbol, "Button clicked " + buttonName + "; requesting native action");
         server.dispatchTradingAction(json);
-        if (!"KeyF".equals(keyCode)) {
-            PluginLog.action(symbol, "Button send " + buttonName);
-        }
     }
 
     static JsonObject createMessage(

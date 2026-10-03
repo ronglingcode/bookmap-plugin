@@ -209,8 +209,9 @@ public class ChartHoverHotkeyHandler implements ScreenSpacePainterFactory {
         boolean shiftDown = event.isShiftDown();
         String actionLog = formatHoverHotkeyActionLog(
                 hover.instrument, keyCode, hover.price, shiftDown);
-        PluginLog.action(hover.instrument, "Bookmap", actionLog);
+        PluginLog.detail(hover.instrument, "Bookmap", actionLog);
         if (isEntryHotkeyDisabledAt(normalizedKey, Instant.now())) {
+            PluginLog.action(hover.instrument, "Bookmap", "Entry hotkey ignored after the entry cutoff; no native action requested");
             return;
         }
 
@@ -233,6 +234,7 @@ public class ChartHoverHotkeyHandler implements ScreenSpacePainterFactory {
             TradebookButtonGroup tradebook =
                     wsServer.getPrimaryWallReversalTradebook(hover.instrument, bidWallReversal);
             if (tradebook == null || tradebook.getEntryMethods().isEmpty()) {
+                PluginLog.action(hover.instrument, "Bookmap", "Entry hotkey ignored: no configured tradebook entry method; no native action requested");
                 return;
             }
 

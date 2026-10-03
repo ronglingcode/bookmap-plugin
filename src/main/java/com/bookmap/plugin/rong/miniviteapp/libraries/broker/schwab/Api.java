@@ -50,7 +50,7 @@ public final class Api {
             boolean success = method.equals("DELETE") ? status == 200 || status == 204
                     : status == 200 || status == 201 || status == 204;
             outcome = success && (!method.equals("POST") || !newOrderId.isEmpty()) ? "accepted"
-                    : status >= 500 || success ? "unknown" : "rejected";
+                    : status >= 500 || status == 408 || status >= 200 && status < 400 ? "unknown" : "rejected";
             String operation = method + (orderId.isEmpty() ? " new order" : " order " + orderId);
             reason = ExecutionDiagnostics.sanitize(outcome.equals("accepted") ? "" : success
                     ? operation + " HTTP " + status + ": " + (location.isEmpty() ? "missing Location header" : "Location header has no numeric order ID: " + location)
@@ -73,7 +73,7 @@ public final class Api {
         if (body != null) headers.put("Content-Type", "application/json");
         long startedAt = System.nanoTime();
         if (timedEntrySymbol != null)
-            log.accept(timedEntrySymbol, "Native entry POST sending to broker at " + LocalDateTime.now().format(ENTRY_LOG_TIME));
+            log.accept(timedEntrySymbol, "Native entry POST attempting HTTP request at " + LocalDateTime.now().format(ENTRY_LOG_TIME));
         HttpPort.Response response;
         try {
             response = http.request(base.resolve("accounts/" + account + path), method, headers, body == null ? null : body.toString());

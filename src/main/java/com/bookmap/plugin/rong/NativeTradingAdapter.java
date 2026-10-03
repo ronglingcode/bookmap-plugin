@@ -41,8 +41,12 @@ public final class NativeTradingAdapter implements AutoCloseable {
     public void start() {
         connectionStatus.setStarting();
         try { runtime = new NativeRuntime(new TradingRuntime.Events() {
-            public void message(JsonObject value) { accept(value); }
+            public void message(JsonObject value) { NativeTradingAdapter.this.accept(value); }
             public void log(String symbol, String value) { PluginLog.action(symbol, value); }
+            public void detail(String symbol, String value) { PluginLog.detail(symbol, value); }
+            public void summary(String symbol, String value, String screenMessage) { PluginLog.summary(symbol, value, screenMessage); }
+            public void transition(String symbol, String value) { PluginLog.transition(symbol, value); }
+            public void aggregate(String symbol, String group, String value, String screenMessage) { PluginLog.aggregate(symbol, group, value, screenMessage); }
             public void notify(String symbol, String value) { notifyUser(symbol, value); }
             public void status(String source, String value) { connectionStatus.update(source, value); }
             public void minuteBarsLoaded(String symbol, String date, List<Candle> bars) {
@@ -51,7 +55,7 @@ public final class NativeTradingAdapter implements AutoCloseable {
         }); runtime.start(); }
         catch (Exception error) { connectionStatus.setUnavailable("startup failed"); PluginLog.action("", "Native startup unavailable. Check local secrets at " + LocalCredentials.defaultPath() + "; then use Restart Native Trading."); }
     }
-    public void dispatch(JsonObject action) { if (runtime == null || closed) PluginLog.action(string(action, "symbol"), "Native runtime unavailable; no action sent"); else runtime.trading.dispatch(action); }
+    public void dispatch(JsonObject action) { if (runtime == null || closed || !runtime.trading.dispatch(action)) PluginLog.action(string(action, "symbol"), "Native runtime unavailable; no native action dispatched"); }
     public void observeBookmapTrade(String symbol, double price, long timestampNs) {
         NativeRuntime current = runtime;
         if (current != null && !closed) current.trading.observeBookmapTrade(symbol, price, timestampNs / 1_000_000L);
@@ -73,8 +77,6 @@ public final class NativeTradingAdapter implements AutoCloseable {
         if (type.equals("account_ready") || type.equals("market_ready") || type.equals("market_update") || type.equals("command_state")) {
             if (type.equals("market_update")) display.acceptLocalMessage(NativeViews.premarketLevels(value));
             NativeViews.project(value).forEach(display::acceptLocalMessage);
-        } else if (type.equals("execution_result") || type.equals("execution_blocked")) {
-            PluginLog.action(string(value, "symbol"), type + " " + string(value, "action") + " " + string(value, "outcome") + " " + string(value, "reason"));
         }
     }
     private void notifyUser(String symbol, String text) {

@@ -13,12 +13,14 @@ import java.util.*;
 import java.util.concurrent.*;
 import java.util.function.BiConsumer;
 import java.util.function.Function;
+import static com.bookmap.plugin.rong.miniviteapp.models.DomainJson.array;
+import static com.bookmap.plugin.rong.miniviteapp.models.DomainJson.object;
 
 /** Single-user executor. State transitions use this monitor; I/O runs outside it. */
 public final class MiniViteApp implements AutoCloseable {
     private final Api api;
     private final BiConsumer<Object, JsonObject> sender;
-    private final BiConsumer<String, String> log;
+    private final ExecutionLog log;
     private final Function<String, String> symbolKey;
     private final ExecutorService executor = Executors.newCachedThreadPool(task -> {
         Thread thread = new Thread(task, "bmtrader-native-execution"); thread.setDaemon(true); return thread;
@@ -35,14 +37,14 @@ public final class MiniViteApp implements AutoCloseable {
     }
     public MiniViteApp(BiConsumer<Object, JsonObject> sender, BiConsumer<String, String> log,
             Function<String, String> symbolKey) {
-        this(new Api(log), sender, log, symbolKey);
+        this(new Api(ExecutionLog.from(log)::detail), sender, log, symbolKey);
     }
     public MiniViteApp(Api api, BiConsumer<Object, JsonObject> sender) {
         this(api, sender, (symbol, message) -> { }, symbol -> symbol == null ? "" : symbol.trim());
     }
     public MiniViteApp(Api api, BiConsumer<Object, JsonObject> sender, BiConsumer<String, String> log,
             Function<String, String> symbolKey) {
-        this.api = api; this.sender = sender; this.log = log; this.symbolKey = symbolKey;
+        this.api = api; this.sender = sender; this.log = ExecutionLog.from(log); this.symbolKey = symbolKey;
     }
     private JsonObject message(String type) {
         JsonObject json = new JsonObject(); json.addProperty("type", type);
@@ -64,7 +66,8 @@ public final class MiniViteApp implements AutoCloseable {
         marketData.remove(symbolKey.apply(symbol));
     }
     public synchronized boolean resetAfterBrokerReview() {
-        requiresReview = false; reviewReason = ""; return true;
+        requiresReview = false; reviewReason = "";
+        log.accept("", "Execution review block cleared by user; reset did not verify broker order state"); return true;
     }
     public synchronized boolean receive(Object connection, JsonObject json) {
         String type = Models.string(json, "type");
@@ -161,12 +164,14 @@ public final class MiniViteApp implements AutoCloseable {
             }
             started.addProperty("clearPending", plan.clearPending); started.addProperty("revision", state.revision);
             sender.accept(connection, started);
+            log.detail(symbol, "Native " + plan.action + " planned " + plan.requests.size()
+                    + " broker request(s); actionId=" + actionId + "; no requests attempted yet");
             Snapshot executionState = state;
             executor.execute(() -> execute(capturedAccount, actionId, executionState, plan));
         } catch (RuntimeException error) {
             String reason = "build " + (entry ? "wall_reversal_entry" : key) + " plan failed: "
                     + ExecutionDiagnostics.describe(error, token, account);
-            log.accept(symbol, "Native blocked: " + reason);
+            log.accept(symbol, "Native blocked: " + reason + "; no broker requests attempted for this action");
             JsonObject blocked = message("execution_blocked"); blocked.addProperty("symbol", symbol);
             blocked.addProperty("reason", reason); sender.accept(connection, blocked);
         }
@@ -183,41 +188,63 @@ public final class MiniViteApp implements AutoCloseable {
     }
     private void execute(String accountHash,
             String actionId, Snapshot state, Plan plan) {
-        JsonArray results = new JsonArray(); boolean dispatched = false, unknown = false;
+        JsonArray results = new JsonArray(); boolean inFlight = false, unknown = false;
+        int attempted = 0, acknowledged = 0, rejected = 0, uncertain = 0;
         boolean entryAccepted = false;
         String outcome = "accepted", reason = "";
         String operation = "prepare native execution";
         String accessToken = "";
+        if (plan.requests.isEmpty()) {
+            outcome = "no_op";
+            reason = plan.action.equals("cancel_pending_entries")
+                    ? state.entries.isEmpty() ? "No pending entry orders found in the execution snapshot"
+                    : "No pending entries selected by the stop-only cancellation rule"
+                    : "Execution plan contains no broker requests";
+        }
         try {
             for (var request : plan.requests) {
                 String requestOperation = request.method + (request.orderId.isEmpty() ? " new order" : " order " + request.orderId);
                 operation = requestOperation;
                 if (request.delayBeforeMs > 0) Thread.sleep(request.delayBeforeMs);
-                accessToken = guard(plan);
                 boolean opening = request.body != null && Models.string(request.body, "orderStrategyType").equals("TRIGGER");
-                operation = requestOperation;
                 accessToken = guard(plan);
-                dispatched = true;
+                log.detail(state.symbol, "Native " + plan.action + " actionId=" + actionId + " request "
+                        + (attempted + 1) + "/" + plan.requests.size() + ": attempting " + requestOperation);
+                attempted++; inFlight = true;
                 Api.Result result = opening && request.method.equals("POST")
                         ? api.mutateEntry(accountHash, accessToken, request, state.symbol)
                         : api.mutate(accountHash, accessToken, request);
                 results.add(result.toJson());
+                inFlight = false;
+                if (result.outcome.equals("accepted")) acknowledged++;
+                else if (result.outcome.equals("rejected")) rejected++;
+                else uncertain++;
+                log.detail(state.symbol, "Native " + plan.action + " actionId=" + actionId + ": "
+                        + requestOperation + " returned HTTP " + result.status + "; "
+                        + (result.outcome.equals("accepted") ? "broker acknowledged request; final order state not confirmed"
+                        : result.outcome.equals("rejected") ? "broker rejected request" : "broker outcome unknown")
+                        + (result.newOrderId.isEmpty() ? "" : "; newOrderId=" + result.newOrderId)
+                        + (result.reason.isEmpty() ? "" : "; " + result.reason));
                 if (opening && result.outcome.equals("accepted") && plan.entry != null) entryAccepted = true;
                 if (!result.outcome.equals("accepted")) {
-                    outcome = result.outcome; unknown = outcome.equals("unknown");
+                    unknown = result.outcome.equals("unknown");
+                    outcome = unknown ? "unknown" : acknowledged > 0 ? "partial" : "rejected";
                     reason = result.reason;
                     if (unknown) reason += "; broker outcome unknown; review orders before resetting";
                     break;
                 }
             }
         } catch (IllegalArgumentException error) {
-            outcome = dispatched ? "partial" : "rejected";
-            reason = operation + " failed: " + ExecutionDiagnostics.describe(error, token, accessToken, accountHash);
+            unknown = inFlight; if (inFlight) uncertain++;
+            outcome = inFlight ? "unknown" : acknowledged > 0 ? "partial" : "rejected";
+            reason = operation + " failed: " + ExecutionDiagnostics.describe(error, token, accessToken, accountHash)
+                    + (inFlight ? "; no classified broker result; broker outcome unknown; review orders before resetting" : "; request not attempted");
         } catch (Exception error) {
             // A network exception after dispatch cannot prove whether the mutation reached the broker.
-            outcome = dispatched ? "unknown" : "rejected"; unknown = dispatched;
+            unknown = inFlight; if (inFlight) uncertain++;
+            outcome = inFlight ? "unknown" : acknowledged > 0 ? "partial" : "rejected";
             reason = operation + " failed: " + ExecutionDiagnostics.describe(error, token, accessToken, accountHash)
-                    + (dispatched ? "; broker outcome unknown; review orders before resetting" : "; order not sent");
+                    + (inFlight ? "; no classified broker result; broker outcome unknown; review orders before resetting" : "; request not attempted");
             if (error instanceof InterruptedException) Thread.currentThread().interrupt();
         }
         synchronized (this) {
@@ -226,12 +253,37 @@ public final class MiniViteApp implements AutoCloseable {
             finished.addProperty("symbol", state.symbol); finished.addProperty("action", plan.action);
             finished.addProperty("outcome", outcome); finished.addProperty("reason", reason);
             finished.addProperty("requiresReview", requiresReview); finished.add("results", results);
+            finished.addProperty("plannedRequestCount", plan.requests.size());
+            finished.addProperty("attemptedRequestCount", attempted);
+            finished.addProperty("acknowledgedRequestCount", acknowledged);
+            finished.addProperty("rejectedRequestCount", rejected);
+            finished.addProperty("unknownRequestCount", uncertain);
+            finished.addProperty("notAttemptedRequestCount", plan.requests.size() - attempted);
             // An accepted entry still needs its trade state if a subsequent old-entry cancellation fails.
             if (entryAccepted) finished.add("entry", plan.entry);
+            int exitPairCount = array(object(plan.entry, "submitEntryResult"), "profitTargets").size();
+            log.summary(state.symbol, "Native " + plan.action + " actionId=" + actionId + ": "
+                    + (outcome.equals("accepted") ? "broker acknowledged all requests; final order state not confirmed" : outcome)
+                    + "; planned=" + plan.requests.size() + "; attempted=" + attempted
+                    + "; acknowledged=" + acknowledged + "; rejected=" + rejected + "; unknown=" + uncertain
+                    + "; notAttempted=" + (plan.requests.size() - attempted)
+                    + (exitPairCount == 0 ? "" : "; plannedExitPairs=" + exitPairCount) + (reason.isEmpty() ? "" : "; " + reason),
+                    actionSummary(plan.action, outcome, attempted, acknowledged, rejected, uncertain, reason, exitPairCount));
             sender.accept(connection, finished);
-            log.accept(state.symbol, "Native " + plan.action + ": " + outcome + (reason.isEmpty() ? "" : " - " + reason));
         }
     }
+    static String actionSummary(String action, String outcome, int attempted, int acknowledged, int rejected, int uncertain, String reason, int exitPairCount) {
+        String label = action.replace('_', ' ');
+        if (outcome.equals("accepted")) return label + ": broker acknowledged " + acknowledged
+                + " request(s)" + (exitPairCount == 0 ? "" : " (" + exitPairCount + " planned exit pairs)")
+                + "; final order state unconfirmed";
+        if (outcome.equals("no_op")) return label + ": no requests sent; " + reason;
+        String result = outcome.equals("unknown") ? "outcome unknown; review broker orders before resetting"
+                : outcome.equals("partial") ? "partially acknowledged" : "rejected";
+        return label + ": " + result + " (" + acknowledged + "/" + attempted + " acknowledged, "
+                + rejected + " rejected, " + uncertain + " unknown)" + (reason.isEmpty() ? "" : "; " + reason);
+    }
+
     @Override public synchronized void close() {
         closed = true; token = ""; account = ""; snapshots.clear(); marketData.clear(); executor.shutdownNow();
     }

@@ -26,11 +26,14 @@ class TradingRuntimeTest {
         AtomicLong now = new AtomicLong(Instant.parse("2026-10-01T13:32:00Z").toEpochMilli()); AtomicInteger refreshes = new AtomicInteger(), accountReads = new AtomicInteger(), writes = new AtomicInteger(), mutations = new AtomicInteger(), audits = new AtomicInteger();
         AtomicBoolean limited = new AtomicBoolean(); AtomicReference<String> positionData = new AtomicReference<>("[]"), orderData = new AtomicReference<>("[]");
         AtomicInteger httpCalls = new AtomicInteger();
+        List<String> canceledOrders = new CopyOnWriteArrayList<>();
         AtomicReference<JsonObject> secrets = new AtomicReference<>(json("{\"appKey\":\"fake-app\",\"secret\":\"fake-secret\",\"access_token\":\"expired\",\"refresh_token\":\"fake-refresh\",\"expires_at\":0,\"accountHashValue\":\"fake-account\"}"));
         List<JsonObject> emitted = new CopyOnWriteArrayList<>(); List<String> logs = new CopyOnWriteArrayList<>(); List<Task> tasks = new ArrayList<>(); List<Socket> sockets = new ArrayList<>();
+        List<String> screen = new CopyOnWriteArrayList<>();
         HttpPort http = (uri, method, headers, body) -> {
             httpCalls.incrementAndGet();
             assertFalse(uri.toString().contains("localhost")); String path = uri.getPath();
+            if (method.equals("DELETE")) { canceledOrders.add(path); return new HttpPort.Response(204, ""); }
             if (path.endsWith("/oauth/token")) { int count = refreshes.incrementAndGet(); return new HttpPort.Response(200, "{\"access_token\":\"fresh-" + count + "\",\"refresh_token\":\"rotated-" + count + "\",\"expires_in\":1800}"); }
             if (path.endsWith(":runQuery")) { JsonObject document = new JsonObject(); document.add("fields", DocumentCodec.encodeFields(configData)); JsonObject row = new JsonObject(); row.add("document", document); JsonArray rows = new JsonArray(); rows.add(row); return new HttpPort.Response(200, rows.toString()); }
             if (path.endsWith("/tradingState")) { if (method.equals("PATCH")) { writes.incrementAndGet(); assertEquals(savedState.get("date"), DocumentCodec.decodeFields(json(body).getAsJsonObject("fields")).get("date")); return new HttpPort.Response(200, "{}"); } JsonObject document = new JsonObject(); document.add("fields", DocumentCodec.encodeFields(savedState)); return new HttpPort.Response(200, document.toString()); }
@@ -49,11 +52,17 @@ class TradingRuntimeTest {
         try (TradingRuntime runtime = new TradingRuntime(http, credentials, json("{\"firebaseConfig\":{\"projectId\":\"fake-project\",\"apiKey\":\"fake-firebase\"},\"massive\":{\"apiKey\":\"fake-massive\"}}"),
             (url, handlers) -> { Socket socket = new Socket(); socket.handlers = handlers; sockets.add(socket); return socket; },
             (delay, run) -> { Task task = new Task(); task.delay = delay; task.run = run; tasks.add(task); return () -> task.canceled = true; }, Runnable::run, now::get,
-            new TradingRuntime.Events() { public void message(JsonObject value) { emitted.add(value.deepCopy()); } public void log(String symbol, String value) { logs.add(value); } public void notify(String symbol, String value) { logs.add(value); } })) {
+            new TradingRuntime.Events() {
+                public void message(JsonObject value) { emitted.add(value.deepCopy()); }
+                public void log(String symbol, String value) { logs.add(value); screen.add(value); }
+                public void detail(String symbol, String value) { logs.add(value); }
+                public void summary(String symbol, String value, String screenMessage) { logs.add(value); screen.add(screenMessage); }
+                public void notify(String symbol, String value) { log(symbol, value); }
+            })) {
             assertThrows(IllegalStateException.class, () -> runtime.exportExecutions(Format.CSV));
             runtime.start().get(2, TimeUnit.SECONDS); assertEquals(1, refreshes.get()); assertEquals(1, accountReads.get()); assertEquals(2, sockets.size());
             assertTrue(logs.stream().anyMatch(value -> value.contains("Native broker orders: sessionDate=2026-10-01 fetched=0")));
-            assertTrue(logs.stream().anyMatch(value -> value.contains("Native Bookmap fills to draw: sessionDate=2026-10-01 count=0")));
+            assertTrue(logs.stream().anyMatch(value -> value.contains("Native projected fills available for display: sessionDate=2026-10-01 count=0")));
             assertThrows(IllegalStateException.class, () -> runtime.exportExecutions(Format.CSV));
             JsonObject view = runtime.view("AAPL", "test"); assertEquals(100, view.getAsJsonObject("state").getAsJsonObject("stateBySymbol").getAsJsonObject("AAPL").getAsJsonObject("breakoutTradeStateForLong").get("initialQuantity").getAsInt());
             runtime.persistState(); runtime.pendingPersistence().get(2, TimeUnit.SECONDS); assertEquals(1, writes.get());
@@ -79,14 +88,28 @@ class TradingRuntimeTest {
             }
             orderData.set(orders.toString()); now.addAndGet(3000); runtime.refreshAccount();
             assertTrue(logs.stream().anyMatch(value -> value.contains("Native broker orders: sessionDate=2026-10-01 fetched=2")));
-            assertTrue(logs.stream().anyMatch(value -> value.contains("Native Bookmap fills to draw: sessionDate=2026-10-01 count=2")));
-            assertTrue(logs.stream().anyMatch(value -> value.contains("Native Bookmap fill: symbol=MSFT orderId=43")));
+            assertTrue(logs.stream().anyMatch(value -> value.contains("Native projected fills available for display: sessionDate=2026-10-01 count=2")));
+            assertTrue(logs.stream().anyMatch(value -> value.contains("Native projected fill: symbol=MSFT orderId=43")));
+            assertTrue(screen.contains("Account fills available for display: 2 for 2026-10-01"));
+            assertTrue(screen.stream().noneMatch(value -> value.contains("Native broker order")
+                    || value.contains("Native projected fill") || value.contains("execution time sample")
+                    || value.contains("returned HTTP") || value.contains("Native entry POST")), screen.toString());
             int callsBeforeExport = httpCalls.get(); JsonObject beforeExport = runtime.view("MSFT", "test");
             for (Format format : Format.values()) { String report = runtime.exportExecutions(format); assertTrue(report.contains("AAPL")); assertTrue(report.contains("MSFT")); }
             assertEquals(callsBeforeExport, httpCalls.get()); assertEquals(beforeExport, runtime.view("MSFT", "test"));
             long sameDay = now.get(); now.addAndGet(86400000);
             assertThrows(IllegalStateException.class, () -> runtime.exportExecutions(Format.SUMMARY), "Yesterday's cached fills must not be exported as today"); now.set(sameDay);
             runtime.pendingPersistence().get(2, TimeUnit.SECONDS);
+            // The cache has only terminal fills. Cancel must discover a newly submitted broker order.
+            orderData.set("[{\"orderId\":\"456\",\"orderStrategyType\":\"TRIGGER\",\"orderType\":\"LIMIT\",\"status\":\"WORKING\",\"cancelable\":true,\"quantity\":10,\"price\":9,\"orderLegCollection\":[{\"instruction\":\"BUY\",\"instrument\":{\"symbol\":\"AAPL\",\"assetType\":\"EQUITY\"}}]}]");
+            runtime.dispatch(json("{\"symbol\":\"AAPL\",\"keyCode\":\"KeyC\"}"));
+            deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(2);
+            while (canceledOrders.isEmpty() && System.nanoTime() < deadline) Thread.sleep(5);
+            assertEquals(List.of("/trader/v1/accounts/fake-account/orders/456"), canceledOrders);
+            orderData.set("invalid JSON");
+            runtime.dispatch(json("{\"symbol\":\"AAPL\",\"keyCode\":\"KeyC\"}"));
+            assertEquals(1, canceledOrders.size());
+            assertTrue(emitted.stream().anyMatch(event -> event.has("reason") && event.get("reason").getAsString().contains("no cancellation attempted")));
             runtime.close(); assertTrue(sockets.stream().allMatch(socket -> socket.closed)); assertTrue(tasks.stream().allMatch(task -> task.canceled)); int readCount = accountReads.get(); tasks.forEach(task -> task.run.run()); runtime.refreshAccount(); assertEquals(readCount, accountReads.get());
             assertTrue(logs.stream().noneMatch(value -> value.contains("fake-secret") || value.contains("fake-refresh")));
         }

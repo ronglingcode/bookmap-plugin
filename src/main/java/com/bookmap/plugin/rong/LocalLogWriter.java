@@ -150,7 +150,7 @@ final class LocalLogWriter implements AutoCloseable {
         } while (true);
         output = outputs.open(path); current = path; currentDate = date;
         retain();
-        status.accept("Local logs: saving to " + directory);
+        status.accept("Local log file opened; writes are buffered at " + directory);
     }
 
     private List<Path> logFiles() throws IOException {

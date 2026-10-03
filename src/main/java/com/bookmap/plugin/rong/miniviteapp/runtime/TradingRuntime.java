@@ -2,6 +2,7 @@ package com.bookmap.plugin.rong.miniviteapp.runtime;
 
 import com.bookmap.plugin.rong.miniviteapp.MiniViteApp;
 import com.bookmap.plugin.rong.miniviteapp.ExecutionDiagnostics;
+import com.bookmap.plugin.rong.miniviteapp.ExecutionLog;
 import com.bookmap.plugin.rong.miniviteapp.core.account.TradeLedger;
 import com.bookmap.plugin.rong.miniviteapp.core.account.ExecutionExports;
 import com.bookmap.plugin.rong.miniviteapp.core.configuration.TradingConfig;
@@ -23,9 +24,10 @@ import static com.bookmap.plugin.rong.miniviteapp.models.DomainJson.*;
 
 /** Single-app orchestration. State locks are short; network and executor dispatch stay outside. */
 public final class TradingRuntime implements AutoCloseable {
-    public interface Events {
+    public interface Events extends ExecutionLog {
         void message(JsonObject message);
         void log(String symbol, String message);
+        default void accept(String symbol, String message) { log(symbol, message); }
         void notify(String symbol, String message);
         default void status(String source, String status) { }
         default void minuteBarsLoaded(String symbol, String date, List<Candle> bars) { }
@@ -75,9 +77,6 @@ public final class TradingRuntime implements AutoCloseable {
                 long delay = 60000; try { delay = Math.max(3000, (long) (Double.parseDouble(response.header("Retry-After")) * 1000)); } catch (RuntimeException ignored) { }
                 synchronized (lock) { nextAccountRead = Math.max(nextAccountRead, now.getAsLong() + delay); }
             }
-            if (!method.equals("GET") && uri.getPath().contains("/orders")) {
-                events.log("", "Broker order " + method + " returned HTTP " + response.status);
-            }
             return response;
         };
         reads = new ReadApi(authenticatedReads);
@@ -86,7 +85,7 @@ public final class TradingRuntime implements AutoCloseable {
         massiveKey = string(object(sections, "massive"), "apiKey"); massive = new com.bookmap.plugin.rong.miniviteapp.libraries.massive.Api(http, () -> massiveKey);
         market = new MarketLoader(massive, executor, now);
         if (object(sections, "tradingPolicy").has("coreTargetEnabled")) policy.addProperty("coreTargetEnabled", bool(object(sections, "tradingPolicy"), "coreTargetEnabled"));
-        execution = new MiniViteApp(new Api(authenticatedReads, this.events::log), (connection, message) -> executionEvent(message), this.events::log, String::trim);
+        execution = new MiniViteApp(new Api(authenticatedReads, this.events::detail), (connection, message) -> executionEvent(message), this.events, String::trim);
     }
     public CompletableFuture<Void> start() {
         return CompletableFuture.runAsync(() -> {
@@ -108,7 +107,7 @@ public final class TradingRuntime implements AutoCloseable {
                 publishToken(); startStreamsAndHistory(); publishAccount();
                 repeat(30000, this::refreshToken); repeat(15000, this::refreshAccount); repeat(60000, this::refreshConfig); repeat(100, this::publishDirty);
                 repeat(1000, this::pendingJobs); repeat(20000, this::disciplineJobs);
-                events.log("", "Native trading runtime started; local credentials, Firestore, Massive and Schwab");
+                events.log("", "Native trading runtime initialized; account and configuration loaded; stream startup requested");
             } catch (Exception error) {
                 events.status("schwab", "startup failed");
                 events.status("massive", "startup failed");
@@ -160,7 +159,7 @@ public final class TradingRuntime implements AutoCloseable {
                 public void status(String source, String status) {
                     if (!stopped) {
                         events.status(source.equals("massive") ? "massiveStream" : source, status);
-                        events.log("", source + ": " + status);
+                        events.transition("", source + ": " + status);
                     }
                 }
             });
@@ -213,14 +212,15 @@ public final class TradingRuntime implements AutoCloseable {
         String snapshot = String.join("\n", lines);
         if (snapshot.equals(lastNativeOrdersLog)) return;
         lastNativeOrdersLog = snapshot;
-        lines.forEach(line -> events.log("", line));
+        lines.forEach(line -> events.detail("", line));
     }
     private void logNativeFills(JsonObject projected, String date) {
         List<String> lines = NativeAccountDiagnostics.projectedFills(projected, date);
         String snapshot = String.join("\n", lines);
         if (snapshot.equals(lastNativeFillsLog)) return;
         lastNativeFillsLog = snapshot;
-        lines.forEach(line -> events.log("", line));
+        events.aggregate("", "account-fills:" + date, lines.get(0), "Account fills available for display: " + (lines.size() - 1) + " for " + date);
+        lines.stream().skip(1).forEach(line -> events.detail("", line));
     }
     public void refreshConfig() {
         if (stopped || !configReading.compareAndSet(false, true)) return;
@@ -292,10 +292,47 @@ public final class TradingRuntime implements AutoCloseable {
                     else for (String field : new String[]{"customEntryPrice", "customStopLong", "customStopShort", "fixedQuantity"}) if (action.has(field)) { if (!action.get(field).isJsonPrimitive() || !action.getAsJsonPrimitive(field).isNumber() || !Double.isFinite(action.get(field).getAsDouble()) || action.get(field).getAsDouble() < 0) throw new IllegalArgumentException("Invalid manual input: " + field); value.add(field, action.get(field)); }
                 } persistState(); events.message(view(symbol, "command_state")); return true;
             }
-            if (key.equals("KeyE") || key.equals("KeyR") || key.equals("KeyV")) { events.log(symbol, key + " is disabled or has no active tradebook in the current browser profile"); return true; }
+            if (key.equals("KeyE") || key.equals("KeyR") || key.equals("KeyV")) { events.log(symbol, key + " native command is disabled; no broker requests attempted"); return true; }
+            if (key.equals("KeyC")) {
+                JsonObject command = action.deepCopy();
+                executor.execute(() -> cancelCurrentEntries(symbol, command));
+                return true;
+            }
             if (!string(action, "retest_warning").isEmpty()) events.notify(symbol, string(action, "retest_warning"));
             publishInputs(symbol); return execution.route(action);
         } catch (RuntimeException error) { failure(symbol, "Native command", error); if (type.equals("core_plan_update")) { JsonObject view = view(symbol, "command_state"); view.addProperty("requestId", string(action, "requestId")); view.addProperty("updateStatus", "error"); view.addProperty("error", error.getMessage()); events.message(view); } return true; }
+    }
+    private void cancelCurrentEntries(String symbol, JsonObject command) {
+        try {
+            events.detail(symbol, "Cancel requested; refreshing broker orders before selecting entries; no cancellation attempted yet");
+            String token = oauth.accessToken(false), date = MarketClock.marketTime(now.getAsLong()).date;
+            JsonArray orders = reads.getOrders(accountHash(), token, date, false, 59);
+            logNativeOrders(orders, date);
+            // Project only order state; do not overwrite the cached positions or trade ledger.
+            JsonObject raw = new JsonObject(), balances = new JsonObject();
+            balances.addProperty("liquidationValue", 0); raw.add("currentBalances", balances);
+            JsonObject projected = AccountProjection.projectAccount(raw, orders, date, this::price);
+            JsonObject input;
+            synchronized (lock) {
+                if (stopped) return;
+                if (state == null || account == null) throw new IllegalStateException("Native account is not ready");
+                input = exitInputs(symbol);
+            }
+            input.add("entries", array(object(projected, "entryOrders"), symbol));
+            input.add("pairs", array(object(projected, "exitPairs"), symbol));
+            events.detail(symbol, "Cancel broker order refresh completed; fetched=" + orders.size()
+                    + "; pendingEntries=" + input.getAsJsonArray("entries").size()
+                    + "; exitPairs=" + input.getAsJsonArray("pairs").size()
+                    + "; selection=" + (input.getAsJsonArray("pairs").size() < number(policy, "batchCount") * 0.4
+                    ? "all pending entries" : "STOP entries only"));
+            publishToken();
+            JsonObject update = message("execution_state"); JsonArray symbols = new JsonArray(); symbols.add(input); update.add("symbols", symbols);
+            synchronized (execution) { execution.receive(this, update); execution.route(command); }
+        } catch (Exception error) {
+            failure(symbol, "Cancel preparation; cancellation not attempted", error);
+            JsonObject blocked = message("execution_blocked"); blocked.addProperty("symbol", symbol);
+            blocked.addProperty("reason", "Cancel preparation failed; no cancellation attempted"); events.message(blocked);
+        }
     }
     public JsonObject manualInputs(String symbol) { synchronized (lock) { return manual.getOrDefault(symbol, new JsonObject()).deepCopy(); } }
     /** Snapshot the whole cached account, including symbols with no attached chart. No vendor reads. */
@@ -358,11 +395,11 @@ public final class TradingRuntime implements AutoCloseable {
                 JsonObject position = object(object(account, "positions"), symbol); double net = number(position, "netQuantity"); var loaded = market.getState(symbol); JsonObject prices = loaded == null ? new JsonObject() : loaded.metrics();
                 JsonArray pairs = array(object(account, "exitPairs"), symbol); double risk = com.bookmap.plugin.rong.miniviteapp.core.controllers.NativeViews.positionRisk(net, number(position, "averagePrice"), pairs, number(prices, "lowOfDay"), number(prices, "highOfDay")), pending = 0;
                 for (JsonElement item : array(object(account, "entryOrders"), symbol)) { JsonObject entry = item.getAsJsonObject(); if (number(entry, "exitStopPrice") > 0) pending += Math.abs(number(entry, "price") - number(entry, "exitStopPrice")) * number(entry, "quantity"); }
-                if (risk / number(policy, "riskDollars") > 1.2) notices.add(new String[]{symbol, "Position risk exceeds 1.2 R: " + Math.round(risk / number(policy, "riskDollars") * 100) / 100.0 + " R"});
-                if (pending / number(policy, "riskDollars") > 1.2) notices.add(new String[]{symbol, "Pending entry risk exceeds 1.2 R: " + Math.round(pending / number(policy, "riskDollars") * 100) / 100.0 + " R"});
+                if (risk / number(policy, "riskDollars") > 1.2) notices.add(new String[]{symbol, "Estimated position risk from cached account exceeds 1.2 R: " + Math.round(risk / number(policy, "riskDollars") * 100) / 100.0 + " R"});
+                if (pending / number(policy, "riskDollars") > 1.2) notices.add(new String[]{symbol, "Estimated pending entry risk from cached account exceeds 1.2 R: " + Math.round(pending / number(policy, "riskDollars") * 100) / 100.0 + " R"});
                 JsonObject active = state.direction(symbol, net > 0); if (net != 0 && bool(policy, "coreTargetEnabled") && bool(active, "hasValue") && !bool(active, "coreTargetReminderShown")) {
                     JsonObject view = view(symbol, "command_state"); for (JsonObject projected : com.bookmap.plugin.rong.miniviteapp.core.controllers.NativeViews.project(view)) if (string(projected, "type").equals("core_plan_config") && number(projected, "partialsTaken") >= 3) {
-                        active.addProperty("coreTargetReminderShown", true); changed = true; view.addProperty("reminderRequested", true); coreReminders.add(view); notices.add(new String[]{symbol, "Three partials completed; review the core target plan"});
+                        active.addProperty("coreTargetReminderShown", true); changed = true; view.addProperty("reminderRequested", true); coreReminders.add(view); notices.add(new String[]{symbol, "Cached exit-pair count indicates at least three partials taken; review the core target plan"});
                     }
                 }
             }

@@ -124,7 +124,7 @@ class LocalLogWriterTest {
         })) {
             await(() -> !warnings.isEmpty());
             for (int i = 0; i < 10; i++) writer.append(event("s", "lost during failure"));
-            await(() -> status.stream().anyMatch(line -> line.contains("saving")));
+            await(() -> status.stream().anyMatch(line -> line.contains("file opened; writes are buffered")));
             writer.append(event("s", "recovered"));
             assertEquals(1, warnings.size(), warnings.toString());
         }

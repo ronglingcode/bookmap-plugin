@@ -63,7 +63,7 @@ public final class NativeAccountDiagnostics {
                 if (!item.isJsonObject()) continue;
                 JsonObject fill = item.getAsJsonObject();
                 count++;
-                lines.add("Native Bookmap fill: symbol=" + symbol
+                lines.add("Native projected fill: symbol=" + symbol
                         + " orderId=" + string(fill, "orderID")
                         + " side=" + (bool(fill, "isBuy") ? "BUY" : "SELL")
                         + " effect=" + (bool(fill, "positionEffectIsOpen") ? "OPENING" : "CLOSING")
@@ -72,13 +72,17 @@ public final class NativeAccountDiagnostics {
                         + " " + times(longValue(fill, "timestamp")));
             }
         }
-        lines.add(0, "Native Bookmap fills to draw: sessionDate=" + sessionDate + " count=" + count);
+        lines.add(0, "Native projected fills available for display: sessionDate=" + sessionDate + " count=" + count);
         return lines;
     }
 
     private static void collectRawFills(JsonObject order, String sessionDate,
             RawCounts counts, List<String> lines) {
         String symbol = AccountProjection.orderSymbol(order);
+        lines.add("Native broker order observed: orderId=" + orderId(order) + " symbol=" + symbol
+                + " status=" + string(order, "status") + " type=" + string(order, "orderType")
+                + " strategy=" + string(order, "orderStrategyType") + " quantity=" + string(order, "quantity")
+                + " filledQuantity=" + string(order, "filledQuantity") + " cancelable=" + string(order, "cancelable"));
         for (JsonElement item : array(order, "orderActivityCollection")) {
             if (!item.isJsonObject()) continue;
             JsonObject activity = item.getAsJsonObject();
