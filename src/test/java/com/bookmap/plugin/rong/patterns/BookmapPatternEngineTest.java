@@ -224,7 +224,7 @@ class BookmapPatternEngineTest {
 
     private static Fixture reappearFixture() {
         Fixture fixture = new Fixture();
-        fixture.bbo(9_999, 10_001, BASE);
+        fixture.bbo(9_997, 9_998, BASE);
         fixture.qualifyAndClear(false, 10_000, BASE + 100);
         fixture.depth(false, 9_999, 100, BASE + 1_400);
         fixture.time(BASE + 1_900);
