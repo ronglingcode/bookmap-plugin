@@ -42,4 +42,7 @@ public final class CairoObservationExport {
         value.addProperty("delivery", delivery); value.addProperty("kind", kind);
         return value;
     }
+    public synchronized JsonObject snapshot(JsonObject episode) {
+        JsonObject copy = episode.deepCopy(); copy.addProperty("sequence", ++sequence); copy.addProperty("delivery", "snapshot"); return copy;
+    }
 }

@@ -222,6 +222,7 @@ public class RongPlugin implements CustomModuleAdapter,
                 IndicatorConfig.BOOKMAP_PATTERN_SIGNALS);
         indicatorConfig.addChangeListener(this);
         sharedServer.registerSymbol(cleanAlias, orderBook, info.pips);
+        if (observationConfig.enabled) sharedServer.observationReady(cleanAlias, false);
         sharedServer.registerVwapUpdateListener(cleanAlias, vwapUpdateListener);
         chartHoverHotkeyHandler.registerSymbol(cleanAlias, info.pips);
         priceZonePainter.registerInstrument(cleanAlias);
@@ -599,6 +600,7 @@ public class RongPlugin implements CustomModuleAdapter,
     public void onSnapshotEnd() {
         if (!initialized) return;
         patternSnapshotComplete = true;
+        if (sharedServer != null && observationConfig.enabled) sharedServer.observationReady(alias, true);
         if (wallChangeTracker != null) {
             wallChangeTracker.markReady();
         }
@@ -611,6 +613,8 @@ public class RongPlugin implements CustomModuleAdapter,
     public void onRealtimeStart() {
         if (!initialized) return;
         patternSnapshotComplete = true;
+        // This callback alone does not prove a live provider (replay can catch up).
+        if (sharedServer != null && observationConfig.enabled) sharedServer.observationReady(alias, true);
         if (wallChangeTracker != null) {
             wallChangeTracker.markReady();
         }

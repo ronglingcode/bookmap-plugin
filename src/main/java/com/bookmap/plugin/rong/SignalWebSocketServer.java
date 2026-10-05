@@ -24,9 +24,42 @@ import com.google.gson.JsonObject;
 
 public class SignalWebSocketServer extends WebSocketServer {
     private final com.bookmap.plugin.rong.patterns.CairoObservationExport observationExport = new com.bookmap.plugin.rong.patterns.CairoObservationExport();
+    private final java.util.concurrent.ArrayBlockingQueue<Runnable> observationQueue = new java.util.concurrent.ArrayBlockingQueue<>(512);
+    private final java.util.concurrent.ScheduledExecutorService observationWorker = java.util.concurrent.Executors.newSingleThreadScheduledExecutor(r -> { Thread t = new Thread(r, "cairo-observations"); t.setDaemon(true); return t; });
+    private final Map<String, Boolean> observationReady = new ConcurrentHashMap<>();
+    private final Map<String, JsonObject> observationEpisodes = new LinkedHashMap<>();
+    public void observationReady(String alias, boolean ready) { observationReady.put(alias, ready); queueObservation(status(alias, "heartbeat")); }
+    private JsonObject status(String alias, String kind) {
+        JsonObject value = observationExport.envelope(alias, kind, "live"); value.addProperty("readiness", observationReady.getOrDefault(alias, false) ? "ready" : "not-ready"); return value;
+    }
+    private void queueObservation(JsonObject value) {
+        if (!observationQueue.offer(() -> broadcast(value.toString()))) {
+            observationQueue.clear();
+            synchronized (observationEpisodes) { observationEpisodes.clear(); }
+            for (String alias : observationReady.keySet()) {
+                JsonObject reset = status(alias, "reset"); observationQueue.offer(() -> broadcast(reset.toString()));
+            }
+        }
+    }
+    public java.util.List<JsonObject> observationSnapshot() {
+        java.util.List<JsonObject> values = new ArrayList<>();
+        synchronized (observationEpisodes) {
+            for (String alias : observationReady.keySet()) values.add(status(alias, "heartbeat"));
+            long oldest = System.currentTimeMillis() - 30_000;
+            for (JsonObject episode : observationEpisodes.values()) if (Long.parseLong(episode.get("receivedAt").getAsString()) / 1_000_000L >= oldest) values.add(observationExport.snapshot(episode));
+        }
+        return values;
+    }
     public void exportPattern(com.bookmap.plugin.rong.patterns.BookmapPatternSignal signal) {
         JsonObject observation = observationExport.episode(signal);
-        if (observation != null) broadcast(observation.toString());
+        if (observation != null) {
+            observation.addProperty("readiness", observationReady.getOrDefault(signal.getInstrumentAlias(), false) ? "ready" : "not-ready");
+            synchronized (observationEpisodes) {
+                observationEpisodes.put(signal.getInstrumentAlias() + ":" + signal.getEpisodeKey(), observation);
+                while (observationEpisodes.size() > 400) observationEpisodes.remove(observationEpisodes.keySet().iterator().next());
+            }
+            queueObservation(observation);
+        }
     }
     private java.util.function.Consumer<JsonObject> tradingDispatch = action -> PluginLog.action(SymbolUtils.cleanSymbol(getString(action, "symbol")), "Native runtime unavailable; no action sent");
     public void setTradingDispatch(java.util.function.Consumer<JsonObject> dispatch) { tradingDispatch = dispatch; }
@@ -133,6 +166,10 @@ public class SignalWebSocketServer extends WebSocketServer {
         setDaemon(true);
         setReuseAddr(true);
         this.orderbookPercentile = orderbookPercentile;
+        observationWorker.scheduleWithFixedDelay(() -> {
+            try { for (int i = 0; i < 64; i++) { Runnable next = observationQueue.poll(); if (next == null) break; next.run(); } } catch (RuntimeException ignored) { }
+        }, 100, 100, java.util.concurrent.TimeUnit.MILLISECONDS);
+        observationWorker.scheduleWithFixedDelay(() -> { for (String alias : observationReady.keySet()) queueObservation(status(alias, "heartbeat")); }, 2, 2, java.util.concurrent.TimeUnit.SECONDS);
     }
 
     /** Register a symbol's order book and pips multiplier. */
@@ -143,6 +180,8 @@ public class SignalWebSocketServer extends WebSocketServer {
 
     /** Unregister a symbol when its plugin instance stops. */
     public void unregisterSymbol(String symbol) {
+        queueObservation(status(symbol, "reset")); observationReady.remove(symbol);
+        synchronized (observationEpisodes) { observationEpisodes.entrySet().removeIf(entry -> entry.getValue().getAsJsonObject("symbol").get("source").getAsString().equals(symbol)); }
         symbolToOrderBook.remove(symbol);
         symbolToPips.remove(symbol);
         symbolToRegularSessionHighLow.remove(symbol);
@@ -523,6 +562,7 @@ public class SignalWebSocketServer extends WebSocketServer {
     @Override
     public void onOpen(WebSocket conn, ClientHandshake handshake) {
         conn.send("{\"type\":\"standalone_status\",\"native\":true}");
+        observationQueue.offer(() -> { for (JsonObject observation : observationSnapshot()) if (conn.isOpen()) conn.send(observation.toString()); });
     }
 
     @Override
@@ -1671,6 +1711,7 @@ public class SignalWebSocketServer extends WebSocketServer {
     }
 
     public void shutdown() {
+        observationWorker.shutdownNow(); observationQueue.clear();
         try {
             stop(1000);
         } catch (InterruptedException e) {
