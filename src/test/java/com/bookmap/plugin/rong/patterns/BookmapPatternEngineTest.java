@@ -162,7 +162,6 @@ class BookmapPatternEngineTest {
     }
 
     @Test
-    @Test
     void eventTimeMakesReplaySpeedIrrelevant() throws Exception {
         Fixture first = reappearFixture();
         Thread.sleep(5);
