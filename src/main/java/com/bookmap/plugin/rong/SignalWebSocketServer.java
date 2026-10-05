@@ -293,7 +293,7 @@ public class SignalWebSocketServer extends WebSocketServer {
     /**
      * Read-only tradebook eligibility for display-only Bookmap pattern badges.
      * An enabled group must have an entry method, match direction, and describe the
-     * applicable Bookmap break or reversal tradebook family.
+     * applicable Bookmap wall-reversal tradebook family.
      */
     public boolean hasEnabledPatternTradebook(String symbol, PatternType patternType) {
         String cleanSymbol = SymbolUtils.cleanSymbol(symbol);
@@ -301,10 +301,7 @@ public class SignalWebSocketServer extends WebSocketServer {
         if (tradebooks == null || tradebooks.isEmpty()) return false;
         for (TradebookButtonGroup tradebook : tradebooks) {
             if (tradebook.getEntryMethods().isEmpty() || !matchesDirection(tradebook, patternType)) continue;
-            if (patternType.getFamily() == PatternType.Family.BREAK) {
-                if (isMatchingWallBreakTradebook(
-                        tradebook, patternType == PatternType.BID_WALL_BREAKDOWN)) return true;
-            } else if (isMatchingWallReversalTradebook(tradebook, patternType)) {
+            if (isMatchingWallReversalTradebook(tradebook, patternType)) {
                 return true;
             }
         }

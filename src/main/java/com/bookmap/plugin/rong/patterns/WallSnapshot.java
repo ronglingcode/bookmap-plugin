@@ -10,11 +10,9 @@ final class WallSnapshot {
     final long firstSeenMs;
     final long qualifiedAtMs;
     final long clearedAtMs;
-    final int tradedAtClear;
     final int effectiveThreshold;
     final int sessionHighAtClear;
     final int sessionLowAtClear;
-    final boolean sweep;
 
     WallSnapshot(
             String phaseId,
@@ -26,11 +24,9 @@ final class WallSnapshot {
             long firstSeenMs,
             long qualifiedAtMs,
             long clearedAtMs,
-            int tradedAtClear,
             int effectiveThreshold,
             int sessionHighAtClear,
-            int sessionLowAtClear,
-            boolean sweep) {
+            int sessionLowAtClear) {
         this.phaseId = phaseId;
         this.bid = bid;
         this.priceTick = priceTick;
@@ -40,11 +36,9 @@ final class WallSnapshot {
         this.firstSeenMs = firstSeenMs;
         this.qualifiedAtMs = qualifiedAtMs;
         this.clearedAtMs = clearedAtMs;
-        this.tradedAtClear = tradedAtClear;
         this.effectiveThreshold = effectiveThreshold;
         this.sessionHighAtClear = sessionHighAtClear;
         this.sessionLowAtClear = sessionLowAtClear;
-        this.sweep = sweep;
     }
 
     long durationMs(long nowMs) {

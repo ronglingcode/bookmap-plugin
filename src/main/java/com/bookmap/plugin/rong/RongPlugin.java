@@ -210,7 +210,6 @@ public class RongPlugin implements CustomModuleAdapter,
                 orderBook,
                 priceLineStore,
                 priceZoneStore,
-                this::getVwapTick,
                 patternType -> indicatorConfig != null
                         && indicatorConfig.isEnabled(IndicatorConfig.BOOKMAP_PATTERN_SIGNALS)
                         && sharedServer != null

@@ -23,46 +23,6 @@ class BookmapPatternEngineTest {
     private static final long BASE = Instant.parse("2026-07-17T14:00:00Z").toEpochMilli();
 
     @Test
-    void detectsOfferBreakoutHoldAndPullbackRebreak() {
-        Fixture hold = new Fixture();
-        hold.bbo(9_999, 10_001, BASE);
-        hold.qualifyAndClear(false, 10_000, BASE + 100);
-        hold.bbo(10_001, 10_002, BASE + 1_301);
-        hold.time(BASE + 3_800);
-        BookmapPatternSignal holdSignal = hold.last(PatternType.OFFER_WALL_BREAKOUT);
-        assertNotNull(holdSignal);
-        assertRule(holdSignal, "break.hold");
-
-        Fixture pullback = new Fixture();
-        pullback.bbo(9_999, 10_001, BASE);
-        pullback.qualifyAndClear(false, 10_000, BASE + 100);
-        pullback.trade(10_005, 10, true, BASE + 1_350);
-        pullback.trade(10_002, 10, true, BASE + 1_400);
-        pullback.trade(10_006, 10, true, BASE + 1_450);
-        BookmapPatternSignal pullbackSignal = pullback.last(PatternType.OFFER_WALL_BREAKOUT);
-        assertNotNull(pullbackSignal);
-        assertRule(pullbackSignal, "break.pullback_rebreak");
-    }
-
-    @Test
-    void detectsBidBreakdownHoldAndPullbackRebreak() {
-        Fixture hold = new Fixture();
-        hold.bbo(9_999, 10_001, BASE);
-        hold.qualifyAndClear(true, 10_000, BASE + 100);
-        hold.bbo(9_997, 9_999, BASE + 1_301);
-        hold.time(BASE + 3_800);
-        assertRule(hold.last(PatternType.BID_WALL_BREAKDOWN), "break.hold");
-
-        Fixture pullback = new Fixture();
-        pullback.bbo(9_999, 10_001, BASE);
-        pullback.qualifyAndClear(true, 10_000, BASE + 100);
-        pullback.trade(9_995, 10, false, BASE + 1_350);
-        pullback.trade(9_998, 10, false, BASE + 1_400);
-        pullback.trade(9_994, 10, false, BASE + 1_450);
-        assertRule(pullback.last(PatternType.BID_WALL_BREAKDOWN), "break.pullback_rebreak");
-    }
-
-    @Test
     void detectsOfferAndBidReappear() {
         Fixture offer = new Fixture();
         offer.bbo(9_997, 9_998, BASE);
@@ -128,7 +88,7 @@ class BookmapPatternEngineTest {
     }
 
     @Test
-    void rejectsFlashPullAndWrongAggressor() {
+    void rejectsFlashPull() {
         Fixture flash = new Fixture();
         flash.depth(false, 10_000, 100, BASE + 100);
         flash.depth(false, 10_000, 0, BASE + 300);
@@ -137,16 +97,6 @@ class BookmapPatternEngineTest {
         flash.depth(false, 10_000, 0, BASE + 900);
         flash.time(BASE + 1_500);
         assertTrue(flash.signals.isEmpty());
-
-        Fixture wrongAggressor = new Fixture();
-        wrongAggressor.bbo(10_001, 10_002, BASE);
-        wrongAggressor.depth(false, 10_000, 100, BASE + 100);
-        wrongAggressor.time(BASE + 600);
-        wrongAggressor.trade(10_000, 100, false, BASE + 700);
-        wrongAggressor.depth(false, 10_000, 10, BASE + 800);
-        wrongAggressor.time(BASE + 1_300);
-        wrongAggressor.time(BASE + 4_000);
-        assertFalse(wrongAggressor.has(PatternType.OFFER_WALL_BREAKOUT));
 
     }
 
@@ -165,7 +115,7 @@ class BookmapPatternEngineTest {
         inactive.time(BASE + 3_800);
         assertTrue(inactive.signals.isEmpty());
 
-        Fixture wrong = new Fixture(EnumSet.of(PatternType.BID_WALL_BREAKDOWN));
+        Fixture wrong = new Fixture(EnumSet.of(PatternType.BID_STEP_UP));
         wrong.bbo(10_001, 10_002, BASE);
         wrong.qualifyAndClear(false, 10_000, BASE + 100);
         wrong.time(BASE + 3_800);
@@ -208,44 +158,17 @@ class BookmapPatternEngineTest {
         fixture.bbo(10_001, 10_002, BASE + 1_400);
         fixture.time(BASE + 4_000);
 
-        assertFalse(fixture.has(PatternType.OFFER_WALL_BREAKOUT));
+        assertFalse(fixture.has(PatternType.OFFER_REAPPEAR));
     }
 
     @Test
-    void penalizesNearbyOpposingLiquidityAndStackedSweep() {
-        Fixture nearby = new Fixture();
-        nearby.bbo(9_999, 10_001, BASE);
-        nearby.qualifyAndClear(true, 10_000, BASE + 100);
-        nearby.depth(true, 9_999, 250, BASE + 1_350);
-        nearby.bbo(9_997, 9_999, BASE + 1_400);
-        nearby.time(BASE + 3_800);
-        assertRule(nearby.last(PatternType.BID_WALL_BREAKDOWN), "liquidity.opposing_wall_2x");
-
-        Fixture sweep = new Fixture();
-        sweep.bbo(10_003, 10_004, BASE);
-        for (int price = 10_000; price <= 10_002; price++) {
-            sweep.depth(false, price, 100, BASE + 100);
-        }
-        sweep.time(BASE + 600);
-        for (int price = 10_000; price <= 10_002; price++) {
-            long offset = price - 10_000;
-            sweep.trade(price, 100, true, BASE + 700 + offset * 10);
-            sweep.depth(false, price, 10, BASE + 800 + offset * 10);
-        }
-        sweep.time(BASE + 1_320);
-        sweep.time(BASE + 3_900);
-        assertTrue(sweep.signals.stream()
-                .filter(signal -> signal.getPatternType() == PatternType.OFFER_WALL_BREAKOUT)
-                .anyMatch(signal -> hasRule(signal, "break.stacked_sweep")));
-    }
-
     @Test
     void eventTimeMakesReplaySpeedIrrelevant() throws Exception {
-        Fixture first = breakoutFixture();
+        Fixture first = reappearFixture();
         Thread.sleep(5);
-        Fixture second = breakoutFixture();
-        BookmapPatternSignal a = first.last(PatternType.OFFER_WALL_BREAKOUT);
-        BookmapPatternSignal b = second.last(PatternType.OFFER_WALL_BREAKOUT);
+        Fixture second = reappearFixture();
+        BookmapPatternSignal a = first.last(PatternType.OFFER_REAPPEAR);
+        BookmapPatternSignal b = second.last(PatternType.OFFER_REAPPEAR);
         assertEquals(a.getScore(), b.getScore());
         assertEquals(a.getContributions().size(), b.getContributions().size());
         assertEquals(a.getEventTimeNs(), b.getEventTimeNs());
@@ -294,34 +217,18 @@ class BookmapPatternEngineTest {
         assertEquals(1, lines.getLinesCalls, "configured-level provider should be shared");
     }
 
-    @Test
-    void vwapComesOnlyFromTheAuthoritativeExternalProvider() {
-        double[] authoritativeVwapTick = {10_025.5};
-        BookmapPatternEngine engine = new BookmapPatternEngine(
-                "TEST", 0.01, () -> 100, 95, new OrderBookState(),
-                new PriceLineStore(), new PriceZoneStore(),
-                () -> authoritativeVwapTick[0], type -> true, signal -> { });
-
-        engine.onTimestamp(BASE * 1_000_000L);
-        engine.onTrade(20_000, 5_000, true, (BASE + 100) * 1_000_000L);
-        assertEquals(10_025.5, engine.vwapTick(), 0.00001);
-
-        authoritativeVwapTick[0] = 10_030.0;
-        assertEquals(10_030.0, engine.vwapTick(), 0.00001);
-    }
-
     private static void depth(BookmapPatternEngine engine, OrderBookState book,
                               boolean bid, int price, int size, long timeMs) {
         book.update(bid, price, size);
         engine.onDepth(bid, price, size, timeMs * 1_000_000L);
     }
 
-    private static Fixture breakoutFixture() {
+    private static Fixture reappearFixture() {
         Fixture fixture = new Fixture();
         fixture.bbo(9_999, 10_001, BASE);
         fixture.qualifyAndClear(false, 10_000, BASE + 100);
-        fixture.bbo(10_001, 10_002, BASE + 1_301);
-        fixture.time(BASE + 3_800);
+        fixture.depth(false, 9_999, 100, BASE + 1_400);
+        fixture.time(BASE + 1_900);
         return fixture;
     }
 
