@@ -30,9 +30,12 @@ class WorkflowExecutionTest {
         assertEquals(13, children.get(0).getAsJsonObject().get("stopPrice").getAsDouble());
         assertEquals(12, children.get(1).getAsJsonObject().get("price").getAsDouble());
     }
-    @Test void qCancelsOnlyStopEntries() {
+    @Test void cCancelsOnlyStopEntries() {
         JsonObject state = ExtendedExecutionPlanTest.longState(); state.add("entries", JsonParser.parseString("[{\"orderID\":\"101\",\"orderType\":\"STOP\",\"quantity\":10,\"price\":11,\"isBuy\":true},{\"orderID\":\"102\",\"orderType\":\"LIMIT\",\"quantity\":10,\"price\":9,\"isBuy\":true}]").getAsJsonArray());
-        Plan plan = WorkflowHandler.handle(new Snapshot(state), "KeyQ", false); assertEquals(1, plan.requests.size()); assertEquals("101", plan.requests.get(0).orderId); assertEquals("DELETE", plan.requests.get(0).method); assertTrue(plan.clearPending);
+        for (boolean shift : new boolean[]{false, true}) {
+            Plan plan = KeyboardHandler.handleKeyPressed(new Snapshot(state), "KeyC", shift, Double.NaN); assertEquals(1, plan.requests.size()); assertEquals("101", plan.requests.get(0).orderId); assertEquals("DELETE", plan.requests.get(0).method); assertTrue(plan.clearPending);
+            assertFalse(KeyboardHandler.supports("KeyQ", shift));
+        }
     }
     @Test void pendingRefreshReplacesTriggerAndCapturesFreshLocalSizingWithoutPlanConfigs() {
         JsonObject state = ExtendedExecutionPlanTest.longState(); state.addProperty("netQuantity", 0); state.add("pairs", new JsonArray());

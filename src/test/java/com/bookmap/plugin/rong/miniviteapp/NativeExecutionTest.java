@@ -128,7 +128,7 @@ class NativeExecutionTest {
         final AtomicInteger mutations = new AtomicInteger();
         final HttpServer server;
         final MiniViteApp engine;
-        JsonObject state = fixture("cancel all entries below threshold");
+        JsonObject state = fixture("cancel only stop entries below threshold");
         volatile int mutationStatus = 204;
         volatile int rejectMutationNumber;
         volatile int readStatus = 200;
@@ -141,6 +141,8 @@ class NativeExecutionTest {
         final CountDownLatch mutationEntered = new CountDownLatch(1);
         volatile CountDownLatch allowMutation;
         Rig() throws Exception {
+            // Most execution-lifecycle checks need two cancellable STOP entries.
+            state.getAsJsonArray("entries").get(1).getAsJsonObject().addProperty("orderType", "STOP");
             server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
             server.createContext("/accounts/", exchange -> {
                 try {

@@ -101,7 +101,7 @@ class TradingRuntimeTest {
             assertThrows(IllegalStateException.class, () -> runtime.exportExecutions(Format.SUMMARY), "Yesterday's cached fills must not be exported as today"); now.set(sameDay);
             runtime.pendingPersistence().get(2, TimeUnit.SECONDS);
             // The cache has only terminal fills. Cancel must discover a newly submitted broker order.
-            orderData.set("[{\"orderId\":\"456\",\"orderStrategyType\":\"TRIGGER\",\"orderType\":\"LIMIT\",\"status\":\"WORKING\",\"cancelable\":true,\"quantity\":10,\"price\":9,\"orderLegCollection\":[{\"instruction\":\"BUY\",\"instrument\":{\"symbol\":\"AAPL\",\"assetType\":\"EQUITY\"}}]}]");
+            orderData.set("[{\"orderId\":\"456\",\"orderStrategyType\":\"TRIGGER\",\"orderType\":\"STOP\",\"status\":\"WORKING\",\"cancelable\":true,\"quantity\":10,\"price\":9,\"orderLegCollection\":[{\"instruction\":\"BUY\",\"instrument\":{\"symbol\":\"AAPL\",\"assetType\":\"EQUITY\"}}]}]");
             runtime.dispatch(json("{\"symbol\":\"AAPL\",\"keyCode\":\"KeyC\"}"));
             deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(2);
             while (canceledOrders.isEmpty() && System.nanoTime() < deadline) Thread.sleep(5);

@@ -323,8 +323,7 @@ public final class TradingRuntime implements AutoCloseable {
             events.detail(symbol, "Cancel broker order refresh completed; fetched=" + orders.size()
                     + "; pendingEntries=" + input.getAsJsonArray("entries").size()
                     + "; exitPairs=" + input.getAsJsonArray("pairs").size()
-                    + "; selection=" + (input.getAsJsonArray("pairs").size() < number(policy, "batchCount") * 0.4
-                    ? "all pending entries" : "STOP entries only"));
+                    + "; selection=STOP entries only");
             publishToken();
             JsonObject update = message("execution_state"); JsonArray symbols = new JsonArray(); symbols.add(input); update.add("symbols", symbols);
             synchronized (execution) { execution.receive(this, update); execution.route(command); }

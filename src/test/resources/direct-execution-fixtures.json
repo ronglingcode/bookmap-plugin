@@ -1,6 +1,6 @@
 [
   {
-    "name": "cancel all entries below threshold",
+    "name": "cancel only stop entries below threshold",
     "key": "KeyC",
     "shift": false,
     "price": null,
@@ -95,10 +95,6 @@
       {
         "method": "DELETE",
         "orderId": "101"
-      },
-      {
-        "method": "DELETE",
-        "orderId": "102"
       }
     ],
     "error": false,

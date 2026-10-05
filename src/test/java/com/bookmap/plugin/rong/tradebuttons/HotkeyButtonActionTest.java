@@ -11,13 +11,13 @@ class HotkeyButtonActionTest {
     @Test
     void cancelMessageMatchesCancelButtonPayloadWithoutPrice() {
         JsonObject json = HotkeyButtonAction.createMessage(
-                "AAPL", "cancel", "Cancel", "KeyC", false, 123L);
+                "AAPL", "cancel", "Cancel Entry", "KeyC", false, 123L);
 
         assertEquals("custom_button_click", json.get("type").getAsString());
         assertEquals("real", json.get("priceUnit").getAsString());
         assertEquals("AAPL", json.get("symbol").getAsString());
         assertEquals("hotkey:cancel", json.get("button_id").getAsString());
-        assertEquals("Cancel", json.get("button_name").getAsString());
+        assertEquals("Cancel Entry", json.get("button_name").getAsString());
         assertEquals("KeyC", json.get("keyCode").getAsString());
         assertEquals("KeyC", json.get("key_code").getAsString());
         assertFalse(json.get("shiftKey").getAsBoolean());

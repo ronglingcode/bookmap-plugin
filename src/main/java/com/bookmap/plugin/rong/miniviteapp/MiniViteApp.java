@@ -196,7 +196,7 @@ public final class MiniViteApp implements AutoCloseable {
         String accessToken = "";
         if (plan.requests.isEmpty()) {
             outcome = "no_op";
-            reason = plan.action.equals("cancel_pending_entries")
+            reason = plan.action.equals("cancel_breakout_entries")
                     ? state.entries.isEmpty() ? "No pending entry orders found in the execution snapshot"
                     : "No pending entries selected by the stop-only cancellation rule"
                     : "Execution plan contains no broker requests";

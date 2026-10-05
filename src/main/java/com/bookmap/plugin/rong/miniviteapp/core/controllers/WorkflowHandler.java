@@ -10,10 +10,9 @@ import static com.bookmap.plugin.rong.miniviteapp.models.DomainJson.*;
 /** Additional manual/periodic workflows. Decisions mirror TS core, requests remain explicit. */
 public final class WorkflowHandler {
     private WorkflowHandler() { }
-    public static boolean supports(String key) { return key.equals("KeyQ") || key.equals("KeyP") || key.equals("RefreshEntryStop"); }
+    public static boolean supports(String key) { return key.equals("KeyP") || key.equals("RefreshEntryStop"); }
     public static Plan handle(Snapshot state, String key, boolean shift) {
         Models.require(supports(key), "unsupported native workflow: " + key);
-        if (key.equals("KeyQ")) { Plan plan = new Plan("cancel_breakout_entries"); plan.clearPending = true; state.entries.stream().filter(order -> order.type.equals("STOP")).forEach(order -> Broker.cancelOrders(plan, order)); return plan; }
         Models.require(state.entryContext != null, "workflow inputs unavailable");
         JsonObject active = object(state.entryContext, "activeTrade");
         if (key.equals("RefreshEntryStop")) {

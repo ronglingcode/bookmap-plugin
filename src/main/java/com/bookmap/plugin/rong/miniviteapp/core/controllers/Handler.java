@@ -11,9 +11,8 @@ import java.util.List;
 public final class Handler {
     private Handler() { }
     public static Plan cancelKeyPressed(Snapshot state) {
-        Plan plan = new Plan("cancel_pending_entries"); plan.clearPending = true;
-        boolean all = state.pairs.size() < state.batchCount * 0.4;
-        state.entries.stream().filter(order -> all || order.type.equals("STOP"))
+        Plan plan = new Plan("cancel_breakout_entries"); plan.clearPending = true;
+        state.entries.stream().filter(order -> order.type.equals("STOP"))
                 .forEach(order -> Broker.cancelOrders(plan, order));
         return plan;
     }

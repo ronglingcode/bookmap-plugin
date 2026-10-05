@@ -19,8 +19,7 @@ The earlier flag-based rollout is historical; this document supersedes it.
 | Opposite-position breakout | Adjust old protective stops to the new entry price, then submit the new protected entry. |
 | A / Add Partial / Shift+A | Protected partial reload at hover/custom price or market with Shift; retain browser low-risk override and hard entry boundary. |
 | W / Swap | Close/reenter in the original direction. A pending same-direction entry instead closes all but the last exit pair. Preserves 500ms close/reentry or 750ms cancel/close workflow delays. |
-| C / Cancel | Existing cancel behavior: pending entries when the exit-pair threshold applies, otherwise STOP entries only; clear pending timer. |
-| Q / Cancel Entries | Cancel STOP breakout entries only; clear pending timer. |
+| C / Cancel Entry | Refresh broker orders, cancel STOP breakout entries only and clear pending timer. |
 | F / Flatten | Preserve uncovered-share branch, otherwise market out exit pairs and any remainder. Core-target protection does not prevent Flatten. |
 | M / Numpad1 / Market Out 1 | Market out the first pair tied for smallest share quantity. |
 | Other numpad digits | Market out the indexed partial; 0 means tenth. |
