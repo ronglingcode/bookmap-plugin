@@ -23,6 +23,11 @@ import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 
 public class SignalWebSocketServer extends WebSocketServer {
+    private final com.bookmap.plugin.rong.patterns.CairoObservationExport observationExport = new com.bookmap.plugin.rong.patterns.CairoObservationExport();
+    public void exportPattern(com.bookmap.plugin.rong.patterns.BookmapPatternSignal signal) {
+        JsonObject observation = observationExport.episode(signal);
+        if (observation != null) broadcast(observation.toString());
+    }
     private java.util.function.Consumer<JsonObject> tradingDispatch = action -> PluginLog.action(SymbolUtils.cleanSymbol(getString(action, "symbol")), "Native runtime unavailable; no action sent");
     public void setTradingDispatch(java.util.function.Consumer<JsonObject> dispatch) { tradingDispatch = dispatch; }
     /** All local actions go directly to the standalone runtime. */

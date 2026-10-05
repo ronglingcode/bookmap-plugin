@@ -765,6 +765,8 @@ public class RongPlugin implements CustomModuleAdapter,
     private void handlePatternSignal(BookmapPatternSignal signal) {
         PatternSignalStore store = patternSignalStore;
         if (store != null) store.addOrUpdate(signal);
+        SignalWebSocketServer server = sharedServer;
+        if (server != null) server.exportPattern(signal);
     }
 
     private void playWallChangeSound(OrderWallChangeEvent event) {
