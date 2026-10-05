@@ -128,40 +128,7 @@ class BookmapPatternEngineTest {
     }
 
     @Test
-    void offerVShapeWaitsForRecordedLowBreakAndUsesPreTradeExtreme() {
-        Fixture fixture = new Fixture();
-        fixture.trade(10_050, 10, true, BASE + 10);
-        fixture.trade(9_900, 10, false, BASE + 20);
-        fixture.bbo(9_999, 10_001, BASE + 30);
-        fixture.qualifyAndClear(false, 10_000, BASE + 100);
-        fixture.trade(9_999, 10, false, BASE + 1_350);
-        assertFalse(fixture.has(PatternType.OFFER_V_SHAPE_REJECTION));
-        fixture.trade(9_900, 10, false, BASE + 1_400);
-        assertFalse(fixture.has(PatternType.OFFER_V_SHAPE_REJECTION));
-        fixture.trade(9_899, 10, false, BASE + 1_450);
-        BookmapPatternSignal signal = fixture.last(PatternType.OFFER_V_SHAPE_REJECTION);
-        assertNotNull(signal);
-        assertEquals(9_899, signal.getTriggerPriceTick());
-        assertRule(signal, "vshape.extreme_15s");
-    }
-
-    @Test
-    void bidVShapeWaitsForRecordedHighBreakAndUsesPreTradeExtreme() {
-        Fixture fixture = new Fixture();
-        fixture.trade(9_950, 10, false, BASE + 10);
-        fixture.trade(10_100, 10, true, BASE + 20);
-        fixture.bbo(9_999, 10_001, BASE + 30);
-        fixture.qualifyAndClear(true, 10_000, BASE + 100);
-        fixture.trade(10_001, 10, true, BASE + 1_350);
-        assertFalse(fixture.has(PatternType.BID_V_SHAPE_RECOVERY));
-        fixture.trade(10_100, 10, true, BASE + 1_400);
-        assertFalse(fixture.has(PatternType.BID_V_SHAPE_RECOVERY));
-        fixture.trade(10_101, 10, true, BASE + 1_450);
-        assertEquals(10_101, fixture.last(PatternType.BID_V_SHAPE_RECOVERY).getTriggerPriceTick());
-    }
-
-    @Test
-    void rejectsFlashPullWrongAggressorAndStaleVShape() {
+    void rejectsFlashPullAndWrongAggressor() {
         Fixture flash = new Fixture();
         flash.depth(false, 10_000, 100, BASE + 100);
         flash.depth(false, 10_000, 0, BASE + 300);
@@ -181,14 +148,6 @@ class BookmapPatternEngineTest {
         wrongAggressor.time(BASE + 4_000);
         assertFalse(wrongAggressor.has(PatternType.OFFER_WALL_BREAKOUT));
 
-        Fixture stale = new Fixture();
-        stale.trade(10_050, 10, true, BASE + 10);
-        stale.trade(9_900, 10, false, BASE + 20);
-        stale.qualifyAndClear(false, 10_000, BASE + 100);
-        stale.trade(9_999, 10, false, BASE + 1_350);
-        stale.time(BASE + 301_301);
-        stale.trade(9_899, 10, false, BASE + 301_400);
-        assertFalse(stale.has(PatternType.OFFER_V_SHAPE_REJECTION));
     }
 
     @Test

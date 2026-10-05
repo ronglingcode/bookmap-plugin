@@ -28,8 +28,8 @@ class PatternSignalArtifactsTest {
     @Test
     void painterBadgeUsesRequestedHeatmapHeadlineAndReasons() {
         BookmapPatternSignal signal = signal("episode", 82, 1_000);
-        assertEquals("SHORT · Offer V-Shape · 82", PatternSignalPainter.headline(signal));
-        assertTrue(PatternSignalPainter.reasonLine(signal).contains("fast extreme break"));
+        assertEquals("SHORT · Offer Reappear · 82", PatternSignalPainter.headline(signal));
+        assertTrue(PatternSignalPainter.reasonLine(signal).contains("wall reappeared"));
         assertTrue(PatternSignalPainter.reasonLine(signal).contains("nearby large bid"));
     }
 
@@ -37,14 +37,14 @@ class PatternSignalArtifactsTest {
         return new BookmapPatternSignal(
                 episode,
                 "TEST",
-                PatternType.OFFER_V_SHAPE_REJECTION,
+                PatternType.OFFER_REAPPEAR,
                 9_900,
                 99.0,
                 10_000,
                 100,
                 score,
                 Arrays.asList(
-                        new ScoreContribution("vshape.extreme_15s", 15, "fast extreme break"),
+                        new ScoreContribution("reappear.comparable_wall", 15, "wall reappeared"),
                         new ScoreContribution("liquidity.opposing_wall_2x", -20, "nearby large bid")),
                 createdAtMs * 1_000_000L,
                 createdAtMs);

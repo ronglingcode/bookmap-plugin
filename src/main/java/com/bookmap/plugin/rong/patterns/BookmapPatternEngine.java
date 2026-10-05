@@ -130,8 +130,6 @@ public final class BookmapPatternEngine implements PatternRuntimeContext, Patter
         definitions.add(new ReappearPatternDefinition(PatternType.BID_REAPPEAR, true));
         definitions.add(new StepPatternDefinition(PatternType.OFFER_STEP_DOWN, false));
         definitions.add(new StepPatternDefinition(PatternType.BID_STEP_UP, true));
-        definitions.add(new VShapePatternDefinition(PatternType.OFFER_V_SHAPE_REJECTION, false));
-        definitions.add(new VShapePatternDefinition(PatternType.BID_V_SHAPE_RECOVERY, true));
         for (PatternDefinition definition : definitions) {
             definitionsByType.put(definition.type(), definition);
         }

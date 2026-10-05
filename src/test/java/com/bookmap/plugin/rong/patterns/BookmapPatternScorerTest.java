@@ -42,9 +42,7 @@ class BookmapPatternScorerTest {
                 new ReappearPatternDefinition(PatternType.OFFER_REAPPEAR, false),
                 new ReappearPatternDefinition(PatternType.BID_REAPPEAR, true),
                 new StepPatternDefinition(PatternType.OFFER_STEP_DOWN, false),
-                new StepPatternDefinition(PatternType.BID_STEP_UP, true),
-                new VShapePatternDefinition(PatternType.OFFER_V_SHAPE_REJECTION, false),
-                new VShapePatternDefinition(PatternType.BID_V_SHAPE_RECOVERY, true)
+                new StepPatternDefinition(PatternType.BID_STEP_UP, true)
         };
         for (PatternDefinition definition : definitions) {
             boolean expected = definition.type().getFamily() == PatternType.Family.BREAK;
@@ -83,8 +81,6 @@ class BookmapPatternScorerTest {
                 .confirmation(type.getFamily() == PatternType.Family.BREAK ? "hold" : "test")
                 .replacementSizeRatio(1.0)
                 .defendedMs(1_000)
-                .reversalDelayMs(2_000)
-                .extremeBreakDelayMs(15_000)
                 .event(10_000_000_000L, 10_000);
         return builder.build();
     }
@@ -97,8 +93,6 @@ class BookmapPatternScorerTest {
                 return new ReappearPatternDefinition(type, type.isBidWallPattern());
             case STEP:
                 return new StepPatternDefinition(type, type.isBidWallPattern());
-            case V_SHAPE:
-                return new VShapePatternDefinition(type, type.isBidWallPattern());
             default:
                 throw new IllegalArgumentException(type.name());
         }
