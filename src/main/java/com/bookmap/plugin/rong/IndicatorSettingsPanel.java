@@ -156,7 +156,7 @@ public class IndicatorSettingsPanel extends StrategyPanel {
 
         gbc.gridy++;
         JCheckBox fireKeyboardEventCheckbox = new JCheckBox(
-                "Chart Hotkeys (B/S, A/W, C/F/Q/P, G/H/T, J/K/L, Z/Space, digits/numpad/M)",
+                "Chart Hotkeys (B/S, A/W, C/F/Q/P, G/H/T, Z/Space, digits/numpad/M)",
                 config.isEnabled(IndicatorConfig.FIRE_KEYBOARD_EVENT));
         fireKeyboardEventCheckbox.addActionListener(e ->
                 config.setEnabled(IndicatorConfig.FIRE_KEYBOARD_EVENT, fireKeyboardEventCheckbox.isSelected()));
