@@ -16,7 +16,6 @@ import java.util.Map;
 import java.util.NavigableMap;
 import java.util.Objects;
 import java.util.function.Consumer;
-import java.util.function.DoubleSupplier;
 import java.util.function.IntSupplier;
 
 import com.bookmap.plugin.rong.BookmapPriceNormalizer;
@@ -46,7 +45,6 @@ public final class BookmapPatternEngine implements PatternRuntimeContext, Patter
     private static final long ATTRIBUTION_WINDOW_MS = 2_000;
     private static final double CLEAR_REMAINING_RATIO = 0.10;
     private static final double CLEAR_ATTRIBUTION_RATIO = 0.70;
-    private static final long SWEEP_WINDOW_MS = 1_000;
 
     private final String instrumentAlias;
     private final double pips;
@@ -55,7 +53,6 @@ public final class BookmapPatternEngine implements PatternRuntimeContext, Patter
     private final OrderBookState orderBook;
     private final PriceLineStore priceLineStore;
     private final PriceZoneStore priceZoneStore;
-    private final DoubleSupplier vwapTickSupplier;
     private final PatternEligibility eligibility;
     private final Consumer<BookmapPatternSignal> signalConsumer;
     private final List<PatternDefinition> definitions = new ArrayList<>();
@@ -64,7 +61,6 @@ public final class BookmapPatternEngine implements PatternRuntimeContext, Patter
     private final BookmapPatternScorer scorer = new BookmapPatternScorer();
     private final Map<LevelKey, WallPhase> wallPhases = new LinkedHashMap<>();
     private final Deque<RecentTrade> recentTrades = new ArrayDeque<>();
-    private final Deque<ClearedWall> recentClears = new ArrayDeque<>();
     private final Map<String, Boolean> alignmentCache = new HashMap<>();
     private final Map<String, Integer> obstacleCache = new HashMap<>();
 
@@ -90,30 +86,6 @@ public final class BookmapPatternEngine implements PatternRuntimeContext, Patter
             PriceZoneStore priceZoneStore,
             PatternEligibility eligibility,
             Consumer<BookmapPatternSignal> signalConsumer) {
-        this(
-                instrumentAlias,
-                pips,
-                wallThresholdFloor,
-                wallPercentile,
-                orderBook,
-                priceLineStore,
-                priceZoneStore,
-                () -> Double.NaN,
-                eligibility,
-                signalConsumer);
-    }
-
-    public BookmapPatternEngine(
-            String instrumentAlias,
-            double pips,
-            IntSupplier wallThresholdFloor,
-            double wallPercentile,
-            OrderBookState orderBook,
-            PriceLineStore priceLineStore,
-            PriceZoneStore priceZoneStore,
-            DoubleSupplier vwapTickSupplier,
-            PatternEligibility eligibility,
-            Consumer<BookmapPatternSignal> signalConsumer) {
         this.instrumentAlias = Objects.requireNonNull(instrumentAlias, "instrumentAlias");
         this.pips = pips;
         this.wallThresholdFloor = Objects.requireNonNull(wallThresholdFloor, "wallThresholdFloor");
@@ -121,17 +93,12 @@ public final class BookmapPatternEngine implements PatternRuntimeContext, Patter
         this.orderBook = Objects.requireNonNull(orderBook, "orderBook");
         this.priceLineStore = Objects.requireNonNull(priceLineStore, "priceLineStore");
         this.priceZoneStore = Objects.requireNonNull(priceZoneStore, "priceZoneStore");
-        this.vwapTickSupplier = Objects.requireNonNull(vwapTickSupplier, "vwapTickSupplier");
         this.eligibility = Objects.requireNonNull(eligibility, "eligibility");
         this.signalConsumer = Objects.requireNonNull(signalConsumer, "signalConsumer");
-        definitions.add(new WallBreakPatternDefinition(PatternType.OFFER_WALL_BREAKOUT, false));
-        definitions.add(new WallBreakPatternDefinition(PatternType.BID_WALL_BREAKDOWN, true));
         definitions.add(new ReappearPatternDefinition(PatternType.OFFER_REAPPEAR, false));
         definitions.add(new ReappearPatternDefinition(PatternType.BID_REAPPEAR, true));
         definitions.add(new StepPatternDefinition(PatternType.OFFER_STEP_DOWN, false));
         definitions.add(new StepPatternDefinition(PatternType.BID_STEP_UP, true));
-        definitions.add(new VShapePatternDefinition(PatternType.OFFER_V_SHAPE_REJECTION, false));
-        definitions.add(new VShapePatternDefinition(PatternType.BID_V_SHAPE_RECOVERY, true));
         for (PatternDefinition definition : definitions) {
             definitionsByType.put(definition.type(), definition);
         }
@@ -149,14 +116,12 @@ public final class BookmapPatternEngine implements PatternRuntimeContext, Patter
         ready = false;
         resetPatternLifecycle();
         recentTrades.clear();
-        recentClears.clear();
     }
 
     /** Clears all event-derived state when automation is toggled without processing disabled events. */
     public synchronized void resetForFeatureToggle() {
         resetPatternLifecycle();
         recentTrades.clear();
-        recentClears.clear();
         sessionDate = null;
         regularSession = false;
         lifecycleSeededForSession = false;
@@ -351,7 +316,7 @@ public final class BookmapPatternEngine implements PatternRuntimeContext, Patter
                 }
             }
         }
-        for (WallPhase phase : qualified) dispatchQualified(phase.snapshot(0, 0, 0, false));
+        for (WallPhase phase : qualified) dispatchQualified(phase.snapshot(0, 0, 0));
         for (WallPhase phase : cleared) dispatchCleared(phase);
         for (LevelKey key : removed) wallPhases.remove(key);
     }
@@ -363,20 +328,10 @@ public final class BookmapPatternEngine implements PatternRuntimeContext, Patter
     }
 
     private void dispatchCleared(WallPhase phase) {
-        pruneRecentClears(phase.pendingClearAtMs);
-        int nearTicks = nearDistanceTicks(phase.priceTick);
-        int stacked = 1;
-        for (ClearedWall previous : recentClears) {
-            if (previous.bid == phase.bid
-                    && Math.abs(previous.priceTick - phase.priceTick) <= nearTicks) stacked++;
-        }
-        boolean sweep = stacked >= 3;
-        recentClears.addLast(new ClearedWall(phase.bid, phase.priceTick, phase.pendingClearAtMs));
         WallSnapshot wall = phase.snapshot(
                 phase.pendingClearAtMs,
                 phase.highAtPending,
-                phase.lowAtPending,
-                sweep);
+                phase.lowAtPending);
         for (PatternDefinition definition : definitions) {
             if (eligibility.isEnabled(definition.type())) definition.onWallCleared(wall, this);
         }
@@ -414,16 +369,8 @@ public final class BookmapPatternEngine implements PatternRuntimeContext, Patter
         }
     }
 
-    private void pruneRecentClears(long nowMs) {
-        while (!recentClears.isEmpty()
-                && nowMs - recentClears.peekFirst().timeMs > SWEEP_WINDOW_MS) {
-            recentClears.removeFirst();
-        }
-    }
-
     private void resetPatternLifecycle() {
         wallPhases.clear();
-        recentClears.clear();
         for (PatternDefinition definition : definitions) definition.reset();
     }
 
@@ -488,12 +435,6 @@ public final class BookmapPatternEngine implements PatternRuntimeContext, Patter
         if (bestBidTick > 0 && bestAskTick > 0) return (bestBidTick + bestAskTick) / 2;
         int quote = Math.max(bestBidTick, bestAskTick);
         return quote > 0 ? quote : lastTradeTick;
-    }
-
-    @Override
-    public double vwapTick() {
-        double vwapTick = vwapTickSupplier.getAsDouble();
-        return Double.isFinite(vwapTick) && vwapTick > 0 ? vwapTick : Double.NaN;
     }
 
     @Override
@@ -607,11 +548,11 @@ public final class BookmapPatternEngine implements PatternRuntimeContext, Patter
             this.firstSeenMs = firstSeenMs;
         }
 
-        WallSnapshot snapshot(long clearedAtMs, int highAtClear, int lowAtClear, boolean sweep) {
+        WallSnapshot snapshot(long clearedAtMs, int highAtClear, int lowAtClear) {
             return new WallSnapshot(
                     phaseId, bid, priceTick, initialSize, peakSize, currentSize,
-                    firstSeenMs, qualifiedAtMs, clearedAtMs, tradedAtPending,
-                    effectiveThreshold, highAtClear, lowAtClear, sweep);
+                    firstSeenMs, qualifiedAtMs, clearedAtMs,
+                    effectiveThreshold, highAtClear, lowAtClear);
         }
     }
 
@@ -632,15 +573,4 @@ public final class BookmapPatternEngine implements PatternRuntimeContext, Patter
         }
     }
 
-    private static final class ClearedWall {
-        final boolean bid;
-        final int priceTick;
-        final long timeMs;
-
-        ClearedWall(boolean bid, int priceTick, long timeMs) {
-            this.bid = bid;
-            this.priceTick = priceTick;
-            this.timeMs = timeMs;
-        }
-    }
 }

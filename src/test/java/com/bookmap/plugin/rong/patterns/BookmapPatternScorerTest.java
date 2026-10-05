@@ -4,9 +4,6 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import java.util.EnumMap;
-import java.util.Map;
-
 import org.junit.jupiter.api.Test;
 
 class BookmapPatternScorerTest {
@@ -14,53 +11,24 @@ class BookmapPatternScorerTest {
     private final BookmapPatternScorer scorer = new BookmapPatternScorer();
 
     @Test
-    void vwapAffectsOnlyBreakPatterns() {
-        Map<PatternType, Integer> withLowVwap = new EnumMap<>(PatternType.class);
-        Map<PatternType, Integer> withHighVwap = new EnumMap<>(PatternType.class);
-        for (PatternType type : PatternType.values()) {
-            PatternCandidate candidate = candidate(type);
-            withLowVwap.put(type, scorer.score(candidate, new Context(90), definition(type)).score);
-            withHighVwap.put(type, scorer.score(candidate, new Context(110), definition(type)).score);
-        }
-
-        assertEquals(15, withLowVwap.get(PatternType.OFFER_WALL_BREAKOUT)
-                - withHighVwap.get(PatternType.OFFER_WALL_BREAKOUT));
-        assertEquals(-15, withLowVwap.get(PatternType.BID_WALL_BREAKDOWN)
-                - withHighVwap.get(PatternType.BID_WALL_BREAKDOWN));
-        for (PatternType type : PatternType.values()) {
-            if (type.getFamily() != PatternType.Family.BREAK) {
-                assertEquals(withLowVwap.get(type), withHighVwap.get(type), type.name());
-            }
-        }
-    }
-
-    @Test
-    void onlyBreakDefinitionsDeclareVwapDetail() {
+    void sessionExtremeDetailsBelongToStepPatterns() {
         PatternDefinition[] definitions = {
-                new WallBreakPatternDefinition(PatternType.OFFER_WALL_BREAKOUT, false),
-                new WallBreakPatternDefinition(PatternType.BID_WALL_BREAKDOWN, true),
                 new ReappearPatternDefinition(PatternType.OFFER_REAPPEAR, false),
                 new ReappearPatternDefinition(PatternType.BID_REAPPEAR, true),
                 new StepPatternDefinition(PatternType.OFFER_STEP_DOWN, false),
-                new StepPatternDefinition(PatternType.BID_STEP_UP, true),
-                new VShapePatternDefinition(PatternType.OFFER_V_SHAPE_REJECTION, false),
-                new VShapePatternDefinition(PatternType.BID_V_SHAPE_RECOVERY, true)
+                new StepPatternDefinition(PatternType.BID_STEP_UP, true)
         };
-        for (PatternDefinition definition : definitions) {
-            boolean expected = definition.type().getFamily() == PatternType.Family.BREAK;
-            assertEquals(expected,
-                    definition.requiredDetails().contains(PatternDetailKey.VWAP_ALIGNMENT),
-                    definition.type().name());
-        }
-        assertTrue(definitions[4].requiredDetails().contains(PatternDetailKey.SESSION_EXTREMES));
-        assertTrue(definitions[5].requiredDetails().contains(PatternDetailKey.SESSION_EXTREMES));
+        assertFalse(definitions[0].requiredDetails().contains(PatternDetailKey.SESSION_EXTREMES));
+        assertFalse(definitions[1].requiredDetails().contains(PatternDetailKey.SESSION_EXTREMES));
+        assertTrue(definitions[2].requiredDetails().contains(PatternDetailKey.SESSION_EXTREMES));
+        assertTrue(definitions[3].requiredDetails().contains(PatternDetailKey.SESSION_EXTREMES));
     }
 
     @Test
     void appliesMirroredNearbyWallPenaltyAndClamp() {
         PatternCandidate shortCandidate = candidate(PatternType.OFFER_REAPPEAR);
         BookmapPatternScorer.ScoreResult result = scorer.score(
-                shortCandidate, new Context(100) {
+                shortCandidate, new Context() {
             @Override
             public int largestOpposingWallSize(
                     Direction direction, int triggerPriceTick, int nearDistanceTicks) {
@@ -77,42 +45,29 @@ class BookmapPatternScorerTest {
         boolean bid = type.isBidWallPattern();
         WallSnapshot wall = new WallSnapshot(
                 "phase", bid, 100, 100, 200, 0,
-                0, 500, 10_000, 200, 100, 120, 80, false);
+                0, 500, 10_000, 200, 120, 80);
         PatternCandidate.Builder builder = PatternCandidate.builder(type, type.name(), wall)
                 .triggerPriceTick(100)
-                .confirmation(type.getFamily() == PatternType.Family.BREAK ? "hold" : "test")
+                .confirmation("test")
                 .replacementSizeRatio(1.0)
                 .defendedMs(1_000)
-                .reversalDelayMs(2_000)
-                .extremeBreakDelayMs(15_000)
                 .event(10_000_000_000L, 10_000);
         return builder.build();
     }
 
     private static PatternDefinition definition(PatternType type) {
         switch (type.getFamily()) {
-            case BREAK:
-                return new WallBreakPatternDefinition(type, type.isBidWallPattern());
             case REAPPEAR:
                 return new ReappearPatternDefinition(type, type.isBidWallPattern());
             case STEP:
                 return new StepPatternDefinition(type, type.isBidWallPattern());
-            case V_SHAPE:
-                return new VShapePatternDefinition(type, type.isBidWallPattern());
             default:
                 throw new IllegalArgumentException(type.name());
         }
     }
 
     private static class Context implements PatternScoringContext {
-        private final double vwap;
-
-        Context(double vwap) {
-            this.vwap = vwap;
-        }
-
         @Override public int currentPriceTick() { return 100; }
-        @Override public double vwapTick() { return vwap; }
         @Override public int nearDistanceTicks(int priceTick) { return 10; }
         @Override public int largestOpposingWallSize(
                 Direction direction, int triggerPriceTick, int nearDistanceTicks) { return 0; }

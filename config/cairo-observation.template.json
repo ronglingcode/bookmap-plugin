@@ -1,0 +1,6 @@
+{
+  "enabled": false,
+  "observerOnly": true,
+  "symbols": ["AAPL"],
+  "detectors": ["BID_STEP_UP", "BID_REAPPEAR"]
+}

@@ -121,7 +121,7 @@ class OrderbookWallThresholdTest {
     }
 
     @Test
-    void patternEligibilityUsesActiveMatchingBreakAndReversalTradebooks() {
+    void patternEligibilityUsesActiveMatchingReversalTradebooks() {
         SignalWebSocketServer server = new SignalWebSocketServer(0, 90);
         JsonObject config = new JsonObject();
         config.addProperty("type", "trade_button_config");
@@ -133,14 +133,10 @@ class OrderbookWallThresholdTest {
         config.add("tradebooks", tradebooks);
         localMessage(server, config.toString());
 
-        assertTrue(server.hasEnabledPatternTradebook("WEN", PatternType.OFFER_WALL_BREAKOUT));
         assertTrue(server.hasEnabledPatternTradebook("WEN", PatternType.BID_REAPPEAR));
         assertTrue(server.hasEnabledPatternTradebook("WEN", PatternType.BID_STEP_UP));
-        assertTrue(server.hasEnabledPatternTradebook("WEN", PatternType.BID_V_SHAPE_RECOVERY));
         assertTrue(server.hasEnabledPatternTradebook("WEN", PatternType.OFFER_REAPPEAR));
         assertTrue(server.hasEnabledPatternTradebook("WEN", PatternType.OFFER_STEP_DOWN));
-        assertTrue(server.hasEnabledPatternTradebook("WEN", PatternType.OFFER_V_SHAPE_REJECTION));
-        assertFalse(server.hasEnabledPatternTradebook("WEN", PatternType.BID_WALL_BREAKDOWN));
     }
 
     @Test

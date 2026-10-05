@@ -110,6 +110,7 @@ public class RongPlugin implements CustomModuleAdapter,
     private BookmapPatternEngine patternEngine;
     private volatile boolean patternAutomationEnabled;
     private volatile boolean patternSnapshotComplete;
+    private final com.bookmap.plugin.rong.patterns.CairoObservationConfig observationConfig = com.bookmap.plugin.rong.patterns.CairoObservationConfig.load();
     private boolean wallLabelsDirty;
     private long lastWallLabelRefreshMs;
     private long lastTimestampNs;
@@ -120,7 +121,7 @@ public class RongPlugin implements CustomModuleAdapter,
 
     @Override
     public void initialize(String alias, InstrumentInfo info, Api api, InitialState initialState) {
-        if (!LocalCredentials.fileExists()) return;
+        if (!LocalCredentials.fileExists() && !observationConfig.observerOnly) return;
         this.rawAlias = alias;
         String cleanAlias = SymbolUtils.cleanSymbol(alias);
         this.alias = cleanAlias;
@@ -178,9 +179,11 @@ public class RongPlugin implements CustomModuleAdapter,
                 filledExecutionManager = new FilledExecutionManager(filledExecutionStore);
                 sharedServer.registerAccountStateListener(filledExecutionManager);
             }
+            if (!observationConfig.observerOnly) {
             nativeApis.put(cleanAlias, api);
             if (nativeTrading == null) { nativeTrading = new NativeTradingAdapter(sharedServer, indicatorConfig, nativeConnectionStatus); nativeTrading.attach(cleanAlias, api); nativeTrading.start(); }
             else nativeTrading.attach(cleanAlias, api);
+            }
             instanceCount++;
             initialized = true;
         }
@@ -210,16 +213,16 @@ public class RongPlugin implements CustomModuleAdapter,
                 orderBook,
                 priceLineStore,
                 priceZoneStore,
-                this::getVwapTick,
-                patternType -> indicatorConfig != null
+                patternType -> observationConfig.eligible(cleanAlias, patternType) || (indicatorConfig != null
                         && indicatorConfig.isEnabled(IndicatorConfig.BOOKMAP_PATTERN_SIGNALS)
                         && sharedServer != null
-                        && sharedServer.hasEnabledPatternTradebook(cleanAlias, patternType),
+                        && sharedServer.hasEnabledPatternTradebook(cleanAlias, patternType)),
                 this::handlePatternSignal);
         this.patternAutomationEnabled = indicatorConfig.isEnabled(
                 IndicatorConfig.BOOKMAP_PATTERN_SIGNALS);
         indicatorConfig.addChangeListener(this);
         sharedServer.registerSymbol(cleanAlias, orderBook, info.pips);
+        if (observationConfig.enabled) sharedServer.observationReady(cleanAlias, false);
         sharedServer.registerVwapUpdateListener(cleanAlias, vwapUpdateListener);
         chartHoverHotkeyHandler.registerSymbol(cleanAlias, info.pips);
         priceZonePainter.registerInstrument(cleanAlias);
@@ -597,6 +600,7 @@ public class RongPlugin implements CustomModuleAdapter,
     public void onSnapshotEnd() {
         if (!initialized) return;
         patternSnapshotComplete = true;
+        if (sharedServer != null && observationConfig.enabled) sharedServer.observationReady(alias, true);
         if (wallChangeTracker != null) {
             wallChangeTracker.markReady();
         }
@@ -609,6 +613,8 @@ public class RongPlugin implements CustomModuleAdapter,
     public void onRealtimeStart() {
         if (!initialized) return;
         patternSnapshotComplete = true;
+        // This callback alone does not prove a live provider (replay can catch up).
+        if (sharedServer != null && observationConfig.enabled) sharedServer.observationReady(alias, true);
         if (wallChangeTracker != null) {
             wallChangeTracker.markReady();
         }
@@ -622,6 +628,7 @@ public class RongPlugin implements CustomModuleAdapter,
     }
 
     public static synchronized void restartNativeTrading() {
+        if (nativeApis.isEmpty()) return;
         if (!LocalCredentials.fileExists()) return;
         if (sharedServer == null) return;
         if (nativeTrading != null) nativeTrading.close();
@@ -710,7 +717,7 @@ public class RongPlugin implements CustomModuleAdapter,
     }
 
     private boolean shouldRunPatternAutomation() {
-        return patternAutomationEnabled && patternEngine != null;
+        return (patternAutomationEnabled || observationConfig.enabled) && patternEngine != null;
     }
 
     private int getEffectiveWallThreshold() {
@@ -766,6 +773,8 @@ public class RongPlugin implements CustomModuleAdapter,
     private void handlePatternSignal(BookmapPatternSignal signal) {
         PatternSignalStore store = patternSignalStore;
         if (store != null) store.addOrUpdate(signal);
+        SignalWebSocketServer server = sharedServer;
+        if (server != null && observationConfig.eligible(alias, signal.getPatternType())) server.exportPattern(signal);
     }
 
     private void playWallChangeSound(OrderWallChangeEvent event) {

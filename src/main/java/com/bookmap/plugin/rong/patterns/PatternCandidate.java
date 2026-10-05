@@ -10,8 +10,6 @@ final class PatternCandidate {
     final double replacementSizeRatio;
     final boolean betterDefensivePrice;
     final long defendedMs;
-    final long reversalDelayMs;
-    final long extremeBreakDelayMs;
     final long eventTimeNs;
     final long eventTimeMs;
 
@@ -25,8 +23,6 @@ final class PatternCandidate {
         replacementSizeRatio = builder.replacementSizeRatio;
         betterDefensivePrice = builder.betterDefensivePrice;
         defendedMs = builder.defendedMs;
-        reversalDelayMs = builder.reversalDelayMs;
-        extremeBreakDelayMs = builder.extremeBreakDelayMs;
         eventTimeNs = builder.eventTimeNs;
         eventTimeMs = builder.eventTimeMs;
     }
@@ -45,8 +41,6 @@ final class PatternCandidate {
         private double replacementSizeRatio;
         private boolean betterDefensivePrice;
         private long defendedMs;
-        private long reversalDelayMs = Long.MAX_VALUE;
-        private long extremeBreakDelayMs = Long.MAX_VALUE;
         private long eventTimeNs;
         private long eventTimeMs;
 
@@ -63,8 +57,6 @@ final class PatternCandidate {
         Builder replacementSizeRatio(double value) { replacementSizeRatio = value; return this; }
         Builder betterDefensivePrice(boolean value) { betterDefensivePrice = value; return this; }
         Builder defendedMs(long value) { defendedMs = value; return this; }
-        Builder reversalDelayMs(long value) { reversalDelayMs = value; return this; }
-        Builder extremeBreakDelayMs(long value) { extremeBreakDelayMs = value; return this; }
         Builder event(long timeNs, long timeMs) { eventTimeNs = timeNs; eventTimeMs = timeMs; return this; }
         PatternCandidate build() { return new PatternCandidate(this); }
     }
