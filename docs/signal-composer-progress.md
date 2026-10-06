@@ -217,3 +217,10 @@ Work is confined to `bookmap-plugin`. The user authorized sequential implementat
 - Changed files: src/main/java/com/bookmap/plugin/rong/IndicatorConfig.java, src/main/java/com/bookmap/plugin/rong/RongPlugin.java, src/test/java/com/bookmap/plugin/rong/SignalComposerActivationTest.java.
 - Verification: Composer and existing activation tests passed (5 tests): disabled defaults, malformed disarming, shared immutable rules/user toggle retention, alias eligibility, invalid pips, and no native runtime construction.
 - Next task: SC-31.
+
+## SC-31 — Route independent composition from Bookmap callbacks
+
+- Status: complete.
+- Changed files: src/main/java/com/bookmap/plugin/rong/RongPlugin.java, src/test/java/com/bookmap/plugin/rong/SignalComposerCallbacksTest.java.
+- Verification: Callback and activation suites passed (7 tests): composer works with legacy engine/tradebooks absent, one shared book update, readiness and market-time provenance gating, and no native runtime.
+- Next task: SC-32.

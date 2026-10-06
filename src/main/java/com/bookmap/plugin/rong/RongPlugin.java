@@ -5,6 +5,7 @@ import java.time.Duration;
 import com.bookmap.plugin.rong.signal.SignalComposerConfig;
 import com.bookmap.plugin.rong.signal.SignalCompositionPipeline;
 import com.bookmap.plugin.rong.signal.TradingSignalStore;
+import com.bookmap.plugin.rong.patterns.PatternEvent;
 
 import com.bookmap.plugin.rong.executions.FilledExecutionManager;
 import com.bookmap.plugin.rong.executions.FilledExecutionPainter;
@@ -585,16 +586,21 @@ public class RongPlugin implements CustomModuleAdapter,
     @Override
     public void onDepth(boolean isBid, int price, int size) {
         if (!initialized) return;
+        long eventTimeNs = getEventTimeNs();
+        PatternEvent.TimestampProvenance provenance = compositionProvenance();
         if (wallChangeTracker != null) {
-            wallChangeTracker.onDepth(isBid, price, size, getEventTimeNs());
+            wallChangeTracker.onDepth(isBid, price, size, eventTimeNs);
         }
         orderBook.update(isBid, price, size);
         plotBookAverage();
-        if (evidenceRecorder != null) evidenceRecorder.depth(isBid, price, size, getEventTimeNs(), lastTimestampNs <= 0);
+        if (evidenceRecorder != null) evidenceRecorder.depth(isBid, price, size, eventTimeNs, lastTimestampNs <= 0);
         if (shouldRunPatternAutomation()) {
-            patternEngine.onDepth(isBid, price, size, getEventTimeNs());
+            patternEngine.onDepth(isBid, price, size, eventTimeNs);
         }
-        if (wallLabelTracker != null && wallLabelTracker.onDepth(isBid, price, size, getEventTimeNs())) {
+        synchronized (compositionLock) {
+            if (shouldRunSignalComposition()) signalComposition.onDepth(isBid, price, size, eventTimeNs, provenance);
+        }
+        if (wallLabelTracker != null && wallLabelTracker.onDepth(isBid, price, size, eventTimeNs)) {
             wallLabelsDirty = true;
             refreshWallLabelsIfNeeded(false);
         }
@@ -604,6 +610,7 @@ public class RongPlugin implements CustomModuleAdapter,
     public void onTrade(double price, int size, TradeInfo tradeInfo) {
         if (!initialized) return;
         long eventTimeNs = getEventTimeNs();
+        PatternEvent.TimestampProvenance provenance = compositionProvenance();
         double realPrice = BookmapPriceNormalizer.toWirePrice(price, instrumentInfo.pips);
         int priceTick = (int) Math.round(price);
         if (evidenceRecorder != null) evidenceRecorder.trade(priceTick, size, tradeInfo == null ? null : tradeInfo.isBidAggressor, eventTimeNs, lastTimestampNs <= 0);
@@ -620,6 +627,10 @@ public class RongPlugin implements CustomModuleAdapter,
         if (shouldRunPatternAutomation()) {
             patternEngine.onTrade(price, size, tradeInfo, eventTimeNs);
         }
+        synchronized (compositionLock) {
+            if (shouldRunSignalComposition()) signalComposition.onTrade(priceTick, size,
+                    tradeInfo == null ? null : tradeInfo.isBidAggressor, eventTimeNs, provenance);
+        }
 
         if (wallLabelTracker != null && wallLabelTracker.cleanup(priceTick)) {
             wallLabelsDirty = true;
@@ -635,6 +646,9 @@ public class RongPlugin implements CustomModuleAdapter,
         if (shouldRunPatternAutomation()) {
             patternEngine.onTimestamp(timestampNs);
         }
+        synchronized (compositionLock) {
+            if (shouldRunSignalComposition()) signalComposition.onTimestamp(timestampNs, compositionProvenance());
+        }
         if (wallLabelTracker != null && wallLabelTracker.onTimestamp(timestampNs)) {
             wallLabelsDirty = true;
             refreshWallLabelsIfNeeded(true);
@@ -644,9 +658,14 @@ public class RongPlugin implements CustomModuleAdapter,
     @Override
     public void onBbo(int bidPrice, int bidSize, int askPrice, int askSize) {
         if (!initialized) return;
-        if (evidenceRecorder != null) evidenceRecorder.bbo(bidPrice, bidSize, askPrice, askSize, getEventTimeNs(), lastTimestampNs <= 0);
+        long eventTimeNs = getEventTimeNs();
+        PatternEvent.TimestampProvenance provenance = compositionProvenance();
+        if (evidenceRecorder != null) evidenceRecorder.bbo(bidPrice, bidSize, askPrice, askSize, eventTimeNs, lastTimestampNs <= 0);
         if (shouldRunPatternAutomation()) {
-            patternEngine.onBbo(bidPrice, bidSize, askPrice, askSize, getEventTimeNs());
+            patternEngine.onBbo(bidPrice, bidSize, askPrice, askSize, eventTimeNs);
+        }
+        synchronized (compositionLock) {
+            if (shouldRunSignalComposition()) signalComposition.onBbo(bidPrice, askPrice, eventTimeNs, provenance);
         }
     }
 
@@ -663,6 +682,7 @@ public class RongPlugin implements CustomModuleAdapter,
         if (shouldRunPatternAutomation()) {
             patternEngine.markReady();
         }
+        markSignalCompositionReady();
     }
 
     @Override
@@ -679,6 +699,7 @@ public class RongPlugin implements CustomModuleAdapter,
         if (shouldRunPatternAutomation()) {
             patternEngine.markReady();
         }
+        markSignalCompositionReady();
     }
 
     public static void resetNativeExecutionAfterBrokerReview() {
@@ -781,6 +802,26 @@ public class RongPlugin implements CustomModuleAdapter,
 
     private boolean shouldRunPatternAutomation() {
         return (patternAutomationEnabled || observationConfig.enabled) && patternEngine != null;
+    }
+    private boolean shouldRunSignalComposition() {
+        return initialized && signalCompositionEnabled && signalComposition != null
+                && compositionRules != null && compositionRules.valid && compositionRules.eligible(alias);
+    }
+    private PatternEvent.TimestampProvenance compositionProvenance() {
+        return lastTimestampNs > 0 ? PatternEvent.TimestampProvenance.MARKET : PatternEvent.TimestampProvenance.FALLBACK;
+    }
+    private void markSignalCompositionReady() {
+        synchronized (compositionLock) {
+            if (!shouldRunSignalComposition()) return;
+            if (lastTimestampNs > 0 && orderBook != null) {
+                for (boolean bid : new boolean[] {true, false}) {
+                    for (java.util.Map.Entry<Integer, Integer> level : orderBook.getLevelsSnapshot(bid).entrySet())
+                        signalComposition.onDepth(bid, level.getKey(), level.getValue(), lastTimestampNs, PatternEvent.TimestampProvenance.MARKET);
+                }
+            }
+            signalComposition.markReady();
+            if (lastTimestampNs > 0) signalComposition.onTimestamp(lastTimestampNs, PatternEvent.TimestampProvenance.MARKET);
+        }
     }
 
     private int getEffectiveWallThreshold() {
