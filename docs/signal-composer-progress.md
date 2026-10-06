@@ -168,3 +168,10 @@ Work is confined to `bookmap-plugin`. The user authorized sequential implementat
 - Changed files: src/main/java/com/bookmap/plugin/rong/patterns/BidFailureDetector.java, src/main/java/com/bookmap/plugin/rong/patterns/PatternObservationEngine.java, src/test/java/com/bookmap/plugin/rong/patterns/BidFailureDetectorTest.java.
 - Verification: BidFailureDetectorTest and observer fixtures passed (5 tests), covering measured 3K cancellation and suppression for flash, reload, unknown attribution, consumption, and relocation.
 - Next task: SC-24.
+
+## SC-24 — Confirm consumed bid breakdown with a below-level print
+
+- Status: complete.
+- Changed files: src/main/java/com/bookmap/plugin/rong/patterns/BidFailureDetector.java, src/main/java/com/bookmap/plugin/rong/patterns/EventTimeTradeAttribution.java, src/main/java/com/bookmap/plugin/rong/patterns/PatternObservationEngine.java, src/test/java/com/bookmap/plugin/rong/patterns/BidFailureDetectorTest.java.
+- Verification: Bid failure and observer suites passed (7 tests), including 70-percent consumption, below-print timing during/after clear decision, wrong direction, expiry, and reset.
+- Next task: SC-25.

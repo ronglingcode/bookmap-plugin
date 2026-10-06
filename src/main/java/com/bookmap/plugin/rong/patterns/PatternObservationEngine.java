@@ -35,7 +35,7 @@ public final class PatternObservationEngine implements PatternRuntimeContext {
         walls = new EventTimeWallTracker(clock.epoch(), config);
         attribution = new EventTimeTradeAttribution(config); relocation = new EventTimeRelocationTracker(config);
         normalizer = new PatternEventNormalizer(alias, pips, config);
-        bidFailures = new BidFailureDetector(alias, pips, output);
+        bidFailures = new BidFailureDetector(alias, pips, config, attribution, output);
         definitions.add(new ReappearPatternDefinition(PatternType.BID_REAPPEAR, true));
         definitions.add(new ReappearPatternDefinition(PatternType.OFFER_REAPPEAR, false));
         definitions.add(new StepPatternDefinition(PatternType.BID_STEP_UP, true));
@@ -114,10 +114,13 @@ public final class PatternObservationEngine implements PatternRuntimeContext {
         for (PatternDefinition definition : definitions) definition.reset(); definitionObservations = 1;
         diagnostics.accept("Pattern reference capacity reset");
     }
-    private void dispatchTime() { for (PatternDefinition definition : definitions) definition.onTime(this); }
+    private void dispatchTime() {
+        bidFailures.onTime(nowNs());
+        for (PatternDefinition definition : definitions) definition.onTime(this);
+    }
     private static int safeInt(long value) { return (int)Math.min(Integer.MAX_VALUE, value); }
     private void clearState(long epoch) {
-        walls.reset(epoch); attribution.reset(); relocation.reset(); normalizer.reset();
+        walls.reset(epoch); attribution.reset(); relocation.reset(); normalizer.reset(); bidFailures.reset();
         for (PatternDefinition definition : definitions) definition.reset();
         seeded = false; bid = ask = last = high = low = definitionObservations = 0;
     }

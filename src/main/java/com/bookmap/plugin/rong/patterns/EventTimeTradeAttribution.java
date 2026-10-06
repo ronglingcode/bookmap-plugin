@@ -76,5 +76,15 @@ public final class EventTimeTradeAttribution {
         return new Result(volume, coverage, attribution);
     }
     public int size() { return trades.size(); }
+    /** Earliest actual print after loss, including prints during the stable-clear decision. */
+    public long firstBreakout(EventTimeWallTracker.Clear clear, boolean above, int distanceTicks) {
+        long end = clear.occurrenceNs + config.detectors.breakoutWindowMs * 1_000_000L;
+        for (Trade trade : trades) {
+            if (trade.time < clear.occurrenceNs || trade.time > end) continue;
+            if (above ? (long)trade.price - clear.priceTick >= distanceTicks
+                    : (long)clear.priceTick - trade.price >= distanceTicks) return trade.time;
+        }
+        return 0;
+    }
     public void reset() { trades.clear(); coverageStartNs = 0; lostThroughNs = 0; now = 0; }
 }

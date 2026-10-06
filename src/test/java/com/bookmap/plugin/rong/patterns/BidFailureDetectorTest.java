@@ -5,6 +5,28 @@ import org.junit.jupiter.api.Test;
 import static com.bookmap.plugin.rong.patterns.PatternObservationEngineTest.*;
 
 class BidFailureDetectorTest {
+    @Test void consumptionRequiresActualBelowPrintAndRetainsPrintDuringClearDecision() {
+        Fixture f = qualified(); f.trade(5100, 2100, false, 2900); f.depth(true, 5100, 0, 3000); f.time(3500);
+        assertTrue(f.events.isEmpty()); f.trade(5100, 1, false, 3600); assertTrue(f.events.isEmpty());
+        f.trade(5099, 1, false, 3700);
+        PatternEvent event = f.events.get(0); assertEquals(PatternEventType.BID_BREAKDOWN, event.type);
+        assertEquals(PatternMeaning.BID_FAIL, event.meaning); assertEquals(3000, event.size);
+        assertEquals(BASE + 3_700_000_000L, event.eventTimeNs);
+        Fixture early = qualified(); early.trade(5100, 3000, false, 2900); early.depth(true, 5100, 0, 3000);
+        early.trade(5099, 1, false, 3100); assertTrue(early.events.isEmpty()); early.time(3500);
+        assertEquals(BASE + 3_100_000_000L, early.events.get(0).eventTimeNs);
+        assertEquals(BASE + 3_500_000_000L, early.events.get(0).observedAtNs);
+    }
+    @Test void insufficientConsumptionWrongDirectionExpiryAndResetCannotBreakDown() {
+        Fixture small = qualified(); small.trade(5100, 2000, false, 2900); small.depth(true, 5100, 0, 3000);
+        small.time(3500); small.trade(5099, 1, false, 3600); assertTrue(small.events.isEmpty());
+        Fixture wrong = qualified(); wrong.trade(5100, 3000, false, 2900); wrong.depth(true, 5100, 0, 3000);
+        wrong.time(3500); wrong.trade(5101, 1, true, 3600); assertTrue(wrong.events.isEmpty());
+        wrong.trade(5099, 1, false, 6001); assertTrue(wrong.events.isEmpty());
+        Fixture reset = qualified(); reset.trade(5100, 3000, false, 2900); reset.depth(true, 5100, 0, 3000); reset.time(3500);
+        reset.engine.reset(com.bookmap.plugin.rong.signal.ResetReason.DISABLED); reset.engine.markReady();
+        reset.trade(5099, 1, false, 3600); assertTrue(reset.events.isEmpty());
+    }
     @Test void persistentThreeThousandBidClearEmitsInferredWithdrawalAtDecisionTime() {
         Fixture f = new Fixture(); f.depth(true, 5100, 3000, 2000); f.time(2500);
         f.depth(true, 5100, 0, 3000); f.time(3500);
