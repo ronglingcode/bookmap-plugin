@@ -176,4 +176,5 @@ test {
 // Tests must not inherit the trader's live/replay observation preferences.
 tasks.withType(Test).configureEach {
     systemProperty "bmtrader.observationConfig", layout.buildDirectory.file("private/tests/no-observation-config.json").get().asFile.absolutePath
+    systemProperty "bmtrader.signalComposerConfig", layout.buildDirectory.file("private/tests/no-signal-composer-config.json").get().asFile.absolutePath
 }

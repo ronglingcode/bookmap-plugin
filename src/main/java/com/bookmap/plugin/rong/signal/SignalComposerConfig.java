@@ -10,10 +10,18 @@ import java.security.NoSuchAlgorithmException;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonArray;
+import com.google.gson.JsonParser;
 import com.bookmap.plugin.rong.SymbolUtils;
+import java.io.InputStream;
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.NoSuchFileException;
 
 /** Immutable rules snapshot. File settings never belong to the broker configuration. */
 public final class SignalComposerConfig {
+    public static final String CONFIG_PROPERTY = "bmtrader.signalComposerConfig";
+    public static final int MAX_CONFIG_BYTES = 16384;
     public final boolean enabled, valid;
     public final String error, revision;
     public final Set<String> symbols;
@@ -43,6 +51,24 @@ public final class SignalComposerConfig {
     }
 
     public static SignalComposerConfig defaults() { return new SignalComposerConfig(new Builder()); }
+
+    public static SignalComposerConfig load() {
+        try {
+            String fallback = Path.of(System.getProperty("user.home"), "bmtrader", "signal-composer.json").toString();
+            return load(Path.of(System.getProperty(CONFIG_PROPERTY, fallback)));
+        } catch (RuntimeException ex) { return invalid("cannot locate configuration: " + ex.getMessage()); }
+    }
+
+    public static SignalComposerConfig load(Path path) {
+        try (InputStream stream = Files.newInputStream(path)) {
+            byte[] bytes = stream.readNBytes(MAX_CONFIG_BYTES + 1);
+            if (bytes.length > MAX_CONFIG_BYTES) return invalid("configuration exceeds " + MAX_CONFIG_BYTES + " bytes");
+            JsonElement value = JsonParser.parseString(new String(bytes, StandardCharsets.UTF_8));
+            if (!value.isJsonObject()) return invalid("configuration must be an object");
+            return parse(value.getAsJsonObject());
+        } catch (NoSuchFileException ex) { return defaults(); }
+        catch (IOException | RuntimeException ex) { return invalid("cannot read configuration: " + ex.getMessage()); }
+    }
 
     public static SignalComposerConfig invalid(String message) {
         return new SignalComposerConfig(new Builder(), false, "SignalComposer disabled: " + message);
