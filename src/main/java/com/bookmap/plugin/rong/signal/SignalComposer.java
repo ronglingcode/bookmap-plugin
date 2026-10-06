@@ -49,8 +49,10 @@ public final class SignalComposer {
         }
         boolean bid = event.meaning == PatternMeaning.BID_HOLD || event.meaning == PatternMeaning.BID_FAIL;
         if (bid && event.size >= config.minimumTriggerSize) {
-            SignalCandidate candidate = new SignalCandidate(event, config.afterWindowMs);
-            candidates.put(event.id, candidate);
+            SignalCandidate proposed = new SignalCandidate(event, config.afterWindowMs);
+            SignalCandidate candidate = candidates.get(proposed.key);
+            if (candidate == null) { candidate = proposed; candidates.put(candidate.key, candidate); }
+            else { candidate.addBidEvidence(event); }
             evaluate(candidate, signals, transitions, diagnostics);
         } else if (bid) { diagnostics.add("Trigger below absolute minimum: " + event.id); }
         else if (event.meaning == PatternMeaning.OFFER_BEARISH_CONFIRMATION || event.meaning == PatternMeaning.OFFER_BULLISH_CONFIRMATION) {
@@ -83,7 +85,7 @@ public final class SignalComposer {
         TradingSignal previous = candidate.signal;
         Map<String, ConfirmationMatch> subsequent = new LinkedHashMap<>();
         for (ConfirmationMatch match : previous.subsequentConfirmations) subsequent.put(match.event.id, match);
-        boolean changed = false;
+        boolean changed = !previous.supportingBidEvidence.equals(candidate.supportingBids);
         for (ConfirmationMatch match : matches) {
             int knownRevision = 0;
             for (ConfirmationMatch initial : previous.firstValidation.confirmations) {

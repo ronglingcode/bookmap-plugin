@@ -6,6 +6,36 @@ import org.junit.jupiter.api.Test;
 import com.bookmap.plugin.rong.patterns.*;
 
 class SignalComposerTest {
+    @Test void reappearAndStepOnTheSameWallShareCandidateAndPrimaryTrigger() {
+        SignalComposer c = composer();
+        TradingSignal first = c.onPatternEvent(event(PatternEventType.BID_STEP_UP, 5000, 5105, 100, "wall")).signals.get(0);
+        TradingSignal revision = c.onPatternEvent(event(PatternEventType.BID_REAPPEAR, 6000, 5105, 100, "wall")).signals.get(0);
+        assertEquals(1, c.candidateStates().size()); assertEquals(first.id, revision.id);
+        assertEquals(2, revision.supportingBidEvidence.size()); assertSame(first.trigger, revision.trigger);
+        assertSame(first.firstValidation, revision.firstValidation); assertEquals(100, revision.firstValidation.eventTimeNs);
+        assertTrue(c.onPatternEvent(event(PatternEventType.BID_REAPPEAR, 6000, 5105, 100, "wall")).signals.isEmpty());
+    }
+    @Test void repeatedStepRevisionCannotRefreshOrReplaceTheTrigger() {
+        SignalComposer c = composer();
+        TradingSignal first = c.onPatternEvent(event(PatternEventType.BID_STEP_UP, 5000, 5105, 100, "wall")).signals.get(0);
+        PatternEvent later = PatternEvent.builder("TEST", 1, PatternEventType.BID_STEP_UP, "wall").revision(2)
+                .size(6000, PatternEvent.SizeBasis.DISPLAYED_WALL).price(5105, .01).times(100, 200)
+                .evidence(PatternEvent.Evidence.builder().attribution(PatternEvent.Attribution.UNKNOWN, PatternEvent.Coverage.USABLE).build()).build();
+        TradingSignal revised = c.onPatternEvent(later).signals.get(0);
+        assertEquals(first.id, revised.id); assertSame(first.firstValidation, revised.firstValidation);
+        assertEquals(5000, revised.trigger.size); assertEquals(100, revised.trigger.eventTimeNs);
+        assertEquals(first.createdAtMs, revised.createdAtMs);
+        assertTrue(c.onPatternEvent(later).signals.isEmpty());
+    }
+    @Test void subsequentExceptionalConfirmationLeavesOriginalAcceptanceFrozen() {
+        SignalComposer c = composer();
+        TradingSignal first = c.onPatternEvent(event(PatternEventType.BID_BREAKDOWN, 5000, 5105, 100, "b")).signals.get(0);
+        TradingSignal revised = c.onPatternEvent(event(PatternEventType.OFFER_REJECTION, 60000, 5120, 200, "o")).signals.get(0);
+        assertEquals(5000, revised.firstValidation.appliedTriggerThreshold);
+        assertEquals(ConfirmationStrength.NONE, revised.firstValidation.confirmationStrength);
+        assertEquals(ConfirmationStrength.EXCEPTIONAL, revised.latestConfirmationStrength);
+        assertSame(first.firstValidation, revised.firstValidation); assertTrue(revised.explanation.contains("after validation"));
+    }
     @Test void laterExceptionalOfferPromotesPendingTriggerAtObservationTime() {
         SignalComposer c = composer();
         assertTrue(c.onPatternEvent(event(PatternEventType.BIDS_CANCELLED, 3000, 5105, 100, "b")).signals.isEmpty());

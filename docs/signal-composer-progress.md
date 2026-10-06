@@ -98,3 +98,10 @@ Work is confined to `bookmap-plugin`. The user authorized sequential implementat
 - Changed files: src/main/java/com/bookmap/plugin/rong/signal/SignalComposer.java, src/test/java/com/bookmap/plugin/rong/signal/SignalComposerTest.java.
 - Verification: SignalComposerTest passed (9 tests), including late promotion, multiple affected triggers and same-ID revisions.
 - Next task: SC-14.
+
+## SC-14 — deduplicate bid interactions and preserve original signal validation
+
+- Status: complete.
+- Changed files: src/main/java/com/bookmap/plugin/rong/signal/SignalCandidate.java, src/main/java/com/bookmap/plugin/rong/signal/SignalComposer.java, src/test/java/com/bookmap/plugin/rong/signal/SignalComposerTest.java.
+- Verification: SignalComposerTest passed (12 tests), including same-wall reappear/step merging, stable revisions and immutable first acceptance.
+- Next task: SC-15.
