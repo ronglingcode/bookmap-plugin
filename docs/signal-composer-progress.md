@@ -301,3 +301,12 @@ Work is confined to `bookmap-plugin`. The user authorized sequential implementat
 - Changed files: docs/signal-composer-progress.md.
 - Verification: Process-local JAVA_HOME set to existing JDK 21.0.12.1+1; gradlew.bat build passed in 20 seconds. 373 unit tests and 10 release-JAR tests passed, zero failures/errors/skips; compileNativeExecution passed. Artifact build/libs/lingrong1988_bmtrader_1.32.jar (906481 bytes), SHA256 7165A011A2C9FF2F9F07D813BDCC51FA857B4ABBAC2E6794772B0EBAF8F59E06. No artifact publication or local enablement performed.
 - Next task: SC-43.
+
+## SC-43 — Actual Bookmap replay verification remains outstanding
+
+- Status: verification blocked; checklist remains unchecked.
+- Changed files: docs/signal-composer-replay-smoke.md, docs/signal-composer-progress.md.
+- Verification: no Bookmap-named process, common installation directory, or standard uninstall-registry entry was found. Native desktop control is unavailable in this session, and no recording was supplied. These checks do not prove Bookmap is absent elsewhere.
+- Limitation: actual Bookmap OpenGL/layout, waiting context, late evidence, expiry, toggle, and seek/reattach observations have not been performed. Automated raw-callback and fake-canvas tests are recorded separately and do not complete this manual task.
+- Manual handoff: follow docs/signal-composer-replay-smoke.md in existing credential-free observer replay mode; record observations before marking SC-43 complete. No local configuration was enabled and no native broker runtime was started by this task.
+- Next task: SC-44.
