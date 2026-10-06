@@ -154,3 +154,10 @@ Work is confined to `bookmap-plugin`. The user authorized sequential implementat
 - Changed files: src/main/java/com/bookmap/plugin/rong/patterns/EventTimeRelocationTracker.java, src/main/java/com/bookmap/plugin/rong/patterns/EventTimeTradeAttribution.java, src/test/java/com/bookmap/plugin/rong/patterns/EventTimeRelocationTrackerTest.java.
 - Verification: Relocation and trade-attribution suites passed (6 tests), covering side/size/time boundaries, one-to-one pairing, move suppression of withdrawal, and cap gaps.
 - Next task: SC-22.
+
+## SC-22 — Normalize independent reappear and step observations
+
+- Status: complete.
+- Changed files: src/main/java/com/bookmap/plugin/rong/patterns/PatternObservationEngine.java, src/main/java/com/bookmap/plugin/rong/patterns/PatternEventNormalizer.java, src/test/java/com/bookmap/plugin/rong/patterns/PatternObservationEngineTest.java.
+- Verification: PatternObservationEngineTest passed (3 callback fixtures): all four types, canonical wall interaction, current size, stable occurrence/revision, absent-wall suppression, and readiness.
+- Next task: SC-23.
