@@ -252,3 +252,10 @@ Work is confined to `bookmap-plugin`. The user authorized sequential implementat
 - Changed files: src/main/java/com/bookmap/plugin/rong/signal/TradingSignalPainter.java, src/test/java/com/bookmap/plugin/rong/signal/TradingSignalPainterTest.java.
 - Verification: TradingSignalPainterTest passed (2 headless tests): LONG/SHORT raster badges, actual quantities, confirmation band, frozen normal/applied thresholds, later-evidence wording, no score, and validation-time anchor.
 - Next task: SC-36.
+
+## SC-36 — Register and refresh validation-anchored chart markers
+
+- Status: complete.
+- Changed files: src/main/java/com/bookmap/plugin/rong/signal/TradingSignalPainter.java, src/main/java/com/bookmap/plugin/rong/RongPlugin.java, src/test/java/com/bookmap/plugin/rong/signal/TradingSignalCanvasTest.java, src/test/java/velox/api/layer1/common/helper/OpenGlHelper.java.
+- Verification: Canvas, badge, and lifecycle suites passed (7 tests): validation-time X/tick-price Y, same-ID replacement, receipt expiry, disable removal, idempotent teardown, and no publishing-thread canvas calls. Headless test-only OpenGlHelper fixture supplies a missing Bookmap runtime helper; actual OpenGL upload remains manual SC-43 verification.
+- Next task: SC-37.

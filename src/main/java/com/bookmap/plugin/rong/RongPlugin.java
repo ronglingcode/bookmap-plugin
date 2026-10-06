@@ -6,6 +6,7 @@ import com.bookmap.plugin.rong.signal.SignalComposerConfig;
 import com.bookmap.plugin.rong.signal.SignalCompositionPipeline;
 import com.bookmap.plugin.rong.signal.TradingSignalStore;
 import com.bookmap.plugin.rong.signal.ResetReason;
+import com.bookmap.plugin.rong.signal.TradingSignalPainter;
 import com.bookmap.plugin.rong.patterns.PatternEvent;
 
 import com.bookmap.plugin.rong.executions.FilledExecutionManager;
@@ -107,6 +108,7 @@ public class RongPlugin implements CustomModuleAdapter,
     private static PatternSignalPainter patternSignalPainter;
     private static SignalComposerConfig signalComposerConfig;
     private static TradingSignalStore tradingSignalStore;
+    private static TradingSignalPainter tradingSignalPainter;
 
     private String rawAlias;
     private volatile boolean initialized;
@@ -245,6 +247,10 @@ public class RongPlugin implements CustomModuleAdapter,
         this.patternAutomationEnabled = indicatorConfig.isEnabled(
                 IndicatorConfig.BOOKMAP_PATTERN_SIGNALS);
         initializeSignalComposition(info.pips);
+        synchronized (RongPlugin.class) {
+            if (tradingSignalPainter == null) tradingSignalPainter = new TradingSignalPainter(tradingSignalStore, indicatorConfig);
+        }
+        tradingSignalPainter.registerInstrument(cleanAlias);
         indicatorConfig.addChangeListener(this);
         sharedServer.registerSymbol(cleanAlias, orderBook, info.pips);
         if (observationConfig.recordEvidence(cleanAlias)) {
@@ -311,6 +317,9 @@ public class RongPlugin implements CustomModuleAdapter,
                 .build());
 
         // Draw predefined key price levels for this instrument
+        api.sendUserMessage(Layer1ApiUserMessageModifyScreenSpacePainter.builder(RongPlugin.class,
+                TradingSignalPainter.PAINTER_NAME_PREFIX + cleanAlias).setScreenSpacePainterFactory(tradingSignalPainter)
+                .setAliasFilter(exactAliasFilter(rawAlias)).setIsAdd(true).build());
         if (keyLevelManager != null) {
             keyLevelManager.onInstrumentInitialized(cleanAlias, info.pips);
         }
@@ -422,6 +431,12 @@ public class RongPlugin implements CustomModuleAdapter,
         }
         if (patternSignalPainter != null) {
             patternSignalPainter.unregisterInstrument(alias);
+        }
+        if (tradingSignalPainter != null) {
+            tradingSignalPainter.unregisterInstrument(alias);
+            api.sendUserMessage(Layer1ApiUserMessageModifyScreenSpacePainter.builder(RongPlugin.class,
+                    TradingSignalPainter.PAINTER_NAME_PREFIX + alias).setScreenSpacePainterFactory(tradingSignalPainter)
+                    .setIsAdd(false).build());
         }
         if (filledExecutionPainter != null) {
             filledExecutionPainter.unregisterInstrument(alias);
@@ -576,6 +591,8 @@ public class RongPlugin implements CustomModuleAdapter,
                 instanceCount = 0;
             }
             if (instanceCount <= 0) {
+                if (tradingSignalPainter != null) tradingSignalPainter.shutdown();
+                tradingSignalPainter = null;
                 signalComposerConfig = null; tradingSignalStore = null;
             }
         }
