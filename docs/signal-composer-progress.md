@@ -140,3 +140,10 @@ Work is confined to `bookmap-plugin`. The user authorized sequential implementat
 - Changed files: src/main/java/com/bookmap/plugin/rong/patterns/EventTimeWallTracker.java, src/test/java/com/bookmap/plugin/rong/patterns/EventTimeWallTrackerTest.java.
 - Verification: EventTimeWallTrackerTest passed (5 tests), including immediate pre-clear size, stable 90-percent loss, inclusive decision delay, reload cancellation, and one clear per phase.
 - Next task: SC-20.
+
+## SC-20 — Attribute bounded market trades to measured wall loss
+
+- Status: complete.
+- Changed files: src/main/java/com/bookmap/plugin/rong/patterns/EventTimeTradeAttribution.java, src/test/java/com/bookmap/plugin/rong/patterns/EventTimeTradeAttributionTest.java.
+- Verification: EventTimeTradeAttributionTest passed (3 tests); side, price, lookback, clear interval, long sums, unknown aggressor, warmup, cap gaps, and overflow verified.
+- Next task: SC-21.
