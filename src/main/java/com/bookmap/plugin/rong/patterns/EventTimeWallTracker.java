@@ -21,15 +21,30 @@ public final class EventTimeWallTracker {
     }
     public static final class Update {
         public final List<Wall> qualified;
+        public final List<Clear> clears;
         public final List<String> diagnostics;
-        private Update(List<Wall> walls, List<String> diagnostics) {
+        private Update(List<Wall> walls, List<Clear> clears, List<String> diagnostics) {
             qualified = Collections.unmodifiableList(new ArrayList<>(walls));
+            this.clears = Collections.unmodifiableList(new ArrayList<>(clears));
             this.diagnostics = Collections.unmodifiableList(new ArrayList<>(diagnostics));
+        }
+    }
+    /** A measured stable loss. Attribution is intentionally not inferred by this tracker. */
+    public static final class Clear {
+        public final String phaseId;
+        public final boolean bid;
+        public final int priceTick;
+        public final long previousSize, remainingSize, removedSize, occurrenceNs, observedAtNs;
+        private Clear(Phase phase, long observedNs) {
+            phaseId = phase.id; bid = phase.bid; priceTick = phase.price;
+            previousSize = phase.preClearSize; remainingSize = phase.size;
+            removedSize = Math.max(0, previousSize - remainingSize);
+            occurrenceNs = phase.pendingClearNs; observedAtNs = observedNs;
         }
     }
     private static final class Phase {
         final String id; final boolean bid; final int price; final long firstSeen;
-        long size; boolean qualified;
+        long size, pendingClearNs, preClearSize; boolean qualified;
         Phase(String id, boolean bid, int price, long size, long time) {
             this.id = id; this.bid = bid; this.price = price; this.size = size; firstSeen = time;
         }
@@ -50,8 +65,18 @@ public final class EventTimeWallTracker {
         if (phase == null && size >= config.observationFloorSize) {
             phase = new Phase(epoch + ":wall:" + ++sequence, bid, price, size, timeNs); phases.put(key, phase);
         } else if (phase != null) {
+            long previous = phase.size;
             phase.size = size;
             if (!phase.qualified && size < config.observationFloorSize) phases.remove(key);
+            if (phase.qualified && phase.pendingClearNs > 0
+                    && size > phase.preClearSize * config.detectors.clearRemainingRatio) {
+                diagnostics.add("Wall reloaded before stable clear: " + phase.id);
+                phase.pendingClearNs = 0; phase.preClearSize = 0;
+            }
+            if (phase.qualified && phase.pendingClearNs == 0 && previous >= config.observationFloorSize
+                    && size <= previous * config.detectors.clearRemainingRatio) {
+                phase.pendingClearNs = timeNs; phase.preClearSize = previous;
+            }
         }
         while (phases.size() > config.maxWallPhases) {
             String oldest = phases.keySet().iterator().next();
@@ -66,11 +91,19 @@ public final class EventTimeWallTracker {
     }
     private Update advance(List<String> diagnostics) {
         List<Wall> qualified = new ArrayList<>();
+        List<Clear> clears = new ArrayList<>();
         for (Phase phase : phases.values()) if (!phase.qualified && phase.size >= config.observationFloorSize
                 && now - phase.firstSeen >= config.detectors.wallLifetimeMs * 1_000_000L) {
             phase.qualified = true; qualified.add(new Wall(phase));
         }
-        return new Update(qualified, diagnostics);
+        java.util.Iterator<Phase> iterator = phases.values().iterator();
+        while (iterator.hasNext()) {
+            Phase phase = iterator.next();
+            if (phase.pendingClearNs > 0 && now - phase.pendingClearNs >= config.detectors.clearDecisionMs * 1_000_000L) {
+                clears.add(new Clear(phase, now)); iterator.remove();
+            }
+        }
+        return new Update(qualified, clears, diagnostics);
     }
     /** Seed each snapshot level at snapshot receipt time; qualification still needs persistence. */
     public Update seed(boolean bid, int price, long size, long timeNs) { return onDepth(bid, price, size, timeNs); }

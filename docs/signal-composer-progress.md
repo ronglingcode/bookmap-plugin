@@ -133,3 +133,10 @@ Work is confined to `bookmap-plugin`. The user authorized sequential implementat
 - Changed files: src/main/java/com/bookmap/plugin/rong/patterns/EventTimeWallTracker.java, src/test/java/com/bookmap/plugin/rong/patterns/EventTimeWallTrackerTest.java.
 - Verification: EventTimeWallTrackerTest passed (3 tests), covering 3K floor, persistence, flash loss, snapshot seeding, stable phase IDs, cap diagnostics, and reset.
 - Next task: SC-19.
+
+## SC-19 — Measure stable wall clears and reload cancellation
+
+- Status: complete.
+- Changed files: src/main/java/com/bookmap/plugin/rong/patterns/EventTimeWallTracker.java, src/test/java/com/bookmap/plugin/rong/patterns/EventTimeWallTrackerTest.java.
+- Verification: EventTimeWallTrackerTest passed (5 tests), including immediate pre-clear size, stable 90-percent loss, inclusive decision delay, reload cancellation, and one clear per phase.
+- Next task: SC-20.
