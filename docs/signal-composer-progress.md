@@ -63,3 +63,10 @@ Work is confined to `bookmap-plugin`. The user authorized sequential implementat
 - Changed files: src/main/java/com/bookmap/plugin/rong/signal/PatternEventStore.java, src/test/java/com/bookmap/plugin/rong/signal/PatternEventStoreTest.java.
 - Verification: PatternEventStoreTest passed (7 tests), covering expiry boundaries, duplicate-delivery pruning, count caps, identifiable evictions and epoch reset.
 - Next task: SC-09.
+
+## SC-09 — match local already-observed offer confirmations
+
+- Status: complete.
+- Changed files: src/main/java/com/bookmap/plugin/rong/signal/ConfirmationMatcher.java, src/test/java/com/bookmap/plugin/rong/signal/ConfirmationMatcherTest.java.
+- Verification: ConfirmationMatcherTest passed (4 tests), covering both directions, time and price boundaries, unknown coverage and stale/future evidence.
+- Next task: SC-10.
