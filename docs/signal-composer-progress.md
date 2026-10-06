@@ -294,3 +294,10 @@ Work is confined to `bookmap-plugin`. The user authorized sequential implementat
 - Changed files: src/releaseTest/java/release/ReleaseJarTest.java, build.gradle.
 - Verification: Targeted release.ReleaseJarTest.advisoryConfigCompositionAndRasterFieldsSurviveObfuscation passed against only the actual release JAR: enum reflection, shaded explicit Gson config/default template, pending 3K promotion by 60K offer, immutable validation/output fields, explanation, raster badge, and absence of headless test fixture from artifact. Existing packaging rules unchanged; project/PluginVersion remain aligned at 1.32.
 - Next task: SC-42.
+
+## SC-42 — Verify the complete build and release artifact
+
+- Status: complete.
+- Changed files: docs/signal-composer-progress.md.
+- Verification: Process-local JAVA_HOME set to existing JDK 21.0.12.1+1; gradlew.bat build passed in 20 seconds. 373 unit tests and 10 release-JAR tests passed, zero failures/errors/skips; compileNativeExecution passed. Artifact build/libs/lingrong1988_bmtrader_1.32.jar (906481 bytes), SHA256 7165A011A2C9FF2F9F07D813BDCC51FA857B4ABBAC2E6794772B0EBAF8F59E06. No artifact publication or local enablement performed.
+- Next task: SC-43.
