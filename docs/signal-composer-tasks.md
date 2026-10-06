@@ -52,7 +52,7 @@ Specification: implementation plan section 6.
 
 Specification: implementation plan section 6 and required design cases in section 10.
 
-- [ ] **SC-12 — Evaluate newly arriving bid triggers.** Add `signal/SignalComposer.java` using the completed store, matcher, classifier, policy, and explanation components. Accept BID_HOLD for LONG and BID_FAIL for SHORT; create candidates and immediately validate sufficient triggers. **Complete when:** tests show 5K bid hold alone produces LONG, 6K bid breakdown produces SHORT, offer-only events produce neither, and below-minimum triggers cannot be rescued.
+- [x] **SC-12 — Evaluate newly arriving bid triggers.** Add `signal/SignalComposer.java` using the completed store, matcher, classifier, policy, and explanation components. Accept BID_HOLD for LONG and BID_FAIL for SHORT; create candidates and immediately validate sufficient triggers. **Complete when:** tests show 5K bid hold alone produces LONG, 6K bid breakdown produces SHORT, offer-only events produce neither, and below-minimum triggers cannot be rescued.
 
 - [ ] **SC-13 — Promote pending triggers using later confirmation.** Reevaluate active candidates on relevant offer events. A 3K trigger can become valid later; a previously valid 5K trigger receives evidence under the same signal ID. **Complete when:** tests cover exceptional confirmation before/after a small trigger, normal confirmation failing to promote it, multiple affected candidates, and validation time being the actual observation time when eligibility becomes known.
 

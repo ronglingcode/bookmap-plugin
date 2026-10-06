@@ -84,3 +84,10 @@ Work is confined to `bookmap-plugin`. The user authorized sequential implementat
 - Changed files: src/main/java/com/bookmap/plugin/rong/signal/SignalExplanationBuilder.java, src/test/java/com/bookmap/plugin/rong/signal/SignalExplanationBuilderTest.java.
 - Verification: SignalExplanationBuilderTest passed (3 tests), covering small-trigger relaxation, no-confirmation defense and later evidence without retroactive justification.
 - Next task: SC-12.
+
+## SC-12 — compose advisory signals from mandatory bid triggers
+
+- Status: complete.
+- Changed files: src/main/java/com/bookmap/plugin/rong/signal/SignalComposer.java, src/test/java/com/bookmap/plugin/rong/signal/SignalComposerTest.java.
+- Verification: SignalComposerTest passed (5 tests), covering both directions, normal standalone triggers, prior exceptional confirmation and hard minimum.
+- Next task: SC-13.
