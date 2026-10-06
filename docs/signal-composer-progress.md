@@ -245,3 +245,10 @@ Work is confined to `bookmap-plugin`. The user authorized sequential implementat
 - Changed files: src/main/java/com/bookmap/plugin/rong/IndicatorSettingsPanel.java, src/main/java/com/bookmap/plugin/rong/RongPlugin.java, src/test/java/com/bookmap/plugin/rong/SignalComposerObserverSettingsTest.java.
 - Verification: Observer settings, advisory toggle, and inactive normal-activation suites passed (6 tests): existing observerOnly config permits settings without secrets, native account/action controls omitted, ordinary controls preserved, no native runtime or trade window in observer construction.
 - Next task: SC-35.
+
+## SC-35 — Render concise advisory signal badges
+
+- Status: complete.
+- Changed files: src/main/java/com/bookmap/plugin/rong/signal/TradingSignalPainter.java, src/test/java/com/bookmap/plugin/rong/signal/TradingSignalPainterTest.java.
+- Verification: TradingSignalPainterTest passed (2 headless tests): LONG/SHORT raster badges, actual quantities, confirmation band, frozen normal/applied thresholds, later-evidence wording, no score, and validation-time anchor.
+- Next task: SC-36.

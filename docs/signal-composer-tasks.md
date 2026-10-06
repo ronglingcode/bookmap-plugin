@@ -110,7 +110,7 @@ Specification: implementation plan section 7.
 
 Specification: implementation plan section 8.
 
-- [ ] **SC-35 — Format and render a composed signal badge.** Implement the pure badge rendering/formatting portion of `signal/TradingSignalPainter.java`: direction, trigger, confirmation band, normal/applied size, and concise reason. **Complete when:** headless tests verify text and non-empty rendering for LONG/SHORT, no score display, and separate trigger versus validation timestamps. This task does not register a Bookmap painter yet.
+- [x] **SC-35 — Format and render a composed signal badge.** Implement the pure badge rendering/formatting portion of `signal/TradingSignalPainter.java`: direction, trigger, confirmation band, normal/applied size, and concise reason. **Complete when:** headless tests verify text and non-empty rendering for LONG/SHORT, no score display, and separate trigger versus validation timestamps. This task does not register a Bookmap painter yet.
 
 - [ ] **SC-36 — Register and refresh the signal painter.** Implement the canvas factory/listeners, immutable-store reads, validation-time X anchor, tick-price Y anchor, receipt-TTL refresh, and painter registration/unregistration in `RongPlugin`. **Complete when:** fake-canvas/lifecycle tests verify anchors, revisions replacing one marker, disable removing markers, and teardown releasing shapes/listeners/scheduler without holding the observation lock during painting.
 
