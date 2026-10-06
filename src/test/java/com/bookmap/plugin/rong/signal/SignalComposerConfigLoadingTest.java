@@ -8,6 +8,12 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 class SignalComposerConfigLoadingTest {
+    @Test void shippedDisabledTemplateMatchesEveryEffectiveDefaultUnderRealLoader() {
+        SignalComposerConfig template = SignalComposerConfig.load(Path.of("config", "signal-composer.template.json"));
+        assertTrue(template.valid, template.error); assertFalse(template.enabled);
+        assertEquals(SignalComposerConfig.defaults().toJson(), template.toJson());
+        assertEquals(SignalComposerConfig.defaults().revision, template.revision);
+    }
     @TempDir Path directory;
     @Test void missingFileProvidesUsableDisabledDefaults() {
         SignalComposerConfig c = SignalComposerConfig.load(directory.resolve("missing.json"));
