@@ -18,7 +18,7 @@ import static org.junit.jupiter.api.Assertions.*;
 class TradingRuntimeTest {
     static JsonObject json(String text) { return JsonParser.parseString(text).getAsJsonObject(); }
     static class Task { long delay; Runnable run; boolean canceled; }
-    static class Socket implements SocketPort.Connection { SocketPort.Handlers handlers; boolean closed; public void send(String value) { } public void close() { closed = true; } }
+    static class Socket implements SocketPort.Connection { SocketPort.Handlers handlers; boolean closed; final List<String> sent = new ArrayList<>(); public void send(String value) { sent.add(value); } public void close() { closed = true; } }
     @Test void invalidSelectedPlanStopsBeforeVendorConnectionsAndUpdatesEveryStatus() throws Exception {
         JsonArray fixtures = JsonParser.parseReader(new InputStreamReader(getClass().getResourceAsStream("/state-fixtures.json"), StandardCharsets.UTF_8)).getAsJsonArray();
         JsonObject config = null;
@@ -120,6 +120,11 @@ class TradingRuntimeTest {
             assertTrue(logs.stream().anyMatch(value -> value.contains("Native projected fills available for display: sessionDate=2026-10-01 count=0")));
             assertThrows(IllegalStateException.class, () -> runtime.exportExecutions(Format.CSV));
             JsonObject view = runtime.view("AAPL", "test"); assertEquals(100, view.getAsJsonObject("state").getAsJsonObject("stateBySymbol").getAsJsonObject("AAPL").getAsJsonObject("breakoutTradeStateForLong").get("initialQuantity").getAsInt());
+            JsonObject targets = runtime.targetMarket("AAPL");
+            assertNotNull(targets);
+            assertEquals("2026-10-01", targets.get("sessionDate").getAsString());
+            assertEquals(view.getAsJsonObject("plan").getAsJsonObject("atr").get("average"), targets.get("atr"));
+            assertTrue(targets.get("lowOfDay").getAsDouble() > 0);
             runtime.persistState(); runtime.pendingPersistence().get(2, TimeUnit.SECONDS); assertEquals(1, writes.get());
             now.addAndGet(1800000); runtime.refreshToken(); assertEquals(2, refreshes.get()); runtime.refreshAccount(); assertEquals(2, accountReads.get());
             // A real native decision and fake broker acceptance initialize state locally, without a ViteApp ACK.
@@ -161,6 +166,18 @@ class TradingRuntimeTest {
             deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(2);
             while (canceledOrders.isEmpty() && System.nanoTime() < deadline) Thread.sleep(5);
             assertEquals(List.of("/trader/v1/accounts/fake-account/orders/456"), canceledOrders);
+            Socket schwab = sockets.get(sockets.size() - 1);
+            schwab.handlers.message(schwab, "{\"response\":[{\"service\":\"ADMIN\",\"command\":\"LOGIN\",\"content\":{\"code\":0}}]}");
+            assertTrue(schwab.sent.stream().anyMatch(value -> value.contains("ACCT_ACTIVITY") && value.contains("0,1,2,3")));
+            int hints = (int) emitted.stream().filter(event -> event.get("type").getAsString().equals("cairo_account_activity")).count();
+            schwab.handlers.message(schwab, "{\"data\":[{\"service\":\"ACCT_ACTIVITY\",\"content\":[{\"1\":\"private-account\",\"2\":\"ExecutionCreated\",\"3\":\"private-xml\"}]}]}");
+            List<JsonObject> activities = new ArrayList<>();
+            emitted.stream().filter(event -> event.get("type").getAsString().equals("cairo_account_activity")).forEach(activities::add);
+            assertEquals(hints + 1, activities.size());
+            JsonObject activity = activities.get(activities.size() - 1);
+            assertEquals(now.get(), activity.get("receivedAt").getAsLong());
+            assertEquals("ExecutionCreated", activity.getAsJsonArray("messageTypes").get(0).getAsString());
+            assertFalse(activity.toString().contains("private-") || activity.toString().contains("fresh-") || activity.toString().contains("fake-secret"));
             orderData.set("invalid JSON");
             runtime.dispatch(json("{\"symbol\":\"AAPL\",\"keyCode\":\"KeyC\"}"));
             assertEquals(1, canceledOrders.size());

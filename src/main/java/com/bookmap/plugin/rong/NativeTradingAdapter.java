@@ -74,7 +74,10 @@ public final class NativeTradingAdapter implements AutoCloseable {
     }
     private void accept(JsonObject value) {
         if (closed) return; String type = string(value, "type");
+        if (type.equals("cairo_account_activity")) { display.broadcastAccountActivity(value); return; }
         if (type.equals("account_ready") || type.equals("market_ready") || type.equals("market_update") || type.equals("command_state")) {
+            NativeRuntime current = runtime;
+            if (current != null) { JsonObject targetMarket = current.trading.targetMarket(string(value, "symbol")); if (targetMarket != null) display.updateTargetMarket(targetMarket); }
             if (type.equals("market_update")) display.acceptLocalMessage(NativeViews.premarketLevels(value));
             NativeViews.project(value).forEach(display::acceptLocalMessage);
         }

@@ -131,6 +131,18 @@ public final class TradingRuntime implements AutoCloseable {
         JsonObject levels = state.sessionLevels();
         return string(levels, "sessionDate").equals(MarketClock.marketTime(now.getAsLong()).date) ? levels : null;
     }
+    public JsonObject targetMarket(String symbol) {
+        JsonObject levels = sessionLevels(symbol);
+        if (levels == null) return null;
+        double atr;
+        synchronized (lock) { atr = number(object(selectedPlan(symbol), "atr"), "average"); }
+        JsonObject result = message("cairo_target_market");
+        result.addProperty("symbol", symbol); result.addProperty("timestamp", now.getAsLong());
+        result.addProperty("sessionDate", string(levels, "sessionDate"));
+        result.addProperty("atr", atr); result.addProperty("lowOfDay", number(levels, "lowOfDay"));
+        result.addProperty("highOfDay", number(levels, "highOfDay"));
+        return result;
+    }
     private void publishToken() throws Exception {
         if (stopped) return; JsonObject value = credentials.loadSchwab(), token = message("execution_token"); token.addProperty("accountHash", accountHash()); token.addProperty("accessToken", string(value, "access_token")); token.addProperty("expiresAt", number(value, "expires_at")); execution.receive(this, token);
     }
@@ -155,8 +167,8 @@ public final class TradingRuntime implements AutoCloseable {
                     if (market.acceptTrade(trade)) synchronized (lock) { dirty.add(trade.symbol); }
                 }
                 public void quote(JsonObject quote) { String symbol = string(quote, "symbol"); synchronized (lock) { JsonObject value = quotes.computeIfAbsent(symbol, key -> new JsonObject()); quote.entrySet().forEach(entry -> value.add(entry.getKey(), entry.getValue())); dirty.add(symbol); } }
-                public void activity(JsonArray values) { refreshAccount(); }
-                public void ready(String source) { if (source.equals("massive")) { massiveTradeReceived.set(false); events.status("massiveStream", "connected; waiting for trades"); if (massiveReady.getAndSet(true)) symbols.forEach(TradingRuntime.this::loadMarket); } else refreshAccount(); }
+                public void activity(JsonArray values) { publishAccountActivity(values); refreshAccount(); }
+                public void ready(String source) { if (source.equals("massive")) { massiveTradeReceived.set(false); events.status("massiveStream", "connected; waiting for trades"); if (massiveReady.getAndSet(true)) symbols.forEach(TradingRuntime.this::loadMarket); } else { publishAccountActivity(new JsonArray()); refreshAccount(); } }
                 public void status(String source, String status) {
                     if (!stopped) {
                         events.status(source.equals("massive") ? "massiveStream" : source, status);
@@ -166,6 +178,21 @@ public final class TradingRuntime implements AutoCloseable {
             });
         synchronized (lock) { if (stopped) { next.close(); return; } streams = next; }
         next.start();
+    }
+    // Activity is a refresh hint, not a complete position/fill snapshot. Never export raw XML or credentials.
+    private void publishAccountActivity(JsonArray values) {
+        if (stopped) return;
+        JsonObject value = message("cairo_account_activity");
+        value.addProperty("receivedAt", now.getAsLong());
+        JsonArray types = new JsonArray();
+        for (JsonElement item : values) {
+            if (!item.isJsonObject()) continue;
+            JsonElement type = item.getAsJsonObject().get("2");
+            if (type != null && type.isJsonPrimitive() && type.getAsJsonPrimitive().isString()
+                    && type.getAsString().matches("[A-Za-z0-9_]{1,80}") && types.size() < 32) types.add(type.getAsString());
+        }
+        value.add("messageTypes", types);
+        events.message(value);
     }
     private void loadMarket(String symbol) {
         JsonObject plan; synchronized (lock) { if (stopped || config == null) return; plan = selectedPlan(symbol); }

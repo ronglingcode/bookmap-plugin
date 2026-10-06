@@ -7,6 +7,31 @@ import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.*;
 
 class NativeTradingActionRoutingTest {
+    @Test void targetMarketChangesAndTenSecondHeartbeatBroadcastWithoutBrokerReads() {
+        List<String> broadcasts = new ArrayList<>();
+        SignalWebSocketServer server = new SignalWebSocketServer(0, 97) { @Override public void broadcast(String text) { broadcasts.add(text); } };
+        try {
+            JsonObject value = com.google.gson.JsonParser.parseString("{\"type\":\"cairo_target_market\",\"symbol\":\"AMD\",\"sessionDate\":\"2026-10-06\",\"timestamp\":100000,\"atr\":10,\"lowOfDay\":100,\"highOfDay\":110}").getAsJsonObject();
+            server.updateTargetMarket(value);
+            value.addProperty("timestamp", 101000); server.updateTargetMarket(value);
+            assertEquals(1, broadcasts.size());
+            value.addProperty("timestamp", 110000); server.updateTargetMarket(value);
+            assertEquals(2, broadcasts.size());
+            value.addProperty("lowOfDay", 99); server.updateTargetMarket(value);
+            assertEquals(3, broadcasts.size());
+        } finally { server.shutdown(); }
+    }
+    @Test void accountActivitiesBroadcastImmediatelyWithoutTradingDispatch() {
+        List<String> broadcasts = new ArrayList<>(); List<JsonObject> actions = new ArrayList<>();
+        SignalWebSocketServer server = new SignalWebSocketServer(0, 97) { @Override public void broadcast(String text) { broadcasts.add(text); } };
+        try {
+            server.setTradingDispatch(actions::add);
+            JsonObject hint = new JsonObject(); hint.addProperty("type", "cairo_account_activity"); hint.addProperty("receivedAt", 123);
+            server.broadcastAccountActivity(hint);
+            assertEquals(List.of(hint.toString()), broadcasts);
+            assertTrue(actions.isEmpty());
+        } finally { server.shutdown(); }
+    }
     @Test void chartAndButtonEntriesUseLocalRetestReadiness() {
         List<JsonObject> actions = new ArrayList<>();
         SignalWebSocketServer server = new SignalWebSocketServer(0, 97) { @Override public void broadcast(String text) { } };

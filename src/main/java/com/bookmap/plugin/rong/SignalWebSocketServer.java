@@ -23,6 +23,18 @@ import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 
 public class SignalWebSocketServer extends WebSocketServer {
+    private final Map<String, JsonObject> targetMarkets = new ConcurrentHashMap<>();
+    private final Map<String, Long> targetMarketBroadcastAt = new ConcurrentHashMap<>();
+    public void updateTargetMarket(JsonObject value) {
+        String symbol = value.get("symbol").getAsString();
+        JsonObject old = targetMarkets.put(symbol, value.deepCopy());
+        if (old == null || !old.get("sessionDate").equals(value.get("sessionDate"))
+                || !old.get("atr").equals(value.get("atr")) || !old.get("lowOfDay").equals(value.get("lowOfDay"))
+                || !old.get("highOfDay").equals(value.get("highOfDay"))
+                || value.get("timestamp").getAsLong() - targetMarketBroadcastAt.getOrDefault(symbol, 0L) >= 10000) {
+            targetMarketBroadcastAt.put(symbol, value.get("timestamp").getAsLong()); broadcast(value.toString());
+        }
+    }
     private final com.bookmap.plugin.rong.patterns.CairoObservationExport observationExport = new com.bookmap.plugin.rong.patterns.CairoObservationExport();
     private final java.util.concurrent.ArrayBlockingQueue<Runnable> observationQueue = new java.util.concurrent.ArrayBlockingQueue<>(512);
     private final java.util.concurrent.ScheduledExecutorService observationWorker = java.util.concurrent.Executors.newSingleThreadScheduledExecutor(r -> { Thread t = new Thread(r, "cairo-observations"); t.setDaemon(true); return t; });
@@ -567,6 +579,7 @@ public class SignalWebSocketServer extends WebSocketServer {
     @Override
     public void onOpen(WebSocket conn, ClientHandshake handshake) {
         conn.send("{\"type\":\"standalone_status\",\"native\":true}");
+        for (JsonObject target : targetMarkets.values()) conn.send(target.toString());
         observationQueue.offer(() -> { for (com.bookmap.plugin.rong.patterns.CairoEvidenceRecorder recorder : evidenceRecorders.values()) for (JsonObject batch : recorder.snapshot()) if (conn.isOpen()) conn.send(batch.toString());
             for (JsonObject observation : observationSnapshot()) if (conn.isOpen()) conn.send(observation.toString()); });
     }
@@ -580,6 +593,10 @@ public class SignalWebSocketServer extends WebSocketServer {
         // External clients cannot supply tokens, trading inputs or overwrite local views.
     }
 
+    /** Broker hints bypass the lossy market-observation queue. */
+    public void broadcastAccountActivity(JsonObject json) {
+        if ("cairo_account_activity".equals(json.get("type").getAsString())) broadcast(json.toString());
+    }
     public void acceptLocalMessage(JsonObject json) {
         if (json != null) {
             String type = getString(json, "type");
