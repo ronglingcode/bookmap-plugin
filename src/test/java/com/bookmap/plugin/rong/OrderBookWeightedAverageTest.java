@@ -150,6 +150,8 @@ class OrderBookWeightedAverageTest {
                 });
         RongPlugin plugin = new RongPlugin();
         IndicatorConfig config = new IndicatorConfig();
+        assertFalse(config.isEnabled(IndicatorConfig.ORDER_BOOK_WEIGHTED_AVERAGE));
+        config.setEnabled(IndicatorConfig.ORDER_BOOK_WEIGHTED_AVERAGE, true);
         Field configField = field("indicatorConfig");
         Object previousConfig = configField.get(null);
         try {

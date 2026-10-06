@@ -46,7 +46,7 @@ public class IndicatorConfig {
         enabled.put(FILLED_EXECUTION_MARKERS, true);
         enabled.put(BOOKMAP_PATTERN_SIGNALS, false);
         enabled.put(VWAP, true);
-        enabled.put(ORDER_BOOK_WEIGHTED_AVERAGE, true);
+        enabled.put(ORDER_BOOK_WEIGHTED_AVERAGE, false);
         enabled.put(TRADING_NOTIFICATION_SOUND, true);
     }
 

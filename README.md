@@ -29,7 +29,7 @@ profiles and the existing single-stock watchlist policy.
 ## Features
 
 - **Order Book Weighted Average**: an electric cyan (`#00E5FF`) line on the price
-  chart, enabled by default. Computes `sum(price * resting quantity) / sum(resting quantity)`
+  chart, disabled by default. Computes `sum(price * resting quantity) / sum(resting quantity)`
   across received bid and ask levels priced between **1% and 10× the current
   bid/ask midpoint**, inclusive. A one-sided book uses its available positive best
   quote; without a positive quote, the indicator produces a gap. Updates on depth
