@@ -38,7 +38,7 @@ Specification: implementation plan sections 2, 5, and 7.
 
 Specification: implementation plan section 6.
 
-- [ ] **SC-07 — Store and revise semantic events.** Add `signal/PatternEventStore.java` with alias/epoch scoping, time ordering, event/episode lookup, and revision upserts. Handle a late-observed event whose occurrence timestamp is earlier than the current watermark. **Complete when:** tests show correct ordering, duplicate suppression, revision replacement, and rejection of a foreign alias/epoch without treating delayed occurrence as replay seek.
+- [x] **SC-07 — Store and revise semantic events.** Add `signal/PatternEventStore.java` with alias/epoch scoping, time ordering, event/episode lookup, and revision upserts. Handle a late-observed event whose occurrence timestamp is earlier than the current watermark. **Complete when:** tests show correct ordering, duplicate suppression, revision replacement, and rejection of a foreign alias/epoch without treating delayed occurrence as replay seek.
 
 - [ ] **SC-08 — Bound and prune event history.** Add retention, event-count caps, epoch clearing, and explicit eviction results to `PatternEventStore`. Pruning must work from market timestamp updates even without a new semantic event. **Complete when:** tests cover 120-second retention, the 2,048-event limit, exact expiry boundaries, and identifiable eviction of a trigger record.
 
