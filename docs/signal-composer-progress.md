@@ -175,3 +175,10 @@ Work is confined to `bookmap-plugin`. The user authorized sequential implementat
 - Changed files: src/main/java/com/bookmap/plugin/rong/patterns/BidFailureDetector.java, src/main/java/com/bookmap/plugin/rong/patterns/EventTimeTradeAttribution.java, src/main/java/com/bookmap/plugin/rong/patterns/PatternObservationEngine.java, src/test/java/com/bookmap/plugin/rong/patterns/BidFailureDetectorTest.java.
 - Verification: Bid failure and observer suites passed (7 tests), including 70-percent consumption, below-print timing during/after clear decision, wrong direction, expiry, and reset.
 - Next task: SC-25.
+
+## SC-25 — Detect completed persistent offer rejection
+
+- Status: complete.
+- Changed files: src/main/java/com/bookmap/plugin/rong/patterns/OfferInteractionDetector.java, src/main/java/com/bookmap/plugin/rong/patterns/PatternObservationEngine.java, src/test/java/com/bookmap/plugin/rong/patterns/OfferInteractionDetectorTest.java.
+- Verification: Offer, bid-failure, and observer suites passed (10 tests); approach, subsequent below-print, inclusive hold, current size, return-near reset, distinct episodes, expiry/removal/breakout rejection verified.
+- Next task: SC-26.

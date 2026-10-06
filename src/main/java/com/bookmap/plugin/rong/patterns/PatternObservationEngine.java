@@ -18,6 +18,7 @@ public final class PatternObservationEngine implements PatternRuntimeContext {
     private final EventTimeRelocationTracker relocation;
     private final PatternEventNormalizer normalizer;
     private final BidFailureDetector bidFailures;
+    private final OfferInteractionDetector offers;
     private final Consumer<PatternEvent> output;
     private final BiConsumer<ResetReason, Long> resets;
     private final Consumer<String> diagnostics;
@@ -36,6 +37,7 @@ public final class PatternObservationEngine implements PatternRuntimeContext {
         attribution = new EventTimeTradeAttribution(config); relocation = new EventTimeRelocationTracker(config);
         normalizer = new PatternEventNormalizer(alias, pips, config);
         bidFailures = new BidFailureDetector(alias, pips, config, attribution, output);
+        offers = new OfferInteractionDetector(alias, pips, config, walls, output);
         definitions.add(new ReappearPatternDefinition(PatternType.BID_REAPPEAR, true));
         definitions.add(new ReappearPatternDefinition(PatternType.OFFER_REAPPEAR, false));
         definitions.add(new StepPatternDefinition(PatternType.BID_STEP_UP, true));
@@ -77,6 +79,7 @@ public final class PatternObservationEngine implements PatternRuntimeContext {
         dispatch(walls.onTime(timeNs));
         PatternTradeTick trade = new PatternTradeTick(price, safeInt(size), Boolean.TRUE.equals(buyAggressor), timeNs, nowMs(), previousHigh, previousLow);
         for (PatternDefinition definition : definitions) definition.onTrade(trade, this);
+        offers.onTrade(price, timeNs, epoch());
         dispatchTime();
     }
     public void onBbo(int bid, int ask, long timeNs, PatternEvent.TimestampProvenance provenance) {
@@ -116,11 +119,12 @@ public final class PatternObservationEngine implements PatternRuntimeContext {
     }
     private void dispatchTime() {
         bidFailures.onTime(nowNs());
+        offers.onTime(nowNs(), epoch());
         for (PatternDefinition definition : definitions) definition.onTime(this);
     }
     private static int safeInt(long value) { return (int)Math.min(Integer.MAX_VALUE, value); }
     private void clearState(long epoch) {
-        walls.reset(epoch); attribution.reset(); relocation.reset(); normalizer.reset(); bidFailures.reset();
+        walls.reset(epoch); attribution.reset(); relocation.reset(); normalizer.reset(); bidFailures.reset(); offers.reset();
         for (PatternDefinition definition : definitions) definition.reset();
         seeded = false; bid = ask = last = high = low = definitionObservations = 0;
     }
