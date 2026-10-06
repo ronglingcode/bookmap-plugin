@@ -17,6 +17,10 @@ class TradingSignalCanvasTest {
     static class Canvas {
         final List<CanvasIcon> shapes = new CopyOnWriteArrayList<>();
         final AtomicInteger disposals = new AtomicInteger();
+        List<CanvasIcon> markers() {
+            return shapes.stream().filter(icon -> icon.getX1().compose().base == CompositeCoordinateBase.DATA_ZERO)
+                    .collect(java.util.stream.Collectors.toList());
+        }
         volatile Thread publishingThread;
         final ScreenSpaceCanvas proxy = (ScreenSpaceCanvas)Proxy.newProxyInstance(ScreenSpaceCanvas.class.getClassLoader(),
                 new Class<?>[] {ScreenSpaceCanvas.class}, (object, method, args) -> {
@@ -40,13 +44,13 @@ class TradingSignalCanvasTest {
             c.onPatternEvent(event(PatternEventType.BIDS_CANCELLED, 3000, 5105, 100, "b"));
             CompositionUpdate validation = c.onPatternEvent(event(PatternEventType.OFFER_REJECTION, 60000, 5120, 200, "o"));
             canvas.publishingThread = Thread.currentThread(); store.publish("TEST", 1, validation); canvas.publishingThread = null;
-            painter.refreshNow(); assertEquals(1, canvas.shapes.size());
-            CanvasIcon icon = canvas.shapes.get(0);
+            painter.refreshNow(); assertEquals(1, canvas.markers().size());
+            CanvasIcon icon = canvas.markers().get(0);
             assertEquals(200, icon.getX1().compose().timeX); assertEquals(5105, icon.getY1().compose().dataY);
             CompositionUpdate revision = c.onPatternEvent(event(PatternEventType.OFFER_REJECTION, 70000, 5120, 300, "later"));
-            store.publish("TEST", 1, revision); painter.refreshNow(); assertEquals(1, canvas.shapes.size());
-            assertNotSame(icon, canvas.shapes.get(0)); assertEquals(200, canvas.shapes.get(0).getX1().compose().timeX);
-            clock.set(31000); painter.refreshNow(); assertTrue(canvas.shapes.isEmpty());
+            store.publish("TEST", 1, revision); painter.refreshNow(); assertEquals(1, canvas.markers().size());
+            assertNotSame(icon, canvas.markers().get(0)); assertEquals(200, canvas.markers().get(0).getX1().compose().timeX);
+            clock.set(31000); painter.refreshNow(); assertTrue(canvas.markers().isEmpty());
             painter.unregisterInstrument("TEST"); assertEquals(1, canvas.disposals.get());
             painter.shutdown(); assertEquals(1, canvas.disposals.get());
         } finally { painter.shutdown(); }

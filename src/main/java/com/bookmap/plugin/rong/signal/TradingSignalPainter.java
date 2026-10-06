@@ -78,12 +78,15 @@ public final class TradingSignalPainter implements ScreenSpacePainterFactory, In
         final String alias; final ScreenSpaceCanvas canvas;
         final Map<String, CanvasIcon> shapes = new HashMap<>();
         final Map<String, Integer> revisions = new HashMap<>();
+        CanvasIcon contextShape;
+        List<String> lastContextLines = List.of();
         volatile boolean dirty = true; boolean disposed;
         Instance(String alias, ScreenSpaceCanvas canvas) { this.alias = alias; this.canvas = canvas; }
         public void onHeatmapFullPixelsWidth(int width) { rebuild(); }
         synchronized void rebuild() {
             if (disposed || alias == null) return;
-            List<TradingSignal> signals = config.isEnabled(IndicatorConfig.SIGNAL_COMPOSER) ? store.snapshot(alias).signals : List.of();
+            TradingSignalStore.Snapshot snapshot = config.isEnabled(IndicatorConfig.SIGNAL_COMPOSER) ? store.snapshot(alias) : null;
+            List<TradingSignal> signals = snapshot == null ? List.of() : snapshot.signals;
             Map<String, TradingSignal> visible = new HashMap<>(); for (TradingSignal signal : signals) visible.put(signal.id, signal);
             for (String id : new ArrayList<>(shapes.keySet())) {
                 TradingSignal signal = visible.get(id);
@@ -100,17 +103,50 @@ public final class TradingSignalPainter implements ScreenSpacePainterFactory, In
                         new CompositeVerticalCoordinate(CompositeCoordinateBase.DATA_ZERO, offset + image.getHeight(), signal.trigger.priceTick));
                 canvas.addShape(icon); shapes.put(signal.id, icon); revisions.put(signal.id, signal.revision);
             }
+            List<String> contextLines = snapshot == null ? List.of() : contextLines(snapshot);
+            if (!contextLines.equals(lastContextLines)) {
+                removeContext(); lastContextLines = contextLines;
+                if (!contextLines.isEmpty()) {
+                    BufferedImage image = renderLines(contextLines, new Color(240, 186, 76));
+                    contextShape = new CanvasIcon(new PreparedImage(image),
+                            new CompositeHorizontalCoordinate(CompositeCoordinateBase.PIXEL_ZERO, 10, 0),
+                            new CompositeVerticalCoordinate(CompositeCoordinateBase.PIXEL_ZERO, 10, 0),
+                            new CompositeHorizontalCoordinate(CompositeCoordinateBase.PIXEL_ZERO, 10 + image.getWidth(), 0),
+                            new CompositeVerticalCoordinate(CompositeCoordinateBase.PIXEL_ZERO, 10 + image.getHeight(), 0));
+                    canvas.addShape(contextShape);
+                }
+            }
             dirty = false;
         }
         private void remove(String id) {
             CanvasIcon icon = shapes.remove(id); revisions.remove(id);
             try { canvas.removeShape(icon); } catch (IllegalArgumentException ignored) { }
         }
+        private void removeContext() {
+            if (contextShape == null) return;
+            try { canvas.removeShape(contextShape); } catch (IllegalArgumentException ignored) { }
+            contextShape = null;
+        }
         public synchronized void dispose() {
             if (disposed) return; disposed = true;
-            for (String id : new ArrayList<>(shapes.keySet())) remove(id); canvas.dispose();
+            for (String id : new ArrayList<>(shapes.keySet())) remove(id); removeContext(); canvas.dispose();
             List<Instance> painters = alias == null ? null : instances.get(alias); if (painters != null) painters.remove(this);
         }
+    }
+    public static List<String> contextLines(TradingSignalStore.Snapshot snapshot) {
+        List<String> lines = new ArrayList<>();
+        for (Direction direction : Direction.values()) {
+            DevelopingContext context = snapshot.contexts.get(direction);
+            if (context == null || snapshot.marketTimeNs > context.expiresAtNs) continue;
+            if (lines.isEmpty()) lines.add("SignalComposer · waiting context");
+            String remaining = java.math.BigDecimal.valueOf(Math.max(0, context.expiresAtNs - snapshot.marketTimeNs))
+                    .scaleByPowerOfTen(-9).setScale(1, java.math.RoundingMode.CEILING).toPlainString();
+            lines.add(direction + " · " + context.confirmation.type.name().replace('_', ' ') + " "
+                    + quantity(context.confirmation.size) + " · " + context.strength);
+            lines.add("Waiting for " + context.waitingFor + " >= " + quantity(context.requiredTriggerSize)
+                    + " · near " + SignalExplanationBuilder.price(context.confirmation.price) + " · " + remaining + "s market time");
+        }
+        return List.copyOf(lines);
     }
     public static List<String> badgeLines(TradingSignal signal) {
         TradingSignal.FirstValidation first = signal.firstValidation;

@@ -259,3 +259,10 @@ Work is confined to `bookmap-plugin`. The user authorized sequential implementat
 - Changed files: src/main/java/com/bookmap/plugin/rong/signal/TradingSignalPainter.java, src/main/java/com/bookmap/plugin/rong/RongPlugin.java, src/test/java/com/bookmap/plugin/rong/signal/TradingSignalCanvasTest.java, src/test/java/velox/api/layer1/common/helper/OpenGlHelper.java.
 - Verification: Canvas, badge, and lifecycle suites passed (7 tests): validation-time X/tick-price Y, same-ID replacement, receipt expiry, disable removal, idempotent teardown, and no publishing-thread canvas calls. Headless test-only OpenGlHelper fixture supplies a missing Bookmap runtime helper; actual OpenGL upload remains manual SC-43 verification.
 - Next task: SC-37.
+
+## SC-37 — Display separate market-time waiting context on the chart
+
+- Status: complete.
+- Changed files: src/main/java/com/bookmap/plugin/rong/signal/TradingSignalPainter.java, src/test/java/com/bookmap/plugin/rong/signal/TradingSignalCanvasTest.java, src/test/java/com/bookmap/plugin/rong/signal/DevelopingContextPainterTest.java.
+- Verification: Waiting-context and marker suites passed (5 tests): separate pixel-anchored status area, LONG/SHORT missing bid meanings and thresholds, local price, market-time remaining window, paused receipt clock independence, expiry/reset removal.
+- Next task: SC-38.
