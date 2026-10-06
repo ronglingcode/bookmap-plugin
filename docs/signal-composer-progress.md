@@ -238,3 +238,10 @@ Work is confined to `bookmap-plugin`. The user authorized sequential implementat
 - Changed files: src/main/java/com/bookmap/plugin/rong/IndicatorSettingsPanel.java, src/main/java/com/bookmap/plugin/rong/RongPlugin.java, src/test/java/com/bookmap/plugin/rong/SignalComposerSettingsTest.java.
 - Verification: Settings and lifecycle tests passed (5 tests): enable/disable under valid defaults, malformed-rule disarming, independent legacy toggle, shared symbol-filtered switch, and later attachment retention.
 - Next task: SC-34.
+
+## SC-34 — Expose credential-free observer settings without native actions
+
+- Status: complete.
+- Changed files: src/main/java/com/bookmap/plugin/rong/IndicatorSettingsPanel.java, src/main/java/com/bookmap/plugin/rong/RongPlugin.java, src/test/java/com/bookmap/plugin/rong/SignalComposerObserverSettingsTest.java.
+- Verification: Observer settings, advisory toggle, and inactive normal-activation suites passed (6 tests): existing observerOnly config permits settings without secrets, native account/action controls omitted, ordinary controls preserved, no native runtime or trade window in observer construction.
+- Next task: SC-35.

@@ -104,7 +104,7 @@ Specification: implementation plan section 7.
 
 - [x] **SC-33 — Add the independent settings toggle.** Add the `SignalComposer (advisory)` checkbox in `IndicatorSettingsPanel.java` and apply the shared switch to each eligible attachment. Valid missing-file defaults can be enabled through UI; invalid config remains disarmed. **Complete when:** settings tests cover user enable/disable, symbol filtering, no coupling to legacy pattern toggles/tradebooks, and a new attachment not resetting the switch.
 
-- [ ] **SC-34 — Support settings in credential-free observer mode.** Update `getCustomSettingsPanels()` and panel construction to expose observation/indicator settings in existing observer-only mode without local secrets, while omitting native trading/account actions. **Complete when:** activation/settings tests show observer-only replay works without credentials and ordinary missing-secrets activation remains inactive. Do not add a second observer-mode flag.
+- [x] **SC-34 — Support settings in credential-free observer mode.** Update `getCustomSettingsPanels()` and panel construction to expose observation/indicator settings in existing observer-only mode without local secrets, while omitting native trading/account actions. **Complete when:** activation/settings tests show observer-only replay works without credentials and ordinary missing-secrets activation remains inactive. Do not add a second observer-mode flag.
 
 ## F. Chart presentation and local explanations
 

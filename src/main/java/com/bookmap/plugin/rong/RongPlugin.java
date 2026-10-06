@@ -254,7 +254,7 @@ public class RongPlugin implements CustomModuleAdapter,
         }
         if (observationConfig.enabled) sharedServer.observationReady(cleanAlias, false);
         sharedServer.registerVwapUpdateListener(cleanAlias, vwapUpdateListener);
-        chartHoverHotkeyHandler.registerSymbol(cleanAlias, info.pips);
+        if (!observationConfig.observerOnly) chartHoverHotkeyHandler.registerSymbol(cleanAlias, info.pips);
         priceZonePainter.registerInstrument(cleanAlias);
         priceLinePainter.registerInstrument(cleanAlias);
         wallLabelPainter.registerInstrument(cleanAlias);
@@ -330,8 +330,10 @@ public class RongPlugin implements CustomModuleAdapter,
             filledExecutionManager.onInstrumentInitialized(cleanAlias, info.pips);
         }
 
-        tradeButtonWindow = new TradeButtonWindow(
-                cleanAlias, sharedServer, wallThresholdConfig::getThresholdFloor, nativeConnectionStatus);
+        if (!observationConfig.observerOnly) {
+            tradeButtonWindow = new TradeButtonWindow(
+                    cleanAlias, sharedServer, wallThresholdConfig::getThresholdFloor, nativeConnectionStatus);
+        }
     }
 
     static AliasFilter exactAliasFilter(String expectedAlias) {
@@ -581,7 +583,7 @@ public class RongPlugin implements CustomModuleAdapter,
 
     @Override
     public StrategyPanel[] getCustomSettingsPanels() {
-        if (!LocalCredentials.fileExists()) return new StrategyPanel[0];
+        if (!LocalCredentials.fileExists() && !observationConfig.observerOnly) return new StrategyPanel[0];
         synchronized (RongPlugin.class) {
             if (indicatorConfig == null) {
                 indicatorConfig = new IndicatorConfig();
@@ -592,7 +594,8 @@ public class RongPlugin implements CustomModuleAdapter,
         }
         return new StrategyPanel[] {
             new IndicatorSettingsPanel(indicatorConfig, wallThresholdConfig, nativeConnectionStatus,
-                    signalComposerConfig == null ? SignalComposerConfig.defaults() : signalComposerConfig)
+                    signalComposerConfig == null ? SignalComposerConfig.defaults() : signalComposerConfig,
+                    observationConfig.observerOnly)
         };
     }
 

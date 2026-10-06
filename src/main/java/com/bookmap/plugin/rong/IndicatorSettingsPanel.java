@@ -31,6 +31,10 @@ public class IndicatorSettingsPanel extends StrategyPanel {
     }
     public IndicatorSettingsPanel(IndicatorConfig config, WallThresholdConfig wallThresholdConfig,
             NativeConnectionStatus connectionStatus, SignalComposerConfig composerRules) {
+        this(config, wallThresholdConfig, connectionStatus, composerRules, false);
+    }
+    public IndicatorSettingsPanel(IndicatorConfig config, WallThresholdConfig wallThresholdConfig,
+            NativeConnectionStatus connectionStatus, SignalComposerConfig composerRules, boolean observerOnly) {
         super("Indicators");
         setLayout(new GridBagLayout());
 
@@ -45,6 +49,7 @@ public class IndicatorSettingsPanel extends StrategyPanel {
         JLabel versionLabel = new JLabel(PluginVersion.NAME + " Version: " + PluginVersion.VERSION);
         add(versionLabel, gbc);
 
+        if (!observerOnly) {
         gbc.gridy++;
         JPanel connectionPanel = new JPanel(new java.awt.GridLayout(0, 1, 0, 3));
         JLabel schwabStatus = connectionLabel();
@@ -59,6 +64,9 @@ public class IndicatorSettingsPanel extends StrategyPanel {
             updateConnectionLabel(massiveStreamStatus, "Massive stream", status.getMassiveStream(), status.isMassiveStreamReceiving());
         }));
         add(connectionPanel, gbc);
+        } else {
+            gbc.gridy++; add(new JLabel("Observer mode: native trading is inactive"), gbc);
+        }
 
         gbc.gridy++;
         JCheckBox camPivotsCheckbox = new JCheckBox(
@@ -171,6 +179,7 @@ public class IndicatorSettingsPanel extends StrategyPanel {
         wallThresholdPanel.add(thresholdSpinner, thresholdGbc);
         add(wallThresholdPanel, gbc);
 
+        if (!observerOnly) {
         gbc.gridy++;
         JCheckBox filledExecutionMarkersCheckbox = new JCheckBox(
                 "Persistent Filled Execution Labels (otherwise 30 seconds)",
@@ -204,6 +213,7 @@ public class IndicatorSettingsPanel extends StrategyPanel {
         resetNative.setToolTipText("Use only after checking unresolved orders at the broker. Does not resend orders.");
         resetNative.addActionListener(e -> RongPlugin.resetNativeExecutionAfterBrokerReview());
         add(resetNative, gbc);
+        }
     }
 
     private static JLabel connectionLabel() {
