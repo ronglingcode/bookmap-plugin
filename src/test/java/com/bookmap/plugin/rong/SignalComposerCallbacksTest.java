@@ -18,7 +18,12 @@ class SignalComposerCallbacksTest {
         RongPlugin p = plugin("TEST");
         field("instrumentInfo").set(p, new InstrumentInfo("TEST", "NASDAQ", "STOCKS", .01, 1, "TEST", true));
         field("orderBook").set(p, new OrderBookState()); field("initialized").setBoolean(p, true);
-        p.initializeSignalComposition(.01); return p;
+        p.initializeSignalComposition(.01);
+        field("compositionLog").set(p, new SignalCompositionLog("TEST", 2048, new SignalCompositionLog.Sink() {
+            public void summary(String alias, String full, String concise) { }
+            public void detail(String alias, String full) { }
+        }));
+        return p;
     }
     static void time(RongPlugin p, long ms) { p.onTimestamp(BASE + ms * 1_000_000L); }
     void enableConfig() throws Exception {

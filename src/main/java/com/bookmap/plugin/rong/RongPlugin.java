@@ -7,6 +7,7 @@ import com.bookmap.plugin.rong.signal.SignalCompositionPipeline;
 import com.bookmap.plugin.rong.signal.TradingSignalStore;
 import com.bookmap.plugin.rong.signal.ResetReason;
 import com.bookmap.plugin.rong.signal.TradingSignalPainter;
+import com.bookmap.plugin.rong.signal.SignalCompositionLog;
 import com.bookmap.plugin.rong.patterns.PatternEvent;
 
 import com.bookmap.plugin.rong.executions.FilledExecutionManager;
@@ -121,6 +122,7 @@ public class RongPlugin implements CustomModuleAdapter,
     private BookmapPatternEngine patternEngine;
     private SignalCompositionPipeline signalComposition;
     private SignalComposerConfig compositionRules;
+    private SignalCompositionLog compositionLog;
     private volatile boolean signalCompositionEnabled;
     private volatile boolean compositionSnapshotComplete;
     private volatile boolean compositionSeedFromSharedBook = true;
@@ -367,10 +369,14 @@ public class RongPlugin implements CustomModuleAdapter,
             compositionRules = signalComposerConfig;
         }
         if (!compositionRules.valid || !compositionRules.eligible(alias) || !Double.isFinite(pips) || pips <= 0) return;
+        compositionLog = new SignalCompositionLog(alias, compositionRules.maxEvents);
+        compositionLog.detail("Rules config=" + compositionRules.revision + "; sourceMode=" + observationConfig.sourceMode + "; advisory only");
         signalComposition = new SignalCompositionPipeline(alias, pips, compositionRules, update -> {
+            if (compositionLog != null) compositionLog.update(update);
             TradingSignalStore store = tradingSignalStore;
             if (store != null) store.publish(alias, signalComposition.epoch(), update);
-        });
+        }, event -> { if (compositionLog != null) compositionLog.event(event); },
+                diagnostic -> { if (compositionLog != null) compositionLog.detail(diagnostic); }, System::currentTimeMillis);
         signalCompositionEnabled = indicatorConfig.isEnabled(IndicatorConfig.SIGNAL_COMPOSER);
     }
 
@@ -381,7 +387,7 @@ public class RongPlugin implements CustomModuleAdapter,
         synchronized (compositionLock) {
             signalCompositionEnabled = false; compositionSnapshotComplete = false;
             if (signalComposition != null) signalComposition.reset(ResetReason.STOPPED);
-            signalComposition = null; compositionRules = null;
+            signalComposition = null; compositionRules = null; compositionLog = null;
             if (tradingSignalStore != null) tradingSignalStore.removeAlias(alias);
         }
         if (indicatorConfig != null) {

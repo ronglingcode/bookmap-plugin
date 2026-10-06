@@ -116,7 +116,7 @@ Specification: implementation plan section 8.
 
 - [x] **SC-37 — Display waiting context separately.** Add the distinct developing-context status area using store snapshots, showing evidence, missing bid meaning/size, local price, and remaining market-time window. **Complete when:** tests verify offer-only evidence displays waiting context rather than a completed signal; both directions remain distinct; expiry/reset clears it; pausing replay does not advance rule time from the UI refresh timer.
 
-- [ ] **SC-38 — Log signals and meaningful state changes.** Wire `CompositionUpdate` to existing queued `PluginLog` APIs: one concise summary per first validation, file-only full explanations/semantic events/revisions/rejections/resets/expiry. **Complete when:** recording-sink tests show late evidence does not create a second entry-style summary or sound, original validation remains accurately explained, and no callback-thread file/network I/O or broker dispatch is introduced.
+- [x] **SC-38 — Log signals and meaningful state changes.** Wire `CompositionUpdate` to existing queued `PluginLog` APIs: one concise summary per first validation, file-only full explanations/semantic events/revisions/rejections/resets/expiry. **Complete when:** recording-sink tests show late evidence does not create a second entry-style summary or sound, original validation remains accurately explained, and no callback-thread file/network I/O or broker dispatch is introduced.
 
 ## G. Regression, release, and handoff
 

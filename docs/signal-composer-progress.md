@@ -266,3 +266,10 @@ Work is confined to `bookmap-plugin`. The user authorized sequential implementat
 - Changed files: src/main/java/com/bookmap/plugin/rong/signal/TradingSignalPainter.java, src/test/java/com/bookmap/plugin/rong/signal/TradingSignalCanvasTest.java, src/test/java/com/bookmap/plugin/rong/signal/DevelopingContextPainterTest.java.
 - Verification: Waiting-context and marker suites passed (5 tests): separate pixel-anchored status area, LONG/SHORT missing bid meanings and thresholds, local price, market-time remaining window, paused receipt clock independence, expiry/reset removal.
 - Next task: SC-38.
+
+## SC-38 — Queue factual advisory summaries and detailed evidence logs
+
+- Status: complete.
+- Changed files: src/main/java/com/bookmap/plugin/rong/signal/SignalCompositionLog.java, src/main/java/com/bookmap/plugin/rong/RongPlugin.java, src/test/java/com/bookmap/plugin/rong/signal/SignalCompositionLogTest.java, src/test/java/com/bookmap/plugin/rong/SignalComposerCallbacksTest.java.
+- Verification: Recording log sink, callback, and lifecycle suites passed (6 tests): first validation summarizes once, later evidence/detail revisions preserve initial acceptance, semantic time/attribution, context changes, expiry/reset, and no sound or execution dependency.
+- Next task: SC-39.
