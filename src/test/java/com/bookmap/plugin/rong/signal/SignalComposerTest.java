@@ -4,8 +4,45 @@ import static org.junit.jupiter.api.Assertions.*;
 import static com.bookmap.plugin.rong.signal.CompositionModelsTest.event;
 import org.junit.jupiter.api.Test;
 import com.bookmap.plugin.rong.patterns.*;
+import com.google.gson.JsonParser;
 
 class SignalComposerTest {
+    @Test void timestampUpdatesExpireWithoutNewPatternAndKeepInclusiveBoundary() {
+        SignalComposer c = composer(); c.onPatternEvent(event(PatternEventType.BIDS_CANCELLED, 3000, 5105, 100, "b"));
+        assertTrue(c.onMarketTime(30_000_000_100L).transitions.isEmpty());
+        CompositionUpdate expired = c.onMarketTime(30_000_000_101L);
+        assertEquals(SignalState.EXPIRED, expired.transitions.get(0).current);
+        assertTrue(c.onPatternEvent(event(PatternEventType.OFFER_REJECTION, 60000, 5120, 30_000_000_200L, "o")).signals.isEmpty());
+    }
+    @Test void opposingBidInvalidationKeepsHistoricalSignalUnchanged() {
+        SignalComposer c = composer();
+        TradingSignal original = c.onPatternEvent(event(PatternEventType.BID_STEP_UP, 5000, 5105, 100, "long")).signals.get(0);
+        CompositionUpdate opposite = c.onPatternEvent(event(PatternEventType.BIDS_CANCELLED, 3000, 5105, 200, "short"));
+        assertEquals(SignalState.INVALID, opposite.transitions.get(0).current);
+        assertEquals(Direction.LONG, original.direction); assertEquals(1, original.revision);
+    }
+    @Test void priceDriftUsesUsableQuotesAndStrictDistanceBoundary() {
+        SignalComposer c = composer(); c.onPatternEvent(event(PatternEventType.BIDS_CANCELLED, 3000, 5105, 100, "b"));
+        assertTrue(c.onMarketPrice(0, 0, 0).transitions.isEmpty());
+        assertTrue(c.onMarketPrice(5125, 5126, 0).transitions.isEmpty());
+        assertEquals(SignalState.INVALID, c.onMarketPrice(5126, 5127, 0).transitions.get(0).current);
+    }
+    @Test void capacityAndHistoryEvictionInvalidateDependentCandidates() {
+        SignalComposerConfig config = SignalComposerConfig.parse(JsonParser.parseString("{\"maxEvents\":1,\"maxCandidates\":2}").getAsJsonObject());
+        SignalComposer c = new SignalComposer("TEST", 1, config);
+        c.onPatternEvent(event(PatternEventType.BIDS_CANCELLED, 3000, 5105, 100, "b1"));
+        CompositionUpdate second = c.onPatternEvent(event(PatternEventType.BIDS_CANCELLED, 3000, 5105, 200, "b2"));
+        assertEquals(SignalState.INVALID, second.transitions.get(0).current);
+        c.onPatternEvent(event(PatternEventType.BIDS_CANCELLED, 3000, 5105, 300, "b3"));
+        assertEquals(2, c.candidateStates().size());
+    }
+    @Test void resetClearsEpochAndRejectsOldContext() {
+        SignalComposer c = composer(); c.onPatternEvent(event(PatternEventType.BIDS_CANCELLED, 3000, 5105, 100, "b"));
+        c.reset(ResetReason.REPLAY_SEEK, 2); assertTrue(c.candidateStates().isEmpty());
+        assertTrue(c.onPatternEvent(event(PatternEventType.OFFER_REJECTION, 60000, 5120, 200, "old")).signals.isEmpty());
+        assertTrue(c.onMarketTime(1).transitions.isEmpty());
+        assertThrows(IllegalArgumentException.class, () -> c.onMarketTime(0));
+    }
     @Test void reappearAndStepOnTheSameWallShareCandidateAndPrimaryTrigger() {
         SignalComposer c = composer();
         TradingSignal first = c.onPatternEvent(event(PatternEventType.BID_STEP_UP, 5000, 5105, 100, "wall")).signals.get(0);

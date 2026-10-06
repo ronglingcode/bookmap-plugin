@@ -105,3 +105,10 @@ Work is confined to `bookmap-plugin`. The user authorized sequential implementat
 - Changed files: src/main/java/com/bookmap/plugin/rong/signal/SignalCandidate.java, src/main/java/com/bookmap/plugin/rong/signal/SignalComposer.java, src/test/java/com/bookmap/plugin/rong/signal/SignalComposerTest.java.
 - Verification: SignalComposerTest passed (12 tests), including same-wall reappear/step merging, stable revisions and immutable first acceptance.
 - Next task: SC-15.
+
+## SC-15 — Expire and invalidate active candidates
+
+- Status: complete.
+- Changed files: src/main/java/com/bookmap/plugin/rong/signal/SignalComposer.java, src/test/java/com/bookmap/plugin/rong/signal/SignalComposerTest.java.
+- Verification: SignalComposerTest passed (17 tests), including event-time expiry, drift, capacity, opposing evidence, and epoch reset.
+- Next task: SC-16.
