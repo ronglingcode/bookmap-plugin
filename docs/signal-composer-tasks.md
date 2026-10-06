@@ -46,7 +46,7 @@ Specification: implementation plan section 6.
 
 - [x] **SC-10 — Classify strength and select trigger requirements.** Add `signal/ConfirmationStrengthClassifier.java` and `TriggerRequirementPolicy.java`. Choose the strongest valid confirmation with deterministic tie-breaking, then apply 5K/4K/3K requirements according to configuration. **Complete when:** tests cover exact 1x/2x/5x/10x bands, fractional division, large `long` quantities, trigger equality/below-threshold cases, and several normal confirmations never becoming exceptional by summation.
 
-- [ ] **SC-11 — Build factual signal explanations.** Add `signal/SignalExplanationBuilder.java`. Explain direction, actual trigger behavior/size basis, real prices, confirmation timing/locality, normal/applied thresholds, and inferred attribution. Support later-confirmation wording without rewriting initial validation. **Complete when:** deterministic tests cover the 60K-offer/3K-bid example, a normal trigger with no confirmation, and confirmation arriving after validation. Do not invent executed absorption from quote-defense patterns.
+- [x] **SC-11 — Build factual signal explanations.** Add `signal/SignalExplanationBuilder.java`. Explain direction, actual trigger behavior/size basis, real prices, confirmation timing/locality, normal/applied thresholds, and inferred attribution. Support later-confirmation wording without rewriting initial validation. **Complete when:** deterministic tests cover the 60K-offer/3K-bid example, a normal trigger with no confirmation, and confirmation arriving after validation. Do not invent executed absorption from quote-defense patterns.
 
 ## C. Composer state machine
 

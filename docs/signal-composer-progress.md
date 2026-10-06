@@ -77,3 +77,10 @@ Work is confined to `bookmap-plugin`. The user authorized sequential implementat
 - Changed files: src/main/java/com/bookmap/plugin/rong/signal/ConfirmationStrengthClassifier.java, src/main/java/com/bookmap/plugin/rong/signal/TriggerRequirementPolicy.java, src/test/java/com/bookmap/plugin/rong/signal/ConfirmationStrengthClassifierTest.java.
 - Verification: ConfirmationStrengthClassifierTest passed (4 tests), including exact boundaries, deterministic ties and long-range arithmetic without summation.
 - Next task: SC-11.
+
+## SC-11 — explain bid triggers and complementary offer evidence factually
+
+- Status: complete.
+- Changed files: src/main/java/com/bookmap/plugin/rong/signal/SignalExplanationBuilder.java, src/test/java/com/bookmap/plugin/rong/signal/SignalExplanationBuilderTest.java.
+- Verification: SignalExplanationBuilderTest passed (3 tests), covering small-trigger relaxation, no-confirmation defense and later evidence without retroactive justification.
+- Next task: SC-12.
