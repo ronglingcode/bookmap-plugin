@@ -203,3 +203,10 @@ Work is confined to `bookmap-plugin`. The user authorized sequential implementat
 - Changed files: src/main/java/com/bookmap/plugin/rong/signal/SignalCompositionPipeline.java, src/test/java/com/bookmap/plugin/rong/patterns/SignalCompositionPipelineTest.java.
 - Verification: SignalCompositionPipelineTest passed (3 integrated fixtures): 60K growth/rejection plus 3K withdrawal SHORT under a higher legacy book threshold, bid hold plus consumed-offer breakout LONG, replay receipt-time independence, fallback suppression, and seek clearing.
 - Next task: SC-29.
+
+## SC-29 — Store immutable composed signals and waiting contexts
+
+- Status: complete.
+- Changed files: src/main/java/com/bookmap/plugin/rong/signal/TradingSignalStore.java, src/test/java/com/bookmap/plugin/rong/signal/TradingSignalStoreTest.java.
+- Verification: TradingSignalStoreTest passed (3 tests): original receipt TTL across revisions, 20-signal cap, alias and epoch isolation, contexts using market time, listener removal, and concurrent immutable reads.
+- Next task: SC-30.

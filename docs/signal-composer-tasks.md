@@ -94,7 +94,7 @@ Specification: implementation plan sections 4 and 5. These tasks use callback fi
 
 Specification: implementation plan section 7.
 
-- [ ] **SC-29 — Store composed signals and context for display.** Add `signal/TradingSignalStore.java` with immutable per-alias snapshots, change listeners, 20-signal capacity, same-ID revisions, original receipt-time TTL, separate developing context, and epoch clearing. **Complete when:** tests cover alias separation, revision without TTL extension, 30-second marker expiry, context updates/removal, and concurrent snapshot reads.
+- [x] **SC-29 — Store composed signals and context for display.** Add `signal/TradingSignalStore.java` with immutable per-alias snapshots, change listeners, 20-signal capacity, same-ID revisions, original receipt-time TTL, separate developing context, and epoch clearing. **Complete when:** tests cover alias separation, revision without TTL extension, 30-second marker expiry, context updates/removal, and concurrent snapshot reads.
 
 - [ ] **SC-30 — Construct composer state during plugin activation.** Add the shared first-attachment config snapshot and `IndicatorConfig.SIGNAL_COMPOSER` master state, plus per-attachment observer/composer instances in `RongPlugin.java`. Initialize the master once from valid config, respecting symbol eligibility. **Complete when:** lifecycle tests show disabled-by-default behavior, invalid-config disarming, a second attachment retaining the user's switch/rules, and observer-only construction without starting the native trading runtime. Do not route callbacks yet.
 
