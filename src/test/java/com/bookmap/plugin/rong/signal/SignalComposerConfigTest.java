@@ -2,8 +2,35 @@ package com.bookmap.plugin.rong.signal;
 
 import static org.junit.jupiter.api.Assertions.*;
 import org.junit.jupiter.api.Test;
+import com.google.gson.JsonParser;
+import com.google.gson.JsonObject;
 
 class SignalComposerConfigTest {
+    private SignalComposerConfig parse(String value) { return SignalComposerConfig.parse(JsonParser.parseString(value).getAsJsonObject()); }
+    @Test void parsesCustomTypedValuesAndRoundTripsExplicitKeys() {
+        SignalComposerConfig c = parse("{\"enabled\":true,\"symbols\":[\"aapl:NASDAQ@BMD\"],\"normalConfirmationSize\":6000,\"detectors\":{\"growthRatio\":0.5}}");
+        assertTrue(c.valid, c.error); assertTrue(c.enabled); assertTrue(c.eligible("AAPL")); assertFalse(c.eligible("MSFT"));
+        assertEquals(6000, c.normalConfirmationSize); assertEquals(5000, c.normalTriggerSize); assertEquals(.5, c.detectors.growthRatio);
+        assertEquals(c.revision, SignalComposerConfig.parse(c.toJson()).revision);
+        assertNotEquals(c.revision, SignalComposerConfig.defaults().revision);
+    }
+    @Test void invalidSettingsAreDisabledWithAnActionableReason() {
+        String[] invalid = {"{\"enabled\":\"true\"}", "{\"maxEvents\":1.5}", "{\"normalTriggerSize\":0}",
+                "{\"normalTriggerSize\":6000}", "{\"observationFloorSize\":5000}",
+                "{\"strengthMultiples\":{\"strong\":0.5}}", "{\"triggerRequirements\":{\"exceptional\":2000}}",
+                "{\"historyRetentionMs\":1000}", "{\"detectors\":{\"consumptionRatio\":2}}",
+                "{\"detectors\":{\"withdrawalMaxTradeRatio\":0.8}}", "{\"maxCandidates\":1000000}",
+                "{\"symbols\":[1]}", "{\"symbols\":null}", "{\"detectors\":false}", "{\"maxEvents\":\"12\"}"};
+        for (String input : invalid) {
+            SignalComposerConfig c = parse(input); assertFalse(c.valid, input); assertFalse(c.enabled, input);
+            assertTrue(c.error.startsWith("SignalComposer disabled:"));
+        }
+    }
+    @Test void normalizedSymbolOrderDoesNotChangeRevision() {
+        assertEquals(parse("{\"symbols\":[\"MSFT\",\"AAPL\"]}").revision,
+                parse("{\"symbols\":[\"aapl\",\"msft\"]}").revision);
+        assertFalse(SignalComposerConfig.parse((JsonObject)null).valid);
+    }
     @Test void defaultsKeepTheDetectionFloorIndependentAndDisabled() {
         SignalComposerConfig c = SignalComposerConfig.defaults();
         assertFalse(c.enabled); assertTrue(c.valid); assertTrue(c.symbols.isEmpty());

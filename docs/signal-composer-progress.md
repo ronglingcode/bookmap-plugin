@@ -28,3 +28,10 @@ Work is confined to `bookmap-plugin`. The user authorized sequential implementat
 - Changed files: src/main/java/com/bookmap/plugin/rong/signal/SignalComposerConfig.java, src/test/java/com/bookmap/plugin/rong/signal/SignalComposerConfigTest.java.
 - Verification: SignalComposerConfigTest passed (3 tests); production and test compilation passed.
 - Next task: SC-04.
+
+## SC-04 — validate and explicitly parse composition rules
+
+- Status: complete.
+- Changed files: src/main/java/com/bookmap/plugin/rong/signal/SignalComposerConfig.java, src/test/java/com/bookmap/plugin/rong/signal/SignalComposerConfigTest.java.
+- Verification: SignalComposerConfigTest passed (6 tests), including malformed and contradictory settings plus deterministic revisions.
+- Next task: SC-05.
