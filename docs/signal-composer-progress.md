@@ -56,3 +56,10 @@ Work is confined to `bookmap-plugin`. The user authorized sequential implementat
 - Changed files: src/main/java/com/bookmap/plugin/rong/signal/PatternEventStore.java, src/test/java/com/bookmap/plugin/rong/signal/PatternEventStoreTest.java.
 - Verification: PatternEventStoreTest passed (3 tests), including delayed occurrences, duplicates and foreign context rejection.
 - Next task: SC-08.
+
+## SC-08 — bound and prune semantic history by market time
+
+- Status: complete.
+- Changed files: src/main/java/com/bookmap/plugin/rong/signal/PatternEventStore.java, src/test/java/com/bookmap/plugin/rong/signal/PatternEventStoreTest.java.
+- Verification: PatternEventStoreTest passed (7 tests), covering expiry boundaries, duplicate-delivery pruning, count caps, identifiable evictions and epoch reset.
+- Next task: SC-09.

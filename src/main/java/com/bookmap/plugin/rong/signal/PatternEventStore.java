@@ -14,12 +14,20 @@ public final class PatternEventStore {
     public enum Change { INSERTED, REVISED, DUPLICATE, REJECTED }
     private final String alias;
     private long epoch, watermarkNs;
+    private final long retentionNs;
+    private final int maxEvents;
+    private List<PatternEvent> lastEvictions = Collections.emptyList();
     private final Map<String, PatternEvent> events = new LinkedHashMap<>();
     private static final Comparator<PatternEvent> ORDER = Comparator.comparingLong((PatternEvent e) -> e.eventTimeNs).thenComparing(e -> e.id);
 
     public PatternEventStore(String alias, long epoch) {
+        this(alias, epoch, SignalComposerConfig.defaults());
+    }
+    public PatternEventStore(String alias, long epoch, SignalComposerConfig config) {
         if (alias == null || alias.isBlank() || epoch <= 0) throw new IllegalArgumentException("History requires alias and epoch");
+        if (!config.valid) throw new IllegalArgumentException(config.error);
         this.alias = alias; this.epoch = epoch;
+        retentionNs = Math.multiplyExact(config.historyRetentionMs, 1_000_000L); maxEvents = config.maxEvents;
     }
     public Change put(PatternEvent event, long processingNs) {
         Objects.requireNonNull(event);
@@ -29,8 +37,9 @@ public final class PatternEventStore {
         if (previous != null && (!previous.interactionId.equals(event.interactionId) || previous.eventTimeNs != event.eventTimeNs
                 || previous.side != event.side || previous.meaning != event.meaning)) return Change.REJECTED;
         watermarkNs = processingNs;
-        if (previous != null && event.revision <= previous.revision) return Change.DUPLICATE;
+        if (previous != null && event.revision <= previous.revision) { pruneInternal(); return Change.DUPLICATE; }
         events.put(event.id, event);
+        pruneInternal();
         return previous == null ? Change.INSERTED : Change.REVISED;
     }
     public List<PatternEvent> snapshot() {
@@ -42,4 +51,26 @@ public final class PatternEventStore {
     public long watermarkNs() { return watermarkNs; }
     public long epoch() { return epoch; }
     public int size() { return events.size(); }
+    public List<PatternEvent> lastEvictions() { return lastEvictions; }
+    public List<PatternEvent> prune(long processingNs) {
+        if (processingNs < watermarkNs) throw new IllegalArgumentException("Processing time moved backwards; reset epoch first");
+        watermarkNs = processingNs; pruneInternal(); return lastEvictions;
+    }
+    private void pruneInternal() {
+        List<PatternEvent> removed = new ArrayList<>();
+        long cutoff = watermarkNs - retentionNs;
+        events.values().removeIf(event -> {
+            if (event.eventTimeNs < cutoff) { removed.add(event); return true; }
+            return false;
+        });
+        while (events.size() > maxEvents) {
+            PatternEvent oldest = Collections.min(events.values(), ORDER);
+            events.remove(oldest.id); removed.add(oldest);
+        }
+        lastEvictions = Collections.unmodifiableList(removed);
+    }
+    public void reset(long nextEpoch) {
+        if (nextEpoch <= epoch) throw new IllegalArgumentException("A reset needs a new epoch");
+        epoch = nextEpoch; watermarkNs = 0; events.clear(); lastEvictions = Collections.emptyList();
+    }
 }
