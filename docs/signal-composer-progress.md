@@ -42,3 +42,10 @@ Work is confined to `bookmap-plugin`. The user authorized sequential implementat
 - Changed files: src/main/java/com/bookmap/plugin/rong/signal/SignalComposerConfig.java, src/test/java/com/bookmap/plugin/rong/signal/SignalComposerConfigLoadingTest.java, build.gradle.
 - Verification: Configuration parsing/loading suites passed (10 tests), using temporary files and test-only overrides.
 - Next task: SC-06.
+
+## SC-06 — define candidate state and immutable advisory results
+
+- Status: complete.
+- Changed files: src/main/java/com/bookmap/plugin/rong/signal/ConfirmationStrength.java, src/main/java/com/bookmap/plugin/rong/signal/SignalState.java, src/main/java/com/bookmap/plugin/rong/signal/ResetReason.java, src/main/java/com/bookmap/plugin/rong/signal/ConfirmationMatch.java, src/main/java/com/bookmap/plugin/rong/signal/TradingSignal.java, src/main/java/com/bookmap/plugin/rong/signal/SignalCandidate.java, src/main/java/com/bookmap/plugin/rong/signal/DevelopingContext.java, src/main/java/com/bookmap/plugin/rong/signal/CompositionUpdate.java, src/test/java/com/bookmap/plugin/rong/signal/CompositionModelsTest.java.
+- Verification: CompositionModelsTest passed (4 tests), covering defensive copies, nanosecond ordering, bid-only output and frozen validation.
+- Next task: SC-07.

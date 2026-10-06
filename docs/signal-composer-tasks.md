@@ -32,7 +32,7 @@ Specification: implementation plan sections 2, 5, and 7.
 
 - [x] **SC-05 — Load local configuration and isolate tests.** Add the bounded-file loader for `%USERPROFILE%/bmtrader/signal-composer.json` and `bmtrader.signalComposerConfig`. Extend `build.gradle` test properties to prevent tests inheriting the user's local composer config. **Complete when:** temporary-file tests cover missing, valid, oversized, and invalid files; missing config gives disabled usable defaults; invalid config cannot be enabled. Production plugin startup is not connected yet.
 
-- [ ] **SC-06 — Define composition state and immutable outputs.** Add `signal/ConfirmationStrength.java`, `SignalState.java`, `SignalCandidate.java`, `TradingSignal.java`, `DevelopingContext.java`, `CompositionUpdate.java`, and reset reasons. Distinguish mutable candidate state from immutable public snapshots, including an immutable first-validation record and subsequent evidence. **Complete when:** model tests verify defensive copies, revisions, before/after timing fields, and absence of score/order-command fields. Keep this layer independent of the Bookmap API.
+- [x] **SC-06 — Define composition state and immutable outputs.** Add `signal/ConfirmationStrength.java`, `SignalState.java`, `SignalCandidate.java`, `TradingSignal.java`, `DevelopingContext.java`, `CompositionUpdate.java`, and reset reasons. Distinguish mutable candidate state from immutable public snapshots, including an immutable first-validation record and subsequent evidence. **Complete when:** model tests verify defensive copies, revisions, before/after timing fields, and absence of score/order-command fields. Keep this layer independent of the Bookmap API.
 
 ## B. History and pure rule components
 
