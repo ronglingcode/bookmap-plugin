@@ -13,7 +13,7 @@ credentials, and executes trades without ViteApp or ProxyServer running.
    `node scripts/importSecrets.mjs ..\secrets\storeSecrets.js`.
    See [credential setup](config/README.md).
 3. In Bookmap, open API Plugins Configuration, add
-   `build/libs/lingrong1988_bmtrader_1.31.jar`, and attach bmtrader to a chart.
+   `build/libs/lingrong1988_bmtrader_1.32.jar`, and attach bmtrader to a chart.
 4. The first attachment starts the trading runtime; the final detachment stops it.
    Check the bmtrader Logs window for startup errors. Settings offer
    **Restart Native Trading / Reload Secrets**, **Open Schwab Authorization**,
@@ -147,7 +147,7 @@ TypeScript fixtures check Java parity; fake services cover standalone startup,
 renewal, requests, persistence and teardown. No live orders or real Firestore writes
 are sent by these checks.
 
-Share only `build/libs/lingrong1988_bmtrader_1.31.jar`. Unobfuscated intermediates
+Share only `build/libs/lingrong1988_bmtrader_1.32.jar`. Unobfuscated intermediates
 and the private mapping remain under `build/intermediates` and
 `build/private/obfuscation`. Obfuscation does not prevent reverse engineering.
 

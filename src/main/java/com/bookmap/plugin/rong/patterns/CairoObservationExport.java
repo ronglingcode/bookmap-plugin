@@ -37,7 +37,7 @@ public final class CairoObservationExport {
         value.addProperty("priceUnit", "USD"); value.addProperty("episodeId", "source-status"); value.addProperty("revision", 0);
         value.addProperty("pattern", "status"); value.add("price", com.google.gson.JsonNull.INSTANCE); value.add("eventTime", com.google.gson.JsonNull.INSTANCE);
         value.addProperty("receivedAt", Long.toString(System.currentTimeMillis() * 1_000_000L));
-        value.addProperty("detectorRevision", "bmtrader-1.31-bid-v1"); value.addProperty("configRevision", "observer-v1");
+        value.addProperty("detectorRevision", "bmtrader-1.32-bid-v1"); value.addProperty("configRevision", "observer-v1");
         value.addProperty("mode", "unknown"); value.addProperty("readiness", "unknown");
         value.addProperty("delivery", delivery); value.addProperty("kind", kind);
         return value;

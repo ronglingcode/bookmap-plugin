@@ -1,6 +1,7 @@
 package com.bookmap.plugin.rong.miniviteapp;
 
 import com.bookmap.plugin.rong.miniviteapp.runtime.TradingRuntime;
+import com.bookmap.plugin.rong.NativeConnectionStatus;
 import com.bookmap.plugin.rong.miniviteapp.core.account.ExecutionExports.Format;
 import com.bookmap.plugin.rong.miniviteapp.ports.*;
 import com.bookmap.plugin.rong.miniviteapp.libraries.firestore.DocumentCodec;
@@ -18,11 +19,65 @@ class TradingRuntimeTest {
     static JsonObject json(String text) { return JsonParser.parseString(text).getAsJsonObject(); }
     static class Task { long delay; Runnable run; boolean canceled; }
     static class Socket implements SocketPort.Connection { SocketPort.Handlers handlers; boolean closed; public void send(String value) { } public void close() { closed = true; } }
+    @Test void invalidSelectedPlanStopsBeforeVendorConnectionsAndUpdatesEveryStatus() throws Exception {
+        JsonArray fixtures = JsonParser.parseReader(new InputStreamReader(getClass().getResourceAsStream("/state-fixtures.json"), StandardCharsets.UTF_8)).getAsJsonArray();
+        JsonObject config = null;
+        for (JsonElement item : fixtures) {
+            JsonObject fixture = item.getAsJsonObject();
+            if (fixture.get("name").getAsString().equals("stock selections config"))
+                config = fixture.getAsJsonArray("args").get(0).getAsJsonObject().deepCopy();
+        }
+        assertNotNull(config);
+        JsonObject plan = config.getAsJsonArray("plans").get(0).getAsJsonObject();
+        plan.addProperty("symbol", "PCVX");
+        plan.getAsJsonObject("long").addProperty("enabled", false);
+        JsonObject shortPlan = plan.getAsJsonObject("short");
+        shortPlan.addProperty("enabled", true);
+        shortPlan.addProperty("firstTargetToAdd", "0");
+        JsonArray selections = new JsonArray(); selections.add("PCVX"); config.add("stockSelections", selections);
+        JsonObject document = new JsonObject(); document.add("fields", DocumentCodec.encodeFields(config));
+        JsonObject row = new JsonObject(); row.add("document", document);
+        JsonArray rows = new JsonArray(); rows.add(row);
+        AtomicInteger configReads = new AtomicInteger();
+        HttpPort http = (uri, method, headers, body) -> {
+            assertTrue(uri.getPath().endsWith(":runQuery"), "Invalid plan must stop startup before broker or market requests");
+            configReads.incrementAndGet(); return new HttpPort.Response(200, rows.toString());
+        };
+        CredentialPort credentials = new CredentialPort() {
+            public JsonObject loadSchwab() { return new JsonObject(); }
+            public void saveSchwab(JsonObject value) { fail("Invalid plan must not rotate tokens"); }
+        };
+        NativeConnectionStatus status = new NativeConnectionStatus(); status.setStarting();
+        List<String> logs = new ArrayList<>();
+        List<JsonObject> emitted = new ArrayList<>();
+        try (TradingRuntime runtime = new TradingRuntime(http, credentials,
+                json("{\"firebaseConfig\":{\"projectId\":\"fake-project\"},\"massive\":{\"apiKey\":\"fake-massive\"}}"),
+                (url, handlers) -> { throw new AssertionError("Invalid plan must not open streams"); },
+                (delay, task) -> { throw new AssertionError("Invalid plan must not start timers"); },
+                Runnable::run, System::currentTimeMillis, new TradingRuntime.Events() {
+                    public void message(JsonObject value) { emitted.add(value.deepCopy()); }
+                    public void log(String symbol, String value) { logs.add(value); }
+                    public void notify(String symbol, String value) { fail("Unexpected notification"); }
+                    public void status(String source, String value) { status.update(source, value); }
+                })) {
+            CompletionException error = assertThrows(CompletionException.class, () -> runtime.start().join());
+            assertEquals("PCVX missing first target to add", error.getCause().getMessage());
+            assertTrue(emitted.isEmpty(), "Failed startup must not publish trading state");
+            runtime.dispatch(json("{\"symbol\":\"PCVX\",\"keyCode\":\"KeyB\"}"));
+            assertTrue(emitted.stream().anyMatch(value -> value.get("type").getAsString().equals("execution_blocked")));
+            assertEquals(1, configReads.get());
+            assertEquals("startup failed", status.snapshot().getSchwab());
+            assertEquals("startup failed", status.snapshot().getMassiveHistory());
+            assertEquals("startup failed", status.snapshot().getMassiveStream());
+            assertTrue(logs.stream().anyMatch(value -> value.contains("PCVX missing first target to add")));
+        }
+    }
     @Test void standaloneStartupRenewalAcceptedEntryPersistenceAndTeardown() throws Exception {
         JsonArray fixtures = JsonParser.parseReader(new InputStreamReader(getClass().getResourceAsStream("/state-fixtures.json"), StandardCharsets.UTF_8)).getAsJsonArray();
         JsonObject config = null, saved = null;
         for (JsonElement item : fixtures) { JsonObject f = item.getAsJsonObject(); if (f.get("name").getAsString().equals("stock selections config")) config = f.getAsJsonArray("args").get(0).getAsJsonObject(); if (f.get("name").getAsString().equals("new state and accepted entry")) saved = f.getAsJsonObject("result"); }
-        final JsonObject configData = config, savedState = saved;
+        final JsonObject configData = config.deepCopy(), savedState = saved;
+        configData.getAsJsonArray("plans").get(0).getAsJsonObject().getAsJsonObject("long").addProperty("firstTargetToAdd", "-1");
         AtomicLong now = new AtomicLong(Instant.parse("2026-10-01T13:32:00Z").toEpochMilli()); AtomicInteger refreshes = new AtomicInteger(), accountReads = new AtomicInteger(), writes = new AtomicInteger(), mutations = new AtomicInteger(), audits = new AtomicInteger();
         AtomicBoolean limited = new AtomicBoolean(); AtomicReference<String> positionData = new AtomicReference<>("[]"), orderData = new AtomicReference<>("[]");
         AtomicInteger httpCalls = new AtomicInteger();

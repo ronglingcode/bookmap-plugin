@@ -110,7 +110,8 @@ public final class TradingRuntime implements AutoCloseable {
                 events.log("", "Native trading runtime initialized; account and configuration loaded; stream startup requested");
             } catch (Exception error) {
                 events.status("schwab", "startup failed");
-                events.status("massive", "startup failed");
+                events.status("massiveHistory", "startup failed");
+                events.status("massiveStream", "startup failed");
                 failure("", "Native startup", error);
                 throw new CompletionException(error);
             }

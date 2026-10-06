@@ -64,7 +64,8 @@ public final class TradingConfig {
             if (!plan.has(side) || !plan.get(side).isJsonObject()) return symbol + " missing " + side + " plan";
             JsonObject direction = plan.getAsJsonObject(side); if (falseValue(direction.get("enabled"))) continue;
             String target = string(direction, "firstTargetToAdd"); double price; try { price = Double.parseDouble(target); } catch (RuntimeException error) { price = 0; }
-            if (!List.of("vwap", "premarketHigh", "premarketLow").contains(target) && !(price > 0)) return symbol + " missing first target to add";
+            // Negative prices select the automatic gap-based threshold in ExtendedEntryRules.
+            if (!List.of("vwap", "premarketHigh", "premarketLow").contains(target) && (!Double.isFinite(price) || price == 0)) return symbol + " missing first target to add";
             if (!direction.has("finalTargets") || !direction.get("finalTargets").isJsonArray() || direction.getAsJsonArray("finalTargets").size() < 2) return symbol + " need at least 2 final targets";
             JsonArray targets = direction.getAsJsonArray("finalTargets");
             for (int index = 0; index < targets.size(); index++) {
