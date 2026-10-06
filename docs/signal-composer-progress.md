@@ -21,3 +21,10 @@ Work is confined to `bookmap-plugin`. The user authorized sequential implementat
 - Changed files: src/main/java/com/bookmap/plugin/rong/patterns/PatternEvent.java, src/main/java/com/bookmap/plugin/rong/patterns/PatternEventType.java, src/main/java/com/bookmap/plugin/rong/patterns/PatternSide.java, src/main/java/com/bookmap/plugin/rong/patterns/PatternMeaning.java, src/test/java/com/bookmap/plugin/rong/patterns/PatternEventTest.java.
 - Verification: PatternEventTest passed (4 tests); production and test compilation passed.
 - Next task: SC-03.
+
+## SC-03 — define typed SignalComposer rule defaults
+
+- Status: complete.
+- Changed files: src/main/java/com/bookmap/plugin/rong/signal/SignalComposerConfig.java, src/test/java/com/bookmap/plugin/rong/signal/SignalComposerConfigTest.java.
+- Verification: SignalComposerConfigTest passed (3 tests); production and test compilation passed.
+- Next task: SC-04.
