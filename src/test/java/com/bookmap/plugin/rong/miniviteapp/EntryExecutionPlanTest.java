@@ -2,6 +2,9 @@ package com.bookmap.plugin.rong.miniviteapp;
 
 import com.bookmap.plugin.rong.miniviteapp.core.controllers.EntryHandler;
 import com.bookmap.plugin.rong.miniviteapp.core.controllers.EntryRulesChecker;
+import com.bookmap.plugin.rong.miniviteapp.core.marketdata.StartupEligibility;
+import com.google.gson.JsonObject;
+import com.google.gson.JsonArray;
 import com.bookmap.plugin.rong.miniviteapp.models.Models.Snapshot;
 import com.google.gson.JsonParser;
 import java.io.InputStreamReader;
@@ -10,6 +13,45 @@ import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.*;
 
 class EntryExecutionPlanTest {
+    private JsonObject entryState() {
+        return JsonParser.parseReader(new InputStreamReader(getClass().getResourceAsStream("/direct-entry-fixtures.json"), StandardCharsets.UTF_8))
+                .getAsJsonArray().get(0).getAsJsonObject().getAsJsonObject("state").deepCopy();
+    }
+    @Test void entryRulesPreserveStartupAndWatchlistReasonsAndShowPriceAndRiskValues() {
+        JsonObject context = entryState().getAsJsonObject("entryContext");
+        String breakout = "previous consolidation breakout on 2026-10-05: open 630.605 inside [621, 631], close 631.75";
+        context.addProperty("startupBlockReason", breakout);
+        assertEquals("checkRule: startup eligibility: " + breakout, assertThrows(IllegalArgumentException.class,
+                () -> EntryRulesChecker.checkBasicGlobalEntryRules(context, true, 10)).getMessage());
+        context.addProperty("startupBlockReason", "");
+        context.addProperty("watchlistBlockReason", "more than 1 stocks in watchlist: AMD, AAPL");
+        assertEquals("checkRule: more than 1 stocks in watchlist: AMD, AAPL", assertThrows(IllegalArgumentException.class,
+                () -> EntryRulesChecker.checkBasicGlobalEntryRules(context, true, 10)).getMessage());
+        context.addProperty("watchlistBlockReason", "");
+        context.addProperty("realizedPnl", -4000);
+        assertTrue(assertThrows(IllegalArgumentException.class, () -> EntryRulesChecker.checkBasicGlobalEntryRules(context, true, 10)).getMessage()
+                .contains("realized P&L=-4000.0, daily max loss=4000.0"));
+        context.addProperty("realizedPnl", 0);
+        context.add("watchAreas", JsonParser.parseString("[10.1]"));
+        assertTrue(assertThrows(IllegalArgumentException.class, () -> EntryRulesChecker.checkBasicGlobalEntryRules(context, true, 10)).getMessage()
+                .contains("entry price 10.0 is near against watch level 10.1"));
+        context.add("watchAreas", new JsonArray());
+        context.add("noTradeZones", JsonParser.parseString("[{\"low\":9.9,\"high\":10.1}]"));
+        assertTrue(assertThrows(IllegalArgumentException.class, () -> EntryRulesChecker.checkBasicGlobalEntryRules(context, true, 10)).getMessage()
+                .contains("entry price 10.0 is inside no trade zone 9.9 - 10.1"));
+    }
+    @Test void amdWithZeroPremarketVolumeCanBuildEntryWhileOtherStartupRulesStillApply() {
+        JsonObject state = entryState(); state.addProperty("symbol", "AMD");
+        JsonObject plan = JsonParser.parseString("{\"symbol\":\"AMD\",\"marketCapInMillions\":10000}").getAsJsonObject();
+        JsonObject stats = JsonParser.parseString("{\"lastDayShares\":0,\"previousDaysSharesAverage\":1000000}").getAsJsonObject();
+        String reason = StartupEligibility.evaluate(plan, 10, 100000000, stats, new JsonArray());
+        assertEquals("", reason);
+        state.getAsJsonObject("entryContext").addProperty("startupBlockReason", reason);
+        JsonObject action = JsonParser.parseString("{\"tradebook_id\":\"RangeBoundBidReversal\",\"entry_method\":\"1 R\"}").getAsJsonObject();
+        assertEquals(1, EntryHandler.handleEntry(new Snapshot(state), action, "").requests.size());
+        plan.addProperty("symbol", "AAPL");
+        assertEquals("premarket shares below 500000 hard floor", StartupEligibility.evaluate(plan, 10, 100000000, stats, new JsonArray()));
+    }
     @Test void fixturesMatchProductionTsEntryHelpers() {
         var stream = getClass().getResourceAsStream("/direct-entry-fixtures.json"); assertNotNull(stream);
         var fixtures = JsonParser.parseReader(new InputStreamReader(stream, StandardCharsets.UTF_8)).getAsJsonArray();

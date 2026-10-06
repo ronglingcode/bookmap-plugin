@@ -350,6 +350,19 @@ class NativeExecutionTest {
             }
         }
     }
+    @Test void blockedEntryLogsAndEmitsTheActualStartupRuleWithoutBrokerRequests() throws Exception {
+        try (var rig = new Rig()) {
+            var command = rig.connectEntry();
+            String rule = "previous consolidation breakout on 2026-10-05: open 630.605 inside [621, 631], close 631.75";
+            rig.state.getAsJsonObject("entryContext").addProperty("startupBlockReason", rule);
+            rig.updateState(System.currentTimeMillis());
+            assertTrue(rig.engine.route(command));
+            var blocked = rig.events.stream().filter(event -> event.get("type").getAsString().equals("execution_blocked")).findFirst().orElseThrow();
+            assertEquals("checkRule: startup eligibility: " + rule, blocked.get("reason").getAsString());
+            assertTrue(rig.logs.stream().anyMatch(line -> line.contains(rule) && line.contains("no broker requests attempted")));
+            assertEquals(0, rig.mutations.get());
+        }
+    }
     @Test void flatEntriesWithOtherRiskLabelsStayNative() throws Exception {
         for (String method : new String[]{"pattern 0.25R", "2 R", "unparsed method"}) try (var rig = new Rig()) {
             var command = rig.connectEntry(); command.addProperty("entry_method", method);

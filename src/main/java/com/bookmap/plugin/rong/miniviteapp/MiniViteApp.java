@@ -169,8 +169,9 @@ public final class MiniViteApp implements AutoCloseable {
             Snapshot executionState = state;
             executor.execute(() -> execute(capturedAccount, actionId, executionState, plan));
         } catch (RuntimeException error) {
-            String reason = "build " + (entry ? "wall_reversal_entry" : key) + " plan failed: "
-                    + ExecutionDiagnostics.describe(error, token, account);
+            String reason = error instanceof IllegalArgumentException && error.getMessage() != null && error.getMessage().startsWith("checkRule:")
+                    ? ExecutionDiagnostics.sanitize(error.getMessage(), token, account)
+                    : "build " + (entry ? "wall_reversal_entry" : key) + " plan failed: " + ExecutionDiagnostics.describe(error, token, account);
             log.accept(symbol, "Native blocked: " + reason + "; no broker requests attempted for this action");
             JsonObject blocked = message("execution_blocked"); blocked.addProperty("symbol", symbol);
             blocked.addProperty("reason", reason); sender.accept(connection, blocked);

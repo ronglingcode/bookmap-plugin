@@ -63,19 +63,19 @@ public final class ExtendedEntryRules {
         // canReloadPartial applies the tradebook boundary before this override.
         if (state.netQuantity != 0 && (state.netQuantity > 0) == isLong && currentRisk < threshold) return;
         Models.require(Models.bool(context, "attendanceAllowed"), "attendance blocks partial entry");
-        Models.require(Models.string(context, "watchlistBlockReason").isEmpty(), "watchlist limit blocks partial entry");
+        EntryRulesChecker.checkEligibility(context);
         double pnl = Models.number(context, "realizedPnl"), limit = Models.number(context, "dailyMaxLoss");
         Models.require(Double.isFinite(pnl) && Models.positive(limit), "partial risk inputs unavailable");
-        Models.require(pnl - currentRisk >= -limit && pnl > -limit, "daily loss limit blocks partial entry");
+        Models.require(pnl - currentRisk >= -limit && pnl > -limit, "checkRule: daily loss limit blocks partial entry; realized P&L=" + pnl + ", existing position risk=" + currentRisk + ", daily max loss=" + limit);
         double totalRisk = currentRisk + entryRisk(state), addedRisk = quantity * Math.abs(price - stop);
-        Models.require(!(pnl < 0 && -pnl + addedRisk + totalRisk > limit), "partial entry exceeds daily loss budget");
+        Models.require(!(pnl < 0 && -pnl + addedRisk + totalRisk > limit), "checkRule: partial entry exceeds daily loss budget; realized P&L=" + pnl + ", existing risk=" + totalRisk + ", added risk=" + addedRisk + ", daily max loss=" + limit);
         double todayRange = Models.number(context, "todayRange");
         if (Models.number(direction, "addCount") > 2 && todayRange != 0 && Models.number(context, "secondsSinceMarketOpen") >= 0) {
             Models.require(Double.isFinite(todayRange), "daily-range add input unavailable");
             double dayStop = Models.number(context, isLong ? "lowOfDay" : "highOfDay");
-            Models.require(Math.abs(price - dayStop) / todayRange < 0.5, "partial entry exceeds half daily range");
+            Models.require(Math.abs(price - dayStop) / todayRange < 0.5, "checkRule: partial entry exceeds half daily range; entry=" + price + ", day stop=" + dayStop + ", daily range=" + todayRange);
         }
-        Models.require(state.netQuantity == 0 || (totalRisk + addedRisk) / limit <= 0.52, "partial entry exceeds position risk budget");
+        Models.require(state.netQuantity == 0 || (totalRisk + addedRisk) / limit <= 0.52, "checkRule: partial entry exceeds position risk budget; total risk=" + (totalRisk + addedRisk) + ", limit=" + limit * 0.52);
         Models.require(!Models.string(direction, "stopTightenPhase").equals("needs_tighten"), "tighten stop before adding");
     }
 }

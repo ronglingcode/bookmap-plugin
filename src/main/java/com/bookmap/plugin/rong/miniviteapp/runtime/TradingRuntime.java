@@ -268,7 +268,7 @@ public final class TradingRuntime implements AutoCloseable {
             JsonArray stocks = new JsonArray(); config.symbols.forEach(stocks::add); JsonObject markets = new JsonObject(); config.symbols.forEach(stock -> { JsonObject prices = new JsonObject(); prices.addProperty("currentPrice", price(stock)); markets.add(stock, prices); });
             input = ExecutionInputs.create(symbol, plan, loaded.orderSnapshot(), quotes.getOrDefault(symbol, new JsonObject()), account, ledger, state, stocks, markets, manual.getOrDefault(symbol, new JsonObject()), now.getAsLong(), ++revision, policy);
             String reason = eligibility.getOrDefault(symbol, "startup eligibility pending");
-            if (!reason.isEmpty()) input.getAsJsonObject("entryContext").addProperty("watchlistBlockReason", reason);
+            input.getAsJsonObject("entryContext").addProperty("startupBlockReason", reason);
             }
         }
         JsonObject update = message("execution_state"); JsonArray symbols = new JsonArray(); symbols.add(input); update.add("symbols", symbols); execution.receive(this, update);
