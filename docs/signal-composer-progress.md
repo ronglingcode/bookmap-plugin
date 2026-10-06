@@ -287,3 +287,10 @@ Work is confined to `bookmap-plugin`. The user authorized sequential implementat
 - Changed files: config/signal-composer.template.json, docs/signal-composer.md, config/README.md, README.md, src/test/java/com/bookmap/plugin/rong/signal/SignalComposerConfigLoadingTest.java.
 - Verification: SignalComposerConfigLoadingTest passed (5 tests); shipped template loads through production bounded loader and exactly matches every disabled default/revision. Operator docs checked against implemented detector, shared lifetime, replay readiness, logging, and artifact filename.
 - Next task: SC-41.
+
+## SC-41 — Smoke test advisory composition in the obfuscated release JAR
+
+- Status: complete.
+- Changed files: src/releaseTest/java/release/ReleaseJarTest.java, build.gradle.
+- Verification: Targeted release.ReleaseJarTest.advisoryConfigCompositionAndRasterFieldsSurviveObfuscation passed against only the actual release JAR: enum reflection, shaded explicit Gson config/default template, pending 3K promotion by 60K offer, immutable validation/output fields, explanation, raster badge, and absence of headless test fixture from artifact. Existing packaging rules unchanged; project/PluginVersion remain aligned at 1.32.
+- Next task: SC-42.

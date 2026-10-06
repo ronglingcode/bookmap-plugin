@@ -173,6 +173,76 @@ class ReleaseJarTest {
         }
     }
 
+    @Test void advisoryConfigCompositionAndRasterFieldsSurviveObfuscation() throws Exception {
+        String root = "com.bookmap.plugin.rong.", configName = root + "signal.SignalComposerConfig";
+        Class<?> jsonObject = Class.forName("com.bookmap.plugin.shaded.gson.JsonObject");
+        Class<?> parser = Class.forName("com.bookmap.plugin.shaded.gson.JsonParser");
+        Object element = parser.getMethod("parseString", String.class).invoke(null,
+                "{\"enabled\":true,\"normalConfirmationSize\":6000,\"symbols\":[\"test\"]}");
+        Object json = element.getClass().getMethod("getAsJsonObject").invoke(element);
+        Object config = mappedMethod(configName, configName + " parse(com.bookmap.plugin.shaded.gson.JsonObject)", jsonObject).invoke(null, json);
+        assertEquals(true, mappedField(configName, "boolean enabled", config));
+        assertEquals(6000L, mappedField(configName, "long normalConfirmationSize", config));
+        assertEquals(true, mappedMethod(configName, "boolean eligible(java.lang.String)", String.class).invoke(config, "TEST"));
+        assertEquals(false, mappedMethod(configName, "boolean eligible(java.lang.String)", String.class).invoke(config, "OTHER"));
+        Object template = mappedMethod(configName, configName + " load(java.nio.file.Path)", Path.class)
+                .invoke(null, Path.of(System.getProperty("signal.template")));
+        assertEquals(true, mappedField(configName, "boolean valid", template));
+        assertEquals(false, mappedField(configName, "boolean enabled", template));
+
+        for (String name : List.of("patterns.PatternEventType", "patterns.PatternMeaning", "patterns.PatternSide",
+                "signal.ConfirmationStrength", "signal.SignalState", "signal.ResetReason")) {
+            Class<?> type = mappedClass(root + name);
+            for (Object value : type.getEnumConstants()) assertSame(value, enumValue(root + name, ((Enum<?>)value).name()));
+        }
+        String composerName = root + "signal.SignalComposer", eventName = root + "patterns.PatternEvent";
+        Object composer = mappedClass(composerName).getConstructor(String.class, long.class, mappedClass(configName)).newInstance("TEST", 1L, config);
+        Method observe = mappedMethod(composerName, root + "signal.CompositionUpdate onPatternEvent(" + eventName + ")", mappedClass(eventName));
+        Object pending = observe.invoke(composer, releaseEvent("BIDS_CANCELLED", 3000, 5105, 100, "bid"));
+        assertTrue(((List<?>)mappedField(root + "signal.CompositionUpdate", "java.util.List signals", pending)).isEmpty());
+        Object update = observe.invoke(composer, releaseEvent("OFFER_REJECTION", 60000, 5120, 200, "offer"));
+        List<?> signals = (List<?>)mappedField(root + "signal.CompositionUpdate", "java.util.List signals", update);
+        assertEquals(1, signals.size()); Object signal = signals.get(0); String signalName = root + "signal.TradingSignal";
+        assertEquals("SHORT", ((Enum<?>)mappedField(signalName, root + "patterns.Direction direction", signal)).name());
+        String validationName = signalName + "$FirstValidation";
+        Object first = mappedField(signalName, validationName + " firstValidation", signal);
+        assertEquals(3000L, mappedField(validationName, "long appliedTriggerThreshold", first));
+        assertEquals(200L, mappedField(validationName, "long eventTimeNs", first));
+        assertEquals("EXCEPTIONAL", ((Enum<?>)mappedField(validationName, root + "signal.ConfirmationStrength confirmationStrength", first)).name());
+        String explanation = (String)mappedField(signalName, "java.lang.String explanation", signal);
+        assertTrue(explanation.contains("60K")); assertTrue(explanation.contains("AFTER"));
+        String painterName = root + "signal.TradingSignalPainter";
+        java.awt.image.BufferedImage image = (java.awt.image.BufferedImage)mappedMethod(painterName,
+                "java.awt.image.BufferedImage renderBadge(" + signalName + ")", mappedClass(signalName)).invoke(null, signal);
+        assertTrue(image.getWidth() > 100); assertTrue(image.getHeight() > 20);
+        assertEquals(200L, mappedMethod(painterName, "long anchorTimeNs(" + signalName + ")", mappedClass(signalName)).invoke(null, signal));
+        try (JarFile jar = new JarFile(JAR.toFile())) { assertNull(jar.getJarEntry("velox/api/layer1/common/helper/OpenGlHelper.class")); }
+    }
+
+    private static Object releaseEvent(String type, long size, int price, long time, String interaction) throws Exception {
+        String root = "com.bookmap.plugin.rong.patterns.", event = root + "PatternEvent", builder = event + "$Builder";
+        String evidence = event + "$Evidence", evidenceBuilder = event + "$EvidenceBuilder";
+        Object details = mappedMethod(evidence, evidenceBuilder + " builder()").invoke(null);
+        mappedMethod(evidenceBuilder, evidenceBuilder + " attribution(" + event + "$Attribution," + event + "$Coverage)",
+                mappedClass(event + "$Attribution"), mappedClass(event + "$Coverage"))
+                .invoke(details, enumValue(event + "$Attribution", "UNKNOWN"), enumValue(event + "$Coverage", "USABLE"));
+        Object builtEvidence = mappedMethod(evidenceBuilder, evidence + " build()").invoke(details);
+        Object value = mappedMethod(event, builder + " builder(java.lang.String,long," + root + "PatternEventType,java.lang.String)",
+                String.class, long.class, mappedClass(root + "PatternEventType"), String.class)
+                .invoke(null, "TEST", 1L, enumValue(root + "PatternEventType", type), interaction);
+        mappedMethod(builder, builder + " size(long," + event + "$SizeBasis)", long.class, mappedClass(event + "$SizeBasis"))
+                .invoke(value, size, enumValue(event + "$SizeBasis", "DISPLAYED_WALL"));
+        mappedMethod(builder, builder + " price(int,double)", int.class, double.class).invoke(value, price, .01);
+        mappedMethod(builder, builder + " times(long,long)", long.class, long.class).invoke(value, time, time);
+        mappedMethod(builder, builder + " evidence(" + evidence + ")", mappedClass(evidence)).invoke(value, builtEvidence);
+        return mappedMethod(builder, event + " build()").invoke(value);
+    }
+    private static Object enumValue(String owner, String name) throws Exception { return mappedClass(owner).getMethod("valueOf", String.class).invoke(null, name); }
+    private static Object mappedField(String owner, String signature, Object instance) throws Exception {
+        String name = MEMBERS.get(owner + "#" + signature); assertNotNull(name, "Missing field mapping: " + owner + "#" + signature);
+        java.lang.reflect.Field field = mappedClass(owner).getDeclaredField(name); field.setAccessible(true); return field.get(instance);
+    }
+
     @Test
     void nativeExecutionWireParsingAndClosingPlansSurviveObfuscation() throws Exception {
         Class<?> parser = Class.forName("com.bookmap.plugin.shaded.gson.JsonParser");
