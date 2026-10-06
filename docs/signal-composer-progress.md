@@ -126,3 +126,10 @@ Work is confined to `bookmap-plugin`. The user authorized sequential implementat
 - Changed files: src/main/java/com/bookmap/plugin/rong/patterns/ObservationClock.java, src/test/java/com/bookmap/plugin/rong/patterns/ObservationClockTest.java.
 - Verification: ObservationClockTest passed (3 tests), covering snapshot, NY session boundaries, backwards callback, fallback provenance, and date changes.
 - Next task: SC-18.
+
+## SC-18 — Track independently qualified event-time walls
+
+- Status: complete.
+- Changed files: src/main/java/com/bookmap/plugin/rong/patterns/EventTimeWallTracker.java, src/test/java/com/bookmap/plugin/rong/patterns/EventTimeWallTrackerTest.java.
+- Verification: EventTimeWallTrackerTest passed (3 tests), covering 3K floor, persistence, flash loss, snapshot seeding, stable phase IDs, cap diagnostics, and reset.
+- Next task: SC-19.
