@@ -1,6 +1,6 @@
 # Cairo setup evidence and replay testing
 
-The new evidence recorder defaults to enabled. It is independent of existing detector buttons and indicator visibility, and records all attached equity charts unless `evidenceSymbols` restricts it.
+The new evidence recorder defaults to disabled. Opt in with `evidenceEnabled: true` to recognize setups and forward their evidence to Cairo. When enabled, it is independent of existing detector buttons and indicator visibility, and records all attached equity charts unless `evidenceSymbols` restricts it.
 
 Preferences are read at plugin attachment from `%USERPROFILE%\bmtrader\cairo-observation.json`:
 
@@ -17,7 +17,7 @@ Preferences are read at plugin attachment from `%USERPROFILE%\bmtrader\cairo-obs
 }
 ```
 
-- `evidenceEnabled`: **true by default**. Set false and reattach/restart to skip the new recorder, wall/history buffers, raw trade/BBO observation work, capture I/O and evidence exports. Existing trading and older pattern-observer behavior retain their own settings.
+- `evidenceEnabled`: **false by default**. Set true explicitly to enable the new recorder. Set false and reattach/restart to skip wall/history buffers, raw trade/BBO observation work, capture I/O and evidence exports. Set the separate older observer flag `enabled` to false as well to stop its pattern exports. Existing trading retains its own settings.
 - `evidenceSymbols`: optional chart restriction; empty/missing means all attached charts. It is separate from the older pattern detector's `symbols` list.
 - `captureEvidence`: true by default; false keeps the live stream/history but skips market-evidence files.
 - `sourceMode`: `replay`, `live`, or `unknown` (default). This is an explicit operator setting, not automatic detection. Bookmap's callbacks in use do not establish provider mode. Set replay for replay testing and live only when running live market data.

@@ -16,9 +16,11 @@ class CairoEvidenceRecorderTest {
         StringBuilder content=new StringBuilder();for(JsonObject batch:r.drain(0)) content.append(batch).append('\n');
         java.nio.file.Files.writeString(path,content);
     }
-    @Test void flagDefaultsOnAndCanBypassAllNewObservationWork() {
+    @Test void flagDefaultsOffAndRequiresExplicitOptInForObservationWork() {
         CairoObservationConfig defaults=new CairoObservationConfig(new JsonObject());
-        assertTrue(defaults.evidenceEnabled); assertTrue(defaults.recordEvidence("PCVX"));
+        assertFalse(defaults.evidenceEnabled); assertFalse(defaults.recordEvidence("PCVX"));
+        CairoObservationConfig on=new CairoObservationConfig(JsonParser.parseString("{\"evidenceEnabled\":true}").getAsJsonObject());
+        assertTrue(on.evidenceEnabled); assertTrue(on.recordEvidence("PCVX"));
         CairoObservationConfig off=new CairoObservationConfig(JsonParser.parseString("{\"evidenceEnabled\":false}").getAsJsonObject());
         assertFalse(off.recordEvidence("PCVX"));
         assertEquals("unknown",defaults.sourceMode);

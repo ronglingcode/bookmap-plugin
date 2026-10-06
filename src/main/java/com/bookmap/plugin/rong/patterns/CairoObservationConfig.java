@@ -14,7 +14,7 @@ public final class CairoObservationConfig {
     private final Set<String> evidenceSymbols = new HashSet<>();
     private final Set<String> detectors = new HashSet<>();
     public CairoObservationConfig(JsonObject value) {
-        evidenceEnabled = !value.has("evidenceEnabled") || value.get("evidenceEnabled").getAsBoolean();
+        evidenceEnabled = value.has("evidenceEnabled") && value.get("evidenceEnabled").getAsBoolean();
         captureEvidence = !value.has("captureEvidence") || value.get("captureEvidence").getAsBoolean();
         String mode = value.has("sourceMode") ? value.get("sourceMode").getAsString() : "unknown";
         sourceMode = java.util.Set.of("live", "replay", "unknown").contains(mode) ? mode : "unknown";
