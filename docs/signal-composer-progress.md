@@ -210,3 +210,10 @@ Work is confined to `bookmap-plugin`. The user authorized sequential implementat
 - Changed files: src/main/java/com/bookmap/plugin/rong/signal/TradingSignalStore.java, src/test/java/com/bookmap/plugin/rong/signal/TradingSignalStoreTest.java.
 - Verification: TradingSignalStoreTest passed (3 tests): original receipt TTL across revisions, 20-signal cap, alias and epoch isolation, contexts using market time, listener removal, and concurrent immutable reads.
 - Next task: SC-30.
+
+## SC-30 — Construct shared composer rules and per-attachment observers
+
+- Status: complete.
+- Changed files: src/main/java/com/bookmap/plugin/rong/IndicatorConfig.java, src/main/java/com/bookmap/plugin/rong/RongPlugin.java, src/test/java/com/bookmap/plugin/rong/SignalComposerActivationTest.java.
+- Verification: Composer and existing activation tests passed (5 tests): disabled defaults, malformed disarming, shared immutable rules/user toggle retention, alias eligibility, invalid pips, and no native runtime construction.
+- Next task: SC-31.

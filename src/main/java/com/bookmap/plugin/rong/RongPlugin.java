@@ -2,6 +2,9 @@ package com.bookmap.plugin.rong;
 
 import java.awt.Color;
 import java.time.Duration;
+import com.bookmap.plugin.rong.signal.SignalComposerConfig;
+import com.bookmap.plugin.rong.signal.SignalCompositionPipeline;
+import com.bookmap.plugin.rong.signal.TradingSignalStore;
 
 import com.bookmap.plugin.rong.executions.FilledExecutionManager;
 import com.bookmap.plugin.rong.executions.FilledExecutionPainter;
@@ -100,6 +103,8 @@ public class RongPlugin implements CustomModuleAdapter,
     private static FilledExecutionManager filledExecutionManager;
     private static PatternSignalStore patternSignalStore;
     private static PatternSignalPainter patternSignalPainter;
+    private static SignalComposerConfig signalComposerConfig;
+    private static TradingSignalStore tradingSignalStore;
 
     private String rawAlias;
     private volatile boolean initialized;
@@ -110,6 +115,10 @@ public class RongPlugin implements CustomModuleAdapter,
     private OrderWallLabelTracker wallLabelTracker;
     private OrderWallChangeTracker wallChangeTracker;
     private BookmapPatternEngine patternEngine;
+    private SignalCompositionPipeline signalComposition;
+    private SignalComposerConfig compositionRules;
+    private volatile boolean signalCompositionEnabled;
+    private final Object compositionLock = new Object();
     private volatile boolean patternAutomationEnabled;
     private volatile boolean patternSnapshotComplete;
     private final com.bookmap.plugin.rong.patterns.CairoObservationConfig observationConfig = com.bookmap.plugin.rong.patterns.CairoObservationConfig.load();
@@ -231,6 +240,7 @@ public class RongPlugin implements CustomModuleAdapter,
                 this::handlePatternSignal);
         this.patternAutomationEnabled = indicatorConfig.isEnabled(
                 IndicatorConfig.BOOKMAP_PATTERN_SIGNALS);
+        initializeSignalComposition(info.pips);
         indicatorConfig.addChangeListener(this);
         sharedServer.registerSymbol(cleanAlias, orderBook, info.pips);
         if (observationConfig.recordEvidence(cleanAlias)) {
@@ -327,6 +337,26 @@ public class RongPlugin implements CustomModuleAdapter,
                 return expectedAlias != null && expectedAlias.equals(candidateAlias);
             }
         };
+    }
+
+    /** Shared rules load once for an activation; each chart owns its observation state. */
+    void initializeSignalComposition(double pips) {
+        synchronized (RongPlugin.class) {
+            if (indicatorConfig == null) indicatorConfig = new IndicatorConfig();
+            if (signalComposerConfig == null) {
+                signalComposerConfig = SignalComposerConfig.load();
+                indicatorConfig.setEnabled(IndicatorConfig.SIGNAL_COMPOSER, signalComposerConfig.valid && signalComposerConfig.enabled);
+                if (!signalComposerConfig.valid) PluginLog.action("", "SignalComposer", signalComposerConfig.error);
+            }
+            if (tradingSignalStore == null) tradingSignalStore = new TradingSignalStore();
+            compositionRules = signalComposerConfig;
+        }
+        if (!compositionRules.valid || !compositionRules.eligible(alias) || !Double.isFinite(pips) || pips <= 0) return;
+        signalComposition = new SignalCompositionPipeline(alias, pips, compositionRules, update -> {
+            TradingSignalStore store = tradingSignalStore;
+            if (store != null) store.publish(alias, signalComposition.epoch(), update);
+        });
+        signalCompositionEnabled = indicatorConfig.isEnabled(IndicatorConfig.SIGNAL_COMPOSER);
     }
 
     @Override
