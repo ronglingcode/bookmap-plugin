@@ -1778,5 +1778,161 @@
       }
     ],
     "result": "missing previous consolidation area for range bound reversal"
+  },
+  {
+    "kind": "startupEligibility",
+    "name": "AMD bypasses hard floor with zero premarket volume",
+    "args": [
+      {
+        "symbol": "AMD",
+        "marketCapInMillions": 10000
+      },
+      10,
+      100000000,
+      {
+        "lastDayShares": 0,
+        "previousDaysSharesAverage": 1000000
+      },
+      []
+    ],
+    "result": ""
+  },
+  {
+    "kind": "startupEligibility",
+    "name": "AMD bypasses absolute and relative volume thresholds",
+    "args": [
+      {
+        "symbol": "AMD",
+        "marketCapInMillions": 10000
+      },
+      10,
+      100000000,
+      {
+        "lastDayShares": 600000,
+        "previousDaysSharesAverage": 1000000
+      },
+      []
+    ],
+    "result": ""
+  },
+  {
+    "kind": "startupEligibility",
+    "name": "AAPL still requires premarket hard floor",
+    "args": [
+      {
+        "symbol": "AAPL",
+        "marketCapInMillions": 10000
+      },
+      10,
+      100000000,
+      {
+        "lastDayShares": 0,
+        "previousDaysSharesAverage": 1000000
+      },
+      []
+    ],
+    "result": "premarket shares below 500000 hard floor"
+  },
+  {
+    "kind": "startupEligibility",
+    "name": "AAPL still requires absolute or relative volume",
+    "args": [
+      {
+        "symbol": "AAPL",
+        "marketCapInMillions": 10000
+      },
+      10,
+      100000000,
+      {
+        "lastDayShares": 600000,
+        "previousDaysSharesAverage": 1000000
+      },
+      []
+    ],
+    "result": "premarket shares below 0.9M and 4x prior average"
+  },
+  {
+    "kind": "startupEligibility",
+    "name": "AAPL qualifies on relative volume",
+    "args": [
+      {
+        "symbol": "AAPL",
+        "marketCapInMillions": 10000
+      },
+      10,
+      100000000,
+      {
+        "lastDayShares": 600000,
+        "previousDaysSharesAverage": 100000
+      },
+      []
+    ],
+    "result": ""
+  },
+  {
+    "kind": "startupEligibility",
+    "name": "AMD still requires configured market cap",
+    "args": [
+      {
+        "symbol": "AMD",
+        "marketCapInMillions": 400
+      },
+      10,
+      100000000,
+      {
+        "lastDayShares": 0,
+        "previousDaysSharesAverage": 1000000
+      },
+      []
+    ],
+    "result": "configured market cap below $500M"
+  },
+  {
+    "kind": "startupEligibility",
+    "name": "AMD still requires implied market cap",
+    "args": [
+      {
+        "symbol": "AMD",
+        "marketCapInMillions": 10000
+      },
+      10,
+      1000000,
+      {
+        "lastDayShares": 0,
+        "previousDaysSharesAverage": 1000000
+      },
+      []
+    ],
+    "result": "implied market cap below $0.9B"
+  },
+  {
+    "kind": "startupEligibility",
+    "name": "AMD still requires valid consolidation area",
+    "args": [
+      {
+        "symbol": "AMD",
+        "marketCapInMillions": 10000,
+        "rangeBoundReversalPlan": {}
+      },
+      10,
+      100000000,
+      {
+        "lastDayShares": 0,
+        "previousDaysSharesAverage": 1000000
+      },
+      [
+        {
+          "symbol": "AAPL",
+          "datetime": 1790775000000,
+          "open": 10,
+          "high": 11,
+          "low": 9,
+          "close": 10,
+          "volume": 100,
+          "vwap": 10
+        }
+      ]
+    ],
+    "result": "missing previous consolidation area for range bound reversal"
   }
 ]

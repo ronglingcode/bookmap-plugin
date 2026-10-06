@@ -6,6 +6,11 @@ import java.math.BigDecimal;
 import java.util.List;
 
 public final class Eligibility {
+    // These symbols may trade without meeting the premarket volume thresholds.
+    public static final List<String> PREMARKET_VOLUME_WHITELIST = List.of("AMD");
+    public static boolean isPremarketVolumeWhitelisted(String symbol) {
+        return PREMARKET_VOLUME_WHITELIST.contains(symbol);
+    }
     private Eligibility() {}
     public static JsonObject premarketEligibility(double shares, double averageShares, double hardFloor, double absoluteThresholdInMillions, double relativeThreshold) {
         JsonObject json = new JsonObject(); json.addProperty("hardFloorPassed", shares >= hardFloor);

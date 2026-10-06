@@ -2,6 +2,7 @@ package com.bookmap.plugin.rong.miniviteapp;
 
 import com.bookmap.plugin.rong.miniviteapp.core.marketdata.Levels;
 import com.bookmap.plugin.rong.miniviteapp.core.marketdata.Eligibility;
+import com.bookmap.plugin.rong.miniviteapp.core.marketdata.StartupEligibility;
 import com.bookmap.plugin.rong.miniviteapp.core.marketdata.Liquidity;
 import com.bookmap.plugin.rong.miniviteapp.core.marketdata.MarketState;
 import com.bookmap.plugin.rong.miniviteapp.libraries.massive.Mapper;
@@ -44,6 +45,9 @@ class MarketParityTest {
                     Trade mapped = Mapper.mapWebSocketTrade(fixture.getAsJsonObject("input")); result = mapped.toJson(); assertEquals(fixture.get("filtered").getAsBoolean(), Mapper.shouldFilterTrade(mapped), name); break;
                 case "premarketEligibility":
                     JsonArray volumeArgs = fixture.getAsJsonArray("args"); result = Eligibility.premarketEligibility(volumeArgs.get(0).getAsDouble(), volumeArgs.get(1).getAsDouble(), volumeArgs.get(2).getAsDouble(), volumeArgs.get(3).getAsDouble(), volumeArgs.get(4).getAsDouble()); break;
+                case "startupEligibility":
+                    JsonArray startupArgs = fixture.getAsJsonArray("args");
+                    result = new JsonPrimitive(StartupEligibility.evaluate(startupArgs.get(0).getAsJsonObject(), startupArgs.get(1).getAsDouble(), startupArgs.get(2).getAsDouble(), startupArgs.get(3).getAsJsonObject(), startupArgs.get(4).getAsJsonArray())); break;
                 case "marketCap":
                     JsonArray capArgs = fixture.getAsJsonArray("args"); result = new JsonPrimitive(Eligibility.impliedMarketCapInBillions(capArgs.get(0).getAsDouble(), capArgs.get(1).getAsDouble())); break;
                 case "consolidation":
