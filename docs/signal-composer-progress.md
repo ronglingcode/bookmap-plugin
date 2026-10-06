@@ -112,3 +112,10 @@ Work is confined to `bookmap-plugin`. The user authorized sequential implementat
 - Changed files: src/main/java/com/bookmap/plugin/rong/signal/SignalComposer.java, src/test/java/com/bookmap/plugin/rong/signal/SignalComposerTest.java.
 - Verification: SignalComposerTest passed (17 tests), including event-time expiry, drift, capacity, opposing evidence, and epoch reset.
 - Next task: SC-16.
+
+## SC-16 — Expose developing directional context
+
+- Status: complete.
+- Changed files: src/main/java/com/bookmap/plugin/rong/signal/SignalComposer.java, src/test/java/com/bookmap/plugin/rong/signal/SignalComposerTest.java.
+- Verification: SignalComposerTest passed (19 tests); offer-only waiting contexts, both directions, local price, inclusive expiry, and reset verified.
+- Next task: SC-17.

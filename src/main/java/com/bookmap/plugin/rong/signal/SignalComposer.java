@@ -5,14 +5,17 @@ import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.EnumMap;
 import java.util.function.LongSupplier;
 import com.bookmap.plugin.rong.patterns.PatternEvent;
 import com.bookmap.plugin.rong.patterns.PatternMeaning;
+import com.bookmap.plugin.rong.patterns.Direction;
 
 /** Serialized by the owning observation engine. All eligibility uses market time. */
 public final class SignalComposer {
     private final String alias;
     private long epoch, nowNs;
+    private int marketPriceTick;
     private final SignalComposerConfig config;
     private final PatternEventStore history;
     private final ConfirmationMatcher matcher;
@@ -122,7 +125,26 @@ public final class SignalComposer {
         signals.add(candidate.signal);
     }
     private CompositionUpdate update(List<TradingSignal> signals, List<CompositionUpdate.CandidateTransition> transitions, List<String> diagnostics) {
-        return new CompositionUpdate(signals, Collections.emptyMap(), transitions, diagnostics, nowNs);
+        Map<Direction, DevelopingContext> contexts = new EnumMap<>(Direction.class);
+        for (PatternEvent event : history.snapshot()) {
+            Direction direction;
+            if (event.meaning == PatternMeaning.OFFER_BULLISH_CONFIRMATION) direction = Direction.LONG;
+            else if (event.meaning == PatternMeaning.OFFER_BEARISH_CONFIRMATION) direction = Direction.SHORT;
+            else continue;
+            long expiry = Math.addExact(event.eventTimeNs, config.beforeWindowMs * 1_000_000L);
+            if (event.timestampProvenance != PatternEvent.TimestampProvenance.MARKET
+                    || event.evidence.coverage != PatternEvent.Coverage.USABLE
+                    || event.observedAtNs > nowNs || nowNs > expiry) continue;
+            if (marketPriceTick > 0 && (Math.abs((long)event.priceTick - marketPriceTick) > config.maxPriceDistanceTicks
+                    || (long)event.priceTick - marketPriceTick < -config.directionalPriceToleranceTicks)) continue;
+            ConfirmationStrength strength = classifier.classify(event.size);
+            DevelopingContext previous = contexts.get(direction);
+            if (previous != null && (strength.ordinal() < previous.strength.ordinal()
+                    || strength == previous.strength && (event.size < previous.confirmation.size
+                    || event.size == previous.confirmation.size && event.eventTimeNs <= previous.confirmation.eventTimeNs))) continue;
+            contexts.put(direction, new DevelopingContext(direction, event, strength, policy.requiredSize(strength), expiry));
+        }
+        return new CompositionUpdate(signals, contexts, transitions, diagnostics, nowNs);
     }
     public Map<String, SignalState> candidateStates() {
         Map<String, SignalState> copy = new LinkedHashMap<>(); candidates.forEach((key, value) -> copy.put(key, value.state));
@@ -160,6 +182,7 @@ public final class SignalComposer {
         if (bidTick > 0 && askTick > 0 && bidTick > askTick) return update(Collections.emptyList(), transitions, Collections.emptyList());
         int price = bidTick > 0 && askTick > 0 ? (int)(((long)bidTick + askTick) / 2)
                 : bidTick > 0 ? bidTick : askTick > 0 ? askTick : lastTradeTick;
+        if (price > 0) marketPriceTick = price;
         if (price > 0) for (SignalCandidate candidate : candidates.values()) {
             if (active(candidate) && Math.abs((long)price - candidate.trigger.priceTick) > config.maxTriggerDriftTicks) {
                 transition(candidate, SignalState.INVALID, "Market price left the local trigger interaction", transitions);
@@ -171,7 +194,7 @@ public final class SignalComposer {
         if (nextEpoch <= epoch) throw new IllegalArgumentException("Reset requires a new epoch");
         List<CompositionUpdate.CandidateTransition> transitions = new ArrayList<>();
         for (SignalCandidate candidate : candidates.values()) if (active(candidate)) transition(candidate, SignalState.EXPIRED, "Observation reset: " + reason, transitions);
-        candidates.clear(); history.reset(nextEpoch); epoch = nextEpoch; nowNs = 0;
+        candidates.clear(); history.reset(nextEpoch); epoch = nextEpoch; nowNs = 0; marketPriceTick = 0;
         return update(Collections.emptyList(), transitions, Collections.singletonList("Observation reset: " + reason));
     }
 }

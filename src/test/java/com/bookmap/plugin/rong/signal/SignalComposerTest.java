@@ -7,6 +7,29 @@ import com.bookmap.plugin.rong.patterns.*;
 import com.google.gson.JsonParser;
 
 class SignalComposerTest {
+    @Test void offerOnlyProducesSeparateWaitingContextsWithoutSignals() {
+        SignalComposer c = composer();
+        CompositionUpdate bearish = c.onPatternEvent(event(PatternEventType.OFFER_REJECTION, 60000, 5120, 100, "bear"));
+        assertTrue(bearish.signals.isEmpty());
+        DevelopingContext shortContext = bearish.contexts.get(Direction.SHORT);
+        assertEquals(PatternMeaning.BID_FAIL, shortContext.waitingFor);
+        assertEquals(3000, shortContext.requiredTriggerSize);
+        assertEquals(ConfirmationStrength.EXCEPTIONAL, shortContext.strength);
+        CompositionUpdate both = c.onPatternEvent(event(PatternEventType.OFFER_BREAKOUT, 10000, 5120, 200, "bull"));
+        assertEquals(2, both.contexts.size()); assertTrue(both.signals.isEmpty());
+        assertEquals(PatternMeaning.BID_HOLD, both.contexts.get(Direction.LONG).waitingFor);
+        assertEquals(5000, both.contexts.get(Direction.LONG).requiredTriggerSize);
+        assertThrows(UnsupportedOperationException.class, () -> both.contexts.clear());
+    }
+    @Test void contextExpiresOnMarketTimeAndResetAndRequiresLocalPrice() {
+        SignalComposer c = composer(); c.onPatternEvent(event(PatternEventType.OFFER_REJECTION, 60000, 5120, 100, "o"));
+        assertEquals(1, c.onMarketTime(30_000_000_100L).contexts.size());
+        assertTrue(c.onMarketTime(30_000_000_101L).contexts.isEmpty());
+        c = composer(); c.onPatternEvent(event(PatternEventType.OFFER_REJECTION, 60000, 5120, 100, "o"));
+        assertEquals(1, c.onMarketPrice(5100, 5101, 0).contexts.size());
+        assertTrue(c.onMarketPrice(5099, 5100, 0).contexts.isEmpty());
+        assertTrue(c.reset(ResetReason.DISABLED, 2).contexts.isEmpty());
+    }
     @Test void timestampUpdatesExpireWithoutNewPatternAndKeepInclusiveBoundary() {
         SignalComposer c = composer(); c.onPatternEvent(event(PatternEventType.BIDS_CANCELLED, 3000, 5105, 100, "b"));
         assertTrue(c.onMarketTime(30_000_000_100L).transitions.isEmpty());

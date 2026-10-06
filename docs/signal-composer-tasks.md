@@ -60,7 +60,7 @@ Specification: implementation plan section 6 and required design cases in sectio
 
 - [x] **SC-15 — Expire and invalidate active candidates.** Add market-time and market-price handling, 64-candidate capacity, trigger-eviction handling, local opposing-bid invalidation, drift invalidation, and reset/epoch clearing. **Complete when:** tests cover timestamp-only expiry, inclusive window boundaries, candidate cap behavior, evicted triggers, opposing meaning, 20-tick drift, and immutable historical emitted results after invalidation.
 
-- [ ] **SC-16 — Expose developing directional context.** Compute immutable LONG/SHORT waiting context from current offer evidence, including missing bid meaning, required size, locality, and event-time expiry. **Complete when:** tests show 60K bearish evidence produces a SHORT context waiting for BID_FAIL >= 3K without a signal, both directions can have separate context, and expiry/reset removes it.
+- [x] **SC-16 — Expose developing directional context.** Compute immutable LONG/SHORT waiting context from current offer evidence, including missing bid meaning, required size, locality, and event-time expiry. **Complete when:** tests show 60K bearish evidence produces a SHORT context waiting for BID_FAIL >= 3K without a signal, both directions can have separate context, and expiry/reset removes it.
 
 ## D. Event-time observations and detectors
 
