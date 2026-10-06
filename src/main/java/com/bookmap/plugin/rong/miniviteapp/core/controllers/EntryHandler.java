@@ -73,7 +73,7 @@ public final class EntryHandler {
                     * ExtendedEntryRules.nextEntryMultiplier(state, isLong, entry));
         }
         double multiplier = EntryRulesChecker.checkBasicGlobalEntryRules(ruleContext, isLong, entry) * methodMultiplier;
-        int count = methodMultiplier == 0.1 ? 1 : state.batchCount;
+        int count = methodMultiplier == 0.1 ? 1 : methodMultiplier == 0.5 ? Math.max(1, (int) Math.round(state.batchCount * 0.5)) : state.batchCount;
         if (market) {
             double estimate = Models.number(action, "estimated_entry_price");
             if (!Models.positive(estimate)) estimate = Models.number(action, "estimatedEntryPrice");
