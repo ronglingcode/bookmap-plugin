@@ -26,6 +26,8 @@ public class SignalWebSocketServer extends WebSocketServer {
     private final com.bookmap.plugin.rong.patterns.CairoObservationExport observationExport = new com.bookmap.plugin.rong.patterns.CairoObservationExport();
     private final java.util.concurrent.ArrayBlockingQueue<Runnable> observationQueue = new java.util.concurrent.ArrayBlockingQueue<>(512);
     private final java.util.concurrent.ScheduledExecutorService observationWorker = java.util.concurrent.Executors.newSingleThreadScheduledExecutor(r -> { Thread t = new Thread(r, "cairo-observations"); t.setDaemon(true); return t; });
+    private final Map<String, com.bookmap.plugin.rong.patterns.CairoEvidenceRecorder> evidenceRecorders = new ConcurrentHashMap<>();
+    public void registerEvidence(String alias, com.bookmap.plugin.rong.patterns.CairoEvidenceRecorder recorder) { evidenceRecorders.put(alias, recorder); }
     private final Map<String, Boolean> observationReady = new ConcurrentHashMap<>();
     private final Map<String, JsonObject> observationEpisodes = new LinkedHashMap<>();
     public void observationReady(String alias, boolean ready) { observationReady.put(alias, ready); queueObservation(status(alias, "heartbeat")); }
@@ -167,7 +169,8 @@ public class SignalWebSocketServer extends WebSocketServer {
         setReuseAddr(true);
         this.orderbookPercentile = orderbookPercentile;
         observationWorker.scheduleWithFixedDelay(() -> {
-            try { for (int i = 0; i < 64; i++) { Runnable next = observationQueue.poll(); if (next == null) break; next.run(); } } catch (RuntimeException ignored) { }
+            try { for (com.bookmap.plugin.rong.patterns.CairoEvidenceRecorder recorder : evidenceRecorders.values()) for (JsonObject batch : recorder.drain(System.currentTimeMillis())) broadcast(batch.toString());
+            for (int i = 0; i < 64; i++) { Runnable next = observationQueue.poll(); if (next == null) break; next.run(); } } catch (RuntimeException ignored) { }
         }, 100, 100, java.util.concurrent.TimeUnit.MILLISECONDS);
         observationWorker.scheduleWithFixedDelay(() -> { for (String alias : observationReady.keySet()) queueObservation(status(alias, "heartbeat")); }, 2, 2, java.util.concurrent.TimeUnit.SECONDS);
     }
@@ -180,7 +183,9 @@ public class SignalWebSocketServer extends WebSocketServer {
 
     /** Unregister a symbol when its plugin instance stops. */
     public void unregisterSymbol(String symbol) {
-        queueObservation(status(symbol, "reset")); observationReady.remove(symbol);
+        com.bookmap.plugin.rong.patterns.CairoEvidenceRecorder recorder = evidenceRecorders.remove(symbol);
+        if (recorder != null) { recorder.close(); observationWorker.execute(() -> { for (JsonObject batch : recorder.drain(System.currentTimeMillis())) broadcast(batch.toString()); }); }
+        if (observationReady.containsKey(symbol)) queueObservation(status(symbol, "reset")); observationReady.remove(symbol);
         synchronized (observationEpisodes) { observationEpisodes.entrySet().removeIf(entry -> entry.getValue().getAsJsonObject("symbol").get("source").getAsString().equals(symbol)); }
         symbolToOrderBook.remove(symbol);
         symbolToPips.remove(symbol);
@@ -562,7 +567,8 @@ public class SignalWebSocketServer extends WebSocketServer {
     @Override
     public void onOpen(WebSocket conn, ClientHandshake handshake) {
         conn.send("{\"type\":\"standalone_status\",\"native\":true}");
-        observationQueue.offer(() -> { for (JsonObject observation : observationSnapshot()) if (conn.isOpen()) conn.send(observation.toString()); });
+        observationQueue.offer(() -> { for (com.bookmap.plugin.rong.patterns.CairoEvidenceRecorder recorder : evidenceRecorders.values()) for (JsonObject batch : recorder.snapshot()) if (conn.isOpen()) conn.send(batch.toString());
+            for (JsonObject observation : observationSnapshot()) if (conn.isOpen()) conn.send(observation.toString()); });
     }
 
     @Override
@@ -1717,7 +1723,11 @@ public class SignalWebSocketServer extends WebSocketServer {
     }
 
     public void shutdown() {
-        observationWorker.shutdownNow(); observationQueue.clear();
+        // Drain on the same writer thread to avoid concurrent file rotation during teardown.
+        java.util.List<com.bookmap.plugin.rong.patterns.CairoEvidenceRecorder> finalRecorders = new ArrayList<>(evidenceRecorders.values());
+        evidenceRecorders.clear();
+        observationWorker.execute(() -> { for (com.bookmap.plugin.rong.patterns.CairoEvidenceRecorder recorder : finalRecorders) { recorder.close(); recorder.drain(System.currentTimeMillis()); } });
+        observationWorker.shutdown(); observationQueue.clear();
         try {
             stop(1000);
         } catch (InterruptedException e) {

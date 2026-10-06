@@ -134,6 +134,7 @@ and the private mapping remain under `build/intermediates` and
 
 ## Documentation
 
+- [Cairo setup evidence flag, capture and replay testing](docs/cairo-evidence.md)
 - [Standalone setup, data sources and operations](docs/direct-broker-execution.md)
 - [Detailed design and source audit](docs/standalone-native-trading-plan.md)
 - [Progress, verification and resume checkpoint](docs/standalone-native-trading-progress.md)

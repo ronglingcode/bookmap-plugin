@@ -111,6 +111,7 @@ public class RongPlugin implements CustomModuleAdapter,
     private volatile boolean patternAutomationEnabled;
     private volatile boolean patternSnapshotComplete;
     private final com.bookmap.plugin.rong.patterns.CairoObservationConfig observationConfig = com.bookmap.plugin.rong.patterns.CairoObservationConfig.load();
+    private com.bookmap.plugin.rong.patterns.CairoEvidenceRecorder evidenceRecorder;
     private boolean wallLabelsDirty;
     private long lastWallLabelRefreshMs;
     private long lastTimestampNs;
@@ -222,6 +223,11 @@ public class RongPlugin implements CustomModuleAdapter,
                 IndicatorConfig.BOOKMAP_PATTERN_SIGNALS);
         indicatorConfig.addChangeListener(this);
         sharedServer.registerSymbol(cleanAlias, orderBook, info.pips);
+        if (observationConfig.recordEvidence(cleanAlias)) {
+            evidenceRecorder = new com.bookmap.plugin.rong.patterns.CairoEvidenceRecorder(cleanAlias, info.pips,
+                    observationConfig.sourceMode, observationConfig.captureEvidence, this::getEffectiveWallThreshold);
+            sharedServer.registerEvidence(cleanAlias, evidenceRecorder);
+        }
         if (observationConfig.enabled) sharedServer.observationReady(cleanAlias, false);
         sharedServer.registerVwapUpdateListener(cleanAlias, vwapUpdateListener);
         chartHoverHotkeyHandler.registerSymbol(cleanAlias, info.pips);
@@ -440,6 +446,7 @@ public class RongPlugin implements CustomModuleAdapter,
         }
         if (sharedServer != null) {
             sharedServer.unregisterSymbol(alias);
+            evidenceRecorder = null;
         }
         synchronized (RongPlugin.class) {
             nativeApis.remove(alias);
@@ -539,6 +546,7 @@ public class RongPlugin implements CustomModuleAdapter,
             wallChangeTracker.onDepth(isBid, price, size, getEventTimeNs());
         }
         orderBook.update(isBid, price, size);
+        if (evidenceRecorder != null) evidenceRecorder.depth(isBid, price, size, getEventTimeNs(), lastTimestampNs <= 0);
         if (shouldRunPatternAutomation()) {
             patternEngine.onDepth(isBid, price, size, getEventTimeNs());
         }
@@ -554,6 +562,7 @@ public class RongPlugin implements CustomModuleAdapter,
         long eventTimeNs = getEventTimeNs();
         double realPrice = BookmapPriceNormalizer.toWirePrice(price, instrumentInfo.pips);
         int priceTick = (int) Math.round(price);
+        if (evidenceRecorder != null) evidenceRecorder.trade(priceTick, size, tradeInfo == null ? null : tradeInfo.isBidAggressor, eventTimeNs, lastTimestampNs <= 0);
         if (sharedServer != null) {
             sharedServer.updateRegularSessionHighLow(alias, realPrice, eventTimeNs);
         }
@@ -591,6 +600,7 @@ public class RongPlugin implements CustomModuleAdapter,
     @Override
     public void onBbo(int bidPrice, int bidSize, int askPrice, int askSize) {
         if (!initialized) return;
+        if (evidenceRecorder != null) evidenceRecorder.bbo(bidPrice, bidSize, askPrice, askSize, getEventTimeNs(), lastTimestampNs <= 0);
         if (shouldRunPatternAutomation()) {
             patternEngine.onBbo(bidPrice, bidSize, askPrice, askSize, getEventTimeNs());
         }
@@ -600,6 +610,7 @@ public class RongPlugin implements CustomModuleAdapter,
     public void onSnapshotEnd() {
         if (!initialized) return;
         patternSnapshotComplete = true;
+        if (evidenceRecorder != null) evidenceRecorder.readiness(true, getEventTimeNs());
         if (sharedServer != null && observationConfig.enabled) sharedServer.observationReady(alias, true);
         if (wallChangeTracker != null) {
             wallChangeTracker.markReady();
@@ -613,6 +624,7 @@ public class RongPlugin implements CustomModuleAdapter,
     public void onRealtimeStart() {
         if (!initialized) return;
         patternSnapshotComplete = true;
+        if (evidenceRecorder != null) evidenceRecorder.readiness(true, getEventTimeNs());
         // This callback alone does not prove a live provider (replay can catch up).
         if (sharedServer != null && observationConfig.enabled) sharedServer.observationReady(alias, true);
         if (wallChangeTracker != null) {
