@@ -5,6 +5,29 @@ import org.junit.jupiter.api.Test;
 import static com.bookmap.plugin.rong.patterns.PatternObservationEngineTest.*;
 
 class OfferInteractionDetectorTest {
+    @Test void growthAloneIsUnknownAndGrowthThenRejectionProducesOneCompositeConfirmation() {
+        Fixture f = new Fixture(); f.depth(false, 5120, 48000, 2000); f.time(2500);
+        f.depth(false, 5120, 60000, 2600);
+        assertEquals(PatternEventType.OFFER_SIZE_INCREASE, f.events.get(0).type);
+        assertEquals(PatternMeaning.UNKNOWN, f.events.get(0).meaning);
+        f.trade(5119, 1, true, 2700); f.trade(5118, 1, false, 2800); f.time(3000);
+        PatternEvent composite = f.events.get(1);
+        assertEquals(PatternEventType.OFFER_SIZE_INCREASING_REJECTION, composite.type);
+        assertEquals(60000, composite.size); assertEquals(48000, composite.evidence.growthBaselineSize);
+        f.time(3100); assertEquals(2, f.events.size());
+    }
+    @Test void laterGrowthRequiresNewRejectionAndUpgradesTheSameEpisode() {
+        Fixture f = qualified(); f.trade(5119, 1, true, 2600); f.trade(5118, 1, false, 2700); f.time(2900);
+        PatternEvent initial = f.events.get(0);
+        f.depth(false, 5120, 7500, 3000); assertEquals(2, f.events.size());
+        f.time(3200); assertEquals(2, f.events.size()); // growth after rejection cannot justify it
+        f.trade(5118, 1, false, 3300); f.time(3500);
+        PatternEvent upgrade = f.events.get(2);
+        assertEquals(initial.id, upgrade.id); assertEquals(initial.interactionId, upgrade.interactionId);
+        assertEquals(initial.eventTimeNs, upgrade.eventTimeNs); assertEquals(2, upgrade.revision);
+        assertEquals(PatternEventType.OFFER_SIZE_INCREASING_REJECTION, upgrade.type);
+        assertTrue(upgrade.observedAtNs > initial.observedAtNs);
+    }
     private Fixture qualified() {
         Fixture f = new Fixture(); f.depth(false, 5120, 6000, 2000); f.time(2500); return f;
     }

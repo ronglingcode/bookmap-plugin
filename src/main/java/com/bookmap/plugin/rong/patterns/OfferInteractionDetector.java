@@ -10,10 +10,13 @@ import com.bookmap.plugin.rong.signal.SignalComposerConfig;
 public final class OfferInteractionDetector {
     private static final class Interaction {
         final String phaseId; final int price;
-        long approachNs, rejectionNs, sequence;
+        long approachNs, rejectionNs, sequence, baselineSize, lastSize, growthAtNs, growthOccurrenceNs, rejectionEventNs;
+        int growthRevision, rejectionRevision;
         String interactionId;
-        boolean completed, broken, away;
-        Interaction(EventTimeWallTracker.Wall wall) { phaseId = wall.phaseId; price = wall.priceTick; }
+        boolean completed, broken, away, composite;
+        Interaction(EventTimeWallTracker.Wall wall) {
+            phaseId = wall.phaseId; price = wall.priceTick; baselineSize = lastSize = wall.size;
+        }
     }
     private final String alias;
     private final double pips;
@@ -45,11 +48,13 @@ public final class OfferInteractionDetector {
             if (i.completed && !near) i.away = true;
             if (near && (i.approachNs == 0 || i.completed && i.away)
                     && (lastTrade == 0 || lastTrade < i.price)) {
+                if (i.completed) { i.baselineSize = walls.active(false, i.price).size; i.growthAtNs = 0; }
                 i.approachNs = nowNs; i.rejectionNs = 0; i.completed = false; i.away = false;
+                i.composite = false; i.rejectionEventNs = 0; i.rejectionRevision = 0;
                 i.interactionId = i.phaseId + ":offer:" + ++i.sequence;
-            } else if (!i.completed && i.approachNs > 0 && nowNs > i.approachNs) {
+            } else if (i.approachNs > 0 && nowNs > i.approachNs) {
                 if ((long)i.price - price >= config.detectors.rejectionDistanceTicks) {
-                    if (i.rejectionNs == 0) i.rejectionNs = nowNs;
+                    if (i.rejectionNs == 0 || i.growthAtNs > i.rejectionNs) i.rejectionNs = nowNs;
                 } else i.rejectionNs = 0;
             }
         }
@@ -58,19 +63,36 @@ public final class OfferInteractionDetector {
     public void onTime(long nowNs, long epoch) {
         refresh();
         for (Interaction i : interactions.values()) {
-            if (i.approachNs == 0 || i.broken || i.completed) continue;
+            EventTimeWallTracker.Wall wall = walls.active(false, i.price);
+            if (wall.size > i.lastSize && wall.size >= i.baselineSize * (1 + config.detectors.growthRatio)) {
+                i.growthAtNs = nowNs;
+                if (i.growthOccurrenceNs == 0) i.growthOccurrenceNs = nowNs;
+                output.accept(PatternEvent.builder(alias, epoch, PatternEventType.OFFER_SIZE_INCREASE, i.phaseId)
+                        .episodeKey("offer-growth:" + i.phaseId).revision(++i.growthRevision)
+                        .size(wall.size, PatternEvent.SizeBasis.DISPLAYED_WALL).price(i.price, pips)
+                        .times(i.growthOccurrenceNs, nowNs).evidence(PatternEvent.Evidence.builder()
+                                .wall(i.phaseId, i.lastSize, wall.size).interaction(i.baselineSize, i.approachNs, 0)
+                                .attribution(PatternEvent.Attribution.UNKNOWN, PatternEvent.Coverage.USABLE).build()).build());
+            }
+            i.lastSize = wall.size;
+            if (i.approachNs == 0 || i.broken || i.completed && i.composite) continue;
             if (nowNs - i.approachNs > config.detectors.interactionWindowMs * 1_000_000L) {
                 i.approachNs = i.rejectionNs = 0; continue;
             }
             if (i.rejectionNs == 0 || nowNs - i.rejectionNs < config.detectors.rejectionHoldMs * 1_000_000L) continue;
-            EventTimeWallTracker.Wall wall = walls.active(false, i.price);
-            output.accept(PatternEvent.builder(alias, epoch, PatternEventType.OFFER_REJECTION, i.interactionId)
+            boolean composite = i.growthAtNs > 0 && i.rejectionNs >= i.growthAtNs
+                    && wall.size >= i.baselineSize * (1 + config.detectors.growthRatio);
+            if (i.completed && !composite) continue;
+            if (i.rejectionEventNs == 0) i.rejectionEventNs = nowNs;
+            output.accept(PatternEvent.builder(alias, epoch, composite ? PatternEventType.OFFER_SIZE_INCREASING_REJECTION
+                            : PatternEventType.OFFER_REJECTION, i.interactionId)
+                    .revision(++i.rejectionRevision)
                     .episodeKey("offer-rejection:" + i.interactionId).size(wall.size, PatternEvent.SizeBasis.DISPLAYED_WALL)
-                    .price(i.price, pips).times(nowNs, nowNs)
+                    .price(i.price, pips).times(i.rejectionEventNs, nowNs)
                     .evidence(PatternEvent.Evidence.builder().wall(i.phaseId, wall.size, wall.size)
-                            .interaction(0, i.approachNs, i.rejectionNs)
+                            .interaction(i.baselineSize, i.approachNs, i.rejectionNs)
                             .attribution(PatternEvent.Attribution.UNKNOWN, PatternEvent.Coverage.USABLE).build()).build());
-            i.completed = true;
+            i.completed = true; i.composite = composite;
         }
     }
     public void reset() { interactions.clear(); lastTrade = 0; }
