@@ -189,3 +189,10 @@ Work is confined to `bookmap-plugin`. The user authorized sequential implementat
 - Changed files: src/main/java/com/bookmap/plugin/rong/patterns/OfferInteractionDetector.java, src/test/java/com/bookmap/plugin/rong/patterns/OfferInteractionDetectorTest.java.
 - Verification: Offer, observer, and bid-failure fixtures passed (12 tests); bare growth UNKNOWN, 25-percent growth plus rejection, and same-ID composite upgrade requiring a new rejection verified.
 - Next task: SC-27.
+
+## SC-27 — Confirm consumed offer breakout with an above-level print
+
+- Status: complete.
+- Changed files: src/main/java/com/bookmap/plugin/rong/patterns/OfferInteractionDetector.java, src/main/java/com/bookmap/plugin/rong/patterns/PatternObservationEngine.java, src/test/java/com/bookmap/plugin/rong/patterns/OfferInteractionDetectorTest.java.
+- Verification: Offer, observer, and bid-failure fixtures passed (14 tests); actual above-print, measured removed size, decision-interval print, pull/unknown/expired/wrong-direction suppression verified.
+- Next task: SC-28.

@@ -3,6 +3,8 @@ package com.bookmap.plugin.rong.patterns;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.function.Consumer;
 import com.bookmap.plugin.rong.signal.SignalComposerConfig;
 
@@ -23,11 +25,20 @@ public final class OfferInteractionDetector {
     private final SignalComposerConfig config;
     private final EventTimeWallTracker walls;
     private final Consumer<PatternEvent> output;
+    private final EventTimeTradeAttribution trades;
+    private static final class Breakout {
+        final EventTimeWallTracker.Clear clear; final PatternEvent.Evidence evidence; final long epoch;
+        Breakout(EventTimeWallTracker.Clear clear, PatternEvent.Evidence evidence, long epoch) {
+            this.clear = clear; this.evidence = evidence; this.epoch = epoch;
+        }
+    }
+    private final List<Breakout> breakouts = new ArrayList<>();
     private final Map<String, Interaction> interactions = new LinkedHashMap<>();
     private int lastTrade;
     public OfferInteractionDetector(String alias, double pips, SignalComposerConfig config,
-            EventTimeWallTracker walls, Consumer<PatternEvent> output) {
+            EventTimeWallTracker walls, EventTimeTradeAttribution trades, Consumer<PatternEvent> output) {
         this.alias = alias; this.pips = pips; this.config = config; this.walls = walls; this.output = output;
+        this.trades = trades;
     }
     private void refresh() {
         Iterator<Interaction> iterator = interactions.values().iterator();
@@ -61,6 +72,16 @@ public final class OfferInteractionDetector {
         lastTrade = price; onTime(nowNs, epoch);
     }
     public void onTime(long nowNs, long epoch) {
+        Iterator<Breakout> pending = breakouts.iterator();
+        while (pending.hasNext()) {
+            Breakout item = pending.next();
+            long printNs = trades.firstBreakout(item.clear, true, config.detectors.breakoutDistanceTicks);
+            if (printNs > 0) {
+                output.accept(PatternEvent.builder(alias, item.epoch, PatternEventType.OFFER_BREAKOUT, item.clear.phaseId)
+                        .size(item.clear.removedSize, PatternEvent.SizeBasis.DISPLAYED_REMOVED).price(item.clear.priceTick, pips)
+                        .times(printNs, nowNs).evidence(item.evidence).build()); pending.remove();
+            } else if (nowNs - item.clear.occurrenceNs > config.detectors.breakoutWindowMs * 1_000_000L) pending.remove();
+        }
         refresh();
         for (Interaction i : interactions.values()) {
             EventTimeWallTracker.Wall wall = walls.active(false, i.price);
@@ -95,5 +116,12 @@ public final class OfferInteractionDetector {
             i.completed = true; i.composite = composite;
         }
     }
-    public void reset() { interactions.clear(); lastTrade = 0; }
+    public void onClear(EventTimeWallTracker.Clear clear, PatternEvent.Evidence evidence, long epoch) {
+        if (clear.bid || clear.removedSize <= 0 || evidence.coverage != PatternEvent.Coverage.USABLE
+                || evidence.attribution != PatternEvent.Attribution.PROBABLE_CONSUMPTION) return;
+        breakouts.add(new Breakout(clear, evidence, epoch));
+        while (breakouts.size() > config.maxWallPhases) breakouts.remove(0);
+        onTime(clear.observedAtNs, epoch);
+    }
+    public void reset() { interactions.clear(); breakouts.clear(); lastTrade = 0; }
 }
