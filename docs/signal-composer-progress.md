@@ -231,3 +231,10 @@ Work is confined to `bookmap-plugin`. The user authorized sequential implementat
 - Changed files: src/main/java/com/bookmap/plugin/rong/RongPlugin.java, src/test/java/com/bookmap/plugin/rong/SignalComposerLifecycleTest.java.
 - Verification: Lifecycle, callback, and activation suites passed (10 tests): toggles consume no disabled observations, seek requires fresh readiness and forbids stale legacy-book seeding, close clears context, stop clears attachment, and final detach reloads rules on reattachment.
 - Next task: SC-33.
+
+## SC-33 — Add the independent advisory settings toggle
+
+- Status: complete.
+- Changed files: src/main/java/com/bookmap/plugin/rong/IndicatorSettingsPanel.java, src/main/java/com/bookmap/plugin/rong/RongPlugin.java, src/test/java/com/bookmap/plugin/rong/SignalComposerSettingsTest.java.
+- Verification: Settings and lifecycle tests passed (5 tests): enable/disable under valid defaults, malformed-rule disarming, independent legacy toggle, shared symbol-filtered switch, and later attachment retention.
+- Next task: SC-34.

@@ -14,6 +14,7 @@ import javax.swing.SwingUtilities;
 import javax.swing.SpinnerNumberModel;
 
 import velox.gui.StrategyPanel;
+import com.bookmap.plugin.rong.signal.SignalComposerConfig;
 
 /**
  * Settings panel for enabling/disabling automatic indicators.
@@ -26,6 +27,10 @@ public class IndicatorSettingsPanel extends StrategyPanel {
 
     public IndicatorSettingsPanel(IndicatorConfig config, WallThresholdConfig wallThresholdConfig,
             NativeConnectionStatus connectionStatus) {
+        this(config, wallThresholdConfig, connectionStatus, SignalComposerConfig.defaults());
+    }
+    public IndicatorSettingsPanel(IndicatorConfig config, WallThresholdConfig wallThresholdConfig,
+            NativeConnectionStatus connectionStatus, SignalComposerConfig composerRules) {
         super("Indicators");
         setLayout(new GridBagLayout());
 
@@ -128,6 +133,16 @@ public class IndicatorSettingsPanel extends StrategyPanel {
         patternSignalsCheckbox.addActionListener(e ->
                 config.setEnabled(IndicatorConfig.BOOKMAP_PATTERN_SIGNALS, patternSignalsCheckbox.isSelected()));
         add(patternSignalsCheckbox, gbc);
+
+        gbc.gridy++;
+        JCheckBox composerCheckbox = new JCheckBox("SignalComposer (advisory)",
+                composerRules.valid && config.isEnabled(IndicatorConfig.SIGNAL_COMPOSER));
+        composerCheckbox.setEnabled(composerRules.valid);
+        composerCheckbox.setToolTipText(composerRules.valid
+                ? "Shared advisory switch for eligible charts. Rules reload after all attachments stop and reattach."
+                : composerRules.error);
+        composerCheckbox.addActionListener(e -> config.setEnabled(IndicatorConfig.SIGNAL_COMPOSER, composerCheckbox.isSelected()));
+        add(composerCheckbox, gbc);
 
         gbc.gridy++;
         JPanel wallThresholdPanel = new JPanel(new GridBagLayout());

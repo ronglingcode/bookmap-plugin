@@ -591,7 +591,8 @@ public class RongPlugin implements CustomModuleAdapter,
             }
         }
         return new StrategyPanel[] {
-            new IndicatorSettingsPanel(indicatorConfig, wallThresholdConfig, nativeConnectionStatus)
+            new IndicatorSettingsPanel(indicatorConfig, wallThresholdConfig, nativeConnectionStatus,
+                    signalComposerConfig == null ? SignalComposerConfig.defaults() : signalComposerConfig)
         };
     }
 
