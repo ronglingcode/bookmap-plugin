@@ -11,6 +11,7 @@ public final class SignalCompositionPipeline {
     private final PatternObservationEngine observer;
     private final Consumer<CompositionUpdate> output;
     private int bid, ask, last;
+    private Consumer<ResetReason> resetListener = reason -> {};
     public SignalCompositionPipeline(String alias, double pips, SignalComposerConfig config, Consumer<CompositionUpdate> output) {
         this(alias, pips, config, output, event -> {}, diagnostic -> {}, System::currentTimeMillis);
     }
@@ -20,7 +21,7 @@ public final class SignalCompositionPipeline {
         observer = new PatternObservationEngine(alias, pips, config, event -> {
             rawEvents.accept(event); output.accept(composer.onPatternEvent(event));
         }, (reason, epoch) -> {
-            bid = ask = last = 0; output.accept(composer.reset(reason, epoch));
+            bid = ask = last = 0; resetListener.accept(reason); output.accept(composer.reset(reason, epoch));
         }, diagnostics);
     }
     public void onDepth(boolean bid, int price, long size, long timeNs, PatternEvent.TimestampProvenance provenance) {
@@ -47,6 +48,7 @@ public final class SignalCompositionPipeline {
         output.accept(composer.onMarketPrice(bid, ask, last));
     }
     public void markReady() { observer.markReady(); }
+    public void setResetListener(Consumer<ResetReason> listener) { resetListener = listener; }
     public void reset(ResetReason reason) { observer.reset(reason); }
     public long epoch() { return observer.epoch(); }
     public boolean usable() { return observer.usable(); }

@@ -17,12 +17,15 @@ public final class EventTimeRelocationTracker {
     private final SignalComposerConfig config;
     private final Deque<Increase> increases = new ArrayDeque<>();
     private long now, lostThroughNs;
+    private boolean overflowed;
     public EventTimeRelocationTracker(SignalComposerConfig config) { this.config = config; }
     public void onDepth(boolean bid, int price, long previousSize, long currentSize, long timeNs) {
         onTime(timeNs);
         if (price <= 0 || previousSize < 0 || currentSize < 0) throw new IllegalArgumentException("Invalid depth increase");
         if (currentSize > previousSize) increases.addLast(new Increase(bid, price, currentSize - previousSize, timeNs));
-        while (increases.size() > config.maxWallPhases) lostThroughNs = Math.max(lostThroughNs, increases.removeFirst().time);
+        while (increases.size() > config.maxWallPhases) {
+            overflowed = true; lostThroughNs = Math.max(lostThroughNs, increases.removeFirst().time);
+        }
     }
     public void onTime(long timeNs) {
         if (timeNs <= 0 || timeNs < now) throw new IllegalArgumentException("Reset relocation before backwards time");
@@ -41,8 +44,9 @@ public final class EventTimeRelocationTracker {
                 iterator.remove(); return Status.PROBABLE_MOVE;
             }
         }
-        return lostThroughNs >= clear.occurrenceNs - window ? Status.COVERAGE_GAP : Status.NO_MATCH;
+        return lostThroughNs > 0 && lostThroughNs >= clear.occurrenceNs - window ? Status.COVERAGE_GAP : Status.NO_MATCH;
     }
     public int size() { return increases.size(); }
-    public void reset() { increases.clear(); lostThroughNs = 0; now = 0; }
+    public boolean consumeOverflow() { boolean result = overflowed; overflowed = false; return result; }
+    public void reset() { increases.clear(); lostThroughNs = 0; now = 0; overflowed = false; }
 }

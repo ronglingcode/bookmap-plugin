@@ -35,16 +35,20 @@ public final class EventTimeTradeAttribution {
     private final SignalComposerConfig config;
     private final Deque<Trade> trades = new ArrayDeque<>();
     private long coverageStartNs, lostThroughNs, now;
+    private long retainedFromNs;
+    private boolean overflowed;
     public EventTimeTradeAttribution(SignalComposerConfig config) { this.config = config; }
     public void markReady(long timeNs) {
         if (timeNs <= 0) throw new IllegalArgumentException("Market timestamp required");
-        trades.clear(); coverageStartNs = timeNs; lostThroughNs = 0; now = timeNs;
+        trades.clear(); coverageStartNs = retainedFromNs = timeNs; lostThroughNs = 0; now = timeNs; overflowed = false;
     }
     public void onTrade(int price, long size, Boolean buyAggressor, long timeNs) {
         onTime(timeNs);
         if (price <= 0 || size <= 0) return;
         trades.addLast(new Trade(price, size, buyAggressor, timeNs));
-        while (trades.size() > config.maxAttributionTrades) lostThroughNs = Math.max(lostThroughNs, trades.removeFirst().time);
+        while (trades.size() > config.maxAttributionTrades) {
+            overflowed = true; lostThroughNs = Math.max(lostThroughNs, trades.removeFirst().time);
+        }
     }
     public void onTime(long timeNs) {
         if (timeNs <= 0 || timeNs < now) throw new IllegalArgumentException("Reset attribution before backwards time");
@@ -52,12 +56,13 @@ public final class EventTimeTradeAttribution {
         // Keep evidence across stable-clear decisions and delayed breakout completion.
         long retention = (config.detectors.attributionLookbackMs + config.detectors.clearDecisionMs
                 + config.detectors.breakoutWindowMs) * 1_000_000L;
+        retainedFromNs = Math.max(retainedFromNs, now - retention);
         while (!trades.isEmpty() && trades.peekFirst().time < now - retention) trades.removeFirst();
     }
     public Result attribute(EventTimeWallTracker.Clear clear) {
         long from = clear.occurrenceNs - config.detectors.attributionLookbackMs * 1_000_000L;
         PatternEvent.Coverage coverage = coverageStartNs == 0 || from < coverageStartNs ? PatternEvent.Coverage.WARMUP
-                : from <= lostThroughNs ? PatternEvent.Coverage.GAP : PatternEvent.Coverage.USABLE;
+                : from < retainedFromNs || from <= lostThroughNs ? PatternEvent.Coverage.GAP : PatternEvent.Coverage.USABLE;
         long volume = 0;
         for (Trade trade : trades) {
             if (trade.time < from || trade.time > clear.observedAtNs || trade.price != clear.priceTick) continue;
@@ -76,6 +81,7 @@ public final class EventTimeTradeAttribution {
         return new Result(volume, coverage, attribution);
     }
     public int size() { return trades.size(); }
+    public boolean consumeOverflow() { boolean result = overflowed; overflowed = false; return result; }
     /** Earliest actual print after loss, including prints during the stable-clear decision. */
     public long firstBreakout(EventTimeWallTracker.Clear clear, boolean above, int distanceTicks) {
         long end = clear.occurrenceNs + config.detectors.breakoutWindowMs * 1_000_000L;
@@ -86,5 +92,5 @@ public final class EventTimeTradeAttribution {
         }
         return 0;
     }
-    public void reset() { trades.clear(); coverageStartNs = 0; lostThroughNs = 0; now = 0; }
+    public void reset() { trades.clear(); coverageStartNs = retainedFromNs = lostThroughNs = now = 0; overflowed = false; }
 }

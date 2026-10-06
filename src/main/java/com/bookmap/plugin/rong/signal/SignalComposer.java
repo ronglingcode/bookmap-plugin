@@ -63,6 +63,9 @@ public final class SignalComposer {
             }
         }
         if (bid && event.size >= config.minimumTriggerSize) {
+            if (marketPriceTick > 0 && Math.abs((long)event.priceTick - marketPriceTick) > config.maxTriggerDriftTicks) {
+                diagnostics.add("Trigger outside current local price: " + event.id); return update(signals, transitions, diagnostics);
+            }
             SignalCandidate proposed = new SignalCandidate(event, config.afterWindowMs);
             SignalCandidate candidate = candidates.get(proposed.key);
             if (candidate == null && event.revision > 1) {

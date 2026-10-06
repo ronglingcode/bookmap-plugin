@@ -5,6 +5,11 @@ import org.junit.jupiter.api.Test;
 import static com.bookmap.plugin.rong.patterns.PatternObservationEngineTest.*;
 
 class OfferInteractionDetectorTest {
+    @Test void quoteAtOrAboveOfferDisarmsAnIncompleteRejection() {
+        Fixture f = qualified(); f.trade(5119, 1, true, 2600); f.trade(5118, 1, false, 2700);
+        f.engine.onBbo(5120, 5121, BASE + 2_800_000_000L, MARKET); f.time(3000);
+        assertTrue(f.events.isEmpty());
+    }
     @Test void consumedOfferNeedsAbovePrintAndUsesMeasuredRemovedSize() {
         Fixture f = qualified(); f.trade(5120, 4200, true, 2900); f.depth(false, 5120, 0, 3000); f.time(3500);
         assertTrue(f.events.isEmpty()); f.trade(5120, 1, true, 3600); assertTrue(f.events.isEmpty());

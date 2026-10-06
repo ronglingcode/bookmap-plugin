@@ -123,5 +123,8 @@ public final class OfferInteractionDetector {
         while (breakouts.size() > config.maxWallPhases) breakouts.remove(0);
         onTime(clear.observedAtNs, epoch);
     }
+    public void onBbo(int bidTick) {
+        refresh(); for (Interaction i : interactions.values()) if (bidTick >= i.price) { i.broken = true; i.rejectionNs = 0; }
+    }
     public void reset() { interactions.clear(); breakouts.clear(); lastTrade = 0; }
 }

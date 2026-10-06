@@ -6,6 +6,12 @@ import com.bookmap.plugin.rong.signal.SignalComposerConfig;
 import com.google.gson.JsonParser;
 
 class EventTimeTradeAttributionTest {
+    @Test void prunedEvidenceDuringDelayedDecisionCannotBecomeWithdrawal() {
+        EventTimeTradeAttribution a = new EventTimeTradeAttribution(SignalComposerConfig.defaults()); a.markReady(1);
+        a.onTrade(5100, 3000, false, CLEAR); a.onTime(10_000_000_001L);
+        assertEquals(PatternEvent.Coverage.GAP, a.attribute(clear(true)).coverage);
+        assertEquals(PatternEvent.Attribution.UNKNOWN, a.attribute(clear(true)).attribution);
+    }
     private static final long CLEAR = 3_000_000_001L;
     private EventTimeWallTracker.Clear clear(boolean bid) {
         EventTimeWallTracker t = new EventTimeWallTracker(1, SignalComposerConfig.defaults());

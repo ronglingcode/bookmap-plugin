@@ -15,7 +15,7 @@ public final class ConfirmationMatcher {
         Direction direction = TradingSignal.directionFrom(trigger);
         List<ConfirmationMatch> matches = new ArrayList<>();
         long beforeNs = config.beforeWindowMs * 1_000_000L, afterNs = config.afterWindowMs * 1_000_000L;
-        if (trigger.observedAtNs > processingNs || processingNs - trigger.eventTimeNs > afterNs) return matches;
+        if (trigger.observedAtNs > processingNs || processingNs - trigger.eventTimeNs > afterNs) return java.util.Collections.emptyList();
         PatternMeaning wanted = direction == Direction.LONG ? PatternMeaning.OFFER_BULLISH_CONFIRMATION : PatternMeaning.OFFER_BEARISH_CONFIRMATION;
         for (PatternEvent event : history) {
             if (event.meaning != wanted || !event.instrumentAlias.equals(trigger.instrumentAlias) || event.epoch != trigger.epoch

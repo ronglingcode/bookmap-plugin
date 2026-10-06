@@ -25,6 +25,7 @@ public final class PatternObservationEngine implements PatternRuntimeContext {
     private final List<PatternDefinition> definitions = new ArrayList<>();
     private final Map<String, Depth> snapshot = new LinkedHashMap<>();
     private boolean seeded;
+    private String pendingCoverageGap;
     private int bid, ask, last, high, low, definitionObservations;
     private static final class Depth {
         final boolean bid; final int price; final long size;
@@ -36,8 +37,9 @@ public final class PatternObservationEngine implements PatternRuntimeContext {
         walls = new EventTimeWallTracker(clock.epoch(), config);
         attribution = new EventTimeTradeAttribution(config); relocation = new EventTimeRelocationTracker(config);
         normalizer = new PatternEventNormalizer(alias, pips, config);
-        bidFailures = new BidFailureDetector(alias, pips, config, attribution, output);
-        offers = new OfferInteractionDetector(alias, pips, config, walls, attribution, output);
+        Consumer<PatternEvent> usableOutput = event -> { if (pendingCoverageGap == null) output.accept(event); };
+        bidFailures = new BidFailureDetector(alias, pips, config, attribution, usableOutput);
+        offers = new OfferInteractionDetector(alias, pips, config, walls, attribution, usableOutput);
         definitions.add(new ReappearPatternDefinition(PatternType.BID_REAPPEAR, true));
         definitions.add(new ReappearPatternDefinition(PatternType.OFFER_REAPPEAR, false));
         definitions.add(new StepPatternDefinition(PatternType.BID_STEP_UP, true));
@@ -65,10 +67,11 @@ public final class PatternObservationEngine implements PatternRuntimeContext {
         String key = (isBid ? "B:" : "O:") + price;
         if (size >= config.observationFloorSize) snapshot.put(key, new Depth(isBid, price, size)); else snapshot.remove(key);
         while (snapshot.size() > config.maxWallPhases) {
-            snapshot.remove(snapshot.keySet().iterator().next()); diagnostics.accept("Snapshot observation capacity eviction");
+            coverageGap("Snapshot observation capacity overflow"); return;
         }
         if (!usable) return;
         relocation.onDepth(isBid, price, previous == null ? 0 : previous.size, size, timeNs);
+        if (relocation.consumeOverflow()) { coverageGap("Relocation buffer overflow"); return; }
         attribution.onTime(timeNs); dispatch(walls.onDepth(isBid, price, size, timeNs)); dispatchTime();
     }
     public void onTrade(int price, long size, Boolean buyAggressor, long timeNs, PatternEvent.TimestampProvenance provenance) {
@@ -76,7 +79,9 @@ public final class PatternObservationEngine implements PatternRuntimeContext {
         int previousHigh = high, previousLow = low;
         last = price; high = high == 0 ? price : Math.max(high, price); low = low == 0 ? price : Math.min(low, price);
         attribution.onTrade(price, size, buyAggressor, timeNs); relocation.onTime(timeNs);
+        if (attribution.consumeOverflow()) { coverageGap("Trade attribution buffer overflow"); return; }
         dispatch(walls.onTime(timeNs));
+        if (!clock.usable()) return;
         PatternTradeTick trade = new PatternTradeTick(price, safeInt(size), Boolean.TRUE.equals(buyAggressor), timeNs, nowMs(), previousHigh, previousLow);
         for (PatternDefinition definition : definitions) definition.onTrade(trade, this);
         offers.onTrade(price, timeNs, epoch());
@@ -86,16 +91,23 @@ public final class PatternObservationEngine implements PatternRuntimeContext {
         if (!begin(timeNs, provenance)) return;
         if (bid > 0 && ask > 0 && bid > ask) return;
         this.bid = bid; this.ask = ask; attribution.onTime(timeNs); relocation.onTime(timeNs);
-        dispatch(walls.onTime(timeNs)); for (PatternDefinition definition : definitions) definition.onBbo(this); dispatchTime();
+        dispatch(walls.onTime(timeNs)); if (!clock.usable()) return;
+        offers.onBbo(bid);
+        for (PatternDefinition definition : definitions) definition.onBbo(this); dispatchTime();
     }
     public void onTimestamp(long timeNs, PatternEvent.TimestampProvenance provenance) {
         if (!begin(timeNs, provenance)) return;
         attribution.onTime(timeNs); relocation.onTime(timeNs); dispatch(walls.onTime(timeNs)); dispatchTime();
     }
     private void dispatch(EventTimeWallTracker.Update update) {
-        for (String diagnostic : update.diagnostics) diagnostics.accept(diagnostic);
+        for (String diagnostic : update.diagnostics) {
+            diagnostics.accept(diagnostic);
+            if (diagnostic.startsWith("Wall phase capacity eviction")) { coverageGap("Wall phase capacity overflow"); return; }
+        }
         for (EventTimeWallTracker.Clear clear : update.clears) {
             PatternEvent.Evidence evidence = attribution.attribute(clear).evidence(clear, relocation.match(clear));
+            diagnostics.accept("Measured wall clear " + clear.phaseId + "; removed=" + clear.removedSize
+                    + "; attribution=" + evidence.attribution + "; coverage=" + evidence.coverage);
             bidFailures.onClear(clear, evidence, epoch());
             offers.onClear(clear, evidence, epoch());
             if (evidence.coverage != PatternEvent.Coverage.USABLE || evidence.attribution != PatternEvent.Attribution.PROBABLE_CONSUMPTION) continue;
@@ -119,15 +131,18 @@ public final class PatternObservationEngine implements PatternRuntimeContext {
         diagnostics.accept("Pattern reference capacity reset");
     }
     private void dispatchTime() {
+        if (!clock.usable()) return;
         bidFailures.onTime(nowNs());
         offers.onTime(nowNs(), epoch());
         for (PatternDefinition definition : definitions) definition.onTime(this);
+        if (pendingCoverageGap != null) coverageGap(pendingCoverageGap);
     }
     private static int safeInt(long value) { return (int)Math.min(Integer.MAX_VALUE, value); }
     private void clearState(long epoch) {
         walls.reset(epoch); attribution.reset(); relocation.reset(); normalizer.reset(); bidFailures.reset(); offers.reset();
         for (PatternDefinition definition : definitions) definition.reset();
         seeded = false; bid = ask = last = high = low = definitionObservations = 0;
+        pendingCoverageGap = null;
     }
     public void reset(ResetReason reason) {
         ObservationClock.Tick tick = clock.reset(reason); clearState(tick.epoch); snapshot.clear(); resets.accept(reason, tick.epoch);
@@ -142,6 +157,10 @@ public final class PatternObservationEngine implements PatternRuntimeContext {
     public int sessionHighTick() { return high; }
     public int sessionLowTick() { return low; }
     public void emit(PatternCandidate candidate) {
-        PatternEvent event = normalizer.normalize(candidate, walls, epoch(), nowNs()); if (event != null) output.accept(event);
+        if (pendingCoverageGap != null) return;
+        PatternEvent event = normalizer.normalize(candidate, walls, epoch(), nowNs());
+        if (normalizer.consumeOverflow()) { pendingCoverageGap = "Normalized episode capacity overflow"; return; }
+        if (event != null) output.accept(event);
     }
+    private void coverageGap(String diagnostic) { diagnostics.accept(diagnostic + "; fresh readiness required"); reset(ResetReason.COVERAGE_GAP); }
 }

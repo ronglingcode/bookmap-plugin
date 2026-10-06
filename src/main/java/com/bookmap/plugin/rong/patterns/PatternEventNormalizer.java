@@ -14,6 +14,7 @@ public final class PatternEventNormalizer {
     private final double pips;
     private final SignalComposerConfig config;
     private final Map<String, Episode> episodes = new LinkedHashMap<>();
+    private boolean overflowed;
     public PatternEventNormalizer(String alias, double pips, SignalComposerConfig config) {
         this.alias = alias; this.pips = pips; this.config = config;
     }
@@ -23,7 +24,7 @@ public final class PatternEventNormalizer {
                 || !current.phaseId.equals(candidate.triggerWall.phaseId)) return null;
         PatternEventType type = PatternEventType.valueOf(candidate.patternType.name());
         Episode episode = episodes.computeIfAbsent(candidate.episodeKey, key -> new Episode(candidate.eventTimeNs));
-        while (episodes.size() > config.maxEvents) episodes.remove(episodes.keySet().iterator().next());
+        while (episodes.size() > config.maxEvents) { episodes.remove(episodes.keySet().iterator().next()); overflowed = true; }
         return PatternEvent.builder(alias, epoch, type, current.phaseId).episodeKey(candidate.episodeKey)
                 .revision(++episode.revision).size(current.size, PatternEvent.SizeBasis.DISPLAYED_WALL)
                 .price(current.priceTick, pips).times(episode.occurrenceNs, observedNs)
@@ -32,5 +33,6 @@ public final class PatternEventNormalizer {
                         .metadata(Map.of("referencePhaseId", candidate.referenceWall.phaseId,
                                 "behavior", candidate.confirmation)).build()).build();
     }
-    public void reset() { episodes.clear(); }
+    public boolean consumeOverflow() { boolean result = overflowed; overflowed = false; return result; }
+    public void reset() { episodes.clear(); overflowed = false; }
 }

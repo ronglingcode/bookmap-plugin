@@ -7,6 +7,12 @@ import com.bookmap.plugin.rong.patterns.*;
 import com.google.gson.JsonParser;
 
 class SignalComposerTest {
+    @Test void initiallyDistantTriggerCannotValidateBeforeDriftInvalidation() {
+        SignalComposer c = composer(); c.onMarketPrice(5100, 5101, 0);
+        assertTrue(c.onPatternEvent(event(PatternEventType.BID_STEP_UP, 6000, 5079, 100, "far")).signals.isEmpty());
+        assertTrue(c.candidateStates().isEmpty());
+        assertEquals(1, c.onPatternEvent(event(PatternEventType.BID_STEP_UP, 5000, 5080, 200, "local")).signals.size());
+    }
     @Test void offerOnlyProducesSeparateWaitingContextsWithoutSignals() {
         SignalComposer c = composer();
         CompositionUpdate bearish = c.onPatternEvent(event(PatternEventType.OFFER_REJECTION, 60000, 5120, 100, "bear"));

@@ -377,6 +377,11 @@ public class RongPlugin implements CustomModuleAdapter,
             if (store != null) store.publish(alias, signalComposition.epoch(), update);
         }, event -> { if (compositionLog != null) compositionLog.event(event); },
                 diagnostic -> { if (compositionLog != null) compositionLog.detail(diagnostic); }, System::currentTimeMillis);
+        signalComposition.setResetListener(reason -> {
+            if (reason == ResetReason.COVERAGE_GAP || reason == ResetReason.REPLAY_SEEK) {
+                compositionSnapshotComplete = false; compositionSeedFromSharedBook = false;
+            }
+        });
         signalCompositionEnabled = indicatorConfig.isEnabled(IndicatorConfig.SIGNAL_COMPOSER);
     }
 

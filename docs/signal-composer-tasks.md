@@ -122,7 +122,7 @@ Specification: implementation plan section 8.
 
 Specification: implementation plan sections 10 and 11.
 
-- [ ] **SC-39 — Verify isolation from existing features.** Add or extend focused regression tests for composer on/off versus legacy badges, Cairo observation/evidence output, tradebook eligibility, and native/manual action routing. Use existing fake services. **Complete when:** those tests and existing affected suites pass, and an end-to-end composed signal causes zero trading dispatches/orders. Review the remaining acceptance matrix and add any missing meaningful rule/detector cases here, without duplicating completed tests.
+- [x] **SC-39 — Verify isolation from existing features.** Add or extend focused regression tests for composer on/off versus legacy badges, Cairo observation/evidence output, tradebook eligibility, and native/manual action routing. Use existing fake services. **Complete when:** those tests and existing affected suites pass, and an end-to-end composed signal causes zero trading dispatches/orders. Review the remaining acceptance matrix and add any missing meaningful rule/detector cases here, without duplicating completed tests.
 
 - [ ] **SC-40 — Add operator configuration and usage docs.** Add `config/signal-composer.template.json` and `docs/signal-composer.md`; update `config/README.md` and `README.md` with the advisory toggle, defaults, shared config lifetime, all-attachment reload requirement, observer-only replay, explanations, and incomplete legacy capture limits. **Complete when:** the disabled template parses under the actual loader and documentation matches implemented fields/behavior and the actual build artifact naming convention.
 
