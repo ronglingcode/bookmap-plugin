@@ -5,6 +5,7 @@ import java.time.Duration;
 import com.bookmap.plugin.rong.signal.SignalComposerConfig;
 import com.bookmap.plugin.rong.signal.SignalCompositionPipeline;
 import com.bookmap.plugin.rong.signal.TradingSignalStore;
+import com.bookmap.plugin.rong.signal.ResetReason;
 import com.bookmap.plugin.rong.patterns.PatternEvent;
 
 import com.bookmap.plugin.rong.executions.FilledExecutionManager;
@@ -119,6 +120,8 @@ public class RongPlugin implements CustomModuleAdapter,
     private SignalCompositionPipeline signalComposition;
     private SignalComposerConfig compositionRules;
     private volatile boolean signalCompositionEnabled;
+    private volatile boolean compositionSnapshotComplete;
+    private volatile boolean compositionSeedFromSharedBook = true;
     private final Object compositionLock = new Object();
     private volatile boolean patternAutomationEnabled;
     private volatile boolean patternSnapshotComplete;
@@ -364,6 +367,12 @@ public class RongPlugin implements CustomModuleAdapter,
     public void stop() {
         if (!initialized) return;
         initialized = false;
+        synchronized (compositionLock) {
+            signalCompositionEnabled = false; compositionSnapshotComplete = false;
+            if (signalComposition != null) signalComposition.reset(ResetReason.STOPPED);
+            signalComposition = null; compositionRules = null;
+            if (tradingSignalStore != null) tradingSignalStore.removeAlias(alias);
+        }
         if (indicatorConfig != null) {
             indicatorConfig.removeChangeListener(this);
         }
@@ -564,6 +573,9 @@ public class RongPlugin implements CustomModuleAdapter,
                 pendingEntryOrderManager = null;
                 instanceCount = 0;
             }
+            if (instanceCount <= 0) {
+                signalComposerConfig = null; tradingSignalStore = null;
+            }
         }
     }
 
@@ -641,6 +653,11 @@ public class RongPlugin implements CustomModuleAdapter,
     @Override
     public void onTimestamp(long timestampNs) {
         if (!initialized) return;
+        if (timestampNs > 0 && lastTimestampNs > 0 && timestampNs < lastTimestampNs) {
+            compositionSnapshotComplete = false;
+            // Legacy book state can retain pre-seek levels. Only fresh callbacks may seed the observer now.
+            compositionSeedFromSharedBook = false;
+        }
         this.lastTimestampNs = timestampNs;
         flushPendingVwapPoints();
         if (shouldRunPatternAutomation()) {
@@ -673,6 +690,7 @@ public class RongPlugin implements CustomModuleAdapter,
     public void onSnapshotEnd() {
         if (!initialized) return;
         patternSnapshotComplete = true;
+        compositionSnapshotComplete = true;
         plotBookAverage();
         if (evidenceRecorder != null) evidenceRecorder.readiness(true, getEventTimeNs());
         if (sharedServer != null && observationConfig.enabled) sharedServer.observationReady(alias, true);
@@ -689,6 +707,7 @@ public class RongPlugin implements CustomModuleAdapter,
     public void onRealtimeStart() {
         if (!initialized) return;
         patternSnapshotComplete = true;
+        compositionSnapshotComplete = true;
         plotBookAverage();
         if (evidenceRecorder != null) evidenceRecorder.readiness(true, getEventTimeNs());
         // This callback alone does not prove a live provider (replay can catch up).
@@ -725,6 +744,14 @@ public class RongPlugin implements CustomModuleAdapter,
     @Override
     public void onIndicatorConfigChanged(String indicatorKey, boolean enabled) {
         if (!initialized) return;
+        if (IndicatorConfig.SIGNAL_COMPOSER.equals(indicatorKey)) {
+            synchronized (compositionLock) {
+                signalCompositionEnabled = enabled && signalComposition != null && compositionRules.valid && compositionRules.eligible(alias);
+                if (signalComposition != null) signalComposition.reset(enabled ? ResetReason.ENABLED : ResetReason.DISABLED);
+                if (signalCompositionEnabled && compositionSnapshotComplete) markSignalCompositionReady();
+            }
+            return;
+        }
         if (IndicatorConfig.ORDER_BOOK_WEIGHTED_AVERAGE.equals(indicatorKey)) {
             updateBookAverageIndicatorVisibility();
             // Plotting stays on Bookmap's data callback thread.
@@ -813,7 +840,7 @@ public class RongPlugin implements CustomModuleAdapter,
     private void markSignalCompositionReady() {
         synchronized (compositionLock) {
             if (!shouldRunSignalComposition()) return;
-            if (lastTimestampNs > 0 && orderBook != null) {
+            if (compositionSeedFromSharedBook && lastTimestampNs > 0 && orderBook != null) {
                 for (boolean bid : new boolean[] {true, false}) {
                     for (java.util.Map.Entry<Integer, Integer> level : orderBook.getLevelsSnapshot(bid).entrySet())
                         signalComposition.onDepth(bid, level.getKey(), level.getValue(), lastTimestampNs, PatternEvent.TimestampProvenance.MARKET);

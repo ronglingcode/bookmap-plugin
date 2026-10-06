@@ -224,3 +224,10 @@ Work is confined to `bookmap-plugin`. The user authorized sequential implementat
 - Changed files: src/main/java/com/bookmap/plugin/rong/RongPlugin.java, src/test/java/com/bookmap/plugin/rong/SignalComposerCallbacksTest.java.
 - Verification: Callback and activation suites passed (7 tests): composer works with legacy engine/tradebooks absent, one shared book update, readiness and market-time provenance gating, and no native runtime.
 - Next task: SC-32.
+
+## SC-32 — Reset and tear down composition across attachment lifecycle
+
+- Status: complete.
+- Changed files: src/main/java/com/bookmap/plugin/rong/RongPlugin.java, src/test/java/com/bookmap/plugin/rong/SignalComposerLifecycleTest.java.
+- Verification: Lifecycle, callback, and activation suites passed (10 tests): toggles consume no disabled observations, seek requires fresh readiness and forbids stale legacy-book seeding, close clears context, stop clears attachment, and final detach reloads rules on reattachment.
+- Next task: SC-33.
