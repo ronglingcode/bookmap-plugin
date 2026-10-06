@@ -132,7 +132,7 @@ Specification: implementation plan sections 10 and 11.
 
 - [ ] **SC-43 — Perform the observer-only Bookmap replay smoke test.** Use existing observer-only replay mode and a test symbol; verify actual waiting context, signal marker, explanation, expiry, late confirmation, toggles, and seek/reattach. **Complete when:** observations and limitations are recorded and replay never starts a native broker runtime. If Bookmap/recordings are unavailable, leave this task unchecked and explicitly record manual verification as outstanding; current Cairo captures may omit 3K walls.
 
-- [ ] **SC-44 — Prepare the final implementation handoff.** Review all task statuses against the plan's definition of done. Summarize implemented behavior, changed files, test/build results, release artifact, and any outstanding manual checks in the progress log and final report. **Complete when:** every claim has evidence, incomplete tasks remain visibly incomplete, the shipped template is disabled by default, and advisory outputs remain disconnected from execution. Do not create commits, publish a release, or enable live trading unless separately requested.
+- [x] **SC-44 — Prepare the final implementation handoff.** Review all task statuses against the plan's definition of done. Summarize implemented behavior, changed files, test/build results, release artifact, and any outstanding manual checks in the progress log and final report. **Complete when:** every claim has evidence, incomplete tasks remain visibly incomplete, the shipped template is disabled by default, and advisory outputs remain disconnected from execution. Do not create commits, publish a release, or enable live trading unless separately requested.
 
 ## Progress-entry format
 

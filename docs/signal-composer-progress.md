@@ -5,7 +5,8 @@ Work is confined to `bookmap-plugin`. The user authorized sequential implementat
 ## SC-01 — Establish the code and test baseline
 
 - Status: complete.
-- Baseline HEAD: `fdbbeaa7b76940d01bc386f2fb11417a734c9c1a`.
+- Planning-stage HEAD: `fdbbeaa7b76940d01bc386f2fb11417a734c9c1a`.
+- Actual implementation base (SC-01's parent, verified at final handoff): `be2f03aeb6cee7f22604b39f7dc6f00392b34045`. Six repository commits preceded SC-01 after the earlier planning snapshot; those existing changes are not part of the SignalComposer task commits. Compare this actual base with HEAD to review this implementation alone.
 - Initial working tree: only the two untracked SignalComposer planning documents from this conversation; no pre-existing source modifications.
 - Instructions: workspace AGENTS supplied by the user and plugin README reviewed; no additional repository AGENTS.md found.
 - Existing JDK found: `C:/Users/lingr/.codex/tmp/bmtrader-execution/jdk/jdk-21.0.12.1+1`. JAVA_HOME is set only in each command's process environment; no installation or persistent environment change.
@@ -310,3 +311,10 @@ Work is confined to `bookmap-plugin`. The user authorized sequential implementat
 - Limitation: actual Bookmap OpenGL/layout, waiting context, late evidence, expiry, toggle, and seek/reattach observations have not been performed. Automated raw-callback and fake-canvas tests are recorded separately and do not complete this manual task.
 - Manual handoff: follow docs/signal-composer-replay-smoke.md in existing credential-free observer replay mode; record observations before marking SC-43 complete. No local configuration was enabled and no native broker runtime was started by this task.
 - Next task: SC-44.
+
+## SC-44 — Prepare verified implementation handoff with manual replay outstanding
+
+- Status: complete.
+- Changed files: docs/signal-composer-handoff.md, docs/signal-composer-progress.md.
+- Verification: Reviewed all task statuses, actual SC-01 parent/base, changed paths, disabled template, execution isolation, full build reports (373 unit plus 10 release checks), artifact SHA256, and manual limitation. SC-01–42 complete; SC-43 intentionally unchecked; SC-44 handoff complete. All changes confined to bookmap-plugin; no live enablement/publication.
+- Next task: SC-43 (manual verification outstanding).
