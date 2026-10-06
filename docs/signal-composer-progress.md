@@ -161,3 +161,10 @@ Work is confined to `bookmap-plugin`. The user authorized sequential implementat
 - Changed files: src/main/java/com/bookmap/plugin/rong/patterns/PatternObservationEngine.java, src/main/java/com/bookmap/plugin/rong/patterns/PatternEventNormalizer.java, src/test/java/com/bookmap/plugin/rong/patterns/PatternObservationEngineTest.java.
 - Verification: PatternObservationEngineTest passed (3 callback fixtures): all four types, canonical wall interaction, current size, stable occurrence/revision, absent-wall suppression, and readiness.
 - Next task: SC-23.
+
+## SC-23 — Detect inferred persistent bid withdrawal
+
+- Status: complete.
+- Changed files: src/main/java/com/bookmap/plugin/rong/patterns/BidFailureDetector.java, src/main/java/com/bookmap/plugin/rong/patterns/PatternObservationEngine.java, src/test/java/com/bookmap/plugin/rong/patterns/BidFailureDetectorTest.java.
+- Verification: BidFailureDetectorTest and observer fixtures passed (5 tests), covering measured 3K cancellation and suppression for flash, reload, unknown attribution, consumption, and relocation.
+- Next task: SC-24.

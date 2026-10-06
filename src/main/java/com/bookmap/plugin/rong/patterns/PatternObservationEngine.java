@@ -17,6 +17,7 @@ public final class PatternObservationEngine implements PatternRuntimeContext {
     private final EventTimeTradeAttribution attribution;
     private final EventTimeRelocationTracker relocation;
     private final PatternEventNormalizer normalizer;
+    private final BidFailureDetector bidFailures;
     private final Consumer<PatternEvent> output;
     private final BiConsumer<ResetReason, Long> resets;
     private final Consumer<String> diagnostics;
@@ -34,6 +35,7 @@ public final class PatternObservationEngine implements PatternRuntimeContext {
         walls = new EventTimeWallTracker(clock.epoch(), config);
         attribution = new EventTimeTradeAttribution(config); relocation = new EventTimeRelocationTracker(config);
         normalizer = new PatternEventNormalizer(alias, pips, config);
+        bidFailures = new BidFailureDetector(alias, pips, output);
         definitions.add(new ReappearPatternDefinition(PatternType.BID_REAPPEAR, true));
         definitions.add(new ReappearPatternDefinition(PatternType.OFFER_REAPPEAR, false));
         definitions.add(new StepPatternDefinition(PatternType.BID_STEP_UP, true));
@@ -91,6 +93,7 @@ public final class PatternObservationEngine implements PatternRuntimeContext {
         for (String diagnostic : update.diagnostics) diagnostics.accept(diagnostic);
         for (EventTimeWallTracker.Clear clear : update.clears) {
             PatternEvent.Evidence evidence = attribution.attribute(clear).evidence(clear, relocation.match(clear));
+            bidFailures.onClear(clear, evidence, epoch());
             if (evidence.coverage != PatternEvent.Coverage.USABLE || evidence.attribution != PatternEvent.Attribution.PROBABLE_CONSUMPTION) continue;
             boundDefinitions();
             WallSnapshot wall = new WallSnapshot(clear.phaseId, clear.bid, clear.priceTick, safeInt(clear.previousSize),
