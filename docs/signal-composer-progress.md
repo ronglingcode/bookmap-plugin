@@ -147,3 +147,10 @@ Work is confined to `bookmap-plugin`. The user authorized sequential implementat
 - Changed files: src/main/java/com/bookmap/plugin/rong/patterns/EventTimeTradeAttribution.java, src/test/java/com/bookmap/plugin/rong/patterns/EventTimeTradeAttributionTest.java.
 - Verification: EventTimeTradeAttributionTest passed (3 tests); side, price, lookback, clear interval, long sums, unknown aggressor, warmup, cap gaps, and overflow verified.
 - Next task: SC-21.
+
+## SC-21 — Recognize probable liquidity relocation in event time
+
+- Status: complete.
+- Changed files: src/main/java/com/bookmap/plugin/rong/patterns/EventTimeRelocationTracker.java, src/main/java/com/bookmap/plugin/rong/patterns/EventTimeTradeAttribution.java, src/test/java/com/bookmap/plugin/rong/patterns/EventTimeRelocationTrackerTest.java.
+- Verification: Relocation and trade-attribution suites passed (6 tests), covering side/size/time boundaries, one-to-one pairing, move suppression of withdrawal, and cap gaps.
+- Next task: SC-22.

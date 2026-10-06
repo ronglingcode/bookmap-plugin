@@ -20,8 +20,16 @@ public final class EventTimeTradeAttribution {
             matchingVolume = volume; this.coverage = coverage; this.attribution = attribution;
         }
         public PatternEvent.Evidence evidence(EventTimeWallTracker.Clear clear) {
+            return evidence(clear, EventTimeRelocationTracker.Status.NO_MATCH);
+        }
+        public PatternEvent.Evidence evidence(EventTimeWallTracker.Clear clear, EventTimeRelocationTracker.Status relocation) {
+            PatternEvent.Coverage effectiveCoverage = relocation == EventTimeRelocationTracker.Status.COVERAGE_GAP
+                    ? PatternEvent.Coverage.GAP : coverage;
+            PatternEvent.Attribution effectiveAttribution = relocation == EventTimeRelocationTracker.Status.PROBABLE_MOVE
+                    ? PatternEvent.Attribution.PROBABLE_MOVE : effectiveCoverage == PatternEvent.Coverage.USABLE
+                    ? attribution : PatternEvent.Attribution.UNKNOWN;
             return PatternEvent.Evidence.builder().wall(clear.phaseId, clear.previousSize, clear.remainingSize)
-                    .trades(matchingVolume, !clear.bid).attribution(attribution, coverage).build();
+                    .trades(matchingVolume, !clear.bid).attribution(effectiveAttribution, effectiveCoverage).build();
         }
     }
     private final SignalComposerConfig config;
