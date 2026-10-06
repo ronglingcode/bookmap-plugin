@@ -66,7 +66,7 @@ Specification: implementation plan section 6 and required design cases in sectio
 
 Specification: implementation plan sections 4 and 5. These tasks use callback fixtures, without a running Bookmap or broker.
 
-- [ ] **SC-17 — Implement the observation clock and readiness gate.** Add a small event-time lifecycle helper for callback watermark, timestamp provenance, readiness, New York regular-session/date boundaries, and epochs. **Complete when:** tests cover pre-snapshot disarming, 09:30/16:00 boundaries, new-session clearing, genuine backward callback time requiring fresh readiness, and fallback wall-clock timestamps being unusable. Delayed detector occurrence time must not reset this clock.
+- [x] **SC-17 — Implement the observation clock and readiness gate.** Add a small event-time lifecycle helper for callback watermark, timestamp provenance, readiness, New York regular-session/date boundaries, and epochs. **Complete when:** tests cover pre-snapshot disarming, 09:30/16:00 boundaries, new-session clearing, genuine backward callback time requiring fresh readiness, and fallback wall-clock timestamps being unusable. Delayed detector occurrence time must not reset this clock.
 
 - [ ] **SC-18 — Track independent wall qualification.** Add `patterns/EventTimeWallTracker.java` with absolute depth updates, stable phase IDs, snapshot seeding, active-size lookup, a 3K observation floor, 500 ms qualification, and the wall-phase cap. It must not modify `OrderBookState` or use its legacy percentile gate. **Complete when:** fixtures qualify a 3K persistent wall under a book whose legacy threshold is higher, reject flash walls, and handle seeding and phase-cap diagnostics.
 

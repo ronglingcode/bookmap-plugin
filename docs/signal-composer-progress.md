@@ -119,3 +119,10 @@ Work is confined to `bookmap-plugin`. The user authorized sequential implementat
 - Changed files: src/main/java/com/bookmap/plugin/rong/signal/SignalComposer.java, src/test/java/com/bookmap/plugin/rong/signal/SignalComposerTest.java.
 - Verification: SignalComposerTest passed (19 tests); offer-only waiting contexts, both directions, local price, inclusive expiry, and reset verified.
 - Next task: SC-17.
+
+## SC-17 — Gate observations with market time and readiness
+
+- Status: complete.
+- Changed files: src/main/java/com/bookmap/plugin/rong/patterns/ObservationClock.java, src/test/java/com/bookmap/plugin/rong/patterns/ObservationClockTest.java.
+- Verification: ObservationClockTest passed (3 tests), covering snapshot, NY session boundaries, backwards callback, fallback provenance, and date changes.
+- Next task: SC-18.
