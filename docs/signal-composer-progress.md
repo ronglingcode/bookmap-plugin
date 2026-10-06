@@ -70,3 +70,10 @@ Work is confined to `bookmap-plugin`. The user authorized sequential implementat
 - Changed files: src/main/java/com/bookmap/plugin/rong/signal/ConfirmationMatcher.java, src/test/java/com/bookmap/plugin/rong/signal/ConfirmationMatcherTest.java.
 - Verification: ConfirmationMatcherTest passed (4 tests), covering both directions, time and price boundaries, unknown coverage and stale/future evidence.
 - Next task: SC-10.
+
+## SC-10 — classify strongest confirmation and apply contextual size policy
+
+- Status: complete.
+- Changed files: src/main/java/com/bookmap/plugin/rong/signal/ConfirmationStrengthClassifier.java, src/main/java/com/bookmap/plugin/rong/signal/TriggerRequirementPolicy.java, src/test/java/com/bookmap/plugin/rong/signal/ConfirmationStrengthClassifierTest.java.
+- Verification: ConfirmationStrengthClassifierTest passed (4 tests), including exact boundaries, deterministic ties and long-range arithmetic without summation.
+- Next task: SC-11.
