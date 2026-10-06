@@ -14,3 +14,10 @@ Work is confined to `bookmap-plugin`. The user authorized sequential implementat
 - Changed files: implementation plan, task checklist, and this progress log. The planning documents are included in this baseline commit.
 - Limitations: full build/release and manual Bookmap checks are reserved for their listed tasks. No broker calls or live settings changes.
 - Next task: SC-02.
+
+## SC-02 — define immutable normalized pattern observations
+
+- Status: complete.
+- Changed files: src/main/java/com/bookmap/plugin/rong/patterns/PatternEvent.java, src/main/java/com/bookmap/plugin/rong/patterns/PatternEventType.java, src/main/java/com/bookmap/plugin/rong/patterns/PatternSide.java, src/main/java/com/bookmap/plugin/rong/patterns/PatternMeaning.java, src/test/java/com/bookmap/plugin/rong/patterns/PatternEventTest.java.
+- Verification: PatternEventTest passed (4 tests); production and test compilation passed.
+- Next task: SC-03.
