@@ -88,7 +88,7 @@ Specification: implementation plan sections 4 and 5. These tasks use callback fi
 
 - [x] **SC-27 — Detect bullish offer breakout.** Extend `OfferInteractionDetector` with attributed offer consumption followed by an above-level trade inside the configured window. **Complete when:** fixtures emit OFFER_BULLISH_CONFIRMATION with the actual removed-size basis, while a generic offer pull, consumption without breakout, unknown attribution, or expired print does not become bullish evidence.
 
-- [ ] **SC-28 — Verify the callback-to-composition pipeline.** Connect normalized observer output to the completed composer using a deterministic fixture harness. Exercise depth, trades, BBO, and timestamps together. **Complete when:** raw callback sequences prove 60K growth/rejection + 3K withdrawal produces one explained SHORT, a qualifying bid hold + offer breakout produces LONG, and replay timing cannot change decisions. Include the legacy-high-threshold/3K case and no-trigger case; synthetic `PatternEvent` tests alone do not satisfy this task.
+- [x] **SC-28 — Verify the callback-to-composition pipeline.** Connect normalized observer output to the completed composer using a deterministic fixture harness. Exercise depth, trades, BBO, and timestamps together. **Complete when:** raw callback sequences prove 60K growth/rejection + 3K withdrawal produces one explained SHORT, a qualifying bid hold + offer breakout produces LONG, and replay timing cannot change decisions. Include the legacy-high-threshold/3K case and no-trigger case; synthetic `PatternEvent` tests alone do not satisfy this task.
 
 ## E. Plugin wiring and settings
 

@@ -196,3 +196,10 @@ Work is confined to `bookmap-plugin`. The user authorized sequential implementat
 - Changed files: src/main/java/com/bookmap/plugin/rong/patterns/OfferInteractionDetector.java, src/main/java/com/bookmap/plugin/rong/patterns/PatternObservationEngine.java, src/test/java/com/bookmap/plugin/rong/patterns/OfferInteractionDetectorTest.java.
 - Verification: Offer, observer, and bid-failure fixtures passed (14 tests); actual above-print, measured removed size, decision-interval print, pull/unknown/expired/wrong-direction suppression verified.
 - Next task: SC-28.
+
+## SC-28 — Verify the raw callback-to-composition pipeline
+
+- Status: complete.
+- Changed files: src/main/java/com/bookmap/plugin/rong/signal/SignalCompositionPipeline.java, src/test/java/com/bookmap/plugin/rong/patterns/SignalCompositionPipelineTest.java.
+- Verification: SignalCompositionPipelineTest passed (3 integrated fixtures): 60K growth/rejection plus 3K withdrawal SHORT under a higher legacy book threshold, bid hold plus consumed-offer breakout LONG, replay receipt-time independence, fallback suppression, and seek clearing.
+- Next task: SC-29.
