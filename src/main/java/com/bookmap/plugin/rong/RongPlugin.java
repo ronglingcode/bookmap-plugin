@@ -70,6 +70,8 @@ public class RongPlugin implements CustomModuleAdapter,
     private static final byte[] WALL_CHANGE_SOUND = OrderWallChangeSound.createAlertSound();
     private static final Color VWAP_COLOR = new Color(171, 71, 188);
     private static final Color VWAP_HIDDEN_COLOR = new Color(171, 71, 188, 0);
+    private static final Color BOOK_AVERAGE_COLOR = new Color(0, 229, 255);
+    private static final Color BOOK_AVERAGE_HIDDEN_COLOR = new Color(0, 229, 255, 0);
 
     // Shared WebSocket server across all symbol instances
     private static SignalWebSocketServer sharedServer;
@@ -119,6 +121,10 @@ public class RongPlugin implements CustomModuleAdapter,
     private VwapTracker vwapTracker;
     private SignalWebSocketServer.VwapUpdateListener vwapUpdateListener;
     private IndicatorModifiable vwapIndicator;
+    private IndicatorModifiable bookAverageIndicator;
+    private long lastBookAverageAuditNs;
+    private boolean bookAverageAuditLogged;
+    private double lastBookAveragePoint = Double.NaN;
 
     @Override
     public void initialize(String alias, InstrumentInfo info, Api api, InitialState initialState) {
@@ -191,6 +197,10 @@ public class RongPlugin implements CustomModuleAdapter,
         this.vwapIndicator = api.registerIndicatorModifiable("VWAP", GraphType.PRIMARY);
         this.vwapIndicator.setWidth(2);
         updateVwapIndicatorVisibility();
+        this.bookAverageIndicator = api.registerIndicatorModifiable(
+                "Order Book Weighted Average", GraphType.PRIMARY, Double.NaN);
+        this.bookAverageIndicator.setWidth(2);
+        updateBookAverageIndicatorVisibility();
         this.wallLabelTracker = new OrderWallLabelTracker(
                 cleanAlias, info.pips, wallLabelStore, this::getEffectiveWallThreshold,
                 WALL_LABEL_RETAIN_TICKS,
@@ -350,6 +360,9 @@ public class RongPlugin implements CustomModuleAdapter,
         vwapUpdateListener = null;
         vwapTracker = null;
         vwapIndicator = null;
+        bookAverageIndicator = null;
+        bookAverageAuditLogged = false;
+        lastBookAveragePoint = Double.NaN;
         if (chartHoverHotkeyHandler != null) {
             chartHoverHotkeyHandler.unregisterSymbol(alias);
         }
@@ -546,6 +559,7 @@ public class RongPlugin implements CustomModuleAdapter,
             wallChangeTracker.onDepth(isBid, price, size, getEventTimeNs());
         }
         orderBook.update(isBid, price, size);
+        plotBookAverage();
         if (evidenceRecorder != null) evidenceRecorder.depth(isBid, price, size, getEventTimeNs(), lastTimestampNs <= 0);
         if (shouldRunPatternAutomation()) {
             patternEngine.onDepth(isBid, price, size, getEventTimeNs());
@@ -610,6 +624,7 @@ public class RongPlugin implements CustomModuleAdapter,
     public void onSnapshotEnd() {
         if (!initialized) return;
         patternSnapshotComplete = true;
+        plotBookAverage();
         if (evidenceRecorder != null) evidenceRecorder.readiness(true, getEventTimeNs());
         if (sharedServer != null && observationConfig.enabled) sharedServer.observationReady(alias, true);
         if (wallChangeTracker != null) {
@@ -624,6 +639,7 @@ public class RongPlugin implements CustomModuleAdapter,
     public void onRealtimeStart() {
         if (!initialized) return;
         patternSnapshotComplete = true;
+        plotBookAverage();
         if (evidenceRecorder != null) evidenceRecorder.readiness(true, getEventTimeNs());
         // This callback alone does not prove a live provider (replay can catch up).
         if (sharedServer != null && observationConfig.enabled) sharedServer.observationReady(alias, true);
@@ -658,6 +674,11 @@ public class RongPlugin implements CustomModuleAdapter,
     @Override
     public void onIndicatorConfigChanged(String indicatorKey, boolean enabled) {
         if (!initialized) return;
+        if (IndicatorConfig.ORDER_BOOK_WEIGHTED_AVERAGE.equals(indicatorKey)) {
+            updateBookAverageIndicatorVisibility();
+            // Plotting stays on Bookmap's data callback thread.
+            return;
+        }
         if (IndicatorConfig.VWAP.equals(indicatorKey)) {
             updateVwapIndicatorVisibility();
             if (enabled && vwapTracker != null) {
@@ -756,9 +777,14 @@ public class RongPlugin implements CustomModuleAdapter,
                 || !indicatorConfig.isEnabled(IndicatorConfig.VWAP)) {
             return;
         }
-        double priceLevel = BookmapPriceNormalizer.toBookmapPriceLevel(
-                point.getValue(), instrumentInfo.pips);
-        vwapIndicator.addPoint(point.getTimestampNs(), priceLevel);
+        addPrimaryPricePoint(vwapIndicator, point.getTimestampNs(), point.getValue());
+    }
+
+    /** Both price lines use the same real-price conversion and timestamped plotting API. */
+    private void addPrimaryPricePoint(IndicatorModifiable indicator, long timestampNs, double realPrice) {
+        double priceLevel = Double.isNaN(realPrice) ? Double.NaN
+                : BookmapPriceNormalizer.toBookmapPriceLevel(realPrice, instrumentInfo.pips);
+        indicator.addPoint(timestampNs, priceLevel);
     }
 
     private double getVwapTick() {
@@ -780,6 +806,62 @@ public class RongPlugin implements CustomModuleAdapter,
         vwapIndicator.setColor(indicatorConfig.isEnabled(IndicatorConfig.VWAP)
                 ? VWAP_COLOR
                 : VWAP_HIDDEN_COLOR);
+    }
+
+    private void plotBookAverage() {
+        if (bookAverageIndicator == null || orderBook == null || instrumentInfo == null || !patternSnapshotComplete
+                || indicatorConfig == null
+                || !indicatorConfig.isEnabled(IndicatorConfig.ORDER_BOOK_WEIGHTED_AVERAGE)) {
+            return;
+        }
+        // Depth prices are ticks. Convert the average to a real price before using
+        // the same real-price-to-chart conversion as VWAP (no extra pips scaling).
+        double reference = orderBook.getWeightedAverageReferencePriceLevel();
+        double minimum = reference * 0.01;
+        double maximum = reference * 10.0;
+        double value = orderBook.getWeightedAveragePriceLevel(minimum, maximum);
+        addPrimaryPricePoint(bookAverageIndicator, getEventTimeNs(), value * instrumentInfo.pips);
+        auditBookAverageIfNeeded(value, minimum, maximum);
+        lastBookAveragePoint = value;
+    }
+
+    private void auditBookAverageIfNeeded(double plottedLevel, double minimum, double maximum) {
+        if (instrumentInfo == null) return;
+        long time = getEventTimeNs();
+        long elapsed = time - lastBookAverageAuditNs;
+        boolean jump = Double.isFinite(plottedLevel) && Double.isFinite(lastBookAveragePoint)
+                && Math.abs(plottedLevel - lastBookAveragePoint) > Math.abs(lastBookAveragePoint) * 0.05;
+        if (bookAverageAuditLogged && elapsed >= 0 && elapsed < 30_000_000_000L
+                && !(jump && elapsed >= 1_000_000_000L)) return;
+        OrderBookState.WeightedAverageAudit audit = orderBook.auditWeightedAverage(minimum, maximum);
+        double pips = instrumentInfo.pips;
+        StringBuilder details = new StringBuilder("eventTimeNs=").append(time)
+                .append(" pips=").append(pips)
+                .append(" plottedTicks=").append(plottedLevel)
+                .append(" plottedPrice=").append(plottedLevel * pips)
+                .append(" recomputedPrice=").append(audit.average * pips)
+                .append(" filterPriceRange=").append(minimum * pips).append("..").append(maximum * pips)
+                .append(" excludedQuantity=").append(audit.excludedQuantity)
+                .append(" bidQuantity=").append(audit.bidQuantity)
+                .append(" askQuantity=").append(audit.askQuantity)
+                .append(" bookPriceRange=").append(audit.minPrice * pips)
+                .append("..").append(audit.maxPrice * pips)
+                .append(" largestPriceQuantityContributions=[");
+        for (OrderBookState.AuditLevel level : audit.largestContributions) {
+            details.append(level.bid ? "bid " : "ask ").append(level.price * pips)
+                    .append(" x ").append(level.size).append("; ");
+        }
+        details.append(']');
+        PluginLog.detail(alias, "OrderBookWeightedAverage", details.toString());
+        lastBookAverageAuditNs = time;
+        bookAverageAuditLogged = true;
+    }
+
+    private void updateBookAverageIndicatorVisibility() {
+        if (bookAverageIndicator != null && indicatorConfig != null) {
+            bookAverageIndicator.setColor(indicatorConfig.isEnabled(IndicatorConfig.ORDER_BOOK_WEIGHTED_AVERAGE)
+                    ? BOOK_AVERAGE_COLOR : BOOK_AVERAGE_HIDDEN_COLOR);
+        }
     }
 
     private void handlePatternSignal(BookmapPatternSignal signal) {

@@ -72,6 +72,16 @@ public class IndicatorSettingsPanel extends StrategyPanel {
         add(vwapCheckbox, gbc);
 
         gbc.gridy++;
+        JCheckBox bookAverageCheckbox = new JCheckBox(
+                "Order Book Weighted Average (bids + asks, price filter)",
+                config.isEnabled(IndicatorConfig.ORDER_BOOK_WEIGHTED_AVERAGE));
+        bookAverageCheckbox.setToolTipText(
+                "Electric cyan: quantity-weighted bids and asks priced from 1% to 10× the current midpoint");
+        bookAverageCheckbox.addActionListener(e -> config.setEnabled(
+                IndicatorConfig.ORDER_BOOK_WEIGHTED_AVERAGE, bookAverageCheckbox.isSelected()));
+        add(bookAverageCheckbox, gbc);
+
+        gbc.gridy++;
         JCheckBox wallLabelsCheckbox = new JCheckBox(
                 "Order Wall Size Labels",
                 config.isEnabled(IndicatorConfig.ORDER_WALL_SIZE_LABELS));

@@ -28,6 +28,25 @@ profiles and the existing single-stock watchlist policy.
 
 ## Features
 
+- **Order Book Weighted Average**: an electric cyan (`#00E5FF`) line on the price
+  chart, enabled by default. Computes `sum(price * resting quantity) / sum(resting quantity)`
+  across received bid and ask levels priced between **1% and 10× the current
+  bid/ask midpoint**, inclusive. A one-sided book uses its available positive best
+  quote; without a positive quote, the indicator produces a gap. Updates on depth
+  changes after the initial snapshot; cancellations remove their weight and an
+  empty book produces a gap. Toggle it in **Indicators**. Includes feed-supplied
+  depth within that price range, independent of wall thresholds or the visible
+  chart range; hidden liquidity
+  and levels unavailable from the feed are not included. This is a current resting
+  liquidity average, distinct from executed-trade VWAP.
+  The line uses the same timestamped primary-chart API and real-price conversion
+  helper as VWAP, with each depth event's timestamp.
+  File-only `OrderBookWeightedAverage` diagnostics periodically record the plotted
+  price, an independent full-book recomputation, bid/ask quantities, the book's
+  price range, filter bounds, excluded quantity and the five largest included
+  price-times-quantity contributors. These allow
+  an unexpected chart value to be checked against the actual received book.
+
 - Native wall-reversal market/breakout entries, same-direction adds, pending-entry
   replacements, opposite-position entries, partial reload and Swap.
 - Cancel, flatten, partial exits, stop/target adjustments and Q/P workflows.
