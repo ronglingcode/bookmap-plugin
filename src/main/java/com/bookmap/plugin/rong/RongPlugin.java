@@ -3,6 +3,7 @@ package com.bookmap.plugin.rong;
 import java.awt.Color;
 import java.time.Duration;
 import com.bookmap.plugin.rong.signal.SignalComposerConfig;
+import com.bookmap.plugin.rong.signal.SignalComposerInspection;
 import com.bookmap.plugin.rong.signal.SignalCompositionPipeline;
 import com.bookmap.plugin.rong.signal.TradingSignalStore;
 import com.bookmap.plugin.rong.signal.ResetReason;
@@ -334,7 +335,7 @@ public class RongPlugin implements CustomModuleAdapter,
         if (!observationConfig.observerOnly) {
             tradeButtonWindow = new TradeButtonWindow(
                     cleanAlias, sharedServer, wallThresholdConfig::getThresholdFloor, nativeConnectionStatus,
-                    this::signalComposerInspectionText);
+                    this::signalComposerInspection);
         }
     }
 
@@ -345,6 +346,19 @@ public class RongPlugin implements CustomModuleAdapter,
                 return expectedAlias != null && expectedAlias.equals(candidateAlias);
             }
         };
+    }
+
+    SignalComposerInspection signalComposerInspection() {
+        synchronized (compositionLock) {
+            String diagnostics = signalComposerInspectionText();
+            if (compositionRules == null || !compositionRules.valid || !compositionRules.eligible(alias) || signalComposition == null) {
+                return new SignalComposerInspection(
+                        diagnostics.substring(diagnostics.indexOf('\n') + 1), diagnostics, java.util.List.of());
+            }
+            SignalComposerInspection snapshot = signalComposition.inspection();
+            return new SignalComposerInspection(
+                    signalCompositionEnabled ? snapshot.notice : "Disabled", diagnostics, snapshot.sections);
+        }
     }
 
     String signalComposerInspectionText() {

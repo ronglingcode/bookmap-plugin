@@ -241,7 +241,7 @@ public final class SignalComposerConfig {
         boolean enabled = true;
         Set<String> symbols = new LinkedHashSet<>();
         long normalTriggerSize = 5000, minimumTriggerSize = 3000, normalConfirmationSize = 5000;
-        long beforeWindowMs = 30000, afterWindowMs = 30000;
+        long beforeWindowMs = HISTORY_RETENTION_MS, afterWindowMs = HISTORY_RETENTION_MS;
         int maxPriceDistanceTicks = 20, directionalPriceToleranceTicks = 2, maxTriggerDriftTicks = 20;
         int maxEvents = 2048, maxCandidates = 64, maxWallPhases = 4096, maxAttributionTrades = 8192;
         StrengthMultiples strengthMultiples = new StrengthMultiples(1, 2, 5, 10);

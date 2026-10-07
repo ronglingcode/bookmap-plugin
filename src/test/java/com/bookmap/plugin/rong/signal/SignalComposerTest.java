@@ -7,6 +7,16 @@ import com.bookmap.plugin.rong.patterns.*;
 import com.google.gson.JsonParser;
 
 class SignalComposerTest {
+    @Test void fourMinuteOldBidAndOfferEvidenceCanStillComposeSignals() {
+        long start = 1_000_000_000L, later = start + 240_000_000_000L;
+        SignalComposer bidFirst = composer();
+        bidFirst.onPatternEvent(event(PatternEventType.BIDS_CANCELLED, 3000, 5105, start, "bid"));
+        assertEquals(1, bidFirst.onPatternEvent(event(PatternEventType.OFFER_REJECTION, 60000, 5120, later, "offer")).signals.size());
+        SignalComposer offerFirst = composer();
+        offerFirst.onPatternEvent(event(PatternEventType.OFFER_BREAKOUT, 60000, 5120, start, "offer"));
+        assertEquals(1, offerFirst.onPatternEvent(event(PatternEventType.BID_STEP_UP, 3000, 5105, later, "bid")).signals.size());
+    }
+
     @Test void initiallyDistantTriggerCannotValidateBeforeDriftInvalidation() {
         SignalComposer c = composer(); c.onMarketPrice(5100, 5101, 0);
         assertTrue(c.onPatternEvent(event(PatternEventType.BID_STEP_UP, 6000, 5079, 100, "far")).signals.isEmpty());
@@ -29,8 +39,8 @@ class SignalComposerTest {
     }
     @Test void contextExpiresOnMarketTimeAndResetAndRequiresLocalPrice() {
         SignalComposer c = composer(); c.onPatternEvent(event(PatternEventType.OFFER_REJECTION, 60000, 5120, 100, "o"));
-        assertEquals(1, c.onMarketTime(30_000_000_100L).contexts.size());
-        assertTrue(c.onMarketTime(30_000_000_101L).contexts.isEmpty());
+        assertEquals(1, c.onMarketTime(300_000_000_100L).contexts.size());
+        assertTrue(c.onMarketTime(300_000_000_101L).contexts.isEmpty());
         c = composer(); c.onPatternEvent(event(PatternEventType.OFFER_REJECTION, 60000, 5120, 100, "o"));
         assertEquals(1, c.onMarketPrice(5100, 5101, 0).contexts.size());
         assertTrue(c.onMarketPrice(5099, 5100, 0).contexts.isEmpty());
@@ -38,10 +48,10 @@ class SignalComposerTest {
     }
     @Test void timestampUpdatesExpireWithoutNewPatternAndKeepInclusiveBoundary() {
         SignalComposer c = composer(); c.onPatternEvent(event(PatternEventType.BIDS_CANCELLED, 3000, 5105, 100, "b"));
-        assertTrue(c.onMarketTime(30_000_000_100L).transitions.isEmpty());
-        CompositionUpdate expired = c.onMarketTime(30_000_000_101L);
+        assertTrue(c.onMarketTime(300_000_000_100L).transitions.isEmpty());
+        CompositionUpdate expired = c.onMarketTime(300_000_000_101L);
         assertEquals(SignalState.EXPIRED, expired.transitions.get(0).current);
-        assertTrue(c.onPatternEvent(event(PatternEventType.OFFER_REJECTION, 60000, 5120, 30_000_000_200L, "o")).signals.isEmpty());
+        assertTrue(c.onPatternEvent(event(PatternEventType.OFFER_REJECTION, 60000, 5120, 300_000_000_200L, "o")).signals.isEmpty());
     }
     @Test void opposingBidInvalidationKeepsHistoricalSignalUnchanged() {
         SignalComposer c = composer();
@@ -127,7 +137,7 @@ class SignalComposerTest {
     @Test void insufficientOrTooLateConfirmationCannotPromote() {
         SignalComposer c = composer(); c.onPatternEvent(event(PatternEventType.BIDS_CANCELLED, 3000, 5105, 100, "b"));
         assertTrue(c.onPatternEvent(event(PatternEventType.OFFER_REJECTION, 7000, 5120, 200, "o1")).signals.isEmpty());
-        assertTrue(c.onPatternEvent(event(PatternEventType.OFFER_REJECTION, 60000, 5120, 30_000_000_101L, "o2")).signals.isEmpty());
+        assertTrue(c.onPatternEvent(event(PatternEventType.OFFER_REJECTION, 60000, 5120, 300_000_000_101L, "o2")).signals.isEmpty());
     }
     private SignalComposer composer() { return new SignalComposer("TEST", 1, SignalComposerConfig.defaults(), () -> 1000); }
     @Test void normalBidHoldAndFailureNeedNoConfirmation() {

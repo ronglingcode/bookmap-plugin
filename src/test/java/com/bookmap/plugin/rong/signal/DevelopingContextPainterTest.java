@@ -25,7 +25,7 @@ class DevelopingContextPainterTest {
             painter.refreshNow(); assertTrue(canvas.markers().isEmpty()); assertEquals(1, canvas.shapes.size());
             assertEquals(CompositeCoordinateBase.PIXEL_ZERO, canvas.shapes.get(0).getX1().compose().base);
             receipt.set(1_000_000); painter.refreshNow(); assertEquals(initial, TradingSignalPainter.contextLines(store.snapshot("TEST")));
-            store.publish("TEST", 1, c.onMarketTime(30_000_000_101L)); painter.refreshNow(); assertTrue(canvas.shapes.isEmpty());
+            store.publish("TEST", 1, c.onMarketTime(300_000_000_101L)); painter.refreshNow(); assertTrue(canvas.shapes.isEmpty());
             store.clear("TEST", 2); painter.refreshNow(); assertTrue(canvas.shapes.isEmpty());
         } finally { painter.shutdown(); }
     }

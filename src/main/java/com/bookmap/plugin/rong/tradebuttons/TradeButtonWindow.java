@@ -27,6 +27,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.IntSupplier;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
+import com.bookmap.plugin.rong.signal.SignalComposerInspection;
 
 import javax.swing.BorderFactory;
 import javax.swing.BoxLayout;
@@ -101,7 +102,7 @@ public class TradeButtonWindow {
     private JLabel massiveHistoryStatusLabel;
     private JLabel massiveStreamStatusLabel;
     private Timer wallThresholdTimer;
-    private final Supplier<String> composerInspectionSupplier;
+    private final Supplier<SignalComposerInspection> composerInspectionSupplier;
     private SignalComposerStatePanel composerInspectionPanel;
     private volatile CorePlanConfigDefinition corePlanConfig;
     private JDialog corePlanDialog;
@@ -128,7 +129,7 @@ public class TradeButtonWindow {
     public TradeButtonWindow(String symbol, SignalWebSocketServer server,
                              IntSupplier wallThresholdFloorSupplier,
                              NativeConnectionStatus connectionStatus,
-                             Supplier<String> composerInspectionSupplier) {
+                             Supplier<SignalComposerInspection> composerInspectionSupplier) {
         this.symbol = symbol;
         this.composerInspectionSupplier = composerInspectionSupplier;
         this.server = server;

@@ -193,6 +193,60 @@ public final class SignalComposer {
         }
         return List.copyOf(lines);
     }
+    public List<SignalComposerInspection.Section> inspectionSections() {
+        List<PatternEvent> events = new ArrayList<>(history.snapshot());
+        Collections.reverse(events);
+        CompositionUpdate current = update(List.of(), List.of(), List.of());
+        List<SignalComposerInspection.Section> sections = new ArrayList<>();
+        for (Direction direction : Direction.values()) {
+            List<SignalComposerInspection.Event> bids = new ArrayList<>(), offers = new ArrayList<>();
+            for (PatternEvent event : events) {
+                boolean bid = event.meaning == PatternMeaning.BID_HOLD || event.meaning == PatternMeaning.BID_FAIL;
+                boolean offer = event.meaning == PatternMeaning.OFFER_BULLISH_CONFIRMATION
+                        || event.meaning == PatternMeaning.OFFER_BEARISH_CONFIRMATION;
+                if (!bid && !offer) continue;
+                Direction eventDirection = event.meaning == PatternMeaning.BID_HOLD
+                        || event.meaning == PatternMeaning.OFFER_BULLISH_CONFIRMATION ? Direction.LONG : Direction.SHORT;
+                if (eventDirection != direction) continue;
+                List<SignalComposerInspection.Event> group = bid ? bids : offers;
+                if (group.size() == 2) continue;
+                long expiry = event.eventTimeNs + (bid ? config.afterWindowMs : config.beforeWindowMs) * 1_000_000L;
+                String status = "";
+                if (nowNs > expiry) status = "Expired";
+                else if (marketPriceTick > 0 && (bid
+                        ? Math.abs((long)event.priceTick - marketPriceTick) > config.maxTriggerDriftTicks
+                        : Math.abs((long)event.priceTick - marketPriceTick) > config.maxPriceDistanceTicks
+                            || (long)event.priceTick - marketPriceTick < -config.directionalPriceToleranceTicks)) {
+                    status = "Out of range";
+                }
+                for (SignalCandidate candidate : candidates.values()) {
+                    if (bid && candidate.supportingBids.stream().anyMatch(e -> e.id.equals(event.id))) {
+                        if (candidate.state == SignalState.INVALID) status = "Invalid";
+                        else if (candidate.state == SignalState.EXPIRED) status = "Expired";
+                        else if (status.isEmpty()) status = candidate.state == SignalState.VALID ? "Validated" : "Awaiting confirmation";
+                        break;
+                    }
+                }
+                if (bid && status.isEmpty() && event.size < config.minimumTriggerSize) status = "Below minimum bid size";
+                group.add(new SignalComposerInspection.Event(event, status));
+            }
+            List<String> requirements = new ArrayList<>();
+            DevelopingContext context = current.contexts.get(direction);
+            if (context != null) requirements.add("Waiting for " + (direction == Direction.LONG ? "bid hold" : "bid failure")
+                    + " ≥ " + context.requiredTriggerSize + " lots · " + remainingSeconds(context.expiresAtNs) + "s market time left");
+            for (SignalCandidate candidate : candidates.values()) {
+                if (candidate.direction != direction || !active(candidate)) continue;
+                ConfirmationStrengthClassifier.Selection selection = classifier.select(matcher.find(candidate.trigger, events, nowNs));
+                requirements.add((candidate.state == SignalState.VALID ? "Validated" : "Awaiting confirmation")
+                        + " @ " + SignalExplanationBuilder.price(candidate.trigger.price)
+                        + " · " + remainingSeconds(candidate.expiresAtNs) + "s market time left"
+                        + (candidate.signal == null ? " · bid required ≥ " + policy.requiredSize(selection.strength) + " lots" : ""));
+            }
+            sections.add(new SignalComposerInspection.Section(direction, requirements, bids, offers));
+        }
+        return List.copyOf(sections);
+    }
+
     private String remainingSeconds(long expiry) {
         return java.math.BigDecimal.valueOf(Math.max(0, expiry - nowNs)).scaleByPowerOfTen(-9)
                 .setScale(1, java.math.RoundingMode.CEILING).toPlainString();

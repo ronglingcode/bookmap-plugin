@@ -18,7 +18,7 @@ class TradingSignalStoreTest {
         assertEquals(2, store.snapshot("TEST").signals.get(0).revision);
         receipt.set(31000); TradingSignalStore.Snapshot expired = store.snapshot("TEST");
         assertTrue(expired.signals.isEmpty()); assertEquals(1, expired.contexts.size()); assertEquals(200, expired.marketTimeNs);
-        store.publish("TEST", 1, c.onMarketTime(30_000_000_201L)); assertTrue(store.snapshot("TEST").contexts.isEmpty());
+        store.publish("TEST", 1, c.onMarketTime(300_000_000_201L)); assertTrue(store.snapshot("TEST").contexts.isEmpty());
         store.publish("TEST", 1, initial); assertTrue(store.snapshot("TEST").signals.isEmpty());
     }
     @Test void capEpochAliasAndListenersAreIndependent() {

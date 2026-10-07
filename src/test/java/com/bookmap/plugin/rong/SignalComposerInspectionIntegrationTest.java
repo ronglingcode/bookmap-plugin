@@ -19,9 +19,13 @@ class SignalComposerInspectionIntegrationTest {
             eligible.initializeSignalComposition(.01); excluded.initializeSignalComposition(.01);
             assertTrue(eligible.signalComposerInspectionText().contains("Enabled"));
             assertTrue(eligible.signalComposerInspectionText().contains("Waiting for snapshot"));
+            assertEquals("Waiting for snapshot / realtime readiness", eligible.signalComposerInspection().notice);
+            assertEquals(2, eligible.signalComposerInspection().sections.size());
             assertTrue(excluded.signalComposerInspectionText().contains("Excluded by configured symbol filter"));
+            assertEquals("Excluded by configured symbol filter", excluded.signalComposerInspection().notice);
             eligible.onIndicatorConfigChanged(IndicatorConfig.SIGNAL_COMPOSER, false);
             assertTrue(eligible.signalComposerInspectionText().contains("Disabled"));
+            assertEquals("Disabled", eligible.signalComposerInspection().notice);
             assertTrue(eligible.signalComposerInspectionText().contains("Last reset: DISABLED"));
         });
         withIsolatedActivation(() -> {

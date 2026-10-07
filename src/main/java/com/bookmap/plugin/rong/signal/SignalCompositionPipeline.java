@@ -59,6 +59,9 @@ public final class SignalCompositionPipeline {
     public void reset(ResetReason reason) { observer.reset(reason); }
     public long epoch() { return observer.epoch(); }
     public boolean usable() { return observer.usable(); }
+    public SignalComposerInspection inspection() {
+        return new SignalComposerInspection(observer.usable() ? "" : observer.status(), inspectionText(), composer.inspectionSections());
+    }
     /** Polling this snapshot does not expire candidates or advance market time. */
     public String inspectionText() {
         String time = observer.nowNs() <= 0 ? "Unavailable" : java.time.Instant.ofEpochSecond(
