@@ -528,13 +528,13 @@ public class TradeButtonWindow {
     }
 
     private JPanel createModePanel() {
-        JPanel modePanel = new JPanel(new GridLayout(0, 1, 0, 4));
+        JPanel modePanel = new JPanel(new BorderLayout(0, 4));
         modePanel.setBorder(BorderFactory.createEmptyBorder(0, 0, 8, 0));
         shiftModeLabel = new JLabel("", SwingConstants.CENTER);
         shiftModeLabel.setOpaque(true);
         shiftModeLabel.setForeground(MODE_TEXT_COLOR);
-        shiftModeLabel.setFont(shiftModeLabel.getFont().deriveFont(Font.BOLD));
-        shiftModeLabel.setBorder(BorderFactory.createEmptyBorder(5, 8, 5, 8));
+        shiftModeLabel.setFont(shiftModeLabel.getFont().deriveFont(Font.BOLD, 11f));
+        shiftModeLabel.setBorder(BorderFactory.createEmptyBorder(2, 4, 2, 4));
         updateModeLabel(shiftPressed);
 
         wallThresholdLabel = new JLabel("", SwingConstants.CENTER);
@@ -545,18 +545,18 @@ public class TradeButtonWindow {
         wallThresholdLabel.setBorder(BorderFactory.createEmptyBorder(4, 8, 4, 8));
         updateWallThresholdLabel();
 
-        JPanel connectionPanel = new JPanel(new GridLayout(1, 3, 4, 0));
+        JPanel connectionPanel = new JPanel(new GridLayout(1, 4, 4, 0));
         schwabStatusLabel = createConnectionLabel();
         massiveHistoryStatusLabel = createConnectionLabel();
         massiveStreamStatusLabel = createConnectionLabel();
         connectionPanel.add(schwabStatusLabel);
         connectionPanel.add(massiveHistoryStatusLabel);
         connectionPanel.add(massiveStreamStatusLabel);
+        connectionPanel.add(shiftModeLabel);
         setConnectionStatus(connectionStatus.snapshot());
 
-        modePanel.add(connectionPanel);
-        modePanel.add(shiftModeLabel);
-        modePanel.add(wallThresholdLabel);
+        modePanel.add(connectionPanel, BorderLayout.NORTH);
+        modePanel.add(wallThresholdLabel, BorderLayout.CENTER);
         attachShiftMouseRefresh(modePanel);
         attachShiftMouseRefresh(shiftModeLabel);
         attachShiftMouseRefresh(wallThresholdLabel);
@@ -576,12 +576,14 @@ public class TradeButtonWindow {
         JLabel label = new JLabel("", SwingConstants.CENTER);
         label.setOpaque(true); label.setForeground(Color.WHITE);
         label.setFont(label.getFont().deriveFont(Font.BOLD, 11f));
-        label.setBorder(BorderFactory.createEmptyBorder(4, 4, 4, 4));
+        label.setBorder(BorderFactory.createEmptyBorder(2, 4, 2, 4));
         return label;
     }
 
     private void updateConnectionLabel(JLabel label, String name, String value, boolean healthy) {
-        label.setText(name + ": " + value);
+        label.setText(name);
+        label.setToolTipText(name + ": " + value);
+        label.getAccessibleContext().setAccessibleDescription(name + ": " + value);
         label.setBackground(healthy ? MODE_BREAKOUT_BACKGROUND : SHORT_TRADEBOOK_BUTTON_COLOR);
     }
 
@@ -788,9 +790,12 @@ public class TradeButtonWindow {
         if (shiftModeLabel == null) {
             return;
         }
-        shiftModeLabel.setText(marketMode
+        shiftModeLabel.setText("[" + symbol + "] " + (marketMode ? "MKT" : "Break"));
+        String description = marketMode
                 ? "[" + symbol + "] Mode: MARKET - Shift pressed"
-                : "[" + symbol + "] Mode: BREAKOUT - Shift not pressed");
+                : "[" + symbol + "] Mode: BREAKOUT - Shift not pressed";
+        shiftModeLabel.setToolTipText(description);
+        shiftModeLabel.getAccessibleContext().setAccessibleDescription(description);
         shiftModeLabel.setBackground(marketMode ? MODE_MARKET_BACKGROUND : MODE_BREAKOUT_BACKGROUND);
     }
 
