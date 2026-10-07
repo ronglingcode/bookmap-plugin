@@ -263,4 +263,4 @@ Current Cairo captures can omit 3K walls because their older evidence floor is h
 
 ## Build and verification
 
-Run `gradlew.bat build` with a compatible JDK for the Gradle wrapper. Source/target remain Java 11. The release filename convention is `build/libs/lingrong1988_bmtrader_<version>.jar`; current project version is 1.32. The build runs unit tests, independent native-engine compilation, and smoke tests against the obfuscated artifact. It does not publish the artifact or enable local composer/trading configuration.
+Run `gradlew.bat build` with a compatible JDK for the Gradle wrapper. Source/target remain Java 11. The release filename convention is `build/libs/lingrong1988_bmtrader_<version>.jar`; current project version is 1.33. The build runs unit tests, independent native-engine compilation, and smoke tests against the obfuscated artifact. It does not publish the artifact or enable local composer/trading configuration.
