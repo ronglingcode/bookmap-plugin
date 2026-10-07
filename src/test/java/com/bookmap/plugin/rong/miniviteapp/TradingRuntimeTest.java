@@ -172,7 +172,13 @@ class TradingRuntimeTest {
             assertEquals(view.getAsJsonObject("plan").getAsJsonObject("atr").get("average"), targets.get("atr"));
             assertTrue(targets.get("lowOfDay").getAsDouble() > 0);
             runtime.persistState(); runtime.pendingPersistence().get(2, TimeUnit.SECONDS); assertEquals(1, writes.get());
-            now.addAndGet(1800000); runtime.refreshToken(); assertEquals(2, refreshes.get()); runtime.refreshAccount(); assertEquals(2, accountReads.get());
+            now.addAndGet(1800000); runtime.refreshToken(); assertEquals(2, refreshes.get());
+            assertTrue(tasks.stream().noneMatch(task -> task.delay == 15000 && !task.canceled));
+            List<Task> periodicRefreshes = tasks.stream().filter(task -> task.delay == 30000 && !task.canceled).collect(java.util.stream.Collectors.toList());
+            assertEquals(2, periodicRefreshes.size(), "token and account refreshes run every thirty seconds");
+            periodicRefreshes.forEach(task -> { task.canceled = true; task.run.run(); });
+            assertEquals(2, accountReads.get(), "periodic account refresh reads the broker without a manual action");
+            assertEquals(2, tasks.stream().filter(task -> task.delay == 30000 && !task.canceled).count(), "both refresh timers schedule their next tick");
             // A real native decision and fake broker acceptance initialize state locally, without a ViteApp ACK.
             JsonObject action = json("{\"symbol\":\"AAPL\",\"tradebook_id\":\"GapGiveAndGoBookmapReversal\",\"entry_method\":\"0.1 R\",\"use_market_order\":true,\"price\":10}"); runtime.dispatch(action);
             long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(2); while (emitted.stream().noneMatch(event -> event.has("outcome")) && System.nanoTime() < deadline) Thread.sleep(5);

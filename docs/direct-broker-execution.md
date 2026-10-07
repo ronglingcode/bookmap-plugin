@@ -83,7 +83,7 @@ changes which executor handles an operation.
 One runtime starts on the first addon attachment and closes after the final one.
 Startup restores config/account/state and buffers live data while history loads. Closed-minute VWAP history is seeded locally; subsequent display
 updates use the last completed minute and ignore repeated unchanged points.
-OAuth checks every 30s, account polling every 15s, config refresh every 60s,
+OAuth checks every 30s, account polling every 30s, config refresh every 60s,
 and market projections every 100ms. Account events and accepted mutations request
 a refresh, coalesced with a minimum three-second read interval. HTTP 429 defers
 reads using Retry-After seconds (60s fallback). Every attempted order action completion requests an immediate account read and follow-up reads after 500ms and 1000ms; these bypass the ordinary three-second throttle while preserving in-flight read coalescing and HTTP 429 backoff. A GET 401 refreshes once and retries

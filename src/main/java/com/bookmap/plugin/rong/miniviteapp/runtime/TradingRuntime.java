@@ -105,7 +105,7 @@ public final class TradingRuntime implements AutoCloseable {
                     state = new TradeState(date, number(projected, "currentBalance"), now.getAsLong(), restored);
                 }
                 publishToken(); startStreamsAndHistory(); publishAccount();
-                repeat(30000, this::refreshToken); repeat(15000, this::refreshAccount); repeat(60000, this::refreshConfig); repeat(100, this::publishDirty);
+                repeat(30000, this::refreshToken); repeat(30000, this::refreshAccount); repeat(60000, this::refreshConfig); repeat(100, this::publishDirty);
                 repeat(1000, this::pendingJobs); repeat(20000, this::disciplineJobs);
                 events.log("", "Native trading runtime initialized; account and configuration loaded; stream startup requested");
             } catch (Exception error) {
