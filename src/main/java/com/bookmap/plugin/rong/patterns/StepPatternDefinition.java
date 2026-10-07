@@ -70,7 +70,7 @@ final class StepPatternDefinition extends AbstractDirectionalPatternDefinition {
                 .orElse(null);
         references.add(wall);
         if (reference == null
-                || !passesSessionExtremeGate(context, wall.priceTick)
+                || !isWithinSessionRange(context, wall.priceTick)
                 || !isDefended(context, wall.priceTick)) return;
         StepEpisode episode = new StepEpisode(wall, reference);
         pendingUpdates.put(wall.phaseId, episode);
@@ -92,6 +92,7 @@ final class StepPatternDefinition extends AbstractDirectionalPatternDefinition {
         for (StepEpisode episode : pendingUpdates.values()) {
             if (!episode.oneSecondUpdateEmitted
                     && context.nowMs() - episode.wall.firstSeenMs >= 1_000
+                    && isWithinSessionRange(context, episode.wall.priceTick)
                     && isDefended(context, episode.wall.priceTick)) {
                 emit(episode, context);
                 episode.oneSecondUpdateEmitted = true;
@@ -118,13 +119,6 @@ final class StepPatternDefinition extends AbstractDirectionalPatternDefinition {
 
     private boolean isImprovedPrice(int newPrice, int oldPrice) {
         return bidWall ? newPrice > oldPrice : newPrice < oldPrice;
-    }
-
-    private boolean passesSessionExtremeGate(PatternRuntimeContext context, int newWallPrice) {
-        if (bidWall) {
-            return context.sessionLowTick() > 0 && newWallPrice > context.sessionLowTick();
-        }
-        return context.sessionHighTick() > 0 && newWallPrice < context.sessionHighTick();
     }
 
     private void cleanup(long nowMs) {

@@ -32,6 +32,7 @@ class SignalComposerIsolationTest {
                         signal -> legacy.add(signal.getPatternType() + ":" + signal.getScore() + ":" + signal.getEventTimeNs() + ":" + signal.getTriggerPriceTick()));
                 field("patternEngine").set(p, engine); field("patternAutomationEnabled").setBoolean(p, true);
                 time(p, 0); p.onSnapshotEnd(); p.onBbo(5100, 1, 5121, 1); time(p, 100); p.onTrade(5090, 1, null);
+                time(p, 101); p.onTrade(5130, 1, null);
                 time(p, 2000); p.onDepth(true, 5100, 6000); time(p, 2500);
                 time(p, 2600); p.onDepth(true, 5101, 6000); time(p, 3100); time(p, 3600);
                 assertFalse(legacy.isEmpty()); assertTrue(actions.isEmpty()); assertTrue(broadcasts.isEmpty());

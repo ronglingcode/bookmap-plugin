@@ -66,7 +66,7 @@ class BookmapPatternEngineTest {
 
     @Test
     void stepPatternsRequireNewWallBeyondTheCorrectSessionExtreme() {
-        Fixture offerAtHod = new Fixture();
+        Fixture offerAtHod = new Fixture(EnumSet.allOf(PatternType.class), false);
         offerAtHod.trade(9_999, 10, true, BASE + 10);
         offerAtHod.bbo(9_997, 9_998, BASE + 20);
         offerAtHod.depth(false, 10_000, 100, BASE + 100);
@@ -76,7 +76,7 @@ class BookmapPatternEngineTest {
         assertFalse(offerAtHod.has(PatternType.OFFER_STEP_DOWN),
                 "stepped-down offer must be strictly below HOD");
 
-        Fixture bidAtLod = new Fixture();
+        Fixture bidAtLod = new Fixture(EnumSet.allOf(PatternType.class), false);
         bidAtLod.trade(10_001, 10, false, BASE + 10);
         bidAtLod.bbo(10_002, 10_003, BASE + 20);
         bidAtLod.depth(true, 10_000, 100, BASE + 100);
@@ -198,6 +198,8 @@ class BookmapPatternEngineTest {
         engine.onTimestamp(BASE * 1_000_000L);
         engine.markReady();
         engine.onBbo(9_997, 10_001, 10, 10, BASE * 1_000_000L);
+        engine.onTrade(9_990, 1, false, BASE * 1_000_000L);
+        engine.onTrade(10_010, 1, true, BASE * 1_000_000L);
 
         depth(engine, book, false, 10_000, 100, BASE + 100);
         engine.onTimestamp((BASE + 600) * 1_000_000L);
@@ -251,12 +253,20 @@ class BookmapPatternEngineTest {
         }
 
         Fixture(Set<PatternType> enabled) {
+            this(enabled, true);
+        }
+
+        Fixture(Set<PatternType> enabled, boolean seedRange) {
             this.enabled = enabled;
             engine = new BookmapPatternEngine(
                     "TEST", 0.01, () -> 100, 95, book,
                     new PriceLineStore(), new PriceZoneStore(), enabled::contains, signals::add);
             engine.onTimestamp(BASE * 1_000_000L);
             engine.markReady();
+            if (seedRange) {
+                trade(9_900, 1, false, BASE);
+                trade(10_100, 1, true, BASE);
+            }
         }
 
         void depth(boolean bid, int price, int size, long timeMs) {

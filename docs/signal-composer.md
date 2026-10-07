@@ -14,6 +14,8 @@ Rules load once at the first attachment. Later attachments share that immutable 
 
 LONG requires a bid hold: a persistent bid reappears or steps up. SHORT requires a bid failure: inferred withdrawal or consumption followed by a breakdown. Offer evidence alone shows waiting context and creates no signal. Bare offer growth has UNKNOWN meaning until actual rejection occurs.
 
+Bid Reappear, Bid Step Up, Offer Reappear, and Offer Step Down all require the replacement wall price to be strictly above the observed session low and strictly below the observed session high. Both bounds must be known; walls at either extreme or outside the range do not qualify. Delayed step revisions use the same check. These bounds come from trades observed by the engine, so starting or resetting observation during the day does not recover earlier extremes.
+
 Confirmation is optional for a normal 5K trigger. The strongest compatible local offer observation determines the requirement; sizes are never added together.
 
 | Confirmation strength | Size versus 5K confirmation baseline | Required bid trigger |

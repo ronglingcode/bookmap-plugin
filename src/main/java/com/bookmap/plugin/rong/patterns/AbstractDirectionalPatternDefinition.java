@@ -18,6 +18,12 @@ abstract class AbstractDirectionalPatternDefinition implements PatternDefinition
         return wall.bid == bidWall;
     }
 
+    boolean isWithinSessionRange(PatternRuntimeContext context, int wallPriceTick) {
+        int low = context.sessionLowTick();
+        int high = context.sessionHighTick();
+        return low > 0 && high > low && wallPriceTick > low && wallPriceTick < high;
+    }
+
     boolean isDefended(PatternRuntimeContext context, int wallPriceTick) {
         if (bidWall) {
             int bestAsk = context.bestAskTick();

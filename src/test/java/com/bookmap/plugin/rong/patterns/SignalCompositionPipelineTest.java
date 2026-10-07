@@ -48,6 +48,7 @@ class SignalCompositionPipelineTest {
     }
     @Test void rawBidHoldAndConsumedOfferBreakoutProduceLongWithOneCanonicalSignal() {
         Harness h = new Harness(1000); h.trade(5090, 1, false, 100);
+        h.trade(5130, 1, true, 101);
         h.depth(true, 5100, 3000, 2000); h.depth(false, 5120, 60000, 2000); h.time(2500);
         h.depth(true, 5101, 3000, 2600); h.time(3100); assertTrue(h.signals.isEmpty());
         h.trade(5120, 42000, true, 3200); h.depth(false, 5120, 0, 3300); h.time(3800); assertTrue(h.signals.isEmpty());

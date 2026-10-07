@@ -45,7 +45,7 @@ class PatternObservationEngineTest {
         }
     }
     @Test void smallStepRevisionRetainsIdentityWhenSizeCrossesThreeThousand() {
-        Fixture f = new Fixture(); f.trade(5090, 1, false, 100);
+        Fixture f = new Fixture(true); f.trade(5090, 1, false, 100);
         f.depth(true, 5100, 1000, 2000); f.time(2500);
         f.depth(true, 5101, 1000, 2600); f.time(3100);
         PatternEvent first = f.events.get(0);
@@ -62,13 +62,17 @@ class PatternObservationEngineTest {
         final List<PatternEvent> events = new ArrayList<>();
         final PatternObservationEngine engine = new PatternObservationEngine("TEST", .01, SignalComposerConfig.defaults(),
                 events::add, (reason, epoch) -> {}, diagnostic -> {});
-        Fixture() { engine.markReady(); time(0); engine.onBbo(5100, 5121, BASE, MARKET); }
+        Fixture() { this(false); }
+        Fixture(boolean seedRange) {
+            engine.markReady(); time(0); engine.onBbo(5100, 5121, BASE, MARKET);
+            if (seedRange) { trade(5080, 1, false, 0); trade(5140, 1, true, 0); }
+        }
         void time(long ms) { engine.onTimestamp(BASE + ms * 1_000_000L, MARKET); }
         void depth(boolean bid, int price, long size, long ms) { engine.onDepth(bid, price, size, BASE + ms * 1_000_000L, MARKET); }
         void trade(int price, long size, Boolean buy, long ms) { engine.onTrade(price, size, buy, BASE + ms * 1_000_000L, MARKET); }
     }
     @Test void independentDefinitionsObserveBidReappearAndStepWithSharedInteraction() {
-        Fixture f = new Fixture(); f.trade(5090, 1, false, 100);
+        Fixture f = new Fixture(true); f.trade(5090, 1, false, 100);
         f.depth(true, 5100, 3000, 2000); f.time(2500);
         f.trade(5100, 3000, false, 2600); f.depth(true, 5100, 0, 2600); f.time(3100);
         f.depth(true, 5101, 4000, 3200); f.time(3700);
@@ -84,7 +88,7 @@ class PatternObservationEngineTest {
         assertEquals(BASE + 4200_000_000L, revised.observedAtNs);
     }
     @Test void independentDefinitionsObserveOfferReappearAndStepDown() {
-        Fixture f = new Fixture(); f.trade(5130, 1, true, 100);
+        Fixture f = new Fixture(true); f.trade(5130, 1, true, 100);
         f.depth(false, 5120, 6000, 2000); f.time(2500);
         f.trade(5120, 6000, true, 2600); f.depth(false, 5120, 0, 2600); f.time(3100);
         f.depth(false, 5119, 3000, 3200); f.time(3700);
@@ -93,7 +97,7 @@ class PatternObservationEngineTest {
         assertEquals(3000, f.events.get(0).size); assertEquals(PatternMeaning.OFFER_BEARISH_CONFIRMATION, f.events.get(1).meaning);
     }
     @Test void absentReplacementCannotEmitDelayedStepUpdateAndReadinessIsRequired() {
-        Fixture f = new Fixture(); f.trade(5090, 1, false, 100);
+        Fixture f = new Fixture(true); f.trade(5090, 1, false, 100);
         f.depth(true, 5100, 6000, 2000); f.time(2500);
         f.depth(true, 5101, 3000, 2600); f.time(3100); assertEquals(1, f.events.size());
         f.depth(true, 5101, 0, 3200); f.time(3600); assertEquals(1, f.events.size());

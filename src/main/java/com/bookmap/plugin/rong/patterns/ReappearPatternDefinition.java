@@ -55,7 +55,8 @@ final class ReappearPatternDefinition extends AbstractDirectionalPatternDefiniti
 
     @Override
     public void onWallQualified(WallSnapshot wall, PatternRuntimeContext context) {
-        if (!matches(wall) || !isDefended(context, wall.priceTick)) return;
+        if (!matches(wall) || !isWithinSessionRange(context, wall.priceTick)
+                || !isDefended(context, wall.priceTick)) return;
         cleanup(context.nowMs());
         WallSnapshot reference = clearedWalls.stream()
                 .filter(candidate -> !candidate.phaseId.equals(wall.phaseId))
