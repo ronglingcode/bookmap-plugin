@@ -149,6 +149,7 @@ public final class PatternObservationEngine implements PatternRuntimeContext {
     }
     public long epoch() { return clock.epoch(); }
     public boolean usable() { return clock.usable(); }
+    public String status() { return clock.status(); }
     public long nowMs() { return nowNs() / 1_000_000L; }
     public long nowNs() { return clock.watermarkNs(); }
     public int bestBidTick() { return bid; }

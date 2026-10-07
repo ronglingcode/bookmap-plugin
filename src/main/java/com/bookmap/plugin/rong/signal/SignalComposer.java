@@ -101,6 +101,7 @@ public final class SignalComposer {
                 selection.strength, 1, receiptClock.getAsLong(), config.revision,
                 explanations.build(candidate.trigger, validation, Collections.emptyList()));
         SignalState previous = candidate.state; candidate.state = SignalState.VALID;
+        candidate.stateReason = "Bid trigger meets applied threshold " + required;
         transitions.add(new CompositionUpdate.CandidateTransition(candidate.key, previous, candidate.state, "Bid trigger meets applied threshold " + required));
         signals.add(candidate.signal);
     }
@@ -153,12 +154,49 @@ public final class SignalComposer {
         Map<String, SignalState> copy = new LinkedHashMap<>(); candidates.forEach((key, value) -> copy.put(key, value.state));
         return Collections.unmodifiableMap(copy);
     }
+    /** Read-only copy, called under the attachment's composition lock. */
+    public List<String> inspectionLines() {
+        List<String> lines = new ArrayList<>();
+        List<PatternEvent> events = history.snapshot();
+        lines.add("Evidence retained: " + events.size() + " / " + config.maxEvents
+                + " · Candidates: " + candidates.size() + " / " + config.maxCandidates);
+        CompositionUpdate current = update(List.of(), List.of(), List.of());
+        if (current.contexts.isEmpty()) lines.add("Offer context: none qualifying at current price / time");
+        for (DevelopingContext context : current.contexts.values()) {
+            lines.add(context.direction + " context: " + context.confirmation.type + " " + context.confirmation.size
+                    + " @ " + SignalExplanationBuilder.price(context.confirmation.price) + " · " + context.strength);
+            lines.add("  Waiting for " + context.waitingFor + " ≥ " + context.requiredTriggerSize
+                    + " · " + remainingSeconds(context.expiresAtNs) + "s market time left");
+        }
+        if (candidates.isEmpty()) lines.add("Bid candidates: none — waiting for bid hold / failure");
+        for (SignalCandidate candidate : candidates.values()) {
+            ConfirmationStrengthClassifier.Selection selection = classifier.select(matcher.find(candidate.trigger, events, nowNs));
+            lines.add(candidate.direction + " " + candidate.state + ": " + candidate.trigger.type + " " + candidate.trigger.size
+                    + " @ " + SignalExplanationBuilder.price(candidate.trigger.price)
+                    + " · " + remainingSeconds(candidate.expiresAtNs) + "s left");
+            lines.add("  " + candidate.stateReason);
+            if (candidate.signal == null && active(candidate)) {
+                lines.add("  Confirmation " + selection.strength + " · bid required ≥ " + policy.requiredSize(selection.strength));
+            }
+            if (candidate.signal != null) {
+                lines.add("  Validated: " + candidate.signal.firstValidation.confirmationStrength
+                        + " · applied ≥ " + candidate.signal.firstValidation.appliedTriggerThreshold
+                        + " · revision " + candidate.signal.revision);
+            }
+        }
+        return List.copyOf(lines);
+    }
+    private String remainingSeconds(long expiry) {
+        return java.math.BigDecimal.valueOf(Math.max(0, expiry - nowNs)).scaleByPowerOfTen(-9)
+                .setScale(1, java.math.RoundingMode.CEILING).toPlainString();
+    }
     private static boolean active(SignalCandidate candidate) {
         return candidate.state == SignalState.CANDIDATE || candidate.state == SignalState.VALID;
     }
     private void transition(SignalCandidate candidate, SignalState state, String reason, List<CompositionUpdate.CandidateTransition> transitions) {
         if (candidate.state == state) return;
-        transitions.add(new CompositionUpdate.CandidateTransition(candidate.key, candidate.state, state, reason)); candidate.state = state;
+        transitions.add(new CompositionUpdate.CandidateTransition(candidate.key, candidate.state, state, reason));
+        candidate.state = state; candidate.stateReason = reason;
     }
     private void maintain(List<CompositionUpdate.CandidateTransition> transitions) {
         for (SignalCandidate candidate : candidates.values()) {

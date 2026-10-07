@@ -13,6 +13,7 @@ final class SignalCandidate {
     final long expiresAtNs;
     final List<PatternEvent> supportingBids = new ArrayList<>();
     SignalState state = SignalState.CANDIDATE;
+    String stateReason = "Waiting for sufficient confirmation";
     TradingSignal signal;
 
     SignalCandidate(PatternEvent trigger, long afterWindowMs) {

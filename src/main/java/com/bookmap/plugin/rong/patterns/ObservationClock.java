@@ -41,6 +41,12 @@ public final class ObservationClock {
     public long epoch() { return epoch; }
     public long watermarkNs() { return watermarkNs; }
     public boolean usable() { return ready && regularSession && watermarkNs > 0; }
+    public String status() {
+        if (!ready) return "Waiting for snapshot / realtime readiness";
+        if (watermarkNs <= 0) return "Waiting for market timestamp";
+        if (!regularSession) return "Outside regular hours (09:30–16:00 New York)";
+        return "Scanning";
+    }
     public Tick reset(ResetReason reason) {
         epoch++; watermarkNs = 0; ready = false; regularSession = false; date = null;
         return new Tick(epoch, 0, false, reason);

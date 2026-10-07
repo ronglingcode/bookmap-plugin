@@ -333,7 +333,8 @@ public class RongPlugin implements CustomModuleAdapter,
 
         if (!observationConfig.observerOnly) {
             tradeButtonWindow = new TradeButtonWindow(
-                    cleanAlias, sharedServer, wallThresholdConfig::getThresholdFloor, nativeConnectionStatus);
+                    cleanAlias, sharedServer, wallThresholdConfig::getThresholdFloor, nativeConnectionStatus,
+                    this::signalComposerInspectionText);
         }
     }
 
@@ -344,6 +345,21 @@ public class RongPlugin implements CustomModuleAdapter,
                 return expectedAlias != null && expectedAlias.equals(candidateAlias);
             }
         };
+    }
+
+    String signalComposerInspectionText() {
+        synchronized (compositionLock) {
+            String heading = "Signal Composer · " + alias + " · advisory\n";
+            if (compositionRules == null) return heading + "Inactive: attachment stopped or not initialized";
+            if (!compositionRules.valid) return heading + compositionRules.error;
+            if (!compositionRules.eligible(alias)) return heading + "Excluded by configured symbol filter";
+            if (signalComposition == null) return heading + "Unavailable: instrument tick size is unusable";
+            return heading + (signalCompositionEnabled ? "Enabled" : "Disabled")
+                    + " · configured sourceMode: " + observationConfig.sourceMode
+                    + "\nRules: " + compositionRules.revision.substring(0, 12)
+                    + " · bid normal / minimum: " + compositionRules.normalTriggerSize + " / " + compositionRules.minimumTriggerSize
+                    + "\n" + signalComposition.inspectionText();
+        }
     }
 
     /** Shared rules load once for an activation; each chart owns its observation state. */
