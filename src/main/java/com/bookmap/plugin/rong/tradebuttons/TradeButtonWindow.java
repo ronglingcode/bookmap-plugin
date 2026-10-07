@@ -96,6 +96,7 @@ public class TradeButtonWindow {
             Collections.newSetFromMap(new ConcurrentHashMap<>());
     private JFrame frame;
     private JPanel buttonPanel;
+    private HotkeyRiskPanel hotkeyRiskPanel;
     private JLabel shiftModeLabel;
     private JLabel wallThresholdLabel;
     private JLabel schwabStatusLabel;
@@ -433,11 +434,14 @@ public class TradeButtonWindow {
         }
         longEntryButtons.clear();
         shortEntryButtons.clear();
+        if (hotkeyRiskPanel != null) hotkeyRiskPanel.dispose();
         buttonPanel.removeAll();
         buttonPanel.setPreferredSize(null);
         buttonPanel.setLayout(new BoxLayout(buttonPanel, BoxLayout.Y_AXIS));
         addFullWidth(createModePanel());
         addFullWidth(createHotkeyPanel());
+        hotkeyRiskPanel = new HotkeyRiskPanel(server.getHotkeyRiskSelection());
+        addFullWidth(hotkeyRiskPanel);
 
         boolean hasTradebookButtons = false;
         JPanel tradebookGrid = new JPanel(new GridLayout(0, 2, 6, 6));
@@ -1020,6 +1024,7 @@ public class TradeButtonWindow {
 
     public void dispose() {
         disposed = true;
+        if (hotkeyRiskPanel != null) hotkeyRiskPanel.dispose();
         if (wallThresholdTimer != null) {
             wallThresholdTimer.stop();
             wallThresholdTimer = null;

@@ -18,11 +18,18 @@ import com.bookmap.plugin.rong.patterns.Direction;
 import com.bookmap.plugin.rong.patterns.PatternType;
 import com.bookmap.plugin.rong.miniviteapp.models.Candle;
 import com.bookmap.plugin.rong.tradebuttons.TradebookButtonGroup;
+import com.bookmap.plugin.rong.tradebuttons.HotkeyRiskSelection;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 
 public class SignalWebSocketServer extends WebSocketServer {
+    private final HotkeyRiskSelection hotkeyRiskSelection = new HotkeyRiskSelection();
+
+    public HotkeyRiskSelection getHotkeyRiskSelection() {
+        return hotkeyRiskSelection;
+    }
+
     private final Map<String, JsonObject> targetMarkets = new ConcurrentHashMap<>();
     private final Map<String, Long> targetMarketBroadcastAt = new ConcurrentHashMap<>();
     public void updateTargetMarket(JsonObject value) {

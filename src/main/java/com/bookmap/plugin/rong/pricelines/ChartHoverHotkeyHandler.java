@@ -238,22 +238,24 @@ public class ChartHoverHotkeyHandler implements ScreenSpacePainterFactory {
                 return;
             }
 
-            String entryMethod = tradebook.getEntryMethods().get(0);
-            json.addProperty(
-                    "pattern",
-                    bidWallReversal
-                            ? "bookmap_bid_wall_reversal"
-                            : "bookmap_offer_wall_reversal");
-            json.addProperty("use_market_order", false);
-            json.addProperty("order_type", "breakout");
-            json.addProperty("sideIsLong", tradebook.isLong());
-            json.addProperty("tradebook_id", tradebook.getTradebookId());
-            json.addProperty("tradebook_name", tradebook.getTradebookName());
-            json.addProperty("entry_method", entryMethod);
+            addWallReversalEntryFields(json, tradebook, bidWallReversal, wsServer);
             wsServer.appendRegularSessionHighLow(hover.instrument, json);
         }
 
         wsServer.dispatchTradingAction(json);
+    }
+
+    static void addWallReversalEntryFields(
+            JsonObject json, TradebookButtonGroup tradebook, boolean bidWallReversal,
+            SignalWebSocketServer server) {
+        json.addProperty("pattern", bidWallReversal
+                ? "bookmap_bid_wall_reversal" : "bookmap_offer_wall_reversal");
+        json.addProperty("use_market_order", false);
+        json.addProperty("order_type", "breakout");
+        json.addProperty("sideIsLong", tradebook.isLong());
+        json.addProperty("tradebook_id", tradebook.getTradebookId());
+        json.addProperty("tradebook_name", tradebook.getTradebookName());
+        json.addProperty("entry_method", server.getHotkeyRiskSelection().getEntryMethod());
     }
 
     private void sendPriceIndependentHotkey(

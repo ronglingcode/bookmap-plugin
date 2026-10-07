@@ -9,13 +9,53 @@ import java.awt.Canvas;
 import java.awt.event.KeyEvent;
 import java.time.Instant;
 import java.util.Set;
+import java.util.List;
+import java.io.InputStreamReader;
+import java.nio.charset.StandardCharsets;
 
 import javax.swing.JLabel;
 import javax.swing.JPanel;
 
 import org.junit.jupiter.api.Test;
+import com.bookmap.plugin.rong.SignalWebSocketServer;
+import com.bookmap.plugin.rong.tradebuttons.HotkeyRiskSelection;
+import com.bookmap.plugin.rong.tradebuttons.TradebookButtonGroup;
+import com.bookmap.plugin.rong.miniviteapp.core.controllers.EntryHandler;
+import com.bookmap.plugin.rong.miniviteapp.models.Models.Snapshot;
+import com.google.gson.JsonObject;
+import com.google.gson.JsonParser;
 
 class ChartHoverHotkeyHandlerTest {
+
+    @Test
+    void bothEntryDirectionsUseSelectedRiskInNativePlansInsteadOfFirstButtonSize() {
+        SignalWebSocketServer server = new SignalWebSocketServer(0, 90);
+        JsonObject fixture = JsonParser.parseReader(new InputStreamReader(
+                getClass().getResourceAsStream("/direct-entry-fixtures.json"), StandardCharsets.UTF_8))
+                .getAsJsonArray().get(0).getAsJsonObject();
+        for (boolean isLong : new boolean[]{true, false}) {
+            String id = isLong ? "RangeBoundBidReversal" : "RangeBoundOfferReversal";
+            TradebookButtonGroup tradebook = new TradebookButtonGroup(
+                    id, "reversal", isLong, id, "reversal", List.of("1 R", "0.5 R", "0.1 R"));
+            for (String method : HotkeyRiskSelection.ENTRY_METHODS) {
+                server.getHotkeyRiskSelection().setEntryMethod(method);
+                JsonObject action = fixture.getAsJsonObject("action").deepCopy();
+                action.addProperty("source", "bookmap_chart_hotkey");
+                action.addProperty("price", 10);
+                ChartHoverHotkeyHandler.addWallReversalEntryFields(action, tradebook, isLong, server);
+                assertEquals(method, action.get("entry_method").getAsString());
+                assertEquals(false, action.get("use_market_order").getAsBoolean());
+                assertEquals("breakout", action.get("order_type").getAsString());
+                var plan = EntryHandler.handleEntry(new Snapshot(fixture.getAsJsonObject("state")),
+                        action, isLong ? "KeyB" : "KeyS");
+                double risk = Double.parseDouble(method.split(" ")[0]);
+                assertEquals(risk, plan.entry.get("multiplier").getAsDouble());
+                assertEquals(Math.floor(1960 * risk), plan.entry.getAsJsonObject("submitEntryResult")
+                        .get("totalQuantity").getAsDouble());
+                assertEquals("1 R", tradebook.getEntryMethods().get(0));
+            }
+        }
+    }
 
     @Test
     void numpadDigitsMapToViteNumpadHotkeys() {

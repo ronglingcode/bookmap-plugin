@@ -11,7 +11,7 @@ The earlier flag-based rollout is historical; this document supersedes it.
 | Operation | Native behavior |
 | --- | --- |
 | Wall-reversal entry buttons | Market or breakout entry for enabled gap-and-go, gap-and-crap, gap-down-and-go-up/down and range-bound bid/offer reversal definitions; numeric risk labels select sizing. |
-| Chart B / S | Long/short breakout at the hovered real price using the matching wall-reversal definition. Shift keeps the breakout path. Existing before-10:00 New York chart-entry cutoff remains. |
+| Chart B / S | Long/short breakout at the hovered real price using the matching wall-reversal definition and the selected **Hotkey risk**. Shift keeps the breakout path. Existing before-10:00 New York chart-entry cutoff remains. |
 | Generic non-chart B / S | Choose the enabled matching definition from locally read plans. |
 | Same-direction add | Existing-risk sizing; retain captured active/core state and allow protective exits. |
 | Entry with pending orders | Submit the protected entry and cancel old same-direction entries; acceptance remains captured if a later cancellation fails. |
@@ -39,6 +39,15 @@ If estimated buying power is insufficient, both apps halve targets once;
 if the half allocation remains insufficient they warn and submit for the broker
 to decide. This intentionally aligns the browser with the established native
 policy. There is no second balance preflight.
+
+The trade panel's **Hotkey risk** row selects exactly one of **1 R**, **0.5 R**,
+or **0.1 R** for chart B/S entries, including adds. It starts at 1 R for each
+plugin session and stays selected until changed, across symbols and panel
+refreshes. Every open trade panel displays the same current selection. Clicking
+a radio button only changes this local preference; it does not place an order.
+Entry buttons keep their own labeled risk, independent of this selection. No
+additional keyboard shortcuts are introduced. Existing sizing rules and fixed
+share inputs still apply.
 
 New entries capture VWAP, the nearest three qualifying opposing depth walls,
 premarket high for longs or premarket low for shorts, and the 2R price. Prices
