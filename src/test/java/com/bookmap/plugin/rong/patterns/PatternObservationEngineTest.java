@@ -8,6 +8,54 @@ import org.junit.jupiter.api.Test;
 import com.bookmap.plugin.rong.signal.SignalComposerConfig;
 
 class PatternObservationEngineTest {
+    @Test void smallBidWithdrawalIsTrackedAtInclusiveFloorButNotBelowIt() {
+        for (long size : new long[] {999, 1000, 2999, 3000}) {
+            Fixture f = new Fixture(); f.trade(5090, 1, false, 100);
+            f.depth(true, 5100, size, 2000); f.time(2500);
+            f.depth(true, 5100, 0, 2600); f.time(3100);
+            if (size < 1000) assertTrue(f.events.isEmpty());
+            else {
+                assertEquals(1, f.events.size());
+                assertEquals(PatternEventType.BIDS_CANCELLED, f.events.get(0).type);
+                assertEquals(size, f.events.get(0).size);
+                assertEquals(PatternSizeCategory.classify(size), f.events.get(0).sizeCategory);
+            }
+        }
+    }
+    @Test void smallOfferRejectionAndGrowthUseTheSameTrackingFloor() {
+        Fixture f = new Fixture(); f.trade(5090, 1, true, 100);
+        f.depth(false, 5120, 1000, 2000); f.time(2500);
+        f.trade(5119, 1, true, 2600); f.trade(5118, 1, false, 2700); f.time(2900);
+        assertEquals(PatternEventType.OFFER_REJECTION, f.events.get(0).type);
+        assertEquals(PatternSizeCategory.LEAST_SIGNIFICANT, f.events.get(0).sizeCategory);
+        f.depth(false, 5120, 3000, 3000);
+        assertTrue(f.events.stream().anyMatch(event -> event.type == PatternEventType.OFFER_SIZE_INCREASE
+                && event.sizeCategory == PatternSizeCategory.BELOW_NORMAL));
+    }
+    @Test void smallConsumptionPatternsAreObservedOnBothSides() {
+        for (boolean bid : new boolean[] {true, false}) {
+            Fixture f = new Fixture(); f.trade(5090, 1, false, 100);
+            int price = bid ? 5100 : 5120;
+            f.depth(bid, price, 1000, 2000); f.time(2500);
+            f.trade(price, 1000, !bid, 2600); f.depth(bid, price, 0, 2600);
+            f.trade(price + (bid ? -1 : 1), 1, !bid, 2700); f.time(3100);
+            assertEquals(1, f.events.size());
+            assertEquals(bid ? PatternEventType.BID_BREAKDOWN : PatternEventType.OFFER_BREAKOUT, f.events.get(0).type);
+            assertEquals(PatternSizeCategory.LEAST_SIGNIFICANT, f.events.get(0).sizeCategory);
+        }
+    }
+    @Test void smallStepRevisionRetainsIdentityWhenSizeCrossesThreeThousand() {
+        Fixture f = new Fixture(); f.trade(5090, 1, false, 100);
+        f.depth(true, 5100, 1000, 2000); f.time(2500);
+        f.depth(true, 5101, 1000, 2600); f.time(3100);
+        PatternEvent first = f.events.get(0);
+        assertEquals(PatternEventType.BID_STEP_UP, first.type);
+        assertEquals(PatternSizeCategory.LEAST_SIGNIFICANT, first.sizeCategory);
+        f.depth(true, 5101, 3000, 3200); f.time(3700);
+        PatternEvent revised = f.events.get(f.events.size() - 1);
+        assertEquals(first.id, revised.id);
+        assertEquals(PatternSizeCategory.BELOW_NORMAL, revised.sizeCategory);
+    }
     static final long BASE = Instant.parse("2026-10-06T14:00:00Z").getEpochSecond() * 1_000_000_000L;
     static final PatternEvent.TimestampProvenance MARKET = PatternEvent.TimestampProvenance.MARKET;
     static class Fixture {

@@ -22,6 +22,7 @@ class SignalCompositionLogTest {
         assertTrue(summaries.get(0).contains("Advisory LONG"));
         assertTrue(details.stream().anyMatch(line -> line.contains("revision=2") && line.contains("after validation")));
         assertTrue(details.stream().anyMatch(line -> line.contains("Semantic event") && line.contains("occurrenceNs=")));
+        assertTrue(details.stream().anyMatch(line -> line.contains("Semantic event") && line.contains("category=Normal")));
         log.update(c.onMarketTime(30_000_000_201L)); log.update(c.reset(ResetReason.DISABLED, 2));
         assertTrue(details.stream().anyMatch(line -> line.contains("EXPIRED")));
         assertTrue(details.stream().anyMatch(line -> line.contains("Observation reset: DISABLED")));

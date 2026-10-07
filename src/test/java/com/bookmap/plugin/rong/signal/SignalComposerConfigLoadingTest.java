@@ -17,7 +17,7 @@ class SignalComposerConfigLoadingTest {
     @TempDir Path directory;
     @Test void missingFileProvidesUsableEnabledDefaults() {
         SignalComposerConfig c = SignalComposerConfig.load(directory.resolve("missing.json"));
-        assertTrue(c.valid); assertTrue(c.enabled); assertEquals(3000, c.observationFloorSize);
+        assertTrue(c.valid); assertTrue(c.enabled); assertEquals(1000, c.observationFloorSize);
     }
     @Test void loadsOnlyTheExplicitTemporaryFile() throws IOException {
         Path file = directory.resolve("config.json"); Files.writeString(file, "{\"enabled\":true,\"symbols\":[\"TEST\"]}");

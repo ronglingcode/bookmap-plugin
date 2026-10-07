@@ -21,6 +21,7 @@ public final class PatternEvent {
     public final PatternSide side;
     public final PatternMeaning meaning;
     public final SizeBasis sizeBasis;
+    public final PatternSizeCategory sizeCategory;
     public final TimestampProvenance timestampProvenance;
     public final Evidence evidence;
 
@@ -41,6 +42,7 @@ public final class PatternEvent {
         epoch = b.epoch;
         revision = b.revision;
         size = b.size;
+        sizeCategory = PatternSizeCategory.classify(size);
         priceTick = b.priceTick;
         tickSize = b.tickSize;
         price = BookmapPriceNormalizer.toWirePrice(priceTick, tickSize);

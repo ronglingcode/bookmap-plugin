@@ -47,13 +47,14 @@ public final class SignalComposer {
         nowNs = Math.max(nowNs, event.observedAtNs);
         history.prune(nowNs);
         maintain(transitions);
+        PatternEvent previousEvent = history.get(event.id);
         PatternEventStore.Change change = history.put(event, nowNs);
         maintain(transitions);
         if (change == PatternEventStore.Change.REJECTED || change == PatternEventStore.Change.DUPLICATE || history.get(event.id) == null) {
             return update(signals, transitions, diagnostics);
         }
         boolean bid = event.meaning == PatternMeaning.BID_HOLD || event.meaning == PatternMeaning.BID_FAIL;
-        if (bid) {
+        if (bid && event.size >= config.minimumTriggerSize) {
             for (SignalCandidate existing : candidates.values()) {
                 if (active(existing) && existing.direction != TradingSignal.directionFrom(event)
                         && event.eventTimeNs >= existing.trigger.eventTimeNs
@@ -68,7 +69,8 @@ public final class SignalComposer {
             }
             SignalCandidate proposed = new SignalCandidate(event, config.afterWindowMs);
             SignalCandidate candidate = candidates.get(proposed.key);
-            if (candidate == null && event.revision > 1) {
+            if (candidate == null && event.revision > 1
+                    && (previousEvent == null || previousEvent.size >= config.minimumTriggerSize)) {
                 diagnostics.add("Revised trigger has no active original candidate: " + proposed.key);
                 return update(signals, transitions, diagnostics);
             }
@@ -160,11 +162,16 @@ public final class SignalComposer {
         List<PatternEvent> events = history.snapshot();
         lines.add("Evidence retained: " + events.size() + " / " + config.maxEvents
                 + " · Candidates: " + candidates.size() + " / " + config.maxCandidates);
+        for (com.bookmap.plugin.rong.patterns.PatternSizeCategory category : com.bookmap.plugin.rong.patterns.PatternSizeCategory.values()) {
+            long count = events.stream().filter(event -> event.sizeCategory == category).count();
+            if (count > 0) lines.add("  " + category.label + ": " + count + " patterns");
+        }
         CompositionUpdate current = update(List.of(), List.of(), List.of());
         if (current.contexts.isEmpty()) lines.add("Offer context: none qualifying at current price / time");
         for (DevelopingContext context : current.contexts.values()) {
             lines.add(context.direction + " context: " + context.confirmation.type + " " + context.confirmation.size
-                    + " @ " + SignalExplanationBuilder.price(context.confirmation.price) + " · " + context.strength);
+                    + " @ " + SignalExplanationBuilder.price(context.confirmation.price) + " · " + context.confirmation.sizeCategory.label
+                    + " · confirmation " + context.strength);
             lines.add("  Waiting for " + context.waitingFor + " ≥ " + context.requiredTriggerSize
                     + " · " + remainingSeconds(context.expiresAtNs) + "s market time left");
         }
@@ -172,7 +179,7 @@ public final class SignalComposer {
         for (SignalCandidate candidate : candidates.values()) {
             ConfirmationStrengthClassifier.Selection selection = classifier.select(matcher.find(candidate.trigger, events, nowNs));
             lines.add(candidate.direction + " " + candidate.state + ": " + candidate.trigger.type + " " + candidate.trigger.size
-                    + " @ " + SignalExplanationBuilder.price(candidate.trigger.price)
+                    + " @ " + SignalExplanationBuilder.price(candidate.trigger.price) + " · " + candidate.trigger.sizeCategory.label
                     + " · " + remainingSeconds(candidate.expiresAtNs) + "s left");
             lines.add("  " + candidate.stateReason);
             if (candidate.signal == null && active(candidate)) {

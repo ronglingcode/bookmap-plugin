@@ -4,7 +4,6 @@
   "normalTriggerSize": 5000,
   "minimumTriggerSize": 3000,
   "normalConfirmationSize": 5000,
-  "observationFloorSize": 3000,
   "beforeWindowMs": 30000,
   "afterWindowMs": 30000,
   "maxPriceDistanceTicks": 20,

@@ -48,7 +48,7 @@ Use these explicit V1 decisions. They resolve ambiguities in the design without 
 1. **Confirmation is optional for a normal-size trigger.** A valid bid event of at least 5,000 shares can generate a signal immediately with confirmation strength `NONE`.
 2. **Late confirmation revisits active triggers.** Keep a smaller trigger pending for the post-trigger window. If exceptional evidence arrives later, it may become valid then. An already valid signal receives an evidence revision under the same ID, rather than a second signal.
 3. **Use six named confirmation bands:** `NONE`, `BELOW_NORMAL`, `NORMAL`, `STRONG`, `VERY_STRONG`, `EXCEPTIONAL`. The document's shorter list and longer example table are reconciled here.
-4. **Use an independent detection floor.** Start at 3,000 shares, at or below the smallest accepted trigger size. Do not apply the legacy percentile filter to composer observations.
+4. **Use an independent detection floor.** Track at least 1,000 shares with a code-owned floor; 1,000–2,999-share events are least significant context. The minimum bid trigger remains 3,000 shares. Do not apply the legacy percentile filter to composer observations.
 5. **Use market event time for rules.** System time is only for receipt timestamps, logging, and display TTL. Replay speed must not change eligibility.
 6. **Keep signal decisions local.** Chart/file output is sufficient for V1. New WebSocket exports, external consumers, and durable event datasets are deferred.
 7. **Start with existing bid-defense patterns for LONG.** Bid reappear and step-up provide the current definition of bid hold. Do not label them absorption or executed rejection. Dedicated bid absorption/reload/bounce detectors can follow later.
@@ -56,7 +56,7 @@ Use these explicit V1 decisions. They resolve ambiguities in the design without 
 
 ## 4. Recommended architecture
 
-Create a separate event-time observation path so the 3K requirement does not alter legacy wall thresholds, pattern scoring, or tradebook eligibility.
+Create a separate event-time observation path so the 1K observation floor does not alter legacy wall thresholds, pattern scoring, or tradebook eligibility.
 
 ```text
 Bookmap callbacks in RongPlugin
@@ -230,7 +230,6 @@ Add `signal/SignalComposerConfig.java` and `config/signal-composer.template.json
   "normalTriggerSize": 5000,
   "minimumTriggerSize": 3000,
   "normalConfirmationSize": 5000,
-  "observationFloorSize": 3000,
   "beforeWindowMs": 30000,
   "afterWindowMs": 30000,
   "maxPriceDistanceTicks": 20,
@@ -312,7 +311,7 @@ Exit criterion: all design examples work using explicit synthetic events, includ
 
 ### Milestone 2 — Observations from real callbacks
 
-Add `patterns/PatternObservationEngine.java`, `EventTimeWallTracker.java`, `PatternEventNormalizer.java`, `BidFailureDetector.java`, and `OfferInteractionDetector.java`. Give the observer its own `ReappearPatternDefinition`/`StepPatternDefinition` instances and independent 3K-capable lifecycle.
+Add `patterns/PatternObservationEngine.java`, `EventTimeWallTracker.java`, `PatternEventNormalizer.java`, `BidFailureDetector.java`, and `OfferInteractionDetector.java`. Give the observer its own `ReappearPatternDefinition`/`StepPatternDefinition` instances and independent 1K-capable lifecycle.
 
 Retain legacy constructors/definitions/output. Add detector and pipeline fixtures using real depth/trade/BBO/timestamp sequences. Cover actual evidence needed for the 60K growth/rejection plus 3K withdrawal example; a synthetic composer event alone is insufficient.
 

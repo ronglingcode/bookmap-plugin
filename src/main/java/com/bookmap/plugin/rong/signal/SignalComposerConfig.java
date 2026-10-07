@@ -12,6 +12,7 @@ import com.google.gson.JsonElement;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonParser;
 import com.bookmap.plugin.rong.SymbolUtils;
+import com.bookmap.plugin.rong.patterns.PatternSizeCategory;
 import java.io.InputStream;
 import java.io.IOException;
 import java.nio.file.Files;
@@ -41,7 +42,7 @@ public final class SignalComposerConfig {
         this.valid = valid; this.error = error; enabled = valid && b.enabled;
         symbols = Collections.unmodifiableSet(new LinkedHashSet<>(b.symbols));
         normalTriggerSize = b.normalTriggerSize; minimumTriggerSize = b.minimumTriggerSize;
-        normalConfirmationSize = b.normalConfirmationSize; observationFloorSize = b.observationFloorSize;
+        normalConfirmationSize = b.normalConfirmationSize; observationFloorSize = PatternSizeCategory.MIN_TRACKED_SIZE;
         historyRetentionMs = HISTORY_RETENTION_MS; beforeWindowMs = b.beforeWindowMs; afterWindowMs = b.afterWindowMs;
         maxPriceDistanceTicks = b.maxPriceDistanceTicks; directionalPriceToleranceTicks = b.directionalPriceToleranceTicks;
         maxTriggerDriftTicks = b.maxTriggerDriftTicks; maxEvents = b.maxEvents; maxCandidates = b.maxCandidates;
@@ -101,7 +102,7 @@ public final class SignalComposerConfig {
             b.normalTriggerSize = integer(json, "normalTriggerSize", b.normalTriggerSize);
             b.minimumTriggerSize = integer(json, "minimumTriggerSize", b.minimumTriggerSize);
             b.normalConfirmationSize = integer(json, "normalConfirmationSize", b.normalConfirmationSize);
-            b.observationFloorSize = integer(json, "observationFloorSize", b.observationFloorSize);
+            // Historical JSON observation floors are ignored; code owns the tracking threshold.
             // Historical JSON retention values are ignored; code owns this setting.
             b.beforeWindowMs = integer(json, "beforeWindowMs", b.beforeWindowMs);
             b.afterWindowMs = integer(json, "afterWindowMs", b.afterWindowMs);
@@ -145,8 +146,10 @@ public final class SignalComposerConfig {
     private static void validate(Builder b) {
         positive(b.normalTriggerSize, Long.MAX_VALUE, "normalTriggerSize");
         positive(b.minimumTriggerSize, b.normalTriggerSize, "minimumTriggerSize");
+        require(b.minimumTriggerSize >= PatternSizeCategory.BELOW_NORMAL.minimumSize,
+                "minimumTriggerSize must be at least 3000; least significant patterns are context only");
         positive(b.normalConfirmationSize, Long.MAX_VALUE, "normalConfirmationSize");
-        positive(b.observationFloorSize, b.minimumTriggerSize, "observationFloorSize");
+        require(PatternSizeCategory.MIN_TRACKED_SIZE <= b.minimumTriggerSize, "tracking floor exceeds minimum trigger size");
         positive(b.beforeWindowMs, 600000, "beforeWindowMs"); positive(b.afterWindowMs, 600000, "afterWindowMs");
         require(HISTORY_RETENTION_MS >= Math.max(b.beforeWindowMs, b.afterWindowMs), "history retention must cover both windows");
         positive(b.maxEvents, 20000, "maxEvents"); positive(b.maxCandidates, 1024, "maxCandidates");
@@ -237,7 +240,7 @@ public final class SignalComposerConfig {
     static final class Builder {
         boolean enabled = true;
         Set<String> symbols = new LinkedHashSet<>();
-        long normalTriggerSize = 5000, minimumTriggerSize = 3000, normalConfirmationSize = 5000, observationFloorSize = 3000;
+        long normalTriggerSize = 5000, minimumTriggerSize = 3000, normalConfirmationSize = 5000;
         long beforeWindowMs = 30000, afterWindowMs = 30000;
         int maxPriceDistanceTicks = 20, directionalPriceToleranceTicks = 2, maxTriggerDriftTicks = 20;
         int maxEvents = 2048, maxCandidates = 64, maxWallPhases = 4096, maxAttributionTrades = 8192;

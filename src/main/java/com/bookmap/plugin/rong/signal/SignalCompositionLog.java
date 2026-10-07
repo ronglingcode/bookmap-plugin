@@ -55,7 +55,7 @@ public final class SignalCompositionLog {
     }
     public void event(PatternEvent event) {
         detail("Semantic event " + event.id + " revision=" + event.revision + " interaction=" + event.interactionId
-                + " type=" + event.type + " meaning=" + event.meaning + " size=" + event.size + " basis=" + event.sizeBasis
+                + " type=" + event.type + " meaning=" + event.meaning + " size=" + event.size + " category=" + event.sizeCategory.label + " basis=" + event.sizeBasis
                 + " price=" + event.price + " occurrenceNs=" + event.eventTimeNs + " observedAtNs=" + event.observedAtNs
                 + " provenance=" + event.timestampProvenance + " coverage=" + event.evidence.coverage
                 + " attribution=" + event.evidence.attribution + " removed=" + event.evidence.removedSize

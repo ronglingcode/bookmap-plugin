@@ -30,7 +30,20 @@ Matching uses the same chart/epoch, up to 30 seconds before or after the trigger
 
 ## What the detectors establish
 
-The observer uses its own 3K floor, independent of the legacy percentile threshold. Walls qualify after 500 ms. Snapshot levels still need persistence; a snapshot itself is not a signal.
+The observer uses its own 1K floor, independent of the legacy percentile threshold. This threshold is fixed in code; existing `observationFloorSize` JSON values are ignored. Walls qualify after 500 ms. Snapshot levels still need persistence; a snapshot itself is not a signal. A completed event must measure at least 1K shares, using displayed wall size or removed size according to its size basis.
+
+Every event has an absolute size category, independent of directional meaning and the configurable confirmation baseline:
+
+| Pattern size category | Shares |
+| --- | --- |
+| Least significant | 1,000–2,999 |
+| Below normal | 3,000–4,999 |
+| Normal | 5,000–9,999 |
+| Strong | 10,000–24,999 |
+| Very strong | 25,000–49,999 |
+| Exceptional | 50,000+ |
+
+Least significant patterns enter the same five-minute history and appear in semantic logs and per-stock inspection counts. They cannot become bid candidates, invalidate candidates, or lower the required bid size. Small offer evidence can show waiting context with the normal bid requirement. A size revision crossing 3K updates the category and can promote a bid episode to a candidate; normal signal rules still apply. The 2,048-event cap may evict older records sooner as observation volume increases.
 
 | Behavior | Required observation |
 | --- | --- |

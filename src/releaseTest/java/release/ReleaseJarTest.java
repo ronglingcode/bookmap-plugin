@@ -183,6 +183,7 @@ class ReleaseJarTest {
         Object config = mappedMethod(configName, configName + " parse(com.bookmap.plugin.shaded.gson.JsonObject)", jsonObject).invoke(null, json);
         assertEquals(true, mappedField(configName, "boolean enabled", config));
         assertEquals(6000L, mappedField(configName, "long normalConfirmationSize", config));
+        assertEquals(1000L, mappedField(configName, "long observationFloorSize", config));
         assertEquals(true, mappedMethod(configName, "boolean eligible(java.lang.String)", String.class).invoke(config, "TEST"));
         assertEquals(false, mappedMethod(configName, "boolean eligible(java.lang.String)", String.class).invoke(config, "OTHER"));
         Object template = mappedMethod(configName, configName + " load(java.nio.file.Path)", Path.class)
@@ -190,12 +191,14 @@ class ReleaseJarTest {
         assertEquals(true, mappedField(configName, "boolean valid", template));
         assertEquals(true, mappedField(configName, "boolean enabled", template));
 
-        for (String name : List.of("patterns.PatternEventType", "patterns.PatternMeaning", "patterns.PatternSide",
+        for (String name : List.of("patterns.PatternEventType", "patterns.PatternMeaning", "patterns.PatternSide", "patterns.PatternSizeCategory",
                 "signal.ConfirmationStrength", "signal.SignalState", "signal.ResetReason")) {
             Class<?> type = mappedClass(root + name);
             for (Object value : type.getEnumConstants()) assertSame(value, enumValue(root + name, ((Enum<?>)value).name()));
         }
         String composerName = root + "signal.SignalComposer", eventName = root + "patterns.PatternEvent";
+        Object small = releaseEvent("BIDS_CANCELLED", 1000, 5105, 50, "small");
+        assertEquals("LEAST_SIGNIFICANT", ((Enum<?>)mappedField(eventName, root + "patterns.PatternSizeCategory sizeCategory", small)).name());
         Object composer = mappedClass(composerName).getConstructor(String.class, long.class, mappedClass(configName)).newInstance("TEST", 1L, config);
         Method observe = mappedMethod(composerName, root + "signal.CompositionUpdate onPatternEvent(" + eventName + ")", mappedClass(eventName));
         Object pending = observe.invoke(composer, releaseEvent("BIDS_CANCELLED", 3000, 5105, 100, "bid"));

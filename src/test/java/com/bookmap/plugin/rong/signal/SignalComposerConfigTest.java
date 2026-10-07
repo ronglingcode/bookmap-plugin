@@ -16,7 +16,7 @@ class SignalComposerConfigTest {
     }
     @Test void invalidSettingsAreDisabledWithAnActionableReason() {
         String[] invalid = {"{\"enabled\":\"true\"}", "{\"maxEvents\":1.5}", "{\"normalTriggerSize\":0}",
-                "{\"normalTriggerSize\":6000}", "{\"observationFloorSize\":5000}",
+                "{\"normalTriggerSize\":6000}", "{\"minimumTriggerSize\":2000}",
                 "{\"strengthMultiples\":{\"strong\":0.5}}", "{\"triggerRequirements\":{\"exceptional\":2000}}",
                 "{\"beforeWindowMs\":300001}", "{\"detectors\":{\"consumptionRatio\":2}}",
                 "{\"detectors\":{\"withdrawalMaxTradeRatio\":0.8}}", "{\"maxCandidates\":1000000}",
@@ -43,7 +43,7 @@ class SignalComposerConfigTest {
         SignalComposerConfig c = SignalComposerConfig.defaults();
         assertTrue(c.enabled); assertTrue(c.valid); assertTrue(c.symbols.isEmpty());
         assertEquals(5000, c.normalTriggerSize); assertEquals(5000, c.normalConfirmationSize);
-        assertEquals(3000, c.minimumTriggerSize); assertEquals(3000, c.observationFloorSize);
+        assertEquals(3000, c.minimumTriggerSize); assertEquals(1000, c.observationFloorSize);
         assertEquals(300000, c.historyRetentionMs); assertEquals(30000, c.beforeWindowMs); assertEquals(30000, c.afterWindowMs);
         assertEquals(20, c.maxPriceDistanceTicks); assertEquals(2, c.directionalPriceToleranceTicks);
         assertEquals(20, c.maxTriggerDriftTicks); assertEquals(2048, c.maxEvents); assertEquals(64, c.maxCandidates);
@@ -52,6 +52,14 @@ class SignalComposerConfigTest {
     @Test void explicitDisableOverridesEnabledDefault() {
         SignalComposerConfig c = parse("{\"enabled\":false}");
         assertTrue(c.valid); assertFalse(c.enabled);
+    }
+    @Test void localObservationFloorsCannotOverrideCodeOwnedTrackingThreshold() {
+        for (String value : new String[] {"3000", "5000", "null", "\"invalid\""}) {
+            SignalComposerConfig c = parse("{\"observationFloorSize\":" + value + "}");
+            assertTrue(c.valid, c.error);
+            assertEquals(1000, c.observationFloorSize);
+            assertEquals(SignalComposerConfig.defaults().revision, c.revision);
+        }
     }
     @Test void defaultsDefineAllSixRequirementsWithoutScores() {
         SignalComposerConfig c = SignalComposerConfig.defaults();

@@ -9,6 +9,8 @@ public final class ConfirmationStrengthClassifier {
     public ConfirmationStrengthClassifier(SignalComposerConfig config) { this.config = config; }
     public ConfirmationStrength classify(long size) {
         if (size <= 0) return ConfirmationStrength.NONE;
+        if (size < com.bookmap.plugin.rong.patterns.PatternSizeCategory.BELOW_NORMAL.minimumSize)
+            return ConfirmationStrength.BELOW_NORMAL;
         if (atLeast(size, config.strengthMultiples.exceptional)) return ConfirmationStrength.EXCEPTIONAL;
         if (atLeast(size, config.strengthMultiples.veryStrong)) return ConfirmationStrength.VERY_STRONG;
         if (atLeast(size, config.strengthMultiples.strong)) return ConfirmationStrength.STRONG;
