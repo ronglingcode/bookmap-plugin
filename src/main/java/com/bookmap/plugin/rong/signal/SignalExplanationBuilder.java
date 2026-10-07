@@ -52,10 +52,12 @@ public final class SignalExplanationBuilder {
                 return "Persistent displayed bids withdrew with little matching observed sell volume and no probable relocation; cancellation is inferred, not confirmed individual-order activity.";
             case BID_BREAKDOWN:
                 return "Bid loss was attributed to observed selling, followed by a trade below the bid level.";
-            case OFFER_REJECTION:
-                return "Price approached the persistent offer from below and rejected downward for the required hold interval.";
-            case OFFER_SIZE_INCREASING_REJECTION:
-                return "The offer grew during the interaction, then price approached and rejected downward while the offer remained present.";
+            case BID_HOLD:
+                return "Price tested a persistent bid from above and rebounded from the test low by the required wall-price percentage, confirmed by subsequent trades while the bid remained present.";
+            case OFFER_HOLD:
+                return "Price tested a persistent offer from below and retreated from the test high by the required wall-price percentage, confirmed by subsequent trades while the offer remained present.";
+            case OFFER_SIZE_INCREASING_HOLD:
+                return "The offer grew, then price completed the percentage-based offer hold while the offer remained present.";
             case OFFER_BREAKOUT:
                 return "Offer loss was attributed to observed buying, followed by a trade above the offer level.";
             case OFFER_SIZE_INCREASE:

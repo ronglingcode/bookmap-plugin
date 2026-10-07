@@ -56,8 +56,9 @@ public final class SignalComposerConfig {
 
     public static SignalComposerConfig load() {
         try {
-            String fallback = Path.of(System.getProperty("user.home"), "bmtrader", "signal-composer.json").toString();
-            return load(Path.of(System.getProperty(CONFIG_PROPERTY, fallback)));
+            // Shipped code defaults are portable; machine-local files require explicit opt-in.
+            String configured = System.getProperty(CONFIG_PROPERTY);
+            return configured == null || configured.isBlank() ? defaults() : load(Path.of(configured));
         } catch (RuntimeException ex) { return invalid("cannot locate configuration: " + ex.getMessage()); }
     }
 
@@ -125,7 +126,7 @@ public final class SignalComposerConfig {
             v.clearDecisionMs = integer(d, "clearDecisionMs", v.clearDecisionMs);
             v.attributionLookbackMs = integer(d, "attributionLookbackMs", v.attributionLookbackMs);
             v.movePairWindowMs = integer(d, "movePairWindowMs", v.movePairWindowMs);
-            v.rejectionHoldMs = integer(d, "rejectionHoldMs", v.rejectionHoldMs);
+            v.holdConfirmationMs = integer(d, "holdConfirmationMs", v.holdConfirmationMs);
             v.interactionWindowMs = integer(d, "interactionWindowMs", v.interactionWindowMs);
             v.breakoutWindowMs = integer(d, "breakoutWindowMs", v.breakoutWindowMs);
             v.clearRemainingRatio = decimal(d, "clearRemainingRatio", v.clearRemainingRatio);
@@ -133,8 +134,8 @@ public final class SignalComposerConfig {
             v.withdrawalMaxTradeRatio = decimal(d, "withdrawalMaxTradeRatio", v.withdrawalMaxTradeRatio);
             v.moveSizeToleranceRatio = decimal(d, "moveSizeToleranceRatio", v.moveSizeToleranceRatio);
             v.growthRatio = decimal(d, "growthRatio", v.growthRatio);
-            v.approachDistanceTicks = smallInteger(d, "approachDistanceTicks", v.approachDistanceTicks);
-            v.rejectionDistanceTicks = smallInteger(d, "rejectionDistanceTicks", v.rejectionDistanceTicks);
+            v.holdApproachRatio = decimal(d, "holdApproachRatio", v.holdApproachRatio);
+            v.holdRetreatRatio = decimal(d, "holdRetreatRatio", v.holdRetreatRatio);
             v.breakoutDistanceTicks = smallInteger(d, "breakoutDistanceTicks", v.breakoutDistanceTicks);
             validate(b);
             return new SignalComposerConfig(b);
@@ -167,14 +168,15 @@ public final class SignalComposerConfig {
         DetectorBuilder d = b.detectors;
         positive(d.wallLifetimeMs, 60000, "wallLifetimeMs"); positive(d.clearDecisionMs, 60000, "clearDecisionMs");
         positive(d.attributionLookbackMs, 60000, "attributionLookbackMs"); positive(d.movePairWindowMs, 60000, "movePairWindowMs");
-        positive(d.rejectionHoldMs, 60000, "rejectionHoldMs"); positive(d.interactionWindowMs, 60000, "interactionWindowMs");
+        positive(d.holdConfirmationMs, 60000, "holdConfirmationMs"); positive(d.interactionWindowMs, 60000, "interactionWindowMs");
         positive(d.breakoutWindowMs, 60000, "breakoutWindowMs");
-        require(d.rejectionHoldMs <= d.interactionWindowMs, "rejection hold exceeds interaction window");
+        require(d.holdConfirmationMs <= d.interactionWindowMs, "hold confirmation exceeds interaction window");
         ratio(d.clearRemainingRatio, "clearRemainingRatio"); ratio(d.consumptionRatio, "consumptionRatio");
         ratio(d.withdrawalMaxTradeRatio, "withdrawalMaxTradeRatio"); ratio(d.moveSizeToleranceRatio, "moveSizeToleranceRatio");
         require(d.clearRemainingRatio < 1 && d.consumptionRatio > d.withdrawalMaxTradeRatio, "clear and attribution ratios conflict");
         require(d.growthRatio > 0 && d.growthRatio <= 100, "growthRatio must be in (0,100]");
-        positive(d.approachDistanceTicks, 100000, "approachDistanceTicks"); positive(d.rejectionDistanceTicks, 100000, "rejectionDistanceTicks");
+        require(d.holdApproachRatio > 0 && d.holdApproachRatio < 1, "holdApproachRatio must be in (0,1)");
+        require(d.holdRetreatRatio > 0 && d.holdRetreatRatio < 1, "holdRetreatRatio must be in (0,1)");
         positive(d.breakoutDistanceTicks, 100000, "breakoutDistanceTicks");
     }
     private static void require(boolean test, String message) { if (!test) throw new IllegalArgumentException(message); }
@@ -222,8 +224,8 @@ public final class SignalComposerConfig {
         d.addProperty("clearDecisionMs", detectors.clearDecisionMs); d.addProperty("attributionLookbackMs", detectors.attributionLookbackMs);
         d.addProperty("consumptionRatio", detectors.consumptionRatio); d.addProperty("withdrawalMaxTradeRatio", detectors.withdrawalMaxTradeRatio);
         d.addProperty("movePairWindowMs", detectors.movePairWindowMs); d.addProperty("moveSizeToleranceRatio", detectors.moveSizeToleranceRatio);
-        d.addProperty("approachDistanceTicks", detectors.approachDistanceTicks); d.addProperty("rejectionDistanceTicks", detectors.rejectionDistanceTicks);
-        d.addProperty("rejectionHoldMs", detectors.rejectionHoldMs); d.addProperty("interactionWindowMs", detectors.interactionWindowMs);
+        d.addProperty("holdApproachRatio", detectors.holdApproachRatio); d.addProperty("holdRetreatRatio", detectors.holdRetreatRatio);
+        d.addProperty("holdConfirmationMs", detectors.holdConfirmationMs); d.addProperty("interactionWindowMs", detectors.interactionWindowMs);
         d.addProperty("growthRatio", detectors.growthRatio); d.addProperty("breakoutDistanceTicks", detectors.breakoutDistanceTicks);
         d.addProperty("breakoutWindowMs", detectors.breakoutWindowMs); j.add("detectors", d);
         return j;
@@ -264,24 +266,26 @@ public final class SignalComposerConfig {
     }
     static final class DetectorBuilder {
         long wallLifetimeMs = 500, clearDecisionMs = 500, attributionLookbackMs = 2000, movePairWindowMs = 500;
-        long rejectionHoldMs = 200, interactionWindowMs = 5000, breakoutWindowMs = 3000;
+        long holdConfirmationMs = 500, interactionWindowMs = 15000, breakoutWindowMs = 3000;
         double clearRemainingRatio = .1, consumptionRatio = .7, withdrawalMaxTradeRatio = .1;
         double moveSizeToleranceRatio = .1, growthRatio = .25;
-        int approachDistanceTicks = 2, rejectionDistanceTicks = 2, breakoutDistanceTicks = 1;
+        double holdApproachRatio = .0005, holdRetreatRatio = .001;
+        int breakoutDistanceTicks = 1;
     }
     public static final class DetectorSettings {
         public final long wallLifetimeMs, clearDecisionMs, attributionLookbackMs, movePairWindowMs;
-        public final long rejectionHoldMs, interactionWindowMs, breakoutWindowMs;
+        public final long holdConfirmationMs, interactionWindowMs, breakoutWindowMs;
         public final double clearRemainingRatio, consumptionRatio, withdrawalMaxTradeRatio, moveSizeToleranceRatio, growthRatio;
-        public final int approachDistanceTicks, rejectionDistanceTicks, breakoutDistanceTicks;
+        public final double holdApproachRatio, holdRetreatRatio;
+        public final int breakoutDistanceTicks;
         private DetectorSettings(DetectorBuilder b) {
             wallLifetimeMs = b.wallLifetimeMs; clearDecisionMs = b.clearDecisionMs;
             attributionLookbackMs = b.attributionLookbackMs; movePairWindowMs = b.movePairWindowMs;
-            rejectionHoldMs = b.rejectionHoldMs; interactionWindowMs = b.interactionWindowMs; breakoutWindowMs = b.breakoutWindowMs;
+            holdConfirmationMs = b.holdConfirmationMs; interactionWindowMs = b.interactionWindowMs; breakoutWindowMs = b.breakoutWindowMs;
             clearRemainingRatio = b.clearRemainingRatio; consumptionRatio = b.consumptionRatio;
             withdrawalMaxTradeRatio = b.withdrawalMaxTradeRatio; moveSizeToleranceRatio = b.moveSizeToleranceRatio;
-            growthRatio = b.growthRatio; approachDistanceTicks = b.approachDistanceTicks;
-            rejectionDistanceTicks = b.rejectionDistanceTicks; breakoutDistanceTicks = b.breakoutDistanceTicks;
+            growthRatio = b.growthRatio; holdApproachRatio = b.holdApproachRatio;
+            holdRetreatRatio = b.holdRetreatRatio; breakoutDistanceTicks = b.breakoutDistanceTicks;
         }
     }
 }

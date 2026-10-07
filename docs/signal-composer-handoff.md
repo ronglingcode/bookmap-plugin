@@ -7,7 +7,7 @@ Review the [checklist](signal-composer-tasks.md), [per-task progress](signal-com
 ## What is implemented
 
 - Independent market-time observation with a 3K wall floor, persistence/readiness/session gates, bounded buffers, explicit trade coverage and probable-relocation evidence.
-- Normalized bid/offer reappear and step observations; inferred bid withdrawal, consumed-bid breakdown, offer rejection, growth-plus-rejection, and consumed-offer breakout.
+- Normalized bid/offer reappear and step observations; inferred bid withdrawal, consumed-bid breakdown, percentage-based bid/offer holds, growth-plus-offer-hold, and consumed-offer breakout.
 - Mandatory directional bid triggers, strongest compatible offer evidence, exact strength bands, 5K/4K/3K trigger policy with hard 3K minimum, pending promotion, same-ID revisions, and immutable first validation.
 - Scoped history/candidates, expiry/opposing/drift invalidation, fresh epochs after seek/gap, and lifecycle clearing across shared toggles and attachment teardown.
 - Shared immutable configuration per activation, an independent advisory checkbox, symbol filtering, credential-free observer settings, immutable display store, validation-anchored marker badges, and separate waiting context.

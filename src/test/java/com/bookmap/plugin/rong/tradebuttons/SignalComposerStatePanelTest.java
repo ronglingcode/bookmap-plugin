@@ -110,7 +110,7 @@ class SignalComposerStatePanelTest {
 
     @Test void preferredSizeQueriesDuringRefreshAndResizeDoNotInvalidateBoxLayoutCalculations() throws Exception {
         SwingUtilities.invokeAndWait(() -> {
-            PatternEvent pattern = PatternEvent.builder("AMD", 1, PatternEventType.OFFER_SIZE_INCREASING_REJECTION, "offer")
+            PatternEvent pattern = PatternEvent.builder("AMD", 1, PatternEventType.OFFER_SIZE_INCREASING_HOLD, "offer")
                     .size(1465, PatternEvent.SizeBasis.DISPLAYED_WALL).price(648, 1).times(100, 100).build();
             List<SignalComposerInspection.Event> events = List.of(new SignalComposerInspection.Event(pattern, "Expired"));
             AtomicReference<SignalComposerInspection> snapshot = new AtomicReference<>(new SignalComposerInspection("", "", List.of()));
@@ -146,7 +146,7 @@ class SignalComposerStatePanelTest {
 
     @Test void eventLinesFitViewportAndWrapLongNamesWithoutHorizontalScrolling() throws Exception {
         SwingUtilities.invokeAndWait(() -> {
-            PatternEvent pattern = PatternEvent.builder("AMD", 1, PatternEventType.OFFER_SIZE_INCREASING_REJECTION, "offer")
+            PatternEvent pattern = PatternEvent.builder("AMD", 1, PatternEventType.OFFER_SIZE_INCREASING_HOLD, "offer")
                     .size(1465, PatternEvent.SizeBasis.DISPLAYED_WALL).price(648, 1).times(100, 100).build();
             List<SignalComposerInspection.Event> events = List.of(new SignalComposerInspection.Event(pattern, "Expired"));
             SignalComposerStatePanel panel = new SignalComposerStatePanel(() -> new SignalComposerInspection("", "", List.of(
@@ -160,7 +160,7 @@ class SignalComposerStatePanelTest {
                 assertFalse(scroll.getHorizontalScrollBar().isVisible());
                 for (JTextArea line : descendants(panel, JTextArea.class)) {
                     if (!"patternEvent".equals(line.getName()) || !line.isVisible()) continue;
-                    assertTrue(line.getText().endsWith("1.4K @ 648, Offer size increasing rejection"));
+                    assertTrue(line.getText().endsWith("1.4K @ 648, Offer size increasing hold"));
                     assertTrue(line.getLineWrap());
                     assertTrue(line.getHeight() >= line.getPreferredSize().height,
                             "panel " + width + " line " + line.getSize() + " preferred " + line.getPreferredSize());

@@ -31,11 +31,11 @@ class SignalCompositionPipelineTest {
     private Harness shortExample(long receipt) {
         Harness h = new Harness(receipt);
         h.depth(false, 5120, 48000, 2000); h.depth(true, 5105, 3000, 2000); h.time(2500);
-        h.depth(false, 5120, 60000, 2600); h.trade(5119, 1, true, 2700); h.trade(5118, 1, false, 2800); h.time(3000);
+        h.depth(false, 5120, 60000, 2600); h.trade(5119, 1, true, 2700); h.trade(5113, 1, false, 2800); h.trade(5113, 1, false, 3300);
         assertTrue(h.signals.isEmpty()); assertEquals(3000, h.latest.contexts.get(Direction.SHORT).requiredTriggerSize);
-        h.depth(true, 5105, 0, 3100); h.time(3600); return h;
+        h.depth(true, 5105, 0, 3400); h.time(3900); return h;
     }
-    @Test void rawSixtyThousandGrowthRejectionAndThreeThousandWithdrawalProduceOneShort() {
+    @Test void rawSixtyThousandGrowingOfferHoldAndThreeThousandWithdrawalProduceOneShort() {
         Harness h = shortExample(1000); assertEquals(1, h.signals.size());
         assertTrue(h.book.getSizeThreshold(5000, 97) > 5000);
         TradingSignal signal = h.signals.get(0); assertEquals(Direction.SHORT, signal.direction);
@@ -59,11 +59,25 @@ class SignalCompositionPipelineTest {
     }
     @Test void offerOnlyAndFallbackNeverCreateSignalsAndSeekClearsContext() {
         Harness h = new Harness(1000); h.depth(false, 5120, 48000, 2000); h.time(2500);
-        h.depth(false, 5120, 60000, 2600); h.trade(5119, 1, true, 2700); h.trade(5118, 1, false, 2800); h.time(3000);
+        h.depth(false, 5120, 60000, 2600); h.trade(5119, 1, true, 2700); h.trade(5113, 1, false, 2800); h.trade(5113, 1, false, 3300);
         assertTrue(h.signals.isEmpty()); assertFalse(h.latest.contexts.isEmpty());
-        h.pipeline.onDepth(true, 5105, 3000, BASE + 3_100_000_000L, PatternEvent.TimestampProvenance.FALLBACK);
+        h.pipeline.onDepth(true, 5105, 3000, BASE + 3_400_000_000L, PatternEvent.TimestampProvenance.FALLBACK);
         h.pipeline.onDepth(true, 5105, 0, BASE + 3_700_000_000L, PatternEvent.TimestampProvenance.FALLBACK);
         h.time(4000); assertTrue(h.signals.isEmpty());
         h.time(1000); assertTrue(h.latest.contexts.isEmpty()); assertFalse(h.pipeline.usable());
     }
+    @Test void testedBidHoldCanTriggerLongWithoutOfferConfirmation() {
+        Harness h = new Harness(1000);
+        h.trade(5130, 1, true, 100);
+        h.depth(true, 5100, 6000, 2000); h.time(2500);
+        h.trade(5101, 1, false, 2600); h.trade(5107, 1, true, 2700);
+        h.time(3200); assertTrue(h.signals.isEmpty());
+        h.trade(5107, 1, true, 3200);
+        assertEquals(1, h.signals.size());
+        assertEquals(PatternEventType.BID_HOLD, h.signals.get(0).trigger.type);
+        assertEquals(Direction.LONG, h.signals.get(0).direction);
+        assertEquals(ConfirmationStrength.NONE, h.signals.get(0).firstValidation.confirmationStrength);
+        assertTrue(h.signals.get(0).explanation.contains("test low"));
+    }
+
 }

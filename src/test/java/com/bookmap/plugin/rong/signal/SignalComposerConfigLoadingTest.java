@@ -36,4 +36,29 @@ class SignalComposerConfigLoadingTest {
         assertNotNull(configured); assertTrue(configured.endsWith("no-signal-composer-config.json"));
         assertTrue(SignalComposerConfig.load().enabled);
     }
+    @Test void defaultStartupUsesShippedRulesEvenWithAStaleHomeDirectoryFile() throws IOException {
+        String configured = System.getProperty(SignalComposerConfig.CONFIG_PROPERTY);
+        String previousHome = System.getProperty("user.home");
+        Path home = directory.resolve("home");
+        Path rules = home.resolve("bmtrader").resolve("signal-composer.json");
+        Files.createDirectories(rules.getParent());
+        Files.writeString(rules, "{\"enabled\":false,\"detectors\":{\"holdApproachRatio\":0.01,\"holdRetreatRatio\":0.02,\"interactionWindowMs\":5000}}");
+        try {
+            System.setProperty("user.home", home.toString());
+            System.clearProperty(SignalComposerConfig.CONFIG_PROPERTY);
+            assertEquals(SignalComposerConfig.defaults().toJson(), SignalComposerConfig.load().toJson());
+            Files.writeString(rules, "{broken");
+            assertEquals(SignalComposerConfig.defaults().revision, SignalComposerConfig.load().revision);
+            System.setProperty(SignalComposerConfig.CONFIG_PROPERTY, " ");
+            assertEquals(SignalComposerConfig.defaults().revision, SignalComposerConfig.load().revision);
+            // Other settings can still be overridden by deliberately opting in to a file.
+            Files.writeString(rules, "{\"enabled\":false}");
+            System.setProperty(SignalComposerConfig.CONFIG_PROPERTY, rules.toString());
+            assertFalse(SignalComposerConfig.load().enabled);
+        } finally {
+            if (previousHome == null) System.clearProperty("user.home"); else System.setProperty("user.home", previousHome);
+            if (configured == null) System.clearProperty(SignalComposerConfig.CONFIG_PROPERTY);
+            else System.setProperty(SignalComposerConfig.CONFIG_PROPERTY, configured);
+        }
+    }
 }

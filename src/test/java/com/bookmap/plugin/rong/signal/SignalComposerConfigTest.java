@@ -75,9 +75,40 @@ class SignalComposerConfigTest {
         assertEquals(2000, d.attributionLookbackMs); assertEquals(.1, d.clearRemainingRatio);
         assertEquals(.7, d.consumptionRatio); assertEquals(.1, d.withdrawalMaxTradeRatio);
         assertEquals(500, d.movePairWindowMs); assertEquals(.1, d.moveSizeToleranceRatio);
-        assertEquals(2, d.approachDistanceTicks); assertEquals(2, d.rejectionDistanceTicks);
-        assertEquals(200, d.rejectionHoldMs); assertEquals(5000, d.interactionWindowMs);
+        assertEquals(.0005, d.holdApproachRatio); assertEquals(.001, d.holdRetreatRatio);
+        assertEquals(500, d.holdConfirmationMs); assertEquals(15000, d.interactionWindowMs);
         assertEquals(.25, d.growthRatio); assertEquals(1, d.breakoutDistanceTicks); assertEquals(3000, d.breakoutWindowMs);
         assertThrows(UnsupportedOperationException.class, () -> SignalComposerConfig.defaults().symbols.add("TEST"));
     }
+    @Test void percentageHoldSettingsRoundTripAndRejectInvalidValues() {
+        JsonObject json = new JsonObject(), detectors = new JsonObject();
+        detectors.addProperty("holdApproachRatio", .0008);
+        detectors.addProperty("holdRetreatRatio", .002);
+        detectors.addProperty("holdConfirmationMs", 700);
+        json.add("detectors", detectors);
+        SignalComposerConfig c = SignalComposerConfig.parse(json);
+        assertTrue(c.valid, c.error);
+        assertEquals(.0008, c.detectors.holdApproachRatio);
+        assertEquals(.002, c.detectors.holdRetreatRatio);
+        assertEquals(700, c.detectors.holdConfirmationMs);
+        assertEquals(c.revision, SignalComposerConfig.parse(c.toJson()).revision);
+        assertFalse(c.toJson().getAsJsonObject("detectors").has("approachDistanceTicks"));
+        for (String key : new String[] {"holdApproachRatio", "holdRetreatRatio"}) {
+            for (double value : new double[] {0, -.01, 1, 2}) {
+                JsonObject invalid = c.toJson(); invalid.getAsJsonObject("detectors").addProperty(key, value);
+                assertFalse(SignalComposerConfig.parse(invalid).valid, key + "=" + value);
+            }
+        }
+        JsonObject invalid = c.toJson(); invalid.getAsJsonObject("detectors").addProperty("holdConfirmationMs", 15001);
+        assertFalse(SignalComposerConfig.parse(invalid).valid);
+    }
+    @Test void legacyTickHoldKeysDoNotChangePercentageDefaults() {
+        JsonObject json = new JsonObject(), detectors = new JsonObject();
+        detectors.addProperty("approachDistanceTicks", 2);
+        detectors.addProperty("rejectionDistanceTicks", 2);
+        detectors.addProperty("rejectionHoldMs", 200);
+        json.add("detectors", detectors);
+        assertEquals(SignalComposerConfig.defaults().revision, SignalComposerConfig.parse(json).revision);
+    }
+
 }

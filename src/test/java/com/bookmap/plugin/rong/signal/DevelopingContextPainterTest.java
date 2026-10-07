@@ -16,7 +16,7 @@ class DevelopingContextPainterTest {
         try {
             painter.registerInstrument("TEST"); painter.createScreenSpacePainter("TEST", "signalComposer_TEST", canvas.factory);
             SignalComposer c = new SignalComposer("TEST", 1, SignalComposerConfig.defaults(), receipt::get);
-            store.publish("TEST", 1, c.onPatternEvent(event(PatternEventType.OFFER_REJECTION, 60000, 5120, 100, "short")));
+            store.publish("TEST", 1, c.onPatternEvent(event(PatternEventType.OFFER_HOLD, 60000, 5120, 100, "short")));
             store.publish("TEST", 1, c.onPatternEvent(event(PatternEventType.OFFER_BREAKOUT, 5000, 5120, 100, "long")));
             java.util.List<String> initial = TradingSignalPainter.contextLines(store.snapshot("TEST"));
             String text = String.join("\n", initial);

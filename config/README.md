@@ -1,8 +1,11 @@
 # Local credentials
 
-SignalComposer uses a separate optional [rule template](signal-composer.template.json)
-at `%USERPROFILE%\bmtrader\signal-composer.json`. See the [operator guide](../docs/signal-composer.md)
-for the advisory switch, exact defaults, all-attachment rule reload, and credential-free replay.
+SignalComposer rules are defined in tracked Java source and compiled into the JAR;
+no composer JSON needs to be copied between machines. The tracked
+[rule template](signal-composer.template.json) documents and is tested against all defaults.
+A custom rules file is read only with the explicit `bmtrader.signalComposerConfig` JVM property.
+See the [operator guide](../docs/signal-composer.md) for the advisory switch, exact defaults,
+all-attachment rule reload, and credential-free replay.
 The existing `cairo-observation.json` `observerOnly` mode permits observation settings and
 attachment without secrets; ordinary missing-secrets attachment remains inactive.
 

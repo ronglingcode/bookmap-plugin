@@ -36,10 +36,10 @@ class SignalComposerCallbacksTest {
             enableConfig(); RongPlugin p = callbackPlugin(); time(p, 0); p.onSnapshotEnd(); p.onBbo(5100, 1, 5121, 1);
             time(p, 2000); p.onDepth(false, 5120, 48000); p.onDepth(true, 5105, 3000); time(p, 2500);
             time(p, 2600); p.onDepth(false, 5120, 60000); time(p, 2700); p.onTrade(5119, 1, null);
-            time(p, 2800); p.onTrade(5118, 1, null); time(p, 3000);
+            time(p, 2800); p.onTrade(5113, 1, null); time(p, 3300); p.onTrade(5113, 1, null);
             assertTrue(store().snapshot("TEST").signals.isEmpty());
             assertEquals(3000, store().snapshot("TEST").contexts.get(Direction.SHORT).requiredTriggerSize);
-            time(p, 3100); p.onDepth(true, 5105, 0); time(p, 3600);
+            time(p, 3400); p.onDepth(true, 5105, 0); time(p, 3900);
             assertEquals(1, store().snapshot("TEST").signals.size());
             assertEquals(Direction.SHORT, store().snapshot("TEST").signals.get(0).direction);
             assertFalse(field("patternAutomationEnabled").getBoolean(p)); assertNull(field("patternEngine").get(p));

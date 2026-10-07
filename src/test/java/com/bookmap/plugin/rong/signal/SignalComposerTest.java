@@ -11,7 +11,7 @@ class SignalComposerTest {
         long start = 1_000_000_000L, later = start + 240_000_000_000L;
         SignalComposer bidFirst = composer();
         bidFirst.onPatternEvent(event(PatternEventType.BIDS_CANCELLED, 3000, 5105, start, "bid"));
-        assertEquals(1, bidFirst.onPatternEvent(event(PatternEventType.OFFER_REJECTION, 60000, 5120, later, "offer")).signals.size());
+        assertEquals(1, bidFirst.onPatternEvent(event(PatternEventType.OFFER_HOLD, 60000, 5120, later, "offer")).signals.size());
         SignalComposer offerFirst = composer();
         offerFirst.onPatternEvent(event(PatternEventType.OFFER_BREAKOUT, 60000, 5120, start, "offer"));
         assertEquals(1, offerFirst.onPatternEvent(event(PatternEventType.BID_STEP_UP, 3000, 5105, later, "bid")).signals.size());
@@ -25,7 +25,7 @@ class SignalComposerTest {
     }
     @Test void offerOnlyProducesSeparateWaitingContextsWithoutSignals() {
         SignalComposer c = composer();
-        CompositionUpdate bearish = c.onPatternEvent(event(PatternEventType.OFFER_REJECTION, 60000, 5120, 100, "bear"));
+        CompositionUpdate bearish = c.onPatternEvent(event(PatternEventType.OFFER_HOLD, 60000, 5120, 100, "bear"));
         assertTrue(bearish.signals.isEmpty());
         DevelopingContext shortContext = bearish.contexts.get(Direction.SHORT);
         assertEquals(PatternMeaning.BID_FAIL, shortContext.waitingFor);
@@ -38,10 +38,10 @@ class SignalComposerTest {
         assertThrows(UnsupportedOperationException.class, () -> both.contexts.clear());
     }
     @Test void contextExpiresOnMarketTimeAndResetAndRequiresLocalPrice() {
-        SignalComposer c = composer(); c.onPatternEvent(event(PatternEventType.OFFER_REJECTION, 60000, 5120, 100, "o"));
+        SignalComposer c = composer(); c.onPatternEvent(event(PatternEventType.OFFER_HOLD, 60000, 5120, 100, "o"));
         assertEquals(1, c.onMarketTime(300_000_000_100L).contexts.size());
         assertTrue(c.onMarketTime(300_000_000_101L).contexts.isEmpty());
-        c = composer(); c.onPatternEvent(event(PatternEventType.OFFER_REJECTION, 60000, 5120, 100, "o"));
+        c = composer(); c.onPatternEvent(event(PatternEventType.OFFER_HOLD, 60000, 5120, 100, "o"));
         assertEquals(1, c.onMarketPrice(5100, 5101, 0).contexts.size());
         assertTrue(c.onMarketPrice(5099, 5100, 0).contexts.isEmpty());
         assertTrue(c.reset(ResetReason.DISABLED, 2).contexts.isEmpty());
@@ -51,7 +51,7 @@ class SignalComposerTest {
         assertTrue(c.onMarketTime(300_000_000_100L).transitions.isEmpty());
         CompositionUpdate expired = c.onMarketTime(300_000_000_101L);
         assertEquals(SignalState.EXPIRED, expired.transitions.get(0).current);
-        assertTrue(c.onPatternEvent(event(PatternEventType.OFFER_REJECTION, 60000, 5120, 300_000_000_200L, "o")).signals.isEmpty());
+        assertTrue(c.onPatternEvent(event(PatternEventType.OFFER_HOLD, 60000, 5120, 300_000_000_200L, "o")).signals.isEmpty());
     }
     @Test void opposingBidInvalidationKeepsHistoricalSignalUnchanged() {
         SignalComposer c = composer();
@@ -78,7 +78,7 @@ class SignalComposerTest {
     @Test void resetClearsEpochAndRejectsOldContext() {
         SignalComposer c = composer(); c.onPatternEvent(event(PatternEventType.BIDS_CANCELLED, 3000, 5105, 100, "b"));
         c.reset(ResetReason.REPLAY_SEEK, 2); assertTrue(c.candidateStates().isEmpty());
-        assertTrue(c.onPatternEvent(event(PatternEventType.OFFER_REJECTION, 60000, 5120, 200, "old")).signals.isEmpty());
+        assertTrue(c.onPatternEvent(event(PatternEventType.OFFER_HOLD, 60000, 5120, 200, "old")).signals.isEmpty());
         assertTrue(c.onMarketTime(1).transitions.isEmpty());
         assertThrows(IllegalArgumentException.class, () -> c.onMarketTime(0));
     }
@@ -106,7 +106,7 @@ class SignalComposerTest {
     @Test void subsequentExceptionalConfirmationLeavesOriginalAcceptanceFrozen() {
         SignalComposer c = composer();
         TradingSignal first = c.onPatternEvent(event(PatternEventType.BID_BREAKDOWN, 5000, 5105, 100, "b")).signals.get(0);
-        TradingSignal revised = c.onPatternEvent(event(PatternEventType.OFFER_REJECTION, 60000, 5120, 200, "o")).signals.get(0);
+        TradingSignal revised = c.onPatternEvent(event(PatternEventType.OFFER_HOLD, 60000, 5120, 200, "o")).signals.get(0);
         assertEquals(5000, revised.firstValidation.appliedTriggerThreshold);
         assertEquals(ConfirmationStrength.NONE, revised.firstValidation.confirmationStrength);
         assertEquals(ConfirmationStrength.EXCEPTIONAL, revised.latestConfirmationStrength);
@@ -115,14 +115,14 @@ class SignalComposerTest {
     @Test void laterExceptionalOfferPromotesPendingTriggerAtObservationTime() {
         SignalComposer c = composer();
         assertTrue(c.onPatternEvent(event(PatternEventType.BIDS_CANCELLED, 3000, 5105, 100, "b")).signals.isEmpty());
-        TradingSignal result = c.onPatternEvent(event(PatternEventType.OFFER_REJECTION, 60000, 5120, 200, "o")).signals.get(0);
+        TradingSignal result = c.onPatternEvent(event(PatternEventType.OFFER_HOLD, 60000, 5120, 200, "o")).signals.get(0);
         assertEquals(200, result.firstValidation.eventTimeNs); assertEquals(100, result.trigger.eventTimeNs);
         assertEquals(3000, result.firstValidation.appliedTriggerThreshold);
     }
     @Test void laterConfirmationEnrichesExistingSignalInsteadOfCreatingAnother() {
         SignalComposer c = composer();
         TradingSignal first = c.onPatternEvent(event(PatternEventType.BID_BREAKDOWN, 5000, 5105, 100, "b")).signals.get(0);
-        TradingSignal revised = c.onPatternEvent(event(PatternEventType.OFFER_REJECTION, 15000, 5120, 200, "o")).signals.get(0);
+        TradingSignal revised = c.onPatternEvent(event(PatternEventType.OFFER_HOLD, 15000, 5120, 200, "o")).signals.get(0);
         assertEquals(first.id, revised.id); assertEquals(2, revised.revision); assertSame(first.firstValidation, revised.firstValidation);
         assertEquals(ConfirmationStrength.NONE, revised.firstValidation.confirmationStrength);
         assertEquals(ConfirmationStrength.STRONG, revised.latestConfirmationStrength);
@@ -132,12 +132,12 @@ class SignalComposerTest {
         SignalComposer c = composer();
         c.onPatternEvent(event(PatternEventType.BIDS_CANCELLED, 3000, 5105, 100, "b1"));
         c.onPatternEvent(event(PatternEventType.BID_BREAKDOWN, 3000, 5106, 150, "b2"));
-        assertEquals(2, c.onPatternEvent(event(PatternEventType.OFFER_REJECTION, 60000, 5120, 200, "o")).signals.size());
+        assertEquals(2, c.onPatternEvent(event(PatternEventType.OFFER_HOLD, 60000, 5120, 200, "o")).signals.size());
     }
     @Test void insufficientOrTooLateConfirmationCannotPromote() {
         SignalComposer c = composer(); c.onPatternEvent(event(PatternEventType.BIDS_CANCELLED, 3000, 5105, 100, "b"));
-        assertTrue(c.onPatternEvent(event(PatternEventType.OFFER_REJECTION, 7000, 5120, 200, "o1")).signals.isEmpty());
-        assertTrue(c.onPatternEvent(event(PatternEventType.OFFER_REJECTION, 60000, 5120, 300_000_000_101L, "o2")).signals.isEmpty());
+        assertTrue(c.onPatternEvent(event(PatternEventType.OFFER_HOLD, 7000, 5120, 200, "o1")).signals.isEmpty());
+        assertTrue(c.onPatternEvent(event(PatternEventType.OFFER_HOLD, 60000, 5120, 300_000_000_101L, "o2")).signals.isEmpty());
     }
     private SignalComposer composer() { return new SignalComposer("TEST", 1, SignalComposerConfig.defaults(), () -> 1000); }
     @Test void normalBidHoldAndFailureNeedNoConfirmation() {
@@ -148,21 +148,21 @@ class SignalComposerTest {
         assertEquals(Direction.SHORT, shortSignal.direction);
     }
     @Test void offerOnlyEvidenceNeverCreatesATradingSignal() {
-        assertTrue(composer().onPatternEvent(event(PatternEventType.OFFER_REJECTION, 60000, 5120, 100, "o")).signals.isEmpty());
+        assertTrue(composer().onPatternEvent(event(PatternEventType.OFFER_HOLD, 60000, 5120, 100, "o")).signals.isEmpty());
         assertTrue(composer().onPatternEvent(event(PatternEventType.OFFER_BREAKOUT, 60000, 5120, 100, "o")).signals.isEmpty());
     }
     @Test void exceptionalPriorOfferPermitsSmallRequiredBidTrigger() {
-        SignalComposer c = composer(); c.onPatternEvent(event(PatternEventType.OFFER_REJECTION, 60000, 5120, 100, "o"));
+        SignalComposer c = composer(); c.onPatternEvent(event(PatternEventType.OFFER_HOLD, 60000, 5120, 100, "o"));
         TradingSignal signal = c.onPatternEvent(event(PatternEventType.BIDS_CANCELLED, 3000, 5105, 200, "b")).signals.get(0);
         assertEquals(3000, signal.firstValidation.appliedTriggerThreshold);
         assertEquals(ConfirmationStrength.EXCEPTIONAL, signal.firstValidation.confirmationStrength);
         assertTrue(signal.explanation.contains("Threshold reduced"));
     }
     @Test void smallTriggerRemainsPendingAndHardMinimumCannotBeRescued() {
-        SignalComposer c = composer(); c.onPatternEvent(event(PatternEventType.OFFER_REJECTION, 7000, 5120, 100, "o"));
+        SignalComposer c = composer(); c.onPatternEvent(event(PatternEventType.OFFER_HOLD, 7000, 5120, 100, "o"));
         assertTrue(c.onPatternEvent(event(PatternEventType.BIDS_CANCELLED, 3000, 5105, 200, "b")).signals.isEmpty());
         assertTrue(c.candidateStates().containsValue(SignalState.CANDIDATE));
-        SignalComposer strong = composer(); strong.onPatternEvent(event(PatternEventType.OFFER_REJECTION, 60000, 5120, 100, "o"));
+        SignalComposer strong = composer(); strong.onPatternEvent(event(PatternEventType.OFFER_HOLD, 60000, 5120, 100, "o"));
         assertTrue(strong.onPatternEvent(event(PatternEventType.BIDS_CANCELLED, 2999, 5105, 200, "b")).signals.isEmpty());
         assertTrue(strong.candidateStates().isEmpty());
     }

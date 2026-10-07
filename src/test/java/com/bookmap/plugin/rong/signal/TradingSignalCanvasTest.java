@@ -42,12 +42,12 @@ class TradingSignalCanvasTest {
             painter.registerInstrument("TEST"); painter.createScreenSpacePainter("TEST", "signalComposer_TEST", canvas.factory);
             SignalComposer c = new SignalComposer("TEST", 1, SignalComposerConfig.defaults(), clock::get);
             c.onPatternEvent(event(PatternEventType.BIDS_CANCELLED, 3000, 5105, 100, "b"));
-            CompositionUpdate validation = c.onPatternEvent(event(PatternEventType.OFFER_REJECTION, 60000, 5120, 200, "o"));
+            CompositionUpdate validation = c.onPatternEvent(event(PatternEventType.OFFER_HOLD, 60000, 5120, 200, "o"));
             canvas.publishingThread = Thread.currentThread(); store.publish("TEST", 1, validation); canvas.publishingThread = null;
             painter.refreshNow(); assertEquals(1, canvas.markers().size());
             CanvasIcon icon = canvas.markers().get(0);
             assertEquals(200, icon.getX1().compose().timeX); assertEquals(5105, icon.getY1().compose().dataY);
-            CompositionUpdate revision = c.onPatternEvent(event(PatternEventType.OFFER_REJECTION, 70000, 5120, 300, "later"));
+            CompositionUpdate revision = c.onPatternEvent(event(PatternEventType.OFFER_HOLD, 70000, 5120, 300, "later"));
             store.publish("TEST", 1, revision); painter.refreshNow(); assertEquals(1, canvas.markers().size());
             assertNotSame(icon, canvas.markers().get(0)); assertEquals(200, canvas.markers().get(0).getX1().compose().timeX);
             clock.set(31000); painter.refreshNow(); assertTrue(canvas.markers().isEmpty());

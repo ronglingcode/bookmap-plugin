@@ -24,7 +24,7 @@ class CompositionModelsTest {
     }
     @Test void validationAndOutputCopiesCannotBeRewritten() {
         PatternEvent bid = event(PatternEventType.BIDS_CANCELLED, 3000, 5105, 20_000_000L, "bid");
-        PatternEvent offer = event(PatternEventType.OFFER_REJECTION, 60000, 5120, 10_000_000L, "offer");
+        PatternEvent offer = event(PatternEventType.OFFER_HOLD, 60000, 5120, 10_000_000L, "offer");
         ConfirmationMatch match = new ConfirmationMatch(bid, offer);
         List<ConfirmationMatch> source = new ArrayList<>(); source.add(match);
         TradingSignal.FirstValidation first = new TradingSignal.FirstValidation(20_000_000L, 5000, 3000, ConfirmationStrength.EXCEPTIONAL, source, match);
@@ -44,7 +44,7 @@ class CompositionModelsTest {
         assertThrows(IllegalArgumentException.class, () -> new TradingSignal(bid, invalid, Collections.emptyList(), Collections.emptyList(), ConfirmationStrength.EXCEPTIONAL, 1, 1, "r", "x"));
     }
     @Test void candidateRejectsOfferOnlyAndContextsRemainSeparateFromSignals() {
-        PatternEvent offer = event(PatternEventType.OFFER_REJECTION, 60000, 5120, 100, "offer");
+        PatternEvent offer = event(PatternEventType.OFFER_HOLD, 60000, 5120, 100, "offer");
         assertThrows(IllegalArgumentException.class, () -> new SignalCandidate(offer, 30000));
         DevelopingContext context = new DevelopingContext(Direction.SHORT, offer, ConfirmationStrength.EXCEPTIONAL, 3000, 200);
         Map<Direction, DevelopingContext> source = new EnumMap<>(Direction.class); source.put(Direction.SHORT, context);

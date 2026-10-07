@@ -21,7 +21,8 @@ class SignalComposerLifecycleTest {
     }
     private void context(RongPlugin p) {
         time(p, 2000); p.onDepth(false, 5120, 60000); time(p, 2500);
-        time(p, 2600); p.onTrade(5119, 1, null); time(p, 2700); p.onTrade(5118, 1, null); time(p, 2900);
+        time(p, 2600); p.onTrade(5119, 1, null); time(p, 2700); p.onTrade(5113, 1, null);
+        time(p, 3200); p.onTrade(5113, 1, null);
     }
     @Test void disableClearsAndConsumesNothingThenEnableSeedsCurrentBook() throws Exception {
         withIsolatedActivation(() -> {
@@ -29,7 +30,7 @@ class SignalComposerLifecycleTest {
             SignalCompositionPipeline pipeline = (SignalCompositionPipeline)field("signalComposition").get(p);
             p.onIndicatorConfigChanged(IndicatorConfig.SIGNAL_COMPOSER, false); long epoch = pipeline.epoch();
             assertTrue(store().snapshot("TEST").contexts.isEmpty());
-            time(p, 3000); p.onDepth(true, 5105, 3000); time(p, 4000);
+            time(p, 3300); p.onDepth(true, 5105, 3000); time(p, 4000);
             assertEquals(epoch, pipeline.epoch()); assertEquals(0, store().snapshot("TEST").marketTimeNs);
             p.onIndicatorConfigChanged(IndicatorConfig.SIGNAL_COMPOSER, true); assertTrue(pipeline.usable());
             time(p, 4500); time(p, 6200); p.onDepth(true, 5105, 0); time(p, 6700);

@@ -22,14 +22,14 @@ class PatternObservationEngineTest {
             }
         }
     }
-    @Test void offerRejectionAndGrowthRequireThreeThousand() {
+    @Test void offerHoldAndGrowthRequireThreeThousand() {
         for (long size : new long[] {1000, 2999, 3000}) {
             Fixture f = new Fixture(); f.trade(5090, 1, true, 100);
             f.depth(false, 5120, size, 2000); f.time(2500);
-            f.trade(5119, 1, true, 2600); f.trade(5118, 1, false, 2700); f.time(2900);
+            f.trade(5119, 1, true, 2600); f.trade(5113, 1, false, 2700); f.trade(5113, 1, false, 3200);
             if (size < 3000) assertTrue(f.events.isEmpty());
-            else assertEquals(PatternEventType.OFFER_REJECTION, f.events.get(0).type);
-            f.depth(false, 5120, 4000, 3000);
+            else assertEquals(PatternEventType.OFFER_HOLD, f.events.get(0).type);
+            f.depth(false, 5120, 4000, 3300);
             assertTrue(f.events.stream().anyMatch(event -> event.type == PatternEventType.OFFER_SIZE_INCREASE
                     && event.sizeCategory == PatternSizeCategory.BELOW_NORMAL));
         }

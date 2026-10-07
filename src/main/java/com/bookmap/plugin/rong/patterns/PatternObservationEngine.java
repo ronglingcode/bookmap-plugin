@@ -18,7 +18,7 @@ public final class PatternObservationEngine implements PatternRuntimeContext {
     private final EventTimeRelocationTracker relocation;
     private final PatternEventNormalizer normalizer;
     private final BidFailureDetector bidFailures;
-    private final OfferInteractionDetector offers;
+    private final WallInteractionDetector offers, bids;
     private final Consumer<PatternEvent> output;
     private final BiConsumer<ResetReason, Long> resets;
     private final Consumer<String> diagnostics;
@@ -41,7 +41,8 @@ public final class PatternObservationEngine implements PatternRuntimeContext {
             if (pendingCoverageGap == null && event.size >= event.type.minimumTrackedSize()) output.accept(event);
         };
         bidFailures = new BidFailureDetector(alias, pips, config, attribution, usableOutput);
-        offers = new OfferInteractionDetector(alias, pips, config, walls, attribution, usableOutput);
+        offers = new WallInteractionDetector(false, alias, pips, config, walls, attribution, usableOutput);
+        bids = new WallInteractionDetector(true, alias, pips, config, walls, attribution, usableOutput);
         definitions.add(new ReappearPatternDefinition(PatternType.BID_REAPPEAR, true));
         definitions.add(new ReappearPatternDefinition(PatternType.OFFER_REAPPEAR, false));
         definitions.add(new StepPatternDefinition(PatternType.BID_STEP_UP, true));
@@ -87,6 +88,7 @@ public final class PatternObservationEngine implements PatternRuntimeContext {
         PatternTradeTick trade = new PatternTradeTick(price, safeInt(size), Boolean.TRUE.equals(buyAggressor), timeNs, nowMs(), previousHigh, previousLow);
         for (PatternDefinition definition : definitions) definition.onTrade(trade, this);
         offers.onTrade(price, timeNs, epoch());
+        bids.onTrade(price, timeNs, epoch());
         dispatchTime();
     }
     public void onBbo(int bid, int ask, long timeNs, PatternEvent.TimestampProvenance provenance) {
@@ -94,7 +96,7 @@ public final class PatternObservationEngine implements PatternRuntimeContext {
         if (bid > 0 && ask > 0 && bid > ask) return;
         this.bid = bid; this.ask = ask; attribution.onTime(timeNs); relocation.onTime(timeNs);
         dispatch(walls.onTime(timeNs)); if (!clock.usable()) return;
-        offers.onBbo(bid);
+        offers.onBbo(bid, ask); bids.onBbo(bid, ask);
         for (PatternDefinition definition : definitions) definition.onBbo(this); dispatchTime();
     }
     public void onTimestamp(long timeNs, PatternEvent.TimestampProvenance provenance) {
@@ -136,12 +138,13 @@ public final class PatternObservationEngine implements PatternRuntimeContext {
         if (!clock.usable()) return;
         bidFailures.onTime(nowNs());
         offers.onTime(nowNs(), epoch());
+        bids.onTime(nowNs(), epoch());
         for (PatternDefinition definition : definitions) definition.onTime(this);
         if (pendingCoverageGap != null) coverageGap(pendingCoverageGap);
     }
     private static int safeInt(long value) { return (int)Math.min(Integer.MAX_VALUE, value); }
     private void clearState(long epoch) {
-        walls.reset(epoch); attribution.reset(); relocation.reset(); normalizer.reset(); bidFailures.reset(); offers.reset();
+        walls.reset(epoch); attribution.reset(); relocation.reset(); normalizer.reset(); bidFailures.reset(); offers.reset(); bids.reset();
         for (PatternDefinition definition : definitions) definition.reset();
         seeded = false; bid = ask = last = high = low = definitionObservations = 0;
         pendingCoverageGap = null;

@@ -14,7 +14,7 @@ class TradingSignalStoreTest {
         SignalComposer c = new SignalComposer("TEST", 1, SignalComposerConfig.defaults(), receipt::get);
         CompositionUpdate initial = c.onPatternEvent(event(PatternEventType.BID_BREAKDOWN, 5000, 5105, 100, "b"));
         store.publish("TEST", 1, initial); receipt.set(2000);
-        store.publish("TEST", 1, c.onPatternEvent(event(PatternEventType.OFFER_REJECTION, 60000, 5120, 200, "o")));
+        store.publish("TEST", 1, c.onPatternEvent(event(PatternEventType.OFFER_HOLD, 60000, 5120, 200, "o")));
         assertEquals(2, store.snapshot("TEST").signals.get(0).revision);
         receipt.set(31000); TradingSignalStore.Snapshot expired = store.snapshot("TEST");
         assertTrue(expired.signals.isEmpty()); assertEquals(1, expired.contexts.size()); assertEquals(200, expired.marketTimeNs);
