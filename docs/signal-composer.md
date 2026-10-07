@@ -26,7 +26,7 @@ Confirmation is optional for a normal 5K trigger. The strongest compatible local
 
 The absolute minimum is 3K regardless of confirmation. A 60K bearish offer observation can therefore qualify a nearby 3K bid failure as SHORT. A 3K bid failure can also wait for sufficient confirmation arriving later. A 5K trigger validated first keeps its original decision and receives later evidence as a revision of the same signal.
 
-Matching uses the same chart/epoch, up to 30 seconds before or after the trigger, already-observed evidence no older than 30 seconds, and at most 20 ticks of separation. The offer must be at or above the bid trigger, allowing two ticks of price noise. Active candidates expire after 30 seconds, or invalidate on opposing local bid behavior, trigger-record eviction, or drift greater than 20 ticks. History is retained for 120 seconds, capped at 2,048 events and 64 candidates.
+Matching uses the same chart/epoch, up to 30 seconds before or after the trigger, already-observed evidence no older than 30 seconds, and at most 20 ticks of separation. The offer must be at or above the bid trigger, allowing two ticks of price noise. Active candidates expire after 30 seconds, or invalidate on opposing local bid behavior, trigger-record eviction, or drift greater than 20 ticks. History is retained for 300 seconds (five minutes), capped at 2,048 events and 64 candidates.
 
 ## What the detectors establish
 

@@ -146,7 +146,7 @@ Prefer one completed rejection event per interaction, upgraded to the composite 
 
 ## 6. History, candidates, and composer behavior
 
-`PatternEventStore` is per attachment and epoch. Keep a time-ordered deque and an ID/episode index. Prune on every event and timestamp callback. Retain 120 seconds by default, bounded to 2,048 semantic events. Keep at most 64 active bid candidates. Report eviction/overflow in file diagnostics; do not retain candidates whose required trigger record was evicted. Bound detector wall phases to 4,096 and attribution trades to 8,192 entries as initial limits, with normal time-based pruning. A detector-buffer overflow invalidates dependent attribution and pending candidates; never silently treat missing trades as a bid cancellation.
+`PatternEventStore` is per attachment and epoch. Keep a time-ordered deque and an ID/episode index. Prune on every event and timestamp callback. Retain 300 seconds (five minutes) by default, bounded to 2,048 semantic events. Keep at most 64 active bid candidates. Report eviction/overflow in file diagnostics; do not retain candidates whose required trigger record was evicted. Bound detector wall phases to 4,096 and attribution trades to 8,192 entries as initial limits, with normal time-based pruning. A detector-buffer overflow invalidates dependent attribution and pending candidates; never silently treat missing trades as a bid cancellation.
 
 Events can be detected after their underlying market action. Keep `observedAtNs` as the monotonic processing clock and `eventTimeNs` as the occurrence clock; insert delayed occurrences into history in time order. History queries must only use evidence already observed at the current processing watermark. Do not reset an epoch merely because a delayed detector outcome refers to an earlier occurrence.
 
@@ -184,7 +184,7 @@ On each newly observed event:
 
 For a trigger at `t`, confirmations must fall in `[t - beforeWindow, t + afterWindow]`, be observed by now, and remain current: their age relative to the processing watermark must not exceed `beforeWindow`. The trigger itself must remain within its post-trigger active window. Boundaries are inclusive; expiry is strictly beyond the boundary.
 
-Default both windows to 30 seconds. A stored event from 90 seconds ago can be present under 120-second retention and still be ineligible. Store retention and matching validity are separate concepts.
+Default both windows to 30 seconds. A stored event from 90 seconds ago can be present under 300-second retention and still be ineligible. Store retention and matching validity are separate concepts.
 
 Match only the same alias and epoch, the appropriate offer meaning, and absolute price distance at most 20 ticks. For initial matching use the event's interaction/wall price, consistently across types; preserve the separate latest market price for diagnostics. Require compatible local structure: bearish offer resistance must be at or above the short bid interaction (allow two ticks of noise); bullish offer-breakout evidence must be at or above the long bid interaction. Make this small tolerance configurable.
 
@@ -231,7 +231,7 @@ Add `signal/SignalComposerConfig.java` and `config/signal-composer.template.json
   "minimumTriggerSize": 3000,
   "normalConfirmationSize": 5000,
   "observationFloorSize": 3000,
-  "historyRetentionMs": 120000,
+  "historyRetentionMs": 300000,
   "beforeWindowMs": 30000,
   "afterWindowMs": 30000,
   "maxPriceDistanceTicks": 20,

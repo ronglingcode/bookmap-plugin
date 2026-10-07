@@ -10,15 +10,15 @@ class PatternEventStoreTest {
         PatternEventStore store = new PatternEventStore("TEST", 1);
         PatternEvent trigger = event("TEST", 1, "w", 1, 1_000_000L, 1_000_000L);
         store.put(trigger, trigger.observedAtNs);
-        assertEquals(PatternEventStore.Change.DUPLICATE, store.put(trigger, 121_001_000_000L));
+        assertEquals(PatternEventStore.Change.DUPLICATE, store.put(trigger, 301_001_000_000L));
         assertEquals(0, store.size()); assertEquals(trigger.id, store.lastEvictions().get(0).id);
     }
     @Test void expiresOnMarketTimeEvenWithoutNewPatternsAndKeepsBoundary() {
         PatternEventStore store = new PatternEventStore("TEST", 1);
         PatternEvent trigger = event("TEST", 1, "w", 1, 1_000_000L, 1_000_000L);
         store.put(trigger, trigger.observedAtNs);
-        assertTrue(store.prune(trigger.eventTimeNs + 120_000_000_000L).isEmpty());
-        assertEquals(trigger.id, store.prune(trigger.eventTimeNs + 120_000_000_001L).get(0).id);
+        assertTrue(store.prune(trigger.eventTimeNs + 300_000_000_000L).isEmpty());
+        assertEquals(trigger.id, store.prune(trigger.eventTimeNs + 300_000_000_001L).get(0).id);
         assertEquals(0, store.size());
     }
     @Test void capacityEvictsOldestOccurrenceIncludingLateInsertedEvents() {
