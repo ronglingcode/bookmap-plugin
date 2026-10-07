@@ -28,6 +28,49 @@ The absolute minimum is 3K regardless of confirmation. A 60K bearish offer obser
 
 Matching uses the same chart/epoch, up to 300 seconds (five minutes) before or after the trigger, already-observed evidence no older than five minutes, and at most 20 ticks of separation. The offer must be at or above the bid trigger, allowing two ticks of price noise. Active candidates expire after five minutes, or invalidate on opposing local bid behavior, trigger-record eviction, or drift greater than 20 ticks. History is retained for 300 seconds (five minutes), capped at 2,048 events and 64 candidates. Retention is fixed in code; any existing `historyRetentionMs` JSON value is ignored and needs no edit.
 
+## Pattern catalog and meanings
+
+The current observer emits the following **10 pattern types**. The identifiers match
+[`PatternEventType`](../src/main/java/com/bookmap/plugin/rong/patterns/PatternEventType.java).
+A pattern is an observation of displayed liquidity and trades; its meaning determines
+how SignalComposer uses it, rather than guaranteeing the next price move.
+
+| Pattern (event identifier) | What was observed | Meaning and composer role |
+| --- | --- | --- |
+| **Bid Reappear** (`BID_REAPPEAR`) | After a bid wall is cleared by probable consumption, a persistent bid wall appears at the same or higher price within five minutes, with at least 50% of the reference size. The best ask remains above the new wall. | `BID_HOLD`: bullish quote defense; can trigger LONG. |
+| **Bid Step Up** (`BID_STEP_UP`) | A persistent bid wall appears above a reference bid wall from the preceding five minutes, with at least 50% of its size. The new wall is above the observed session low and the best ask remains above it. The reference can be active or previously cleared by probable consumption. | `BID_HOLD`: support moves higher; can trigger LONG. |
+| **Bids Cancelled** (`BIDS_CANCELLED`) | A qualified bid wall loses at least 90% of its immediately pre-clear size, the loss remains stable for 500 ms, known sell trades explain at most 10%, coverage is usable, and no likely relocation is identified. | `BID_FAIL`: inferred support withdrawal; can trigger SHORT. The name does not prove an exchange cancellation. |
+| **Bid Breakdown** (`BID_BREAKDOWN`) | Known sell trades explain at least 70% of a qualified bid wall's loss, followed by an actual trade at least one tick below within three seconds. | `BID_FAIL`: support is consumed and price breaks below; can trigger SHORT. |
+| **Offer Reappear** (`OFFER_REAPPEAR`) | After an offer wall is cleared by probable consumption, a persistent offer wall appears at the same or lower price within five minutes, with at least 50% of the reference size. The best bid remains below the new wall. | `OFFER_BEARISH_CONFIRMATION`: renewed resistance; confirms a compatible SHORT bid trigger or shows SHORT waiting context. |
+| **Offer Step Down** (`OFFER_STEP_DOWN`) | A persistent offer wall appears below a reference offer wall from the preceding five minutes, with at least 50% of its size. The new wall is below the observed session high and the best bid remains below it. The reference can be active or previously cleared by probable consumption. | `OFFER_BEARISH_CONFIRMATION`: resistance moves lower; confirms a compatible SHORT bid trigger or shows SHORT waiting context. |
+| **Offer Rejection** (`OFFER_REJECTION`) | Price approaches a persistent offer from below within two ticks, then trades at least two ticks below it and holds that rejection for 200 ms within a five-second interaction. The offer remains present and unbroken. | `OFFER_BEARISH_CONFIRMATION`: observed rejection at resistance; confirms a compatible SHORT bid trigger or shows SHORT waiting context. |
+| **Offer Size Increasing Rejection** (`OFFER_SIZE_INCREASING_REJECTION`) | An offer grows at least 25% relative to its interaction baseline, then meets the offer-rejection conditions in the same interaction. | `OFFER_BEARISH_CONFIRMATION`: growing resistance followed by rejection; upgrades the same rejection episode rather than counting as a separate rejection. |
+| **Offer Breakout** (`OFFER_BREAKOUT`) | Known buy trades explain at least 70% of a qualified offer wall's loss, followed by an actual trade at least one tick above within three seconds. | `OFFER_BULLISH_CONFIRMATION`: resistance is consumed and price breaks above; confirms a compatible LONG bid trigger or shows LONG waiting context. |
+| **Offer Size Increase** (`OFFER_SIZE_INCREASE`) | A persistent offer grows at least 25% relative to its baseline; no rejection is required for this observation. | `UNKNOWN`: recorded in history and inspection, with no directional confirmation or bid-size reduction. Growth alone does not establish bearish meaning. |
+
+The table gives current default detector thresholds. Configurable detector values
+come from the [rule template](../config/signal-composer.template.json). Reappear/step
+reference windows and their 50% comparison are fixed by their pattern definitions.
+The session extremes used by step patterns come from trades observed by this
+attachment since its last reset; they are not independently fetched daily extremes.
+
+The enum also defines `UNKNOWN_BID_LOSS` and `UNKNOWN_OFFER_LOSS`, both with
+`UNKNOWN` meaning. **The current observer does not emit these two types.** Ambiguous
+wall losses can produce diagnostics, but do not establish a directional pattern.
+
+Only `BID_HOLD` and `BID_FAIL` create signal candidates. Directional offer meanings
+provide confirmation and waiting context; they cannot create completed signals on
+their own. `UNKNOWN` events carry no directional meaning. All triggers still need
+the size, locality, readiness, and timing rules above. An opposing local bid trigger
+of at least 3K can invalidate an active candidate.
+
+Implementation references: [observer wiring](../src/main/java/com/bookmap/plugin/rong/patterns/PatternObservationEngine.java),
+[reappear](../src/main/java/com/bookmap/plugin/rong/patterns/ReappearPatternDefinition.java),
+[step](../src/main/java/com/bookmap/plugin/rong/patterns/StepPatternDefinition.java),
+[bid failure](../src/main/java/com/bookmap/plugin/rong/patterns/BidFailureDetector.java),
+[offer interaction](../src/main/java/com/bookmap/plugin/rong/patterns/OfferInteractionDetector.java),
+and [composer](../src/main/java/com/bookmap/plugin/rong/signal/SignalComposer.java).
+
 ## What the detectors establish
 
 The observer uses its own 1K floor, independent of the legacy percentile threshold. This threshold is fixed in code; existing `observationFloorSize` JSON values are ignored. Walls qualify after 500 ms. Snapshot levels still need persistence; a snapshot itself is not a signal. A completed event must measure at least 1K shares, using displayed wall size or removed size according to its size basis.
