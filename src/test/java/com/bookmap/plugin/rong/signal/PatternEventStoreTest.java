@@ -6,6 +6,19 @@ import com.bookmap.plugin.rong.patterns.*;
 import com.google.gson.JsonParser;
 
 class PatternEventStoreTest {
+    @Test void onlyBreakoutAndBreakdownAdmitOneThousandAndOtherTypesRequireThreeThousand() {
+        for (PatternEventType type : PatternEventType.values()) {
+            long minimum = type == PatternEventType.OFFER_BREAKOUT || type == PatternEventType.BID_BREAKDOWN ? 1000 : 3000;
+            for (long size : new long[] {999, 1000, 2999, 3000}) {
+                PatternEventStore store = new PatternEventStore("TEST", 1);
+                PatternEvent event = PatternEvent.builder("TEST", 1, type, "wall")
+                        .size(size, PatternEvent.SizeBasis.DISPLAYED_WALL).price(5100, .01).times(100, 100).build();
+                assertEquals(size >= minimum ? PatternEventStore.Change.INSERTED : PatternEventStore.Change.REJECTED,
+                        store.put(event, 100), type + " size=" + size);
+                assertEquals(size >= minimum ? 1 : 0, store.size());
+            }
+        }
+    }
     @Test void duplicateDeliveryStillPrunesAtItsNewProcessingTime() {
         PatternEventStore store = new PatternEventStore("TEST", 1);
         PatternEvent trigger = event("TEST", 1, "w", 1, 1_000_000L, 1_000_000L);

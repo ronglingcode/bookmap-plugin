@@ -14,20 +14,20 @@ class SmallPatternTrackingTest {
         assertEquals(ConfirmationStrength.BELOW_NORMAL, strength);
         assertEquals(5000, new TriggerRequirementPolicy(config).requiredSize(strength));
     }
-    @Test void smallBidIsRetainedButCannotTriggerEvenWithExceptionalConfirmation() {
+    @Test void smallBidIsNotRetainedEvenWithExceptionalConfirmation() {
         SignalComposer c = new SignalComposer("TEST", 1, SignalComposerConfig.defaults());
         c.onPatternEvent(event(PatternEventType.OFFER_BREAKOUT, 60000, 5120, 100, "offer"));
         for (long size : new long[] {1000, 2999}) {
             assertTrue(c.onPatternEvent(event(PatternEventType.BID_STEP_UP, size, 5105, 200 + size, "bid" + size)).signals.isEmpty());
         }
         assertTrue(c.candidateStates().isEmpty());
-        assertTrue(String.join("\n", c.inspectionLines()).contains("Least significant: 2 patterns"));
+        assertFalse(String.join("\n", c.inspectionLines()).contains("Least significant:"));
     }
     @Test void revisionCrossingThreeThousandPromotesSameEpisodeAndUpdatesCategory() {
         SignalComposer c = new SignalComposer("TEST", 1, SignalComposerConfig.defaults());
         c.onPatternEvent(event(PatternEventType.OFFER_BREAKOUT, 60000, 5120, 100, "offer"));
         c.onPatternEvent(event(PatternEventType.BID_STEP_UP, 1000, 5105, 200, "bid"));
-        PatternEvent revision = PatternEvent.builder("TEST", 1, PatternEventType.BID_STEP_UP, "bid").revision(2)
+        PatternEvent revision = PatternEvent.builder("TEST", 1, PatternEventType.BID_STEP_UP, "bid").revision(1)
                 .size(3000, PatternEvent.SizeBasis.DISPLAYED_WALL).price(5105, .01).times(200, 300)
                 .evidence(PatternEvent.Evidence.builder().attribution(PatternEvent.Attribution.UNKNOWN, PatternEvent.Coverage.USABLE).build()).build();
         TradingSignal signal = c.onPatternEvent(revision).signals.get(0);

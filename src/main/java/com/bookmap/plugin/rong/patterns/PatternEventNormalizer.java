@@ -19,10 +19,10 @@ public final class PatternEventNormalizer {
         this.alias = alias; this.pips = pips; this.config = config;
     }
     PatternEvent normalize(PatternCandidate candidate, EventTimeWallTracker tracker, long epoch, long observedNs) {
-        EventTimeWallTracker.Wall current = tracker.active(candidate.triggerWall.bid, candidate.triggerPriceTick);
-        if (current == null || !current.qualified || current.size < config.observationFloorSize
-                || !current.phaseId.equals(candidate.triggerWall.phaseId)) return null;
         PatternEventType type = PatternEventType.valueOf(candidate.patternType.name());
+        EventTimeWallTracker.Wall current = tracker.active(candidate.triggerWall.bid, candidate.triggerPriceTick);
+        if (current == null || !current.qualified || current.size < type.minimumTrackedSize()
+                || !current.phaseId.equals(candidate.triggerWall.phaseId)) return null;
         Episode episode = episodes.computeIfAbsent(candidate.episodeKey, key -> new Episode(candidate.eventTimeNs));
         while (episodes.size() > config.maxEvents) { episodes.remove(episodes.keySet().iterator().next()); overflowed = true; }
         return PatternEvent.builder(alias, epoch, type, current.phaseId).episodeKey(candidate.episodeKey)

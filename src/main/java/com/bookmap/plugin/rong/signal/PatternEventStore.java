@@ -32,7 +32,8 @@ public final class PatternEventStore {
     public Change put(PatternEvent event, long processingNs) {
         Objects.requireNonNull(event);
         if (!alias.equals(event.instrumentAlias) || epoch != event.epoch || processingNs < watermarkNs
-                || event.observedAtNs > processingNs) return Change.REJECTED;
+                || event.observedAtNs > processingNs
+                || event.size < event.type.minimumTrackedSize()) return Change.REJECTED;
         PatternEvent previous = events.get(event.id);
         if (previous != null && (!previous.interactionId.equals(event.interactionId) || previous.eventTimeNs != event.eventTimeNs
                 || previous.side != event.side || previous.meaning != event.meaning)) return Change.REJECTED;

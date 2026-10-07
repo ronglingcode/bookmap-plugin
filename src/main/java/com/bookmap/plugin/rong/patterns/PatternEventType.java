@@ -22,4 +22,9 @@ public enum PatternEventType {
         this.side = side;
         this.meaning = meaning;
     }
+
+    /** Inclusive observation floor in equity shares, independent of signal validation. */
+    public long minimumTrackedSize() {
+        return this == OFFER_BREAKOUT || this == BID_BREAKDOWN ? 1000 : 3000;
+    }
 }

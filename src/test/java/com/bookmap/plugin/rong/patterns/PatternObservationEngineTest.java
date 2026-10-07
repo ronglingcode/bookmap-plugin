@@ -8,12 +8,12 @@ import org.junit.jupiter.api.Test;
 import com.bookmap.plugin.rong.signal.SignalComposerConfig;
 
 class PatternObservationEngineTest {
-    @Test void smallBidWithdrawalIsTrackedAtInclusiveFloorButNotBelowIt() {
+    @Test void bidWithdrawalIsTrackedAtInclusiveThreeThousandFloorButNotBelowIt() {
         for (long size : new long[] {999, 1000, 2999, 3000}) {
             Fixture f = new Fixture(); f.trade(5090, 1, false, 100);
             f.depth(true, 5100, size, 2000); f.time(2500);
             f.depth(true, 5100, 0, 2600); f.time(3100);
-            if (size < 1000) assertTrue(f.events.isEmpty());
+            if (size < 3000) assertTrue(f.events.isEmpty());
             else {
                 assertEquals(1, f.events.size());
                 assertEquals(PatternEventType.BIDS_CANCELLED, f.events.get(0).type);
@@ -22,15 +22,17 @@ class PatternObservationEngineTest {
             }
         }
     }
-    @Test void smallOfferRejectionAndGrowthUseTheSameTrackingFloor() {
-        Fixture f = new Fixture(); f.trade(5090, 1, true, 100);
-        f.depth(false, 5120, 1000, 2000); f.time(2500);
-        f.trade(5119, 1, true, 2600); f.trade(5118, 1, false, 2700); f.time(2900);
-        assertEquals(PatternEventType.OFFER_REJECTION, f.events.get(0).type);
-        assertEquals(PatternSizeCategory.LEAST_SIGNIFICANT, f.events.get(0).sizeCategory);
-        f.depth(false, 5120, 3000, 3000);
-        assertTrue(f.events.stream().anyMatch(event -> event.type == PatternEventType.OFFER_SIZE_INCREASE
-                && event.sizeCategory == PatternSizeCategory.BELOW_NORMAL));
+    @Test void offerRejectionAndGrowthRequireThreeThousand() {
+        for (long size : new long[] {1000, 2999, 3000}) {
+            Fixture f = new Fixture(); f.trade(5090, 1, true, 100);
+            f.depth(false, 5120, size, 2000); f.time(2500);
+            f.trade(5119, 1, true, 2600); f.trade(5118, 1, false, 2700); f.time(2900);
+            if (size < 3000) assertTrue(f.events.isEmpty());
+            else assertEquals(PatternEventType.OFFER_REJECTION, f.events.get(0).type);
+            f.depth(false, 5120, 4000, 3000);
+            assertTrue(f.events.stream().anyMatch(event -> event.type == PatternEventType.OFFER_SIZE_INCREASE
+                    && event.sizeCategory == PatternSizeCategory.BELOW_NORMAL));
+        }
     }
     @Test void smallConsumptionPatternsAreObservedOnBothSides() {
         for (boolean bid : new boolean[] {true, false}) {
@@ -48,12 +50,11 @@ class PatternObservationEngineTest {
         Fixture f = new Fixture(true); f.trade(5090, 1, false, 100);
         f.depth(true, 5100, 1000, 2000); f.time(2500);
         f.depth(true, 5101, 1000, 2600); f.time(3100);
-        PatternEvent first = f.events.get(0);
-        assertEquals(PatternEventType.BID_STEP_UP, first.type);
-        assertEquals(PatternSizeCategory.LEAST_SIGNIFICANT, first.sizeCategory);
+        assertTrue(f.events.isEmpty());
         f.depth(true, 5101, 3000, 3200); f.time(3700);
         PatternEvent revised = f.events.get(f.events.size() - 1);
-        assertEquals(first.id, revised.id);
+        assertEquals(PatternEventType.BID_STEP_UP, revised.type);
+        assertEquals(1, revised.revision);
         assertEquals(PatternSizeCategory.BELOW_NORMAL, revised.sizeCategory);
     }
     static final long BASE = Instant.parse("2026-10-06T14:00:00Z").getEpochSecond() * 1_000_000_000L;

@@ -73,20 +73,20 @@ this attachment since its last reset during the regular session. They can differ
 from the full day's low and high. `W` is the pattern's wall price, `R` the reference
 wall price, and `T` a subsequent trade price.
 
-| Pattern | Price range tracked / required price interaction |
-| --- | --- |
-| **Bid Reappear** (`BID_REAPPEAR`) | Replacement wall strictly inside `L < W < H`, with `W >= R` and best ask above `W`. No maximum distance from the reference wall or current price at detection. |
-| **Bid Step Up** (`BID_STEP_UP`) | New wall strictly inside `L < W < H`, with `W > R` and best ask above `W`. The same range applies to delayed revisions. No maximum step distance at detection. |
-| **Bids Cancelled** (`BIDS_CANCELLED`) | All tracked bid levels. This independent observer event has no day-high/day-low or 2% filter; the chart's BID PULL filter below does not apply to it. |
-| **Bid Breakdown** (`BID_BREAKDOWN`) | All tracked bid levels; requires a subsequent print `T <= W - 1 tick`. No daily-range filter or maximum distance below the wall. |
-| **Offer Reappear** (`OFFER_REAPPEAR`) | Replacement wall strictly inside `L < W < H`, with `W <= R` and best bid below `W`. No maximum distance from the reference wall or current price at detection. |
-| **Offer Step Down** (`OFFER_STEP_DOWN`) | New wall strictly inside `L < W < H`, with `W < R` and best bid below `W`. The same range applies to delayed revisions. No maximum step distance at detection. |
-| **Offer Rejection** (`OFFER_REJECTION`) | Offer walls at any tracked price; approach trade must be in `[W - 2 ticks, W]`, followed by a trade `T <= W - 2 ticks`. No daily-range filter or maximum rejection distance. A trade above `W` or best bid at/above `W` breaks the interaction. |
-| **Offer Size Increasing Rejection** (`OFFER_SIZE_INCREASING_REJECTION`) | Same price range and approach/rejection requirements as Offer Rejection; growth does not widen the range. |
-| **Offer Breakout** (`OFFER_BREAKOUT`) | All tracked offer levels; requires a subsequent print `T >= W + 1 tick`. No daily-range filter or maximum distance above the wall. |
-| **Offer Size Increase** (`OFFER_SIZE_INCREASE`) | All qualified tracked offer levels. No approach to current price, daily-range filter, or percentage-distance limit is required. |
-| **Unknown Bid Loss** (`UNKNOWN_BID_LOSS`) | Not emitted by the current observer; no active tracking range. |
-| **Unknown Offer Loss** (`UNKNOWN_OFFER_LOSS`) | Not emitted by the current observer; no active tracking range. |
+| Pattern | Price range tracked / required price interaction | Minimum tracked size |
+| --- | --- | --- |
+| **Bid Reappear** (`BID_REAPPEAR`) | Replacement wall strictly inside `L < W < H`, with `W >= R` and best ask above `W`. No maximum distance from the reference wall or current price at detection. | 3K displayed shares, inclusive |
+| **Bid Step Up** (`BID_STEP_UP`) | New wall strictly inside `L < W < H`, with `W > R` and best ask above `W`. The same range applies to delayed revisions. No maximum step distance at detection. | 3K displayed shares, inclusive |
+| **Bids Cancelled** (`BIDS_CANCELLED`) | All tracked bid levels. This independent observer event has no day-high/day-low or 2% filter; the chart's BID PULL filter below does not apply to it. | 3K shares removed, inclusive |
+| **Bid Breakdown** (`BID_BREAKDOWN`) | All tracked bid levels; requires a subsequent print `T <= W - 1 tick`. No daily-range filter or maximum distance below the wall. | 1K shares removed, inclusive |
+| **Offer Reappear** (`OFFER_REAPPEAR`) | Replacement wall strictly inside `L < W < H`, with `W <= R` and best bid below `W`. No maximum distance from the reference wall or current price at detection. | 3K displayed shares, inclusive |
+| **Offer Step Down** (`OFFER_STEP_DOWN`) | New wall strictly inside `L < W < H`, with `W < R` and best bid below `W`. The same range applies to delayed revisions. No maximum step distance at detection. | 3K displayed shares, inclusive |
+| **Offer Rejection** (`OFFER_REJECTION`) | Offer walls at any tracked price; approach trade must be in `[W - 2 ticks, W]`, followed by a trade `T <= W - 2 ticks`. No daily-range filter or maximum rejection distance. A trade above `W` or best bid at/above `W` breaks the interaction. | 3K displayed shares, inclusive |
+| **Offer Size Increasing Rejection** (`OFFER_SIZE_INCREASING_REJECTION`) | Same price range and approach/rejection requirements as Offer Rejection; growth does not widen the range. | 3K displayed shares, inclusive |
+| **Offer Breakout** (`OFFER_BREAKOUT`) | All tracked offer levels; requires a subsequent print `T >= W + 1 tick`. No daily-range filter or maximum distance above the wall. | 1K shares removed, inclusive |
+| **Offer Size Increase** (`OFFER_SIZE_INCREASE`) | All qualified tracked offer levels. No approach to current price, daily-range filter, or percentage-distance limit is required. | 3K displayed shares, inclusive |
+| **Unknown Bid Loss** (`UNKNOWN_BID_LOSS`) | Not emitted by the current observer; no active tracking range. | Not emitted (3K policy if admitted) |
+| **Unknown Offer Loss** (`UNKNOWN_OFFER_LOSS`) | Not emitted by the current observer; no active tracking range. | Not emitted (3K policy if admitted) |
 
 After detection, bid trigger candidates use `maxTriggerDriftTicks` (default 20
 ticks) relative to current market price. Compatible offer confirmation must be
@@ -110,22 +110,28 @@ are suppressed if a valid stock price or day range is unavailable; an excluded
 change is not saved for later admission when the band expands. The underlying
 book remains tracked for size thresholds, trade attribution, and move pairing.
 
-| Chart pattern / event | Price range tracked for emitted alerts |
-| --- | --- |
-| **Bid canceled / BID PULL** (`REDUCED` or `REPLACED_SMALLER`, without trade consumption) | Only the inclusive cancellation band above. |
-| **Offer canceled / OFFER PULL** (`REDUCED` or `REPLACED_SMALLER`, without trade consumption) | Only the inclusive cancellation band above. |
-| **Bid added** (`ADDED`) | All tracked bid levels; no cancellation-band filter. |
-| **Offer added** (`ADDED`) | All tracked offer levels; no cancellation-band filter. |
-| **Bid increased** (`INCREASED`) | All tracked bid levels; no cancellation-band filter. |
-| **Offer increased** (`INCREASED`) | All tracked offer levels; no cancellation-band filter. |
-| **Bid moved up** (`BID_MOVED_UP`) | Any paired tracked bid levels with destination above source; no maximum price distance or cancellation-band filter. |
-| **Bid moved down** (`BID_MOVED_DOWN`) | Any paired tracked bid levels with destination below source; no maximum price distance or cancellation-band filter. |
-| **Offer moved up** (`OFFER_MOVED_UP`) | Any paired tracked offer levels with destination above source; no maximum price distance or cancellation-band filter. |
-| **Offer moved down** (`OFFER_MOVED_DOWN`) | Any paired tracked offer levels with destination below source; no maximum price distance or cancellation-band filter. |
-| **Bid breakdown** (`BID_BREAKDOWN`) | All tracked bid levels where trade-driven loss meets the existing enabled wall-break rule; no cancellation-band filter. |
-| **Offer breakout** (`OFFER_BREAKOUT`) | All tracked offer levels where trade-driven loss meets the existing enabled wall-break rule; no cancellation-band filter. |
-| **Trade-driven size decrease** (`REDUCED` or `REPLACED_SMALLER`, with trade consumption) | All tracked levels on either side; excluded from the cancellation filter even if displayed with a pull label. |
+| Chart pattern / event | Price range tracked for emitted alerts | Minimum / material-size rule |
+| --- | --- | --- |
+| **Bid canceled / BID PULL** (`REDUCED` or `REPLACED_SMALLER`, without trade consumption) | Only the inclusive cancellation band above. | Material-change rule at `Q` (floor 5K); see below. |
+| **Offer canceled / OFFER PULL** (`REDUCED` or `REPLACED_SMALLER`, without trade consumption) | Only the inclusive cancellation band above. | Material-change rule at `Q` (floor 5K); see below. |
+| **Bid added** (`ADDED`) | All tracked bid levels; no cancellation-band filter. | Material-change rule at `Q` (floor 5K); see below. |
+| **Offer added** (`ADDED`) | All tracked offer levels; no cancellation-band filter. | Material-change rule at `Q` (floor 5K); see below. |
+| **Bid increased** (`INCREASED`) | All tracked bid levels; no cancellation-band filter. | Material-change rule at `Q` (floor 5K); see below. |
+| **Offer increased** (`INCREASED`) | All tracked offer levels; no cancellation-band filter. | Material-change rule at `Q` (floor 5K); see below. |
+| **Bid moved up** (`BID_MOVED_UP`) | Any paired tracked bid levels with destination above source; no maximum price distance or cancellation-band filter. | Material-change rule at `Q` (floor 5K); see below. |
+| **Bid moved down** (`BID_MOVED_DOWN`) | Any paired tracked bid levels with destination below source; no maximum price distance or cancellation-band filter. | Material-change rule at `Q` (floor 5K); see below. |
+| **Offer moved up** (`OFFER_MOVED_UP`) | Any paired tracked offer levels with destination above source; no maximum price distance or cancellation-band filter. | Material-change rule at `Q` (floor 5K); see below. |
+| **Offer moved down** (`OFFER_MOVED_DOWN`) | Any paired tracked offer levels with destination below source; no maximum price distance or cancellation-band filter. | Material-change rule at `Q` (floor 5K); see below. |
+| **Bid breakdown** (`BID_BREAKDOWN`) | All tracked bid levels where trade-driven loss meets the existing enabled wall-break rule; no cancellation-band filter. | Material-change rule at `Q` (floor 5K); see below. |
+| **Offer breakout** (`OFFER_BREAKOUT`) | All tracked offer levels where trade-driven loss meets the existing enabled wall-break rule; no cancellation-band filter. | Material-change rule at `Q` (floor 5K); see below. |
+| **Trade-driven size decrease** (`REDUCED` or `REPLACED_SMALLER`, with trade consumption) | All tracked levels on either side; excluded from the cancellation filter even if displayed with a pull label. | Material-change rule at `Q` (floor 5K); see below. |
 
+The chart tracker uses a separate effective threshold `Q`: the larger of 5K
+shares and the fifth-largest displayed level size, capped at 10K. A material
+change crosses `Q` or changes size by more than `Q`; there is no independent
+minimum on the reported delta, so a threshold crossing may report a smaller
+change. Moves must pair material changes of similar size. These chart thresholds
+remain unchanged by the observer's 1K/3K pattern minimums.
 The chart also marks an event as an active-liquidity alert only when its bid price
 is strictly above `dayLow`, or its offer price is strictly below `dayHigh`, and
 the change is material and not trade consumption. This existing classification
@@ -146,7 +152,15 @@ and [composer](../src/main/java/com/bookmap/plugin/rong/signal/SignalComposer.ja
 
 ## What the detectors establish
 
-The observer uses its own 1K floor, independent of the legacy percentile threshold. This threshold is fixed in code; existing `observationFloorSize` JSON values are ignored. Walls qualify after 500 ms. Snapshot levels still need persistence; a snapshot itself is not a signal. A completed event must measure at least 1K shares, using displayed wall size or removed size according to its size basis.
+The observer retains raw depth from 1K shares so it can detect small Offer Breakout
+and Bid Breakdown events. Those two completed patterns require at least 1K removed
+shares; every other emitted observer pattern requires at least 3K shares, using
+displayed wall size or removed size according to its size basis. The per-pattern
+minimums are inclusive and listed in the range table above. They are fixed in code,
+independent of the legacy percentile threshold and of signal-validation thresholds;
+existing `observationFloorSize` JSON values are ignored. Walls qualify after 500 ms.
+Snapshot levels still need persistence; a snapshot itself is not a signal. Events
+below their pattern's minimum are not emitted or admitted to pattern history.
 
 Every event has an absolute size category, independent of directional meaning and the configurable confirmation baseline:
 
@@ -159,7 +173,13 @@ Every event has an absolute size category, independent of directional meaning an
 | Very strong | 25,000–49,999 |
 | Exceptional | 50,000+ |
 
-Least significant patterns enter the same five-minute history and appear in semantic logs and per-stock inspection counts. They cannot become bid candidates, invalidate candidates, or lower the required bid size. Small offer evidence can show waiting context with the normal bid requirement. A size revision crossing 3K updates the category and can promote a bid episode to a candidate; normal signal rules still apply. The 2,048-event cap may evict older records sooner as observation volume increases.
+Only Offer Breakout and Bid Breakdown can enter the Least significant band and
+appear in five-minute history, semantic logs, and per-stock inspection counts.
+They cannot become bid candidates, invalidate candidates, or lower the required
+bid size. Small Offer Breakout evidence can show LONG waiting context with the
+normal bid requirement. Other pattern episodes first enter history once their
+measured size reaches 3K; normal signal rules still apply. The 2,048-event cap may
+evict older records sooner as observation volume increases.
 
 | Behavior | Required observation |
 | --- | --- |
@@ -175,7 +195,7 @@ Wall phases and relocation/reference data are bounded at 4,096; trade attributio
 
 ## Read the chart and logs
 
-The per-stock floating **Trade** window includes a scrollable **Signal Composer** panel at the bottom. It refreshes once per second and separates **Long** and **Short**, each with **Bid patterns** and **Offer patterns**. Each group shows its two newest retained semantic events, ordered by occurrence time, as compact selectable text lines in the form `09:31:52: 1.4K @ 648, Bids cancelled`, using New York market time and full pattern names. Quantities use compact lots, truncated to one decimal for K/M/B suffixes. There are no tables or column headers; lines fit the viewport and wrap only when needed in a narrow window. Event revisions replace the existing event rather than adding a row. Expired events are greyed out without a repeated Expired label; hover to inspect their status and exact quantity in lots. Hover over an event for its status, including invalid, out-of-range, below-minimum, pending, or validated states. Unknown-direction events are not assigned to Long or Short. Current directional requirements and market-time countdowns appear above the event groups. Normal operation has no Scanning label; disabled, unavailable, readiness, and session restrictions appear as notices. Expand **Diagnostics** for enablement, symbol/config eligibility, configured source mode, rule revision, market timestamp, epoch, latest raw observation (including unknown meaning), retained evidence counts, all retained candidate details, and reset/diagnostic information. Candidate details are retained within the configured 64-candidate capacity until reset or eviction, even after the chart badge disappears; event rows use the configured history retention. Diagnostic text can be selected and copied, and event text can be selected and copied with Ctrl+C. Inspection never advances market time or expires state, so pausing replay freezes the displayed market-time countdowns. The configured Cairo `sourceMode` label does not automatically detect Bookmap replay. Observer-only attachments do not create the floating Trade window.
+The per-stock floating **Trade** window includes a scrollable **Signal Composer** panel at the bottom. It refreshes once per second and separates **Long** and **Short**, each with **Bid patterns** and **Offer patterns**. Each group shows its two newest retained semantic events, ordered by occurrence time, as compact selectable text lines in the form `09:31:52: 3.4K @ 648, Bids cancelled`, using New York market time and full pattern names. Quantities use compact lots, truncated to one decimal for K/M/B suffixes. There are no tables or column headers; lines fit the viewport and wrap only when needed in a narrow window. Event revisions replace the existing event rather than adding a row. Expired events are greyed out without a repeated Expired label; hover to inspect their status and exact quantity in lots. Hover over an event for its status, including invalid, out-of-range, below-minimum, pending, or validated states. Unknown-direction events are not assigned to Long or Short. Current directional requirements and market-time countdowns appear above the event groups. Normal operation has no Scanning label; disabled, unavailable, readiness, and session restrictions appear as notices. Expand **Diagnostics** for enablement, symbol/config eligibility, configured source mode, rule revision, market timestamp, epoch, latest raw observation (including unknown meaning), retained evidence counts, all retained candidate details, and reset/diagnostic information. Candidate details are retained within the configured 64-candidate capacity until reset or eviction, even after the chart badge disappears; event rows use the configured history retention. Diagnostic text can be selected and copied, and event text can be selected and copied with Ctrl+C. Inspection never advances market time or expires state, so pausing replay freezes the displayed market-time countdowns. The configured Cairo `sourceMode` label does not automatically detect Bookmap replay. Observer-only attachments do not create the floating Trade window.
 
 Completed badges show direction, trigger behavior and size, the confirmation band at first validation, and normal/applied requirements. They anchor horizontally at **validation time**, vertically at the trigger's tick price. Full explanations distinguish trigger occurrence, observation/validation time, confirmation ordering, locality, and attribution.
 

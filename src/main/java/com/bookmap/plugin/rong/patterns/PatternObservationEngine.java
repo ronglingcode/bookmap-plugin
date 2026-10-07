@@ -38,7 +38,7 @@ public final class PatternObservationEngine implements PatternRuntimeContext {
         attribution = new EventTimeTradeAttribution(config); relocation = new EventTimeRelocationTracker(config);
         normalizer = new PatternEventNormalizer(alias, pips, config);
         Consumer<PatternEvent> usableOutput = event -> {
-            if (pendingCoverageGap == null && event.size >= config.observationFloorSize) output.accept(event);
+            if (pendingCoverageGap == null && event.size >= event.type.minimumTrackedSize()) output.accept(event);
         };
         bidFailures = new BidFailureDetector(alias, pips, config, attribution, usableOutput);
         offers = new OfferInteractionDetector(alias, pips, config, walls, attribution, usableOutput);
