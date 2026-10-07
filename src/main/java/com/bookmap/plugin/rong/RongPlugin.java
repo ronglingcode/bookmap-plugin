@@ -133,6 +133,7 @@ public class RongPlugin implements CustomModuleAdapter,
     private boolean wallLabelsDirty;
     private long lastWallLabelRefreshMs;
     private long lastTimestampNs;
+    private volatile double wallChangeStockPrice = Double.NaN;
     private TradeButtonWindow tradeButtonWindow;
     private VwapTracker vwapTracker;
     private SignalWebSocketServer.VwapUpdateListener vwapUpdateListener;
@@ -223,7 +224,8 @@ public class RongPlugin implements CustomModuleAdapter,
                 this::handleWallChangeEvent,
                 this::isWallBreakAlertEnabled,
                 this::getWallChangeDayHigh,
-                this::getWallChangeDayLow);
+                this::getWallChangeDayLow,
+                () -> wallChangeStockPrice);
         this.patternEngine = new BookmapPatternEngine(
                 cleanAlias,
                 info.pips,
@@ -672,6 +674,7 @@ public class RongPlugin implements CustomModuleAdapter,
         long eventTimeNs = getEventTimeNs();
         PatternEvent.TimestampProvenance provenance = compositionProvenance();
         double realPrice = BookmapPriceNormalizer.toWirePrice(price, instrumentInfo.pips);
+        wallChangeStockPrice = realPrice;
         int priceTick = (int) Math.round(price);
         if (evidenceRecorder != null) evidenceRecorder.trade(priceTick, size, tradeInfo == null ? null : tradeInfo.isBidAggressor, eventTimeNs, lastTimestampNs <= 0);
         if (sharedServer != null) {

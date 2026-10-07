@@ -40,6 +40,11 @@ profiles and the existing single-stock watchlist policy.
   [Exact operation table](docs/direct-broker-execution.md).
 - Existing indicator subset: VWAP, premarket/previous-day levels, Camarilla pivots,
   configured key levels/zones, liquidity-wall labels and retest signals.
+- BID PULL and OFFER PULL cancellation alerts are limited to the inclusive range
+  from regular-session low of day minus 2% of the latest traded stock price to
+  high of day plus 2%. The range is checked when the depth change starts;
+  cancellations are suppressed until day levels and stock price are available. Additions, moves,
+  and trade-consumption alerts keep their existing behavior.
 - Local account/orders/fills and position-risk display, entry-input dialog,
   core-plan editor, trading notifications and optional sound.
 - One **Export** menu in Logs copies summary/detailed ThinkScript bubbles or trade

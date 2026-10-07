@@ -46,6 +46,7 @@ public class OrderWallChangeTracker {
     private final Predicate<Boolean> wallBreakAlertEnabled;
     private final DoubleSupplier dayHighSupplier;
     private final DoubleSupplier dayLowSupplier;
+    private DoubleSupplier cancellationStockPriceSupplier;
     private final ScheduledExecutorService scheduler;
     private final Map<LevelKey, Integer> currentSizes = new HashMap<>();
     private final Map<LevelKey, PendingChange> pendingChanges = new HashMap<>();
@@ -220,6 +221,37 @@ public class OrderWallChangeTracker {
         return () -> normalizedThreshold;
     }
 
+    /** Enables cancellation filtering against the daily range plus 2% of stock price. */
+    public OrderWallChangeTracker(String instrumentAlias, double pips,
+                                  IntSupplier largeOrderThresholdSupplier,
+                                  int largestOrderRank, double remainingRatio,
+                                  long decreaseDecisionDelayMs,
+                                  Consumer<OrderWallChangeEvent> alertConsumer,
+                                  Predicate<Boolean> wallBreakAlertEnabled,
+                                  DoubleSupplier dayHighSupplier,
+                                  DoubleSupplier dayLowSupplier,
+                                  DoubleSupplier stockPriceSupplier) {
+        this(instrumentAlias, pips, largeOrderThresholdSupplier, largestOrderRank,
+                remainingRatio, decreaseDecisionDelayMs, alertConsumer,
+                wallBreakAlertEnabled, dayHighSupplier, dayLowSupplier);
+        cancellationStockPriceSupplier = Objects.requireNonNull(stockPriceSupplier);
+    }
+
+    private boolean isCancellationInRange(int priceTick) {
+        // Older constructors retain their unrestricted behavior.
+        if (cancellationStockPriceSupplier == null) return true;
+        double stockPrice = getDayLevel(cancellationStockPriceSupplier);
+        double high = getDayLevel(dayHighSupplier);
+        double low = getDayLevel(dayLowSupplier);
+        if (!Double.isFinite(stockPrice) || !Double.isFinite(high)
+                || !Double.isFinite(low) || stockPrice <= 0 || low <= 0 || low > high) return false;
+        double price = BookmapPriceNormalizer.toWirePrice(priceTick, pips);
+        double padding = stockPrice * .02;
+        // Permit tiny floating-point conversion error at an inclusive boundary.
+        double tolerance = Math.ulp(Math.max(high + padding, price)) * 4;
+        return price >= low - padding - tolerance && price <= high + padding + tolerance;
+    }
+
     private static int rankForLegacyPercentile(double percentile) {
         return percentile > 0 ? DEFAULT_LARGEST_ORDER_RANK : 0;
     }
@@ -251,6 +283,7 @@ public class OrderWallChangeTracker {
         }
 
         PendingChange newPending = new PendingChange(previousSize, eventTimeNs, nowMs);
+        newPending.cancellationInRange = isCancellationInRange(priceTick);
         pendingChanges.put(key, newPending);
         scheduler.schedule(() -> evaluatePendingChange(key),
                 changeSurvivalMs, TimeUnit.MILLISECONDS);
@@ -407,6 +440,8 @@ public class OrderWallChangeTracker {
     }
 
     private void emitSingleChange(EvaluatedChange change, int threshold, long nowMs) {
+        if (change.delta < 0 && !change.tradeConsumption
+                && !change.pending.cancellationInRange) return;
         double realPrice = BookmapPriceNormalizer.toWirePrice(change.key.priceTick, pips);
         double dayHigh = getDayLevel(dayHighSupplier);
         double dayLow = getDayLevel(dayLowSupplier);
@@ -658,6 +693,7 @@ public class OrderWallChangeTracker {
     }
 
     private static final class PendingChange {
+        private boolean cancellationInRange = true;
         private final int previousSize;
         private final long createdAtMs;
         private long latestEventTimeNs;

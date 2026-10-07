@@ -60,6 +60,77 @@ The enum also defines `UNKNOWN_BID_LOSS` and `UNKNOWN_OFFER_LOSS`, both with
 `UNKNOWN` meaning. **The current observer does not emit these two types.** Ambiguous
 wall losses can produce diagnostics, but do not establish a directional pattern.
 
+### Price ranges tracked by each pattern
+
+These are detector eligibility ranges, before SignalComposer applies its separate
+signal-matching and price-drift checks. “All tracked levels” means there is no
+additional daily-range or percentage-distance filter; size, persistence,
+attribution, coverage, and buffer limits still apply. Tick distances below are the
+current defaults and can be changed in the rule template.
+
+For the observer, `L` and `H` are the lowest and highest trade prices observed by
+this attachment since its last reset during the regular session. They can differ
+from the full day's low and high. `W` is the pattern's wall price, `R` the reference
+wall price, and `T` a subsequent trade price.
+
+| Pattern | Price range tracked / required price interaction |
+| --- | --- |
+| **Bid Reappear** (`BID_REAPPEAR`) | Replacement wall strictly inside `L < W < H`, with `W >= R` and best ask above `W`. No maximum distance from the reference wall or current price at detection. |
+| **Bid Step Up** (`BID_STEP_UP`) | New wall strictly inside `L < W < H`, with `W > R` and best ask above `W`. The same range applies to delayed revisions. No maximum step distance at detection. |
+| **Bids Cancelled** (`BIDS_CANCELLED`) | All tracked bid levels. This independent observer event has no day-high/day-low or 2% filter; the chart's BID PULL filter below does not apply to it. |
+| **Bid Breakdown** (`BID_BREAKDOWN`) | All tracked bid levels; requires a subsequent print `T <= W - 1 tick`. No daily-range filter or maximum distance below the wall. |
+| **Offer Reappear** (`OFFER_REAPPEAR`) | Replacement wall strictly inside `L < W < H`, with `W <= R` and best bid below `W`. No maximum distance from the reference wall or current price at detection. |
+| **Offer Step Down** (`OFFER_STEP_DOWN`) | New wall strictly inside `L < W < H`, with `W < R` and best bid below `W`. The same range applies to delayed revisions. No maximum step distance at detection. |
+| **Offer Rejection** (`OFFER_REJECTION`) | Offer walls at any tracked price; approach trade must be in `[W - 2 ticks, W]`, followed by a trade `T <= W - 2 ticks`. No daily-range filter or maximum rejection distance. A trade above `W` or best bid at/above `W` breaks the interaction. |
+| **Offer Size Increasing Rejection** (`OFFER_SIZE_INCREASING_REJECTION`) | Same price range and approach/rejection requirements as Offer Rejection; growth does not widen the range. |
+| **Offer Breakout** (`OFFER_BREAKOUT`) | All tracked offer levels; requires a subsequent print `T >= W + 1 tick`. No daily-range filter or maximum distance above the wall. |
+| **Offer Size Increase** (`OFFER_SIZE_INCREASE`) | All qualified tracked offer levels. No approach to current price, daily-range filter, or percentage-distance limit is required. |
+| **Unknown Bid Loss** (`UNKNOWN_BID_LOSS`) | Not emitted by the current observer; no active tracking range. |
+| **Unknown Offer Loss** (`UNKNOWN_OFFER_LOSS`) | Not emitted by the current observer; no active tracking range. |
+
+After detection, bid trigger candidates use `maxTriggerDriftTicks` (default 20
+ticks) relative to current market price. Compatible offer confirmation must be
+within `maxPriceDistanceTicks` (default 20 ticks) of the bid trigger and at or
+above it, with `directionalPriceToleranceTicks` (default two ticks) allowed below
+it. Offer waiting context uses the same 20-tick/two-tick limits relative to
+current market price. These checks do not restrict the underlying depth tracking
+or remove distant raw observations from history.
+
+### Chart order-wall alerts and cancellation ranges
+
+The chart's order-wall change tracker is separate from the observer catalog above.
+It displays bid/offer cancellations as **BID PULL / OFFER PULL** and does not emit
+a SignalComposer `OFFERS_CANCELLED` event.
+
+Here `dayLow` and `dayHigh` are the shared regular-session day levels, which can
+include minute history, and `P` is the latest traded stock price. The cancellation
+band is the inclusive interval `[dayLow - 0.02 * P, dayHigh + 0.02 * P]`.
+Eligibility is frozen when the pending depth change starts. Cancellation alerts
+are suppressed if a valid stock price or day range is unavailable; an excluded
+change is not saved for later admission when the band expands. The underlying
+book remains tracked for size thresholds, trade attribution, and move pairing.
+
+| Chart pattern / event | Price range tracked for emitted alerts |
+| --- | --- |
+| **Bid canceled / BID PULL** (`REDUCED` or `REPLACED_SMALLER`, without trade consumption) | Only the inclusive cancellation band above. |
+| **Offer canceled / OFFER PULL** (`REDUCED` or `REPLACED_SMALLER`, without trade consumption) | Only the inclusive cancellation band above. |
+| **Bid added** (`ADDED`) | All tracked bid levels; no cancellation-band filter. |
+| **Offer added** (`ADDED`) | All tracked offer levels; no cancellation-band filter. |
+| **Bid increased** (`INCREASED`) | All tracked bid levels; no cancellation-band filter. |
+| **Offer increased** (`INCREASED`) | All tracked offer levels; no cancellation-band filter. |
+| **Bid moved up** (`BID_MOVED_UP`) | Any paired tracked bid levels with destination above source; no maximum price distance or cancellation-band filter. |
+| **Bid moved down** (`BID_MOVED_DOWN`) | Any paired tracked bid levels with destination below source; no maximum price distance or cancellation-band filter. |
+| **Offer moved up** (`OFFER_MOVED_UP`) | Any paired tracked offer levels with destination above source; no maximum price distance or cancellation-band filter. |
+| **Offer moved down** (`OFFER_MOVED_DOWN`) | Any paired tracked offer levels with destination below source; no maximum price distance or cancellation-band filter. |
+| **Bid breakdown** (`BID_BREAKDOWN`) | All tracked bid levels where trade-driven loss meets the existing enabled wall-break rule; no cancellation-band filter. |
+| **Offer breakout** (`OFFER_BREAKOUT`) | All tracked offer levels where trade-driven loss meets the existing enabled wall-break rule; no cancellation-band filter. |
+| **Trade-driven size decrease** (`REDUCED` or `REPLACED_SMALLER`, with trade consumption) | All tracked levels on either side; excluded from the cancellation filter even if displayed with a pull label. |
+
+The chart also marks an event as an active-liquidity alert only when its bid price
+is strictly above `dayLow`, or its offer price is strictly below `dayHigh`, and
+the change is material and not trade consumption. This existing classification
+does not replace the cancellation band and does not restrict all emitted events.
+
 Only `BID_HOLD` and `BID_FAIL` create signal candidates. Directional offer meanings
 provide confirmation and waiting context; they cannot create completed signals on
 their own. `UNKNOWN` events carry no directional meaning. All triggers still need

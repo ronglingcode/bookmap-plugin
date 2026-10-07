@@ -10,6 +10,7 @@ import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 
 import org.junit.jupiter.api.Test;
 
@@ -17,6 +18,103 @@ class OrderWallChangeTrackerTest {
 
     private static final int LARGE_THRESHOLD = 5_000;
     private static final long TEST_SURVIVAL_MS = 60;
+
+    @Test
+    void cancellationRangeScalesWithStockPriceAndIncludesBothBoundaries() throws Exception {
+        for (double stockPrice : new double[] {10, 500}) {
+            double high = stockPrice * 1.1, low = stockPrice * .9;
+            int lower = (int) Math.round((low - stockPrice * .02) * 100);
+            int upper = (int) Math.round((high + stockPrice * .02) * 100);
+            for (boolean bid : new boolean[] {true, false}) {
+                List<OrderWallChangeEvent> events = new CopyOnWriteArrayList<>();
+                CountDownLatch seen = new CountDownLatch(3);
+                OrderWallChangeTracker tracker = rangeTracker(events, seen,
+                        () -> high, () -> low, () -> stockPrice);
+                try {
+                    int[] levels = {lower - 1, lower, (int) Math.round(stockPrice * 100), upper, upper + 1};
+                    for (int level : levels) tracker.onDepth(bid, level, 8_000, 1L);
+                    tracker.markReady();
+                    for (int level : levels) tracker.onDepth(bid, level, 0, 2L);
+                    assertTrue(seen.await(1, TimeUnit.SECONDS));
+                    Thread.sleep(150);
+                    assertEquals(3, events.size());
+                    assertTrue(events.stream().allMatch(e -> e.getPriceTick() >= lower && e.getPriceTick() <= upper));
+                } finally { tracker.shutdown(); }
+            }
+        }
+    }
+
+    @Test
+    void cancellationUsesRangeAtStartInsteadOfRangeAfterStabilityDelay() throws Exception {
+        AtomicReference<Double> high = new AtomicReference<>(110.0);
+        AtomicReference<Double> low = new AtomicReference<>(90.0);
+        AtomicReference<Double> stock = new AtomicReference<>(100.0);
+        List<OrderWallChangeEvent> events = new CopyOnWriteArrayList<>();
+        CountDownLatch seen = new CountDownLatch(1);
+        OrderWallChangeTracker tracker = rangeTracker(events, seen, high::get, low::get, stock::get);
+        try {
+            tracker.onDepth(false, 11_200, 8_000, 1L);
+            tracker.onDepth(false, 11_201, 8_000, 1L);
+            tracker.markReady();
+            tracker.onDepth(false, 11_200, 0, 2L);
+            tracker.onDepth(false, 11_201, 0, 2L);
+            high.set(200.0); low.set(150.0); stock.set(175.0);
+            assertTrue(seen.await(1, TimeUnit.SECONDS));
+            Thread.sleep(150);
+            assertEquals(1, events.size());
+            assertEquals(11_200, events.get(0).getPriceTick());
+        } finally { tracker.shutdown(); }
+    }
+
+    @Test
+    void missingRangeSuppressesPullsButPreservesAdditionsAndConsumption() throws Exception {
+        List<OrderWallChangeEvent> events = new CopyOnWriteArrayList<>();
+        CountDownLatch seen = new CountDownLatch(2);
+        OrderWallChangeTracker tracker = rangeTracker(events, seen,
+                () -> Double.NaN, () -> Double.NaN, () -> Double.NaN);
+        try {
+            tracker.onDepth(true, 8_000, 8_000, 1L);
+            tracker.onDepth(false, 12_000, 8_000, 1L);
+            tracker.markReady();
+            tracker.onDepth(true, 8_000, 0, 2L);
+            tracker.onTrade(12_000, 8_000, true);
+            tracker.onDepth(false, 12_000, 0, 2L);
+            tracker.onDepth(true, 10_000, 16_000, 2L);
+            assertTrue(seen.await(1, TimeUnit.SECONDS));
+            Thread.sleep(150);
+            assertEquals(2, events.size());
+            assertTrue(events.stream().anyMatch(OrderWallChangeEvent::isTradeConsumption));
+            assertTrue(events.stream().anyMatch(e -> e.getType() == OrderWallChangeEvent.Type.ADDED));
+        } finally { tracker.shutdown(); }
+    }
+
+    private static OrderWallChangeTracker rangeTracker(List<OrderWallChangeEvent> events,
+            CountDownLatch seen, java.util.function.DoubleSupplier high,
+            java.util.function.DoubleSupplier low, java.util.function.DoubleSupplier stock) {
+        return new OrderWallChangeTracker("TEST", .01, () -> LARGE_THRESHOLD, 0, .5,
+                TEST_SURVIVAL_MS, event -> { events.add(event); seen.countDown(); },
+                bid -> false, high, low, stock);
+    }
+
+    @Test
+    void outOfRangeMovesStillEmitAsMoves() throws Exception {
+        for (boolean bid : new boolean[] {true, false}) {
+            List<OrderWallChangeEvent> events = new CopyOnWriteArrayList<>();
+            CountDownLatch seen = new CountDownLatch(1);
+            OrderWallChangeTracker tracker = rangeTracker(events, seen,
+                    () -> 110.0, () -> 90.0, () -> 100.0);
+            try {
+                tracker.onDepth(bid, 15_000, 8_000, 1L);
+                tracker.markReady();
+                tracker.onDepth(bid, 15_000, 0, 2L);
+                tracker.onDepth(bid, 15_001, 8_000, 3L);
+                assertTrue(seen.await(1, TimeUnit.SECONDS));
+                Thread.sleep(150);
+                assertEquals(1, events.size());
+                assertTrue(events.get(0).isMovedOrder());
+            } finally { tracker.shutdown(); }
+        }
+    }
 
     @Test
     void skipsChangeThatDoesNotSurviveStabilityWindow() throws Exception {
