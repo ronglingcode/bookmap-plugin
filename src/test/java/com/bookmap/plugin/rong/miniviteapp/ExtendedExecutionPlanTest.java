@@ -88,6 +88,6 @@ class ExtendedExecutionPlanTest {
         JsonObject action = new JsonObject(); action.addProperty("tradebook_id", "RangeBoundBidReversal"); action.addProperty("entry_method", "pattern 0.25R");
         Plan plan = EntryHandler.handleEntry(new Snapshot(json), action, "");
         assertEquals(0.25, Models.number(plan.entry, "multiplier"));
-        assertEquals(3, plan.requests.get(0).body.getAsJsonArray("childOrderStrategies").size());
+        assertEquals(10, plan.requests.get(0).body.getAsJsonArray("childOrderStrategies").size());
     }
 }

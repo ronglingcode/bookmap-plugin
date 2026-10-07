@@ -16,7 +16,7 @@ public final class OrderFlow {
         String type = market ? "MARKET" : (isLong ? state.currentPrice > entryPrice : state.currentPrice < entryPrice) ? "LIMIT" : "STOP";
         double orderEntry = isLong ? RiskManager.addCents(entryPrice) : RiskManager.minusCents(entryPrice);
         double orderStop = isLong ? RiskManager.minusCents(stopPrice) : RiskManager.addCents(stopPrice);
-        int count = fixed > 0 ? requestedCount : Math.min(requestedCount, Math.max(1, Math.min(state.batchCount, (int) Math.round(multiplier * state.batchCount))));
+        int count = requestedCount;
         double shares = fixed > 0 ? fixed : RiskManager.calculateTotalShares(orderEntry, riskPrice, multiplier, Models.number(context, "riskDollars"));
         double cap = Models.number(context, "maxQuantity");
         if (!(fixed > 0) && cap > 0) shares = Math.min(shares, cap);

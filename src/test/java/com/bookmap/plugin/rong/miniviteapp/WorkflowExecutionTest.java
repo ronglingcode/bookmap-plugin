@@ -42,7 +42,12 @@ class WorkflowExecutionTest {
         state.add("entries", JsonParser.parseString("[{\"orderID\":\"101\",\"orderType\":\"STOP\",\"quantity\":10,\"price\":10.5,\"exitStopPrice\":9.5,\"isBuy\":true}]").getAsJsonArray());
         state.getAsJsonObject("entryContext").add("longTrade", active()); state.getAsJsonObject("entryContext").addProperty("lowOfDay", 9);
         Plan plan = WorkflowHandler.handle(new Snapshot(state), "RefreshEntryStop", false); assertEquals(1, plan.requests.size()); assertEquals("PUT", plan.requests.get(0).method); assertEquals("101", plan.requests.get(0).orderId); assertEquals("TRIGGER", plan.requests.get(0).body.get("orderStrategyType").getAsString());
-        assertEquals(1, plan.entry.getAsJsonObject("basePlan").getAsJsonObject("planConfigs").get("sizingCount").getAsInt()); assertEquals(9, plan.entry.get("stopOutPrice").getAsDouble());
+        assertEquals(10, plan.entry.getAsJsonObject("basePlan").getAsJsonObject("planConfigs").get("sizingCount").getAsInt()); assertEquals(9, plan.entry.get("stopOutPrice").getAsDouble());
+        state.getAsJsonObject("entryContext").getAsJsonObject("longTrade").getAsJsonObject("plan").add("planConfigs", json("{\"sizingCount\":1}"));
+        state.getAsJsonObject("entryContext").getAsJsonObject("longTrade").getAsJsonObject("plan").addProperty("entryMethod", "0.1 R");
+        plan = WorkflowHandler.handle(new Snapshot(state), "RefreshEntryStop", false);
+        assertEquals(1, plan.entry.getAsJsonObject("basePlan").getAsJsonObject("planConfigs").get("sizingCount").getAsInt());
+        assertEquals(1, plan.requests.get(0).body.getAsJsonArray("childOrderStrategies").size());
     }
     @Test void removedTrailingKeysCannotFallThroughToAnotherExitWorkflow() {
         Snapshot state = new Snapshot(ExtendedExecutionPlanTest.longState());

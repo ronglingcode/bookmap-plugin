@@ -607,13 +607,14 @@ public class TradeButtonWindow {
     private JPanel createEntryMethodPanel(TradebookButtonGroup tradebook) {
         JPanel entryMethodPanel = new JPanel(new GridBagLayout());
         List<String> entryMethods = tradebook.getEntryMethods();
+        int columns = Math.max(1, (entryMethods.size() + 1) / 2);
         for (int index = 0; index < entryMethods.size(); index++) {
             GridBagConstraints gbc = new GridBagConstraints();
-            gbc.gridx = index;
-            gbc.gridy = 0;
+            gbc.gridx = index % columns;
+            gbc.gridy = index / columns;
             gbc.fill = GridBagConstraints.HORIZONTAL;
-            gbc.weightx = index == 0 ? PRIMARY_ENTRY_BUTTON_WEIGHT : SECONDARY_ENTRY_BUTTON_WEIGHT;
-            gbc.insets = new Insets(0, 0, 0, index == entryMethods.size() - 1 ? 0 : 6);
+            gbc.weightx = gbc.gridx == 0 ? PRIMARY_ENTRY_BUTTON_WEIGHT : SECONDARY_ENTRY_BUTTON_WEIGHT;
+            gbc.insets = new Insets(gbc.gridy == 0 ? 0 : 6, 0, 0, gbc.gridx == columns - 1 ? 0 : 6);
             entryMethodPanel.add(createEntryButton(tradebook, entryMethods.get(index)), gbc);
         }
         return entryMethodPanel;

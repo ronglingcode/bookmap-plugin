@@ -52,6 +52,35 @@ class EntryExecutionPlanTest {
         plan.addProperty("symbol", "AAPL");
         assertEquals("premarket shares below 500000 hard floor", StartupEligibility.evaluate(plan, 10, 100000000, stats, new JsonArray()));
     }
+    @Test void onlyTenthRiskUsesOnePartialWhileOtherMethodsUseFullPartials() {
+        var stream = getClass().getResourceAsStream("/direct-entry-fixtures.json"); assertNotNull(stream);
+        var fixture = JsonParser.parseReader(new InputStreamReader(stream, StandardCharsets.UTF_8)).getAsJsonArray().get(0).getAsJsonObject();
+        for (boolean isLong : new boolean[]{true, false}) {
+            for (double risk : new double[]{0.1, 0.2, 0.3, 0.5, 1}) {
+                var action = fixture.getAsJsonObject("action").deepCopy();
+                action.addProperty("entry_method", risk + " R");
+                action.addProperty("tradebook_id", isLong ? "RangeBoundBidReversal" : "RangeBoundOfferReversal");
+                var state = fixture.getAsJsonObject("state").deepCopy();
+                state.getAsJsonObject("entryContext").addProperty("customEntryPrice", 10);
+                var plan = EntryHandler.handleEntry(new Snapshot(state), action, "");
+                assertEquals(risk, plan.entry.get("multiplier").getAsDouble());
+                int count = risk == 0.1 ? 1 : 10;
+                assertEquals(count, plan.entry.getAsJsonObject("basePlan").getAsJsonObject("planConfigs").get("sizingCount").getAsInt());
+                assertEquals(count, plan.entry.getAsJsonObject("submitEntryResult").getAsJsonArray("profitTargets").size());
+                assertEquals(Math.floor(1960 * risk), plan.entry.getAsJsonObject("submitEntryResult").get("totalQuantity").getAsDouble());
+                assertEquals(count, plan.toJson().get(0).getAsJsonObject().getAsJsonObject("body").getAsJsonArray("childOrderStrategies").size());
+            }
+        }
+    }
+    @Test void reducedLiquidityKeepsFullPartialCount() {
+        var state = entryState();
+        state.getAsJsonObject("entryContext").add("volumes", JsonParser.parseString("[500000,80000,60000]"));
+        var action = JsonParser.parseString("{\"tradebook_id\":\"RangeBoundBidReversal\",\"entry_method\":\"0.2 R\"}").getAsJsonObject();
+        var plan = EntryHandler.handleEntry(new Snapshot(state), action, "");
+        assertEquals(0.1, plan.entry.get("multiplier").getAsDouble());
+        assertEquals(10, plan.entry.getAsJsonObject("basePlan").getAsJsonObject("planConfigs").get("sizingCount").getAsInt());
+        assertEquals(10, plan.entry.getAsJsonObject("submitEntryResult").getAsJsonArray("profitTargets").size());
+    }
     @Test void fixturesMatchNativeEntryPolicy() {
         var stream = getClass().getResourceAsStream("/direct-entry-fixtures.json"); assertNotNull(stream);
         var fixtures = JsonParser.parseReader(new InputStreamReader(stream, StandardCharsets.UTF_8)).getAsJsonArray();

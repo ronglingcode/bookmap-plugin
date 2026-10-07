@@ -24,7 +24,9 @@ public final class WorkflowHandler {
             JsonObject definition = new JsonObject(); definition.addProperty("tradebookID", string(object(saved, "submitEntryResult"), "tradeBookID")); definition.add("basePlan", object(saved, "plan"));
             double entry = isLong ? Math.max(existing.price, state.ask) : Math.min(existing.price, state.bid);
             Models.require(Models.positive(entry), "invalid pending replacement prices");
-            Plan sized = OrderFlow.submitEntry(state, state.entryContext, definition, new JsonObject(), isLong, false, entry, stop, number(saved, "sizeMultipler"), state.batchCount, "");
+            int count = (int) number(object(object(saved, "plan"), "planConfigs"), "sizingCount");
+            if (count <= 0) count = state.batchCount;
+            Plan sized = OrderFlow.submitEntry(state, state.entryContext, definition, new JsonObject(), isLong, false, entry, stop, number(saved, "sizeMultipler"), count, string(object(saved, "plan"), "entryMethod"));
             Plan plan = new Plan("refresh_pending_entry"); plan.entry = sized.entry; plan.warnings.addAll(sized.warnings); plan.requests.add(new Request("PUT", existing, sized.requests.get(0).body)); return plan;
         }
         Models.require(state.netQuantity != 0, "workflow requires an open position");
