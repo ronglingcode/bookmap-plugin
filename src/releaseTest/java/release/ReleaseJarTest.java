@@ -188,7 +188,7 @@ class ReleaseJarTest {
         Object template = mappedMethod(configName, configName + " load(java.nio.file.Path)", Path.class)
                 .invoke(null, Path.of(System.getProperty("signal.template")));
         assertEquals(true, mappedField(configName, "boolean valid", template));
-        assertEquals(false, mappedField(configName, "boolean enabled", template));
+        assertEquals(true, mappedField(configName, "boolean enabled", template));
 
         for (String name : List.of("patterns.PatternEventType", "patterns.PatternMeaning", "patterns.PatternSide",
                 "signal.ConfirmationStrength", "signal.SignalState", "signal.ResetReason")) {

@@ -57,6 +57,7 @@ class TradingSignalCanvasTest {
     }
     @Test void disabledAndUnknownAliasesCannotPaintAndDisposeIsIdempotent() {
         TradingSignalStore store = new TradingSignalStore(() -> 1000); IndicatorConfig config = new IndicatorConfig();
+        config.setEnabled(IndicatorConfig.SIGNAL_COMPOSER, false);
         TradingSignalPainter painter = new TradingSignalPainter(store, config); Canvas canvas = new Canvas();
         try {
             painter.registerInstrument("TEST"); ScreenSpacePainter screen = painter.createScreenSpacePainter("TEST", "signalComposer_TEST", canvas.factory);

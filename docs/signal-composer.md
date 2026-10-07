@@ -4,9 +4,9 @@ SignalComposer combines Bookmap depth and trade observations into advisory LONG/
 
 ## Enable and configure
 
-The default is disabled. **SignalComposer (advisory)** in addon settings is a shared switch across eligible charts, independent of **Bookmap Pattern Automation** and tradebook eligibility. A missing configuration file gives valid defaults that can be enabled through this checkbox. A malformed file disarms the feature and disables the checkbox; the log and tooltip explain the error.
+The default is enabled. **SignalComposer (advisory)** in addon settings is a shared switch across eligible charts, independent of **Bookmap Pattern Automation** and tradebook eligibility. A missing configuration file gives valid enabled defaults. Uncheck this checkbox or set "enabled": false in the configuration to start disabled. A malformed file disarms the feature and disables the checkbox; the log and tooltip explain the error.
 
-Copy [the disabled template](../config/signal-composer.template.json) to `%USERPROFILE%\bmtrader\signal-composer.json` to customize rules. Java resolves this under `user.home`. An explicit JVM override is `-Dbmtrader.signalComposerConfig=C:\absolute\path\signal-composer.json`. Configuration files are limited to 16 KiB. Empty `symbols` means all attached symbols; a list filters symbols after normalization. Quantities below are equity shares, prices are integer Bookmap ticks, and configuration durations are milliseconds.
+Copy [the template](../config/signal-composer.template.json) to `%USERPROFILE%\bmtrader\signal-composer.json` to customize rules. Java resolves this under `user.home`. An explicit JVM override is `-Dbmtrader.signalComposerConfig=C:\absolute\path\signal-composer.json`. Configuration files are limited to 16 KiB. Empty `symbols` means all attached symbols; a list filters symbols after normalization. Quantities below are equity shares, prices are integer Bookmap ticks, and configuration durations are milliseconds.
 
 Rules load once at the first attachment. Later attachments share that immutable configuration revision and retain the user's current checkbox state. **Stop every bmtrader attachment, then reattach them to reload the rules.** Restart Native Trading does not reload composer rules. This feature does not write your configuration or secrets.
 

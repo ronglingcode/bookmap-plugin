@@ -30,11 +30,11 @@ class SignalComposerActivationTest {
             assertNull(field("nativeTrading").get(null));
         });
     }
-    @Test void missingDefaultsConstructDisabledAndMalformedConfigDisarms() throws Exception {
+    @Test void missingDefaultsConstructEnabledAndMalformedConfigDisarms() throws Exception {
         withIsolatedActivation(() -> {
             System.setProperty(SignalComposerConfig.CONFIG_PROPERTY, directory.resolve("missing.json").toString());
             RongPlugin missing = plugin("TEST"); missing.initializeSignalComposition(.01);
-            assertNotNull(field("signalComposition").get(missing)); assertFalse(field("signalCompositionEnabled").getBoolean(missing));
+            assertNotNull(field("signalComposition").get(missing)); assertTrue(field("signalCompositionEnabled").getBoolean(missing));
         });
         withIsolatedActivation(() -> {
             Path config = directory.resolve("invalid.json"); Files.writeString(config, "{\"enabled\":true,\"minimumTriggerSize\":0}");

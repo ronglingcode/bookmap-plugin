@@ -21,13 +21,13 @@ class SignalComposerSettingsTest {
         }
         return null;
     }
-    @Test void missingDefaultsCanEnableIndependentMasterAndInvalidRulesCannot() throws Exception {
+    @Test void missingDefaultsEnableIndependentMasterAndInvalidRulesCannot() throws Exception {
         IndicatorConfig config = new IndicatorConfig();
         IndicatorSettingsPanel panel = new IndicatorSettingsPanel(config, new WallThresholdConfig());
-        JCheckBox toggle = checkbox(panel, "SignalComposer (advisory)"); assertNotNull(toggle); assertFalse(toggle.isSelected());
-        SwingUtilities.invokeAndWait(toggle::doClick); assertTrue(config.isEnabled(IndicatorConfig.SIGNAL_COMPOSER));
-        assertFalse(config.isEnabled(IndicatorConfig.BOOKMAP_PATTERN_SIGNALS));
+        JCheckBox toggle = checkbox(panel, "SignalComposer (advisory)"); assertNotNull(toggle); assertTrue(toggle.isSelected());
         SwingUtilities.invokeAndWait(toggle::doClick); assertFalse(config.isEnabled(IndicatorConfig.SIGNAL_COMPOSER));
+        assertFalse(config.isEnabled(IndicatorConfig.BOOKMAP_PATTERN_SIGNALS));
+        SwingUtilities.invokeAndWait(toggle::doClick); assertTrue(config.isEnabled(IndicatorConfig.SIGNAL_COMPOSER));
         IndicatorSettingsPanel invalid = new IndicatorSettingsPanel(config, new WallThresholdConfig(), new NativeConnectionStatus(), SignalComposerConfig.invalid("bad JSON"));
         assertFalse(checkbox(invalid, "SignalComposer (advisory)").isEnabled());
         assertTrue(checkbox(invalid, "SignalComposer (advisory)").getToolTipText().contains("bad JSON"));

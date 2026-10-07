@@ -5,9 +5,9 @@ market data and Firestore configuration/state directly, refreshes local Schwab
 credentials, and executes trades without ViteApp or ProxyServer running.
 
 SignalComposer adds optional advisory LONG/SHORT markers and separate waiting context from
-Bookmap observations. It is disabled by default and independent of execution, legacy scores,
+Bookmap observations. It is enabled by default and independent of execution, legacy scores,
 tradebook eligibility, and Cairo export. See the [operator guide](docs/signal-composer.md)
-and [disabled configuration template](config/signal-composer.template.json). Existing
+and [configuration template](config/signal-composer.template.json). Existing
 `observerOnly` replay mode exposes these settings without credentials or native trading.
 
 ## Setup

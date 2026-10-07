@@ -8,16 +8,16 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 class SignalComposerConfigLoadingTest {
-    @Test void shippedDisabledTemplateMatchesEveryEffectiveDefaultUnderRealLoader() {
+    @Test void shippedEnabledTemplateMatchesEveryEffectiveDefaultUnderRealLoader() {
         SignalComposerConfig template = SignalComposerConfig.load(Path.of("config", "signal-composer.template.json"));
-        assertTrue(template.valid, template.error); assertFalse(template.enabled);
+        assertTrue(template.valid, template.error); assertTrue(template.enabled);
         assertEquals(SignalComposerConfig.defaults().toJson(), template.toJson());
         assertEquals(SignalComposerConfig.defaults().revision, template.revision);
     }
     @TempDir Path directory;
-    @Test void missingFileProvidesUsableDisabledDefaults() {
+    @Test void missingFileProvidesUsableEnabledDefaults() {
         SignalComposerConfig c = SignalComposerConfig.load(directory.resolve("missing.json"));
-        assertTrue(c.valid); assertFalse(c.enabled); assertEquals(3000, c.observationFloorSize);
+        assertTrue(c.valid); assertTrue(c.enabled); assertEquals(3000, c.observationFloorSize);
     }
     @Test void loadsOnlyTheExplicitTemporaryFile() throws IOException {
         Path file = directory.resolve("config.json"); Files.writeString(file, "{\"enabled\":true,\"symbols\":[\"TEST\"]}");
@@ -34,6 +34,6 @@ class SignalComposerConfigLoadingTest {
     @Test void testProcessNeverInheritsTheUsersLocalFile() {
         String configured = System.getProperty(SignalComposerConfig.CONFIG_PROPERTY);
         assertNotNull(configured); assertTrue(configured.endsWith("no-signal-composer-config.json"));
-        assertFalse(SignalComposerConfig.load().enabled);
+        assertTrue(SignalComposerConfig.load().enabled);
     }
 }
