@@ -18,7 +18,7 @@ class SignalComposerConfigTest {
         String[] invalid = {"{\"enabled\":\"true\"}", "{\"maxEvents\":1.5}", "{\"normalTriggerSize\":0}",
                 "{\"normalTriggerSize\":6000}", "{\"observationFloorSize\":5000}",
                 "{\"strengthMultiples\":{\"strong\":0.5}}", "{\"triggerRequirements\":{\"exceptional\":2000}}",
-                "{\"historyRetentionMs\":1000}", "{\"detectors\":{\"consumptionRatio\":2}}",
+                "{\"beforeWindowMs\":300001}", "{\"detectors\":{\"consumptionRatio\":2}}",
                 "{\"detectors\":{\"withdrawalMaxTradeRatio\":0.8}}", "{\"maxCandidates\":1000000}",
                 "{\"symbols\":[1]}", "{\"symbols\":null}", "{\"detectors\":false}", "{\"maxEvents\":\"12\"}"};
         for (String input : invalid) {
@@ -30,6 +30,14 @@ class SignalComposerConfigTest {
         assertEquals(parse("{\"symbols\":[\"MSFT\",\"AAPL\"]}").revision,
                 parse("{\"symbols\":[\"aapl\",\"msft\"]}").revision);
         assertFalse(SignalComposerConfig.parse((JsonObject)null).valid);
+    }
+    @Test void localRetentionOverridesCannotChangeCodeOwnedRetentionOrRevision() {
+        for (String value : new String[] {"120000", "600000", "null", "\"invalid\""}) {
+            SignalComposerConfig c = parse("{\"historyRetentionMs\":" + value + "}");
+            assertTrue(c.valid, c.error);
+            assertEquals(300000, c.historyRetentionMs);
+            assertEquals(SignalComposerConfig.defaults().revision, c.revision);
+        }
     }
     @Test void defaultsKeepTheDetectionFloorIndependentAndDisabled() {
         SignalComposerConfig c = SignalComposerConfig.defaults();

@@ -146,7 +146,7 @@ Prefer one completed rejection event per interaction, upgraded to the composite 
 
 ## 6. History, candidates, and composer behavior
 
-`PatternEventStore` is per attachment and epoch. Keep a time-ordered deque and an ID/episode index. Prune on every event and timestamp callback. Retain 300 seconds (five minutes) by default, bounded to 2,048 semantic events. Keep at most 64 active bid candidates. Report eviction/overflow in file diagnostics; do not retain candidates whose required trigger record was evicted. Bound detector wall phases to 4,096 and attribution trades to 8,192 entries as initial limits, with normal time-based pruning. A detector-buffer overflow invalidates dependent attribution and pending candidates; never silently treat missing trades as a bid cancellation.
+`PatternEventStore` is per attachment and epoch. Keep a time-ordered deque and an ID/episode index. Prune on every event and timestamp callback. Retain 300 seconds (five minutes), fixed in code with no local override, bounded to 2,048 semantic events. Keep at most 64 active bid candidates. Report eviction/overflow in file diagnostics; do not retain candidates whose required trigger record was evicted. Bound detector wall phases to 4,096 and attribution trades to 8,192 entries as initial limits, with normal time-based pruning. A detector-buffer overflow invalidates dependent attribution and pending candidates; never silently treat missing trades as a bid cancellation.
 
 Events can be detected after their underlying market action. Keep `observedAtNs` as the monotonic processing clock and `eventTimeNs` as the occurrence clock; insert delayed occurrences into history in time order. History queries must only use evidence already observed at the current processing watermark. Do not reset an epoch merely because a delayed detector outcome refers to an earlier occurrence.
 
@@ -231,7 +231,6 @@ Add `signal/SignalComposerConfig.java` and `config/signal-composer.template.json
   "minimumTriggerSize": 3000,
   "normalConfirmationSize": 5000,
   "observationFloorSize": 3000,
-  "historyRetentionMs": 300000,
   "beforeWindowMs": 30000,
   "afterWindowMs": 30000,
   "maxPriceDistanceTicks": 20,

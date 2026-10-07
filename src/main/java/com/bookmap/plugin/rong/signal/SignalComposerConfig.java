@@ -22,6 +22,7 @@ import java.nio.file.NoSuchFileException;
 public final class SignalComposerConfig {
     public static final String CONFIG_PROPERTY = "bmtrader.signalComposerConfig";
     public static final int MAX_CONFIG_BYTES = 16384;
+    public static final long HISTORY_RETENTION_MS = 300000;
     public final boolean enabled, valid;
     public final String error, revision;
     public final Set<String> symbols;
@@ -41,7 +42,7 @@ public final class SignalComposerConfig {
         symbols = Collections.unmodifiableSet(new LinkedHashSet<>(b.symbols));
         normalTriggerSize = b.normalTriggerSize; minimumTriggerSize = b.minimumTriggerSize;
         normalConfirmationSize = b.normalConfirmationSize; observationFloorSize = b.observationFloorSize;
-        historyRetentionMs = b.historyRetentionMs; beforeWindowMs = b.beforeWindowMs; afterWindowMs = b.afterWindowMs;
+        historyRetentionMs = HISTORY_RETENTION_MS; beforeWindowMs = b.beforeWindowMs; afterWindowMs = b.afterWindowMs;
         maxPriceDistanceTicks = b.maxPriceDistanceTicks; directionalPriceToleranceTicks = b.directionalPriceToleranceTicks;
         maxTriggerDriftTicks = b.maxTriggerDriftTicks; maxEvents = b.maxEvents; maxCandidates = b.maxCandidates;
         maxWallPhases = b.maxWallPhases; maxAttributionTrades = b.maxAttributionTrades;
@@ -101,7 +102,7 @@ public final class SignalComposerConfig {
             b.minimumTriggerSize = integer(json, "minimumTriggerSize", b.minimumTriggerSize);
             b.normalConfirmationSize = integer(json, "normalConfirmationSize", b.normalConfirmationSize);
             b.observationFloorSize = integer(json, "observationFloorSize", b.observationFloorSize);
-            b.historyRetentionMs = integer(json, "historyRetentionMs", b.historyRetentionMs);
+            // Historical JSON retention values are ignored; code owns this setting.
             b.beforeWindowMs = integer(json, "beforeWindowMs", b.beforeWindowMs);
             b.afterWindowMs = integer(json, "afterWindowMs", b.afterWindowMs);
             b.maxPriceDistanceTicks = smallInteger(json, "maxPriceDistanceTicks", b.maxPriceDistanceTicks);
@@ -147,8 +148,7 @@ public final class SignalComposerConfig {
         positive(b.normalConfirmationSize, Long.MAX_VALUE, "normalConfirmationSize");
         positive(b.observationFloorSize, b.minimumTriggerSize, "observationFloorSize");
         positive(b.beforeWindowMs, 600000, "beforeWindowMs"); positive(b.afterWindowMs, 600000, "afterWindowMs");
-        positive(b.historyRetentionMs, 3600000, "historyRetentionMs");
-        require(b.historyRetentionMs >= Math.max(b.beforeWindowMs, b.afterWindowMs), "history retention must cover both windows");
+        require(HISTORY_RETENTION_MS >= Math.max(b.beforeWindowMs, b.afterWindowMs), "history retention must cover both windows");
         positive(b.maxEvents, 20000, "maxEvents"); positive(b.maxCandidates, 1024, "maxCandidates");
         positive(b.maxWallPhases, 20000, "maxWallPhases"); positive(b.maxAttributionTrades, 100000, "maxAttributionTrades");
         positive(b.maxPriceDistanceTicks, 100000, "maxPriceDistanceTicks"); positive(b.maxTriggerDriftTicks, 100000, "maxTriggerDriftTicks");
@@ -238,7 +238,7 @@ public final class SignalComposerConfig {
         boolean enabled;
         Set<String> symbols = new LinkedHashSet<>();
         long normalTriggerSize = 5000, minimumTriggerSize = 3000, normalConfirmationSize = 5000, observationFloorSize = 3000;
-        long historyRetentionMs = 300000, beforeWindowMs = 30000, afterWindowMs = 30000;
+        long beforeWindowMs = 30000, afterWindowMs = 30000;
         int maxPriceDistanceTicks = 20, directionalPriceToleranceTicks = 2, maxTriggerDriftTicks = 20;
         int maxEvents = 2048, maxCandidates = 64, maxWallPhases = 4096, maxAttributionTrades = 8192;
         StrengthMultiples strengthMultiples = new StrengthMultiples(1, 2, 5, 10);
