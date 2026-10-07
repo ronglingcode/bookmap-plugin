@@ -235,7 +235,7 @@ public final class SignalComposerConfig {
     }
 
     static final class Builder {
-        boolean enabled;
+        boolean enabled = true;
         Set<String> symbols = new LinkedHashSet<>();
         long normalTriggerSize = 5000, minimumTriggerSize = 3000, normalConfirmationSize = 5000, observationFloorSize = 3000;
         long beforeWindowMs = 30000, afterWindowMs = 30000;

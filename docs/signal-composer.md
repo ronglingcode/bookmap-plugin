@@ -4,9 +4,9 @@ SignalComposer combines Bookmap depth and trade observations into advisory LONG/
 
 ## Enable and configure
 
-The default is disabled. **SignalComposer (advisory)** in addon settings is a shared switch across eligible charts, independent of **Bookmap Pattern Automation** and tradebook eligibility. A missing configuration file gives valid defaults that can be enabled through this checkbox. A malformed file disarms the feature and disables the checkbox; the log and tooltip explain the error.
+The default is enabled. **SignalComposer (advisory)** in addon settings is a shared switch across eligible charts, independent of **Bookmap Pattern Automation** and tradebook eligibility. A missing configuration file gives valid enabled defaults. Uncheck this checkbox or set "enabled": false in the configuration to start disabled. A malformed file disarms the feature and disables the checkbox; the log and tooltip explain the error.
 
-Copy [the disabled template](../config/signal-composer.template.json) to `%USERPROFILE%\bmtrader\signal-composer.json` to customize rules. Java resolves this under `user.home`. An explicit JVM override is `-Dbmtrader.signalComposerConfig=C:\absolute\path\signal-composer.json`. Configuration files are limited to 16 KiB. Empty `symbols` means all attached symbols; a list filters symbols after normalization. Quantities below are equity shares, prices are integer Bookmap ticks, and configuration durations are milliseconds.
+Copy [the template](../config/signal-composer.template.json) to `%USERPROFILE%\bmtrader\signal-composer.json` to customize rules. Java resolves this under `user.home`. An explicit JVM override is `-Dbmtrader.signalComposerConfig=C:\absolute\path\signal-composer.json`. Configuration files are limited to 16 KiB. Empty `symbols` means all attached symbols; a list filters symbols after normalization. Quantities below are equity shares, prices are integer Bookmap ticks, and configuration durations are milliseconds.
 
 Rules load once at the first attachment. Later attachments share that immutable configuration revision and retain the user's current checkbox state. **Stop every bmtrader attachment, then reattach them to reload the rules.** Restart Native Trading does not reload composer rules. This feature does not write your configuration or secrets.
 
@@ -45,6 +45,8 @@ Trade attribution uses the same price, known aggressor side, a two-second lookba
 Wall phases and relocation/reference data are bounded at 4,096; trade attribution is bounded at 8,192 trades. Observation buffer overflow clears dependent composition state, begins a new epoch, and requires fresh readiness. Diagnostics identify the reason.
 
 ## Read the chart and logs
+
+The per-stock floating **Trade** window includes a scrollable **Signal Composer state (advisory)** panel at the bottom. It refreshes once per second and remains visible without a qualifying signal. It shows enablement, symbol/config eligibility, readiness, market timestamp in New York, epoch, rule revision, latest semantic observation, retained evidence, directional offer contexts, bid candidates and their confirmation requirements, validated candidate revisions, and the latest reset/diagnostic. Candidate details are retained within the configured 64-candidate capacity until reset or eviction, even after the chart badge disappears. Scroll to examine older candidates; text can be selected and copied. Quantities are shares. Inspection never advances market time or expires state, so pausing replay freezes the displayed market-time countdowns. The configured Cairo `sourceMode` label does not automatically detect Bookmap replay. Observer-only attachments do not create the floating Trade window.
 
 Completed badges show direction, trigger behavior and size, the confirmation band at first validation, and normal/applied requirements. They anchor horizontally at **validation time**, vertically at the trigger's tick price. Full explanations distinguish trigger occurrence, observation/validation time, confirmation ordering, locality, and attribution.
 

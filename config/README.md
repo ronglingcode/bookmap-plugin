@@ -1,6 +1,6 @@
 # Local credentials
 
-SignalComposer uses a separate optional [disabled rule template](signal-composer.template.json)
+SignalComposer uses a separate optional [rule template](signal-composer.template.json)
 at `%USERPROFILE%\bmtrader\signal-composer.json`. See the [operator guide](../docs/signal-composer.md)
 for the advisory switch, exact defaults, all-attachment rule reload, and credential-free replay.
 The existing `cairo-observation.json` `observerOnly` mode permits observation settings and

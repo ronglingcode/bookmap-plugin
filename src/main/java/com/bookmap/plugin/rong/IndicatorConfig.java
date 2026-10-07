@@ -45,7 +45,7 @@ public class IndicatorConfig {
         enabled.put(FIRE_KEYBOARD_EVENT, true);
         enabled.put(FILLED_EXECUTION_MARKERS, true);
         enabled.put(BOOKMAP_PATTERN_SIGNALS, false);
-        enabled.put(SIGNAL_COMPOSER, false);
+        enabled.put(SIGNAL_COMPOSER, true);
         enabled.put(VWAP, true);
         enabled.put(TRADING_NOTIFICATION_SOUND, true);
     }

@@ -39,15 +39,19 @@ class SignalComposerConfigTest {
             assertEquals(SignalComposerConfig.defaults().revision, c.revision);
         }
     }
-    @Test void defaultsKeepTheDetectionFloorIndependentAndDisabled() {
+    @Test void defaultsKeepTheDetectionFloorIndependentAndEnabled() {
         SignalComposerConfig c = SignalComposerConfig.defaults();
-        assertFalse(c.enabled); assertTrue(c.valid); assertTrue(c.symbols.isEmpty());
+        assertTrue(c.enabled); assertTrue(c.valid); assertTrue(c.symbols.isEmpty());
         assertEquals(5000, c.normalTriggerSize); assertEquals(5000, c.normalConfirmationSize);
         assertEquals(3000, c.minimumTriggerSize); assertEquals(3000, c.observationFloorSize);
         assertEquals(300000, c.historyRetentionMs); assertEquals(30000, c.beforeWindowMs); assertEquals(30000, c.afterWindowMs);
         assertEquals(20, c.maxPriceDistanceTicks); assertEquals(2, c.directionalPriceToleranceTicks);
         assertEquals(20, c.maxTriggerDriftTicks); assertEquals(2048, c.maxEvents); assertEquals(64, c.maxCandidates);
         assertEquals(4096, c.maxWallPhases); assertEquals(8192, c.maxAttributionTrades);
+    }
+    @Test void explicitDisableOverridesEnabledDefault() {
+        SignalComposerConfig c = parse("{\"enabled\":false}");
+        assertTrue(c.valid); assertFalse(c.enabled);
     }
     @Test void defaultsDefineAllSixRequirementsWithoutScores() {
         SignalComposerConfig c = SignalComposerConfig.defaults();

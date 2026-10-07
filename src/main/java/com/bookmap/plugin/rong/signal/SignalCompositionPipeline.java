@@ -11,18 +11,25 @@ public final class SignalCompositionPipeline {
     private final PatternObservationEngine observer;
     private final Consumer<CompositionUpdate> output;
     private int bid, ask, last;
+    private PatternEvent latestEvent;
+    private String latestDiagnostic = "None", latestReset = "None";
     private Consumer<ResetReason> resetListener = reason -> {};
     public SignalCompositionPipeline(String alias, double pips, SignalComposerConfig config, Consumer<CompositionUpdate> output) {
         this(alias, pips, config, output, event -> {}, diagnostic -> {}, System::currentTimeMillis);
     }
     public SignalCompositionPipeline(String alias, double pips, SignalComposerConfig config, Consumer<CompositionUpdate> output,
             Consumer<PatternEvent> rawEvents, Consumer<String> diagnostics, LongSupplier receiptClock) {
-        this.output = output; composer = new SignalComposer(alias, 1, config, receiptClock);
+        this.output = update -> {
+            if (!update.diagnostics.isEmpty()) latestDiagnostic = update.diagnostics.get(update.diagnostics.size() - 1);
+            output.accept(update);
+        };
+        composer = new SignalComposer(alias, 1, config, receiptClock);
         observer = new PatternObservationEngine(alias, pips, config, event -> {
-            rawEvents.accept(event); output.accept(composer.onPatternEvent(event));
+            latestEvent = event; rawEvents.accept(event); this.output.accept(composer.onPatternEvent(event));
         }, (reason, epoch) -> {
-            bid = ask = last = 0; resetListener.accept(reason); output.accept(composer.reset(reason, epoch));
-        }, diagnostics);
+            bid = ask = last = 0; latestEvent = null; latestReset = reason.name(); latestDiagnostic = "None";
+            resetListener.accept(reason); this.output.accept(composer.reset(reason, epoch));
+        }, message -> { latestDiagnostic = message; diagnostics.accept(message); });
     }
     public void onDepth(boolean bid, int price, long size, long timeNs, PatternEvent.TimestampProvenance provenance) {
         observer.onDepth(bid, price, size, timeNs, provenance); finish(provenance);
@@ -52,4 +59,20 @@ public final class SignalCompositionPipeline {
     public void reset(ResetReason reason) { observer.reset(reason); }
     public long epoch() { return observer.epoch(); }
     public boolean usable() { return observer.usable(); }
+    /** Polling this snapshot does not expire candidates or advance market time. */
+    public String inspectionText() {
+        String time = observer.nowNs() <= 0 ? "Unavailable" : java.time.Instant.ofEpochSecond(
+                observer.nowNs() / 1_000_000_000L, observer.nowNs() % 1_000_000_000L)
+                .atZone(java.time.ZoneId.of("America/New_York"))
+                .format(java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss.SSS 'NY'"));
+        StringBuilder text = new StringBuilder(observer.status()).append(" · Epoch ").append(observer.epoch())
+                .append("\nMarket time: ").append(time).append("\nLatest observation: ");
+        if (latestEvent == null) text.append("None since reset");
+        else text.append(latestEvent.type).append(" · ").append(latestEvent.meaning).append(" · ")
+                .append(latestEvent.size).append(" @ ").append(SignalExplanationBuilder.price(latestEvent.price))
+                .append(" · ").append(latestEvent.evidence.coverage).append(" / ").append(latestEvent.evidence.attribution);
+        for (String line : composer.inspectionLines()) text.append('\n').append(line);
+        return text.append("\nLast reset: ").append(latestReset).append("\nLatest diagnostic: ")
+                .append(latestDiagnostic).toString();
+    }
 }
