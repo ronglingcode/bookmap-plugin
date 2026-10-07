@@ -187,67 +187,97 @@ public final class MiniViteApp implements AutoCloseable {
         if (!body.has("orderLegCollection")) return 0;
         JsonObject leg = body.getAsJsonArray("orderLegCollection").get(0).getAsJsonObject(); String instruction = Models.string(leg, "instruction"); return instruction.equals("SELL") || instruction.equals("BUY_TO_COVER") ? Models.number(leg, "quantity") : 0;
     }
-    private void execute(String accountHash,
-            String actionId, Snapshot state, Plan plan) {
-        JsonArray results = new JsonArray(); boolean inFlight = false, unknown = false;
+    private static boolean isProtectedEntry(Request request) {
+        return request.body != null && Models.string(request.body, "orderStrategyType").equals("TRIGGER");
+    }
+    private void execute(String accountHash, String actionId, Snapshot state, Plan plan) {
+        JsonArray results = new JsonArray();
         int attempted = 0, acknowledged = 0, rejected = 0, uncertain = 0;
-        boolean entryAccepted = false;
-        String outcome = "accepted", reason = "";
-        String operation = "prepare native execution";
-        String accessToken = "";
-        if (plan.requests.isEmpty()) {
-            outcome = "no_op";
-            reason = plan.action.equals("cancel_breakout_entries")
-                    ? state.entries.isEmpty() ? "No pending entry orders found in the execution snapshot"
-                    : "No pending entries selected by the stop-only cancellation rule"
-                    : "Execution plan contains no broker requests";
-        }
-        try {
-            for (var request : plan.requests) {
-                String requestOperation = request.method + (request.orderId.isEmpty() ? " new order" : " order " + request.orderId);
-                operation = requestOperation;
-                if (request.delayBeforeMs > 0) Thread.sleep(request.delayBeforeMs);
-                boolean opening = request.body != null && Models.string(request.body, "orderStrategyType").equals("TRIGGER");
-                accessToken = guard(plan);
-                log.detail(state.symbol, "Native " + plan.action + " actionId=" + actionId + " request "
-                        + (attempted + 1) + "/" + plan.requests.size() + ": attempting " + requestOperation);
-                attempted++; inFlight = true;
-                Api.Result result = opening && request.method.equals("POST")
-                        ? api.mutateEntry(accountHash, accessToken, request, state.symbol)
-                        : api.mutate(accountHash, accessToken, request);
-                results.add(result.toJson());
-                inFlight = false;
-                if (result.outcome.equals("accepted")) acknowledged++;
-                else if (result.outcome.equals("rejected")) rejected++;
-                else uncertain++;
-                log.detail(state.symbol, "Native " + plan.action + " actionId=" + actionId + ": "
-                        + requestOperation + " returned HTTP " + result.status + "; "
-                        + (result.outcome.equals("accepted") ? "broker acknowledged request; final order state not confirmed"
-                        : result.outcome.equals("rejected") ? "broker rejected request" : "broker outcome unknown")
-                        + (result.newOrderId.isEmpty() ? "" : "; newOrderId=" + result.newOrderId)
-                        + (result.reason.isEmpty() ? "" : "; " + result.reason));
-                if (opening && result.outcome.equals("accepted") && plan.entry != null) entryAccepted = true;
-                if (!result.outcome.equals("accepted")) {
-                    unknown = result.outcome.equals("unknown");
-                    outcome = unknown ? "unknown" : acknowledged > 0 ? "partial" : "rejected";
-                    reason = result.reason;
-                    if (unknown) reason += "; broker outcome unknown; review orders before resetting";
-                    break;
-                }
+        boolean entryAccepted = false, stageFailed = false;
+        List<String> reasons = new ArrayList<>();
+        int cursor = 0;
+        while (cursor < plan.requests.size() && !stageFailed) {
+            Request first = plan.requests.get(cursor);
+            try {
+                if (first.delayBeforeMs > 0) Thread.sleep(first.delayBeforeMs);
+            } catch (InterruptedException error) {
+                Thread.currentThread().interrupt();
+                reasons.add("Native execution interrupted before next batch dispatch");
+                break;
             }
-        } catch (IllegalArgumentException error) {
-            unknown = inFlight; if (inFlight) uncertain++;
-            outcome = inFlight ? "unknown" : acknowledged > 0 ? "partial" : "rejected";
-            reason = operation + " failed: " + ExecutionDiagnostics.describe(error, token, accessToken, accountHash)
-                    + (inFlight ? "; no classified broker result; broker outcome unknown; review orders before resetting" : "; request not attempted");
-        } catch (Exception error) {
-            // A network exception after dispatch cannot prove whether the mutation reached the broker.
-            unknown = inFlight; if (inFlight) uncertain++;
-            outcome = inFlight ? "unknown" : acknowledged > 0 ? "partial" : "rejected";
-            reason = operation + " failed: " + ExecutionDiagnostics.describe(error, token, accessToken, accountHash)
-                    + (inFlight ? "; no classified broker result; broker outcome unknown; review orders before resetting" : "; request not attempted");
-            if (error instanceof InterruptedException) Thread.currentThread().interrupt();
+            int end = cursor + 1;
+            // Delays and protected entries delimit dependent workflow stages. Within a stage,
+            // every cancellation/replacement/submission starts before awaiting any response.
+            while (end < plan.requests.size() && plan.requests.get(end).delayBeforeMs == 0
+                    && !isProtectedEntry(first) && !isProtectedEntry(plan.requests.get(end))) end++;
+            List<CompletableFuture<JsonObject>> pending = new ArrayList<>();
+            for (int i = cursor; i < end; i++) {
+                Request request = plan.requests.get(i);
+                int index = i + 1;
+                pending.add(CompletableFuture.supplyAsync(
+                        () -> executeRequest(accountHash, actionId, state, plan, request, index), executor));
+            }
+            for (int i = 0; i < pending.size(); i++) {
+                JsonObject result = pending.get(i).join(); results.add(result);
+                if (Models.bool(result, "attempted")) {
+                    attempted++;
+                    if (Models.string(result, "outcome").equals("accepted")) {
+                        acknowledged++;
+                        if (isProtectedEntry(plan.requests.get(cursor + i)) && plan.entry != null) entryAccepted = true;
+                    } else if (Models.string(result, "outcome").equals("unknown")) uncertain++;
+                    else rejected++;
+                }
+                if (!Models.string(result, "outcome").equals("accepted")) stageFailed = true;
+                if (!Models.string(result, "reason").isEmpty()) reasons.add(Models.string(result, "reason"));
+            }
+            cursor = end;
         }
+        boolean unknown = uncertain > 0;
+        String outcome = unknown ? "unknown" : plan.requests.isEmpty() ? "no_op"
+                : acknowledged == plan.requests.size() ? "accepted" : acknowledged > 0 ? "partial" : "rejected";
+        String reason = String.join("; ", reasons);
+        if (plan.requests.isEmpty()) reason = plan.action.equals("cancel_breakout_entries")
+                ? state.entries.isEmpty() ? "No pending entry orders found in the execution snapshot"
+                : "No pending entries selected by the stop-only cancellation rule"
+                : "Execution plan contains no broker requests";
+        if (unknown) reason += "; broker outcome unknown; review orders before resetting";
+        finishExecution(actionId, state, plan, results, attempted, acknowledged, rejected, uncertain,
+                entryAccepted, outcome, reason, unknown);
+    }
+    private JsonObject executeRequest(String accountHash, String actionId, Snapshot state, Plan plan,
+            Request request, int index) {
+        String accessToken = "";
+        boolean dispatched = false;
+        String operation = request.method + (request.orderId.isEmpty() ? " new order" : " order " + request.orderId);
+        try {
+            accessToken = guard(plan);
+            log.detail(state.symbol, "Native " + plan.action + " actionId=" + actionId + " request "
+                    + index + "/" + plan.requests.size() + ": attempting " + operation);
+            dispatched = true;
+            Api.Result response = isProtectedEntry(request) && request.method.equals("POST")
+                    ? api.mutateEntry(accountHash, accessToken, request, state.symbol)
+                    : api.mutate(accountHash, accessToken, request);
+            log.detail(state.symbol, "Native " + plan.action + " actionId=" + actionId + ": " + operation
+                    + " returned HTTP " + response.status + "; "
+                    + (response.outcome.equals("accepted") ? "broker acknowledged request; final order state not confirmed"
+                    : response.outcome.equals("rejected") ? "broker rejected request" : "broker outcome unknown")
+                    + (response.newOrderId.isEmpty() ? "" : "; newOrderId=" + response.newOrderId)
+                    + (response.reason.isEmpty() ? "" : "; " + response.reason));
+            JsonObject result = response.toJson(); result.addProperty("attempted", true); return result;
+        } catch (Exception error) {
+            JsonObject result = new JsonObject();
+            result.addProperty("method", request.method); result.addProperty("orderId", request.orderId);
+            result.addProperty("attempted", dispatched);
+            result.addProperty("outcome", dispatched ? "unknown" : "rejected");
+            result.addProperty("reason", operation + " failed: "
+                    + ExecutionDiagnostics.describe(error, accessToken, accountHash)
+                    + (dispatched ? "; no classified broker result; broker outcome unknown; review orders before resetting" : "; request not attempted"));
+            return result;
+        }
+    }
+    private void finishExecution(String actionId, Snapshot state, Plan plan, JsonArray results,
+            int attempted, int acknowledged, int rejected, int uncertain, boolean entryAccepted,
+            String outcome, String reason, boolean unknown) {
         synchronized (this) {
             if (unknown) { requiresReview = true; reviewReason = reason; }
             JsonObject finished = message("execution_result"); finished.addProperty("actionId", actionId);

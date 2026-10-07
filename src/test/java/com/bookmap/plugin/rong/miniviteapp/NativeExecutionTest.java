@@ -80,19 +80,18 @@ class NativeExecutionTest {
             assertFalse(rig.screen.get(0).contains("actionId="));
         }
     }
-    @Test void rejectedAndUnknownRequestsReportUnattemptedRemainder() throws Exception {
+    @Test void rejectedAndUnknownBatchesCollectEveryDispatchedResponse() throws Exception {
         for (int status : new int[]{400, 202, 408, 503}) try (var rig = new Rig()) {
             rig.connect(); rig.mutationStatus = status; rig.engine.route(action("KeyC")); var result = rig.finish();
             assertEquals(status == 400 ? "rejected" : "unknown", result.get("outcome").getAsString());
-            assertEquals(1, result.get("attemptedRequestCount").getAsInt());
+            assertEquals(2, result.get("attemptedRequestCount").getAsInt());
             assertEquals(0, result.get("acknowledgedRequestCount").getAsInt());
-            assertEquals(1, result.get("notAttemptedRequestCount").getAsInt());
-            assertEquals(status == 400 ? 0 : 1, result.get("unknownRequestCount").getAsInt());
-            assertEquals(status == 400 ? 1 : 0, result.get("rejectedRequestCount").getAsInt());
-            assertTrue(rig.logs.stream().anyMatch(line -> line.contains("DELETE order 101 returned HTTP " + status)));
-            assertFalse(rig.logs.stream().anyMatch(line -> line.contains("attempting DELETE order 102")));
+            assertEquals(0, result.get("notAttemptedRequestCount").getAsInt());
+            assertEquals(status == 400 ? 0 : 2, result.get("unknownRequestCount").getAsInt());
+            assertEquals(status == 400 ? 2 : 0, result.get("rejectedRequestCount").getAsInt());
+            for (String id : new String[]{"101", "102"})
+                assertTrue(rig.logs.stream().anyMatch(line -> line.contains("DELETE order " + id + " returned HTTP " + status)));
             assertEquals(1, rig.screen.size());
-            assertTrue(rig.screen.get(0).contains(status == 400 ? "rejected" : "review broker orders before resetting"));
         }
     }
     @Test void stopOnlyPolicyExplainsWhyLimitEntriesWereNotCanceled() throws Exception {
@@ -449,7 +448,7 @@ class NativeExecutionTest {
         try (var rig = new Rig()) {
             rig.state = ExtendedExecutionPlanTest.longState(); rig.connect(); var command = action(""); command.addProperty("tradebook_id", "RangeBoundOfferReversal"); rig.mutationStatus = 503;
             rig.engine.route(command); assertEquals("unknown", rig.finish().get("outcome").getAsString());
-            assertTrue(rig.engine.route(command)); assertEquals(1, rig.mutations.get());
+            assertTrue(rig.engine.route(command)); assertEquals(4, rig.mutations.get());
             assertTrue(rig.engine.resetAfterBrokerReview()); assertTrue(rig.engine.route(command));
         }
     }
@@ -557,6 +556,108 @@ class NativeExecutionTest {
             assertEquals("SELL", rig.bodies.get(0).getAsJsonArray("orderLegCollection").get(0).getAsJsonObject().get("instruction").getAsString());
         }
     }
+    @Test void independentBatchesDispatchEveryRequestBeforeAnyResponseAndCollectFailures() throws Exception {
+        for (String key : new String[]{"KeyF", "KeyG", "KeyT", "KeyC"}) for (int failureStatus : new int[]{201, 400, 503}) {
+            int batchCount = key.equals("KeyG") ? 5 : 10;
+            JsonObject state = fixture("flatten replaces all exit pairs");
+            state.addProperty("coreRuleEnabled", false); state.addProperty("splitPartials", true);
+            JsonObject template = state.getAsJsonArray("pairs").get(0).getAsJsonObject();
+            JsonArray pairs = new JsonArray();
+            for (int i = 0; i < 10; i++) {
+                JsonObject pair = template.deepCopy();
+                for (String leg : new String[]{"STOP", "LIMIT"}) {
+                    pair.getAsJsonObject(leg).addProperty("orderID", "" + (100 + i * 2 + (leg.equals("STOP") ? 0 : 1)));
+                    pair.getAsJsonObject(leg).addProperty("quantity", 10);
+                }
+                pairs.add(pair);
+            }
+            state.add("pairs", pairs); state.addProperty("netQuantity", 100);
+            JsonArray entries = new JsonArray();
+            if (key.equals("KeyC")) for (int i = 0; i < 10; i++) {
+                JsonObject entry = pairs.get(i).getAsJsonObject().getAsJsonObject("STOP").deepCopy();
+                entry.addProperty("orderID", "" + (500 + i)); entry.addProperty("isBuy", true); entries.add(entry);
+            }
+            state.add("entries", entries);
+            CountDownLatch entered = new CountDownLatch(batchCount), release = new CountDownLatch(1);
+            AtomicInteger sent = new AtomicInteger();
+            CompletableFuture<JsonObject> finished = new CompletableFuture<>();
+            int status = failureStatus;
+            Api api = new Api((uri, method, headers, body) -> {
+                int index = sent.incrementAndGet(); entered.countDown();
+                assertTrue(release.await(3, TimeUnit.SECONDS));
+                return new com.bookmap.plugin.rong.miniviteapp.ports.HttpPort.Response(
+                        index == 1 && status != 201 ? status : method.equals("DELETE") ? 204 : 201,
+                        "", Map.of("Location", "/orders/" + index));
+            }, (symbol, message) -> { });
+            try (MiniViteApp engine = new MiniViteApp(api, (client, event) -> {
+                if (event.get("type").getAsString().equals("execution_result")) finished.complete(event);
+            })) {
+                engine.receive(this, json("{\"type\":\"execution_token\",\"accountHash\":\"fake-account\",\"accessToken\":\"fake-token\",\"expiresAt\":9999999999999}"));
+                JsonObject inputs = json("{\"type\":\"execution_state\"}");
+                JsonArray symbols = new JsonArray(); symbols.add(state); inputs.add("symbols", symbols); engine.receive(this, inputs);
+                JsonObject command = action(key); command.addProperty("shiftKey", key.equals("KeyG"));
+                command.addProperty("price", 99); engine.route(command);
+                try {
+                    assertTrue(entered.await(2, TimeUnit.SECONDS), key + ": all requests must start while responses are blocked");
+                    assertFalse(finished.isDone(), "Refresh/result must wait for all responses");
+                } finally { release.countDown(); }
+                JsonObject result = finished.get(3, TimeUnit.SECONDS);
+                assertEquals(batchCount, result.get("attemptedRequestCount").getAsInt());
+                assertEquals(0, result.get("notAttemptedRequestCount").getAsInt());
+                assertEquals(batchCount, result.getAsJsonArray("results").size());
+                assertEquals(status == 201 ? "accepted" : status == 400 ? "partial" : "unknown", result.get("outcome").getAsString());
+                assertEquals(status == 201 ? batchCount : batchCount - 1, result.get("acknowledgedRequestCount").getAsInt());
+                assertEquals(status == 503, result.get("requiresReview").getAsBoolean());
+            }
+        }
+    }
+    @Test void swapAndTargetResetRunConcurrentStagesAndPreserveEntryCapture() throws Exception {
+        for (String key : new String[]{"KeyW", "KeyP"}) for (boolean fail : new boolean[]{false, true}) {
+            JsonObject state = ExtendedExecutionPlanTest.longState();
+            if (key.equals("KeyP")) {
+                state.addProperty("netQuantity", 50);
+                state.getAsJsonObject("entryContext").add("activeTrade", WorkflowExecutionTest.active());
+            }
+            int firstCount = state.getAsJsonArray("pairs").size() * (key.equals("KeyP") ? 2 : 1);
+            CountDownLatch firstEntered = new CountDownLatch(firstCount), releaseFirst = new CountDownLatch(1);
+            CountDownLatch secondEntered = new CountDownLatch(key.equals("KeyP") ? 2 : 1), releaseSecond = new CountDownLatch(1);
+            AtomicInteger laterRequests = new AtomicInteger();
+            CompletableFuture<JsonObject> finished = new CompletableFuture<>();
+            Api api = new Api((uri, method, headers, body) -> {
+                if (method.equals("POST")) {
+                    laterRequests.incrementAndGet(); secondEntered.countDown();
+                    assertTrue(releaseSecond.await(3, TimeUnit.SECONDS));
+                } else {
+                    firstEntered.countDown(); assertTrue(releaseFirst.await(3, TimeUnit.SECONDS));
+                    if (fail) return new com.bookmap.plugin.rong.miniviteapp.ports.HttpPort.Response(400, "rejected");
+                }
+                return new com.bookmap.plugin.rong.miniviteapp.ports.HttpPort.Response(method.equals("DELETE") ? 204 : 201,
+                        "", Map.of("Location", "/orders/123"));
+            }, (symbol, message) -> { });
+            try (MiniViteApp engine = new MiniViteApp(api, (client, event) -> {
+                if (event.get("type").getAsString().equals("execution_result")) finished.complete(event);
+            })) {
+                engine.receive(this, json("{\"type\":\"execution_token\",\"accountHash\":\"fake-account\",\"accessToken\":\"fake-token\",\"expiresAt\":9999999999999}"));
+                JsonObject inputs = json("{\"type\":\"execution_state\"}");
+                JsonArray symbols = new JsonArray(); symbols.add(state); inputs.add("symbols", symbols); engine.receive(this, inputs);
+                engine.route(action(key));
+                try {
+                    assertTrue(firstEntered.await(2, TimeUnit.SECONDS), key + ": first stage must dispatch concurrently");
+                    assertEquals(0, laterRequests.get(), "Dependent submissions must follow the first stage");
+                    releaseFirst.countDown();
+                    if (!fail) {
+                        assertTrue(secondEntered.await(2, TimeUnit.SECONDS), key + ": second stage must dispatch concurrently");
+                        assertFalse(finished.isDone());
+                    }
+                } finally { releaseFirst.countDown(); releaseSecond.countDown(); }
+                JsonObject result = finished.get(3, TimeUnit.SECONDS);
+                assertEquals(fail ? "rejected" : "accepted", result.get("outcome").getAsString());
+                assertEquals(!fail && key.equals("KeyW"), result.has("entry"));
+                assertEquals(fail ? 0 : key.equals("KeyP") ? 2 : 1, laterRequests.get());
+                assertEquals(fail ? firstCount : firstCount + laterRequests.get(), result.get("attemptedRequestCount").getAsInt());
+            }
+        }
+    }
     @Test void flattenExecutesWithoutBookmapProviderVerification() throws Exception {
         try (var rig = new Rig()) {
             rig.state = fixture("flatten replaces all exit pairs"); rig.connect();
@@ -574,7 +675,7 @@ class NativeExecutionTest {
             rig.engine.route(action("KeyC")); var result = rig.finish();
             assertEquals("rejected", result.get("outcome").getAsString());
             assertTrue(result.get("reason").getAsString().contains("DELETE order 101 HTTP 401"));
-            assertEquals(List.of("DELETE /accounts/hash/orders/101"), rig.requests);
+            assertEquals(Set.of("DELETE /accounts/hash/orders/101", "DELETE /accounts/hash/orders/102"), new HashSet<>(rig.requests));
             assertFalse(result.get("requiresReview").getAsBoolean());
         }
     }
@@ -582,9 +683,13 @@ class NativeExecutionTest {
         try (var rig = new Rig()) {
             rig.connect(); rig.allowMutation = new CountDownLatch(1); rig.engine.route(action("KeyC"));
             assertTrue(rig.mutationEntered.await(3, TimeUnit.SECONDS));
+            long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(2);
+            while (rig.logs.stream().filter(line -> line.contains(": attempting DELETE")).count() < 2 && System.nanoTime() < deadline) Thread.sleep(5);
+            assertEquals(2, rig.logs.stream().filter(line -> line.contains(": attempting DELETE")).count());
             rig.token(2, System.currentTimeMillis()+120_000, "fake-refreshed-access-token");
             rig.allowMutation.countDown(); assertEquals("accepted", rig.finish().get("outcome").getAsString());
-            assertEquals(List.of("Bearer fake-access-token", "Bearer fake-refreshed-access-token"), rig.authorizations);
+            assertEquals(2, rig.authorizations.size());
+            assertTrue(rig.authorizations.stream().allMatch(value -> value.equals("Bearer fake-access-token")));
             assertEquals(2, rig.mutations.get());
         }
     }
@@ -592,7 +697,7 @@ class NativeExecutionTest {
         try (var rig = new Rig()) {
             rig.connect(); rig.orderFilled = true; rig.mutationStatus = 400; rig.engine.route(action("KeyC"));
             assertEquals("rejected", rig.finish().get("outcome").getAsString());
-            assertEquals(List.of("DELETE /accounts/hash/orders/101"), rig.requests);
+            assertEquals(Set.of("DELETE /accounts/hash/orders/101", "DELETE /accounts/hash/orders/102"), new HashSet<>(rig.requests));
         }
     }
     @Test void oldAccountQuotesAndEntryContextDoNotBlockDispatch() throws Exception {
@@ -727,13 +832,13 @@ class NativeExecutionTest {
             rig.connect(); rig.mutationStatus = 503; rig.engine.route(action("KeyC"));
             assertEquals("unknown", rig.finish().get("outcome").getAsString());
             rig.updateState(System.currentTimeMillis()+10); rig.engine.route(action("KeyC"));
-            assertEquals(1, rig.mutations.get()); assertTrue(rig.engine.status().get("requiresReview").getAsBoolean());
+            assertEquals(2, rig.mutations.get()); assertTrue(rig.engine.status().get("requiresReview").getAsBoolean());
             rig.engine.route(action("KeyC"));
-            assertEquals(1, rig.mutations.get());
+            assertEquals(2, rig.mutations.get());
             assertTrue(rig.engine.resetAfterBrokerReview());
             rig.mutationStatus = 200; rig.engine.route(action("KeyC"));
             assertEquals("accepted", rig.finish(2).get("outcome").getAsString());
-            assertEquals(3, rig.mutations.get());
+            assertEquals(4, rig.mutations.get());
         }
     }
     @Test void updatesExecuteWithoutHandshakeSessionIdOrAccountMatching() throws Exception {
@@ -747,7 +852,7 @@ class NativeExecutionTest {
             var state = rig.message("execution_state"); var symbols = new JsonArray(); symbols.add(rig.state.deepCopy());
             state.add("symbols", symbols); rig.engine.receive(rig.connection, state);
             rig.engine.route(action("KeyC")); assertEquals("accepted", rig.finish().get("outcome").getAsString());
-            assertEquals(List.of("DELETE /accounts/updated-hash/orders/101", "DELETE /accounts/updated-hash/orders/102"), rig.requests);
+            assertEquals(Set.of("DELETE /accounts/updated-hash/orders/101", "DELETE /accounts/updated-hash/orders/102"), new HashSet<>(rig.requests));
             assertTrue(rig.authorizations.stream().allMatch(value -> value.equals("Bearer fake-refreshed-access-token")));
             assertFalse(rig.engine.status().has("epoch"));
             assertTrue(rig.events.stream().noneMatch(event -> event.get("type").getAsString().equals("execution_session")));

@@ -20,7 +20,7 @@ The earlier flag-based rollout is historical; this document supersedes it.
 | A / Add Partial / Shift+A | Protected partial reload at hover/custom price or market with Shift; retain browser low-risk override and hard entry boundary. |
 | W / Swap | Close/reenter in the original direction. A pending same-direction entry instead closes all but the last exit pair. Preserves 500ms close/reentry or 750ms cancel/close workflow delays. |
 | C / Cancel Entry | Refresh broker orders, cancel STOP breakout entries only and clear pending timer. |
-| F / Flatten | Preserve uncovered-share branch, otherwise market out exit pairs and any remainder. Core-target protection does not prevent Flatten. |
+| F / Flatten | Preserve uncovered-share branch, otherwise market out exit pairs and any remainder. Core-target protection does not prevent Flatten. Independent requests dispatch concurrently; all responses are collected before refreshing account status. |
 | M / Numpad1 / Market Out 1 | Market out the first pair tied for smallest share quantity. |
 | Other numpad digits | Market out the indexed partial; 0 means tenth. |
 | Top-row digits | Move the selected stop/limit to hover price; Digit1 uses the first smallest pair, remaining digits are positional. |
@@ -86,7 +86,7 @@ updates use the last completed minute and ignore repeated unchanged points.
 OAuth checks every 30s, account polling every 15s, config refresh every 60s,
 and market projections every 100ms. Account events and accepted mutations request
 a refresh, coalesced with a minimum three-second read interval. HTTP 429 defers
-reads using Retry-After seconds (60s fallback). A GET 401 refreshes once and retries
+reads using Retry-After seconds (60s fallback). Every attempted order action completion requests an immediate account read and follow-up reads after 500ms and 1000ms; these bypass the ordinary three-second throttle while preserving in-flight read coalescing and HTTP 429 backoff. A GET 401 refreshes once and retries
 the read; broker mutations are never automatically retried.
 
 Day rollover rebuilds market/state inputs. Removed watchlist symbols lose their
@@ -99,6 +99,8 @@ and closed-entry-candle volume, over-risk exposure, stop-tightening discipline
 and the third-partial core-plan reminder. They appear in bmtrader Logs; optional
 **Native Trading Notification Sound** uses the existing Bookmap sound API. Browser
 speech and DOM blinking stay in the browser.
+
+The trade window **Refresh Account** button requests the same immediate and delayed reads for positions, orders and fills across the account. It bypasses the ordinary polling throttle while respecting broker backoff.
 
 ## Architecture and development
 
@@ -144,6 +146,6 @@ Entries and exits submit from the current local account cache without experiment
 position/pending-order preflight GETs. Trading restrictions follow ViteApp; see
 [viteapp-rule-parity-audit.md](viteapp-rule-parity-audit.md). There are no input-age
 cutoffs, session ownership, action coordination fences or waits
-for reconciliation. Broker rejections stop the remaining requests. An ambiguous
+for reconciliation. All independent requests within a workflow stage dispatch concurrently and every response is collected, including rejections and unknown outcomes. Explicit delays and protected-entry transitions separate dependent stages (Swap, target reset, opposite-position entries and entry-before-cancel workflows). A failed stage stops later dependent stages; requests already dispatched in its batch are all accounted for. Accepted protected entries remain captured even when subsequent cancellations fail. An ambiguous
 mutation outcome requires broker review; use **Reset After Broker Review** only
 after checking the account. It never triggers automatic resend or a browser fallback.

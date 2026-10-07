@@ -19,6 +19,52 @@ class TradingRuntimeTest {
     static JsonObject json(String text) { return JsonParser.parseString(text).getAsJsonObject(); }
     static class Task { long delay; Runnable run; boolean canceled; }
     static class Socket implements SocketPort.Connection { SocketPort.Handlers handlers; boolean closed; final List<String> sent = new ArrayList<>(); public void send(String value) { sent.add(value); } public void close() { closed = true; } }
+    @Test void everyOrderCompletionAndManualRefreshSchedulesRepeatedAccountReads() throws Exception {
+        for (String action : new String[]{"market_out_half", "cancel_breakout_entries", "swap", "adjust_batch_exits", "reset_profit_targets", "market_out_partial", "adjust_exit", "wall_reversal_entry", "manual"})
+            for (String outcome : new String[]{"accepted", "partial", "unknown"}) {
+                AtomicLong now = new AtomicLong(Instant.parse("2026-10-07T13:32:00Z").toEpochMilli());
+                AtomicInteger reads = new AtomicInteger(); List<Task> tasks = new ArrayList<>();
+                JsonObject secrets = json("{\"access_token\":\"fake-token\",\"accountHashValue\":\"fake-account\",\"expires_at\":9999999999999}");
+                CredentialPort credentials = new CredentialPort() {
+                    public JsonObject loadSchwab() { return secrets.deepCopy(); }
+                    public void saveSchwab(JsonObject value) { }
+                };
+                HttpPort http = (uri, method, headers, body) -> {
+                    if (uri.getPath().endsWith("/accounts")) {
+                        reads.incrementAndGet();
+                        return new HttpPort.Response(200, "[{\"securitiesAccount\":{\"positions\":[],\"currentBalances\":{\"liquidationValue\":25000}}}]");
+                    }
+                    if (uri.getPath().endsWith("/orders")) return new HttpPort.Response(200, "[]");
+                    throw new AssertionError("Unexpected request " + uri);
+                };
+                try (TradingRuntime runtime = new TradingRuntime(http, credentials, new JsonObject(),
+                        (uri, handlers) -> { throw new AssertionError("No streams needed"); },
+                        (delay, run) -> { Task task = new Task(); task.delay = delay; task.run = run; tasks.add(task); return () -> task.canceled = true; },
+                        Runnable::run, now::get, new TradingRuntime.Events() {
+                            public void message(JsonObject value) { }
+                            public void log(String symbol, String value) { }
+                            public void notify(String symbol, String value) { }
+                        })) {
+                    runtime.refreshAccount(); assertEquals(1, reads.get());
+                    JsonObject result = json("{\"type\":\"execution_result\",\"symbol\":\"AAPL\",\"plannedRequestCount\":10,\"attemptedRequestCount\":10}");
+                    result.addProperty("action", action); result.addProperty("outcome", outcome);
+                    if (Set.of("market_out_partial", "adjust_exit", "wall_reversal_entry").contains(action)) {
+                        result.addProperty("plannedRequestCount", 1); result.addProperty("attemptedRequestCount", 1);
+                    }
+                    if (action.equals("manual")) assertTrue(runtime.dispatch(json("{\"type\":\"account_refresh\"}")));
+                    else {
+                        var receive = TradingRuntime.class.getDeclaredMethod("executionEvent", JsonObject.class); receive.setAccessible(true); receive.invoke(runtime, result);
+                    }
+                    assertEquals(2, reads.get(), action + ": immediate read bypasses ordinary throttle");
+                    for (long delay : new long[]{500, 1000}) {
+                        now.set(Instant.parse("2026-10-07T13:32:00Z").toEpochMilli() + delay);
+                        Task task = tasks.stream().filter(value -> value.delay == delay).findFirst().orElseThrow();
+                        task.canceled = true; task.run.run();
+                    }
+                    assertEquals(4, reads.get(), action + ": both follow-up reads run");
+                }
+            }
+    }
     @Test void invalidSelectedPlanStopsBeforeVendorConnectionsAndUpdatesEveryStatus() throws Exception {
         JsonArray fixtures = JsonParser.parseReader(new InputStreamReader(getClass().getResourceAsStream("/state-fixtures.json"), StandardCharsets.UTF_8)).getAsJsonArray();
         JsonObject config = null;
@@ -83,7 +129,7 @@ class TradingRuntimeTest {
         AtomicInteger httpCalls = new AtomicInteger();
         List<String> canceledOrders = new CopyOnWriteArrayList<>();
         AtomicReference<JsonObject> secrets = new AtomicReference<>(json("{\"appKey\":\"fake-app\",\"secret\":\"fake-secret\",\"access_token\":\"expired\",\"refresh_token\":\"fake-refresh\",\"expires_at\":0,\"accountHashValue\":\"fake-account\"}"));
-        List<JsonObject> emitted = new CopyOnWriteArrayList<>(); List<String> logs = new CopyOnWriteArrayList<>(); List<Task> tasks = new ArrayList<>(); List<Socket> sockets = new ArrayList<>();
+        List<JsonObject> emitted = new CopyOnWriteArrayList<>(); List<String> logs = new CopyOnWriteArrayList<>(); List<Task> tasks = new CopyOnWriteArrayList<>(); List<Socket> sockets = new ArrayList<>();
         List<String> screen = new CopyOnWriteArrayList<>();
         HttpPort http = (uri, method, headers, body) -> {
             httpCalls.incrementAndGet();
@@ -133,9 +179,9 @@ class TradingRuntimeTest {
             assertEquals(1, mutations.get(), logs.toString()); assertTrue(emitted.stream().anyMatch(event -> event.has("outcome") && event.get("outcome").getAsString().equals("accepted")), emitted.toString());
             runtime.pendingPersistence().get(2, TimeUnit.SECONDS); assertEquals(2, writes.get());
             runtime.dispatch(json("{\"type\":\"manual_inputs\",\"symbol\":\"AAPL\",\"customEntryPrice\":11,\"fixedQuantity\":20}")); assertEquals(20, runtime.manualInputs("AAPL").get("fixedQuantity").getAsInt()); runtime.dispatch(json("{\"symbol\":\"AAPL\",\"keyCode\":\"Space\"}")); assertEquals(json("{\"fixedQuantity\":20}"), runtime.manualInputs("AAPL"));
-            for (int i = 0; i < 10; i++) runtime.refreshAccount(); assertEquals(2, accountReads.get());
-            assertEquals(1, tasks.stream().filter(task -> task.delay == 3000 && !task.canceled).count()); Task deferred = tasks.stream().filter(task -> task.delay == 3000 && !task.canceled).findFirst().orElseThrow(); deferred.canceled = true; limited.set(true); now.addAndGet(3000); deferred.run.run(); assertEquals(3, accountReads.get());
-            runtime.refreshAccount(); assertEquals(3, accountReads.get()); Task retry = tasks.stream().filter(task -> task.delay == 60000 && !task.canceled).reduce((a, b) -> b).orElseThrow(); retry.canceled = true; limited.set(false); now.addAndGet(60000); retry.run.run(); assertEquals(4, accountReads.get());
+            for (int i = 0; i < 10; i++) runtime.refreshAccount(); assertEquals(3, accountReads.get());
+            assertEquals(1, tasks.stream().filter(task -> task.delay == 3000 && !task.canceled).count()); Task deferred = tasks.stream().filter(task -> task.delay == 3000 && !task.canceled).findFirst().orElseThrow(); deferred.canceled = true; limited.set(true); now.addAndGet(3000); deferred.run.run(); assertEquals(4, accountReads.get());
+            runtime.refreshAccount(); assertEquals(4, accountReads.get()); Task retry = tasks.stream().filter(task -> task.delay == 60000 && !task.canceled).reduce((a, b) -> b).orElseThrow(); retry.canceled = true; limited.set(false); now.addAndGet(60000); retry.run.run(); assertEquals(5, accountReads.get());
             positionData.set("[{\"instrument\":{\"symbol\":\"MSFT\",\"assetType\":\"EQUITY\"},\"longQuantity\":10,\"shortQuantity\":0,\"averagePrice\":20}]"); now.addAndGet(3000); runtime.refreshAccount(); assertEquals(10, runtime.view("MSFT", "test").getAsJsonObject("account").getAsJsonObject("positions").getAsJsonObject("MSFT").get("netQuantity").getAsInt());
             positionData.set("[]"); now.addAndGet(3000); runtime.refreshAccount(); assertTrue(emitted.stream().anyMatch(event -> event.has("symbol") && event.get("symbol").getAsString().equals("MSFT") && event.get("type").getAsString().equals("account_ready") && event.getAsJsonObject("account").getAsJsonObject("positions").size() == 0));
             configData.add("stockSelections", new JsonArray()); runtime.refreshConfig(); assertFalse(runtime.view("AAPL", "test").has("plan")); assertEquals(0, audits.get(), "Logs, notifications, orders and breakout snapshots must never be sent to Firestore");
@@ -178,6 +224,25 @@ class TradingRuntimeTest {
             assertEquals(now.get(), activity.get("receivedAt").getAsLong());
             assertEquals("ExecutionCreated", activity.getAsJsonArray("messageTypes").get(0).getAsString());
             assertFalse(activity.toString().contains("private-") || activity.toString().contains("fresh-") || activity.toString().contains("fake-secret"));
+            // Flatten refreshes immediately and twice more, even inside the ordinary three-second throttle.
+            orderData.set("[]");
+            positionData.set("[{\"instrument\":{\"symbol\":\"AAPL\",\"assetType\":\"EQUITY\"},\"longQuantity\":10}]");
+            now.addAndGet(3000); runtime.refreshAccount();
+            int readsBeforeFlatten = accountReads.get();
+            int tasksBeforeFlatten = tasks.size();
+            runtime.dispatch(json("{\"symbol\":\"AAPL\",\"keyCode\":\"KeyF\"}"));
+            deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(2);
+            while (tasks.subList(tasksBeforeFlatten, tasks.size()).stream().noneMatch(task -> task.delay == 1000 && !task.canceled) && System.nanoTime() < deadline) Thread.sleep(5);
+            assertEquals(readsBeforeFlatten + 1, accountReads.get());
+            Task followup500 = tasks.subList(tasksBeforeFlatten, tasks.size()).stream().filter(task -> task.delay == 500 && !task.canceled).findFirst().orElseThrow();
+            Task followup1000 = tasks.subList(tasksBeforeFlatten, tasks.size()).stream().filter(task -> task.delay == 1000 && !task.canceled).reduce((a, b) -> b).orElseThrow();
+            positionData.set("[]"); now.addAndGet(500); followup500.canceled = true; followup500.run.run();
+            assertEquals(readsBeforeFlatten + 2, accountReads.get());
+            assertEquals(0, runtime.view("AAPL", "test").getAsJsonObject("account").getAsJsonObject("positions").size());
+            limited.set(true); now.addAndGet(500); followup1000.canceled = true; followup1000.run.run();
+            assertEquals(readsBeforeFlatten + 3, accountReads.get());
+            runtime.refreshAccount(); assertEquals(readsBeforeFlatten + 3, accountReads.get(), "429 backoff must remain respected");
+            limited.set(false);
             orderData.set("invalid JSON");
             runtime.dispatch(json("{\"symbol\":\"AAPL\",\"keyCode\":\"KeyC\"}"));
             assertEquals(1, canceledOrders.size());
