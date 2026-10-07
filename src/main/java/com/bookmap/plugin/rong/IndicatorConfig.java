@@ -23,7 +23,6 @@ public class IndicatorConfig {
     public static final String BOOKMAP_PATTERN_SIGNALS = "bookmap_pattern_signals";
     public static final String SIGNAL_COMPOSER = "signal_composer";
     public static final String VWAP = "vwap";
-    public static final String ORDER_BOOK_WEIGHTED_AVERAGE = "order_book_weighted_average";
     public static final String TRADING_NOTIFICATION_SOUND = "trading_notification_sound";
 
     private final Map<String, Boolean> enabled = new ConcurrentHashMap<>();
@@ -48,7 +47,6 @@ public class IndicatorConfig {
         enabled.put(BOOKMAP_PATTERN_SIGNALS, false);
         enabled.put(SIGNAL_COMPOSER, false);
         enabled.put(VWAP, true);
-        enabled.put(ORDER_BOOK_WEIGHTED_AVERAGE, false);
         enabled.put(TRADING_NOTIFICATION_SOUND, true);
     }
 
