@@ -491,7 +491,6 @@ public class TradeButtonWindow {
         hotkeyPanel.add(createHotkeyButton("Market Out 1", "market_out_1_partial", "KeyM"));
         hotkeyPanel.add(createHotkeyButton("Market Out Half", "market_out_half", "KeyG", true));
         hotkeyPanel.add(createHotkeyButton("Swap", "swap", "KeyW"));
-        hotkeyPanel.add(createCorePlanButton());
         JButton inputs = new JButton("Entry Inputs"); applyHotkeyButtonStyle(inputs); inputs.addActionListener(e -> showManualInputs()); hotkeyPanel.add(inputs);
         hotkeyPanel.add(createHotkeyButton("Reset Targets", "reset_targets", "KeyP"));
         JButton refreshAccount = new JButton("Refresh Account");
@@ -516,13 +515,6 @@ public class TradeButtonWindow {
         try { for (int i = 0; i < fields.length; i++) { double value = Double.parseDouble(inputs[i].getText().trim()); if (!Double.isFinite(value) || value < 0 || fields[i].equals("fixedQuantity") && value != Math.floor(value)) throw new IllegalArgumentException(); action.addProperty(fields[i], value); } }
         catch (IllegalArgumentException error) { JOptionPane.showMessageDialog(frame, "Use nonnegative prices and whole share quantities."); return; }
         server.dispatchTradingAction(action);
-    }
-
-    private JButton createCorePlanButton() {
-        JButton button = new JButton("Update Plan");
-        applyHotkeyButtonStyle(button);
-        button.addActionListener(e -> showCorePlanDialog(false));
-        return button;
     }
 
     private JButton createHotkeyButton(String label, String id, String keyCode) {
