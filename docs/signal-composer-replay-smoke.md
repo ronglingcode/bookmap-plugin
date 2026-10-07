@@ -8,7 +8,7 @@ Environment checks found no process named Bookmap, no installation at `C:\Bookma
 
 ## Setup for the operator
 
-1. Use the built artifact `build/libs/lingrong1988_bmtrader_1.33.jar` in an available Bookmap installation. Record the Bookmap version, recording path, chart alias/tick size, recording session date, artifact hash, and composer configuration revision.
+1. Use the built artifact `build/libs/lingrong1988_bmtrader_1.34.jar` in an available Bookmap installation. Record the Bookmap version, recording path, chart alias/tick size, recording session date, artifact hash, and composer configuration revision.
 2. Follow [credential-free replay setup](signal-composer.md#credential-free-replay), using existing Cairo `observerOnly: true`, `sourceMode: "replay"`, and the actual recording symbol. Enable the advisory checkbox or an isolated replay composer configuration. The shipped template remains disabled. Keep this replay attachment in observer mode.
 3. Verify that no native broker runtime/account authorization or floating trade-button window starts. Settings should expose observation indicators and SignalComposer while omitting native action controls.
 4. Use a regular-hours recording containing the required depth/trade interactions. Older Cairo captures may omit 3K walls; they are insufficient for the 3K case if those callbacks are absent.

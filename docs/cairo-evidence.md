@@ -25,7 +25,7 @@ Preferences are read at plugin attachment from `%USERPROFILE%\bmtrader\cairo-obs
 
 ## Restart and test
 
-1. Build with `gradlew.bat build`; select `build/libs/lingrong1988_bmtrader_1.33.jar` in Bookmap API Plugins Configuration. Older registered JAR paths do not automatically follow the new build.
+1. Build with `gradlew.bat build`; select `build/libs/lingrong1988_bmtrader_1.34.jar` in Bookmap API Plugins Configuration. Older registered JAR paths do not automatically follow the new build.
 2. Apply replay settings above, restart Bookmap in replay mode, attach bmtrader, and replay a recording with large bid/offer walls. Snapshot completion establishes depth readiness.
 3. Rebuild/restart Cairo (`npm run build`, then its normal launcher). Open live chat or Bookmap observations. The setup assistant shows replay, market time, coverage, recognized before/after bounces, measured highs, ask confirmation and prior offer rejection.
 4. Automatic AI explanations default on while Cairo's model is connected and idle. Turn off “AI explanations on setup changes” on the card to suppress them, or click “Explain with AI” for a focused review. Chat cancellation pauses automatic explanations. Replay remains advisory and cannot be accepted as a real-position tag.
