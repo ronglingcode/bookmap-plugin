@@ -3521,7 +3521,7 @@
                         "symbol": "AAPL"
                       },
                       "instruction": "SELL",
-                      "quantity": 99
+                      "quantity": 99.0
                     }
                   ],
                   "orderType": "STOP",
@@ -3539,7 +3539,89 @@
                         "symbol": "AAPL"
                       },
                       "instruction": "SELL",
-                      "quantity": 99
+                      "quantity": 99.0
+                    }
+                  ],
+                  "orderType": "LIMIT",
+                  "orderStrategyType": "SINGLE",
+                  "price": 11.0
+                }
+              ]
+            },
+            {
+              "orderStrategyType": "OCO",
+              "childOrderStrategies": [
+                {
+                  "session": "NORMAL",
+                  "duration": "DAY",
+                  "orderLegCollection": [
+                    {
+                      "orderLegType": "EQUITY",
+                      "instrument": {
+                        "assetType": "EQUITY",
+                        "symbol": "AAPL"
+                      },
+                      "instruction": "SELL",
+                      "quantity": 99.0
+                    }
+                  ],
+                  "orderType": "STOP",
+                  "orderStrategyType": "SINGLE",
+                  "stopPrice": 9.49
+                },
+                {
+                  "session": "NORMAL",
+                  "duration": "DAY",
+                  "orderLegCollection": [
+                    {
+                      "orderLegType": "EQUITY",
+                      "instrument": {
+                        "assetType": "EQUITY",
+                        "symbol": "AAPL"
+                      },
+                      "instruction": "SELL",
+                      "quantity": 99.0
+                    }
+                  ],
+                  "orderType": "LIMIT",
+                  "orderStrategyType": "SINGLE",
+                  "price": 12.53
+                }
+              ]
+            },
+            {
+              "orderStrategyType": "OCO",
+              "childOrderStrategies": [
+                {
+                  "session": "NORMAL",
+                  "duration": "DAY",
+                  "orderLegCollection": [
+                    {
+                      "orderLegType": "EQUITY",
+                      "instrument": {
+                        "assetType": "EQUITY",
+                        "symbol": "AAPL"
+                      },
+                      "instruction": "SELL",
+                      "quantity": 99.0
+                    }
+                  ],
+                  "orderType": "STOP",
+                  "orderStrategyType": "SINGLE",
+                  "stopPrice": 9.49
+                },
+                {
+                  "session": "NORMAL",
+                  "duration": "DAY",
+                  "orderLegCollection": [
+                    {
+                      "orderLegType": "EQUITY",
+                      "instrument": {
+                        "assetType": "EQUITY",
+                        "symbol": "AAPL"
+                      },
+                      "instruction": "SELL",
+                      "quantity": 99.0
                     }
                   ],
                   "orderType": "LIMIT",
@@ -3562,7 +3644,7 @@
                         "symbol": "AAPL"
                       },
                       "instruction": "SELL",
-                      "quantity": 99
+                      "quantity": 99.0
                     }
                   ],
                   "orderType": "STOP",
@@ -3580,7 +3662,7 @@
                         "symbol": "AAPL"
                       },
                       "instruction": "SELL",
-                      "quantity": 99
+                      "quantity": 99.0
                     }
                   ],
                   "orderType": "LIMIT",
@@ -3603,7 +3685,7 @@
                         "symbol": "AAPL"
                       },
                       "instruction": "SELL",
-                      "quantity": 99
+                      "quantity": 99.0
                     }
                   ],
                   "orderType": "STOP",
@@ -3621,7 +3703,7 @@
                         "symbol": "AAPL"
                       },
                       "instruction": "SELL",
-                      "quantity": 99
+                      "quantity": 99.0
                     }
                   ],
                   "orderType": "LIMIT",
@@ -3644,7 +3726,7 @@
                         "symbol": "AAPL"
                       },
                       "instruction": "SELL",
-                      "quantity": 99
+                      "quantity": 99.0
                     }
                   ],
                   "orderType": "STOP",
@@ -3662,7 +3744,7 @@
                         "symbol": "AAPL"
                       },
                       "instruction": "SELL",
-                      "quantity": 99
+                      "quantity": 99.0
                     }
                   ],
                   "orderType": "LIMIT",
@@ -3685,7 +3767,7 @@
                         "symbol": "AAPL"
                       },
                       "instruction": "SELL",
-                      "quantity": 99
+                      "quantity": 99.0
                     }
                   ],
                   "orderType": "STOP",
@@ -3703,7 +3785,7 @@
                         "symbol": "AAPL"
                       },
                       "instruction": "SELL",
-                      "quantity": 99
+                      "quantity": 99.0
                     }
                   ],
                   "orderType": "LIMIT",
@@ -3726,7 +3808,7 @@
                         "symbol": "AAPL"
                       },
                       "instruction": "SELL",
-                      "quantity": 99
+                      "quantity": 99.0
                     }
                   ],
                   "orderType": "STOP",
@@ -3744,7 +3826,7 @@
                         "symbol": "AAPL"
                       },
                       "instruction": "SELL",
-                      "quantity": 99
+                      "quantity": 99.0
                     }
                   ],
                   "orderType": "LIMIT",
@@ -3767,7 +3849,7 @@
                         "symbol": "AAPL"
                       },
                       "instruction": "SELL",
-                      "quantity": 99
+                      "quantity": 99.0
                     }
                   ],
                   "orderType": "STOP",
@@ -3785,7 +3867,7 @@
                         "symbol": "AAPL"
                       },
                       "instruction": "SELL",
-                      "quantity": 99
+                      "quantity": 99.0
                     }
                   ],
                   "orderType": "LIMIT",
@@ -3808,7 +3890,7 @@
                         "symbol": "AAPL"
                       },
                       "instruction": "SELL",
-                      "quantity": 99
+                      "quantity": 99.0
                     }
                   ],
                   "orderType": "STOP",
@@ -3826,89 +3908,7 @@
                         "symbol": "AAPL"
                       },
                       "instruction": "SELL",
-                      "quantity": 99
-                    }
-                  ],
-                  "orderType": "LIMIT",
-                  "orderStrategyType": "SINGLE",
-                  "price": 13.54
-                }
-              ]
-            },
-            {
-              "orderStrategyType": "OCO",
-              "childOrderStrategies": [
-                {
-                  "session": "NORMAL",
-                  "duration": "DAY",
-                  "orderLegCollection": [
-                    {
-                      "orderLegType": "EQUITY",
-                      "instrument": {
-                        "assetType": "EQUITY",
-                        "symbol": "AAPL"
-                      },
-                      "instruction": "SELL",
-                      "quantity": 99
-                    }
-                  ],
-                  "orderType": "STOP",
-                  "orderStrategyType": "SINGLE",
-                  "stopPrice": 9.49
-                },
-                {
-                  "session": "NORMAL",
-                  "duration": "DAY",
-                  "orderLegCollection": [
-                    {
-                      "orderLegType": "EQUITY",
-                      "instrument": {
-                        "assetType": "EQUITY",
-                        "symbol": "AAPL"
-                      },
-                      "instruction": "SELL",
-                      "quantity": 99
-                    }
-                  ],
-                  "orderType": "LIMIT",
-                  "orderStrategyType": "SINGLE",
-                  "price": 13.54
-                }
-              ]
-            },
-            {
-              "orderStrategyType": "OCO",
-              "childOrderStrategies": [
-                {
-                  "session": "NORMAL",
-                  "duration": "DAY",
-                  "orderLegCollection": [
-                    {
-                      "orderLegType": "EQUITY",
-                      "instrument": {
-                        "assetType": "EQUITY",
-                        "symbol": "AAPL"
-                      },
-                      "instruction": "SELL",
-                      "quantity": 99
-                    }
-                  ],
-                  "orderType": "STOP",
-                  "orderStrategyType": "SINGLE",
-                  "stopPrice": 9.49
-                },
-                {
-                  "session": "NORMAL",
-                  "duration": "DAY",
-                  "orderLegCollection": [
-                    {
-                      "orderLegType": "EQUITY",
-                      "instrument": {
-                        "assetType": "EQUITY",
-                        "symbol": "AAPL"
-                      },
-                      "instruction": "SELL",
-                      "quantity": 99
+                      "quantity": 99.0
                     }
                   ],
                   "orderType": "LIMIT",
@@ -4241,7 +4241,7 @@
                         "symbol": "AAPL"
                       },
                       "instruction": "BUY_TO_COVER",
-                      "quantity": 99
+                      "quantity": 99.0
                     }
                   ],
                   "orderType": "STOP",
@@ -4259,7 +4259,89 @@
                         "symbol": "AAPL"
                       },
                       "instruction": "BUY_TO_COVER",
-                      "quantity": 99
+                      "quantity": 99.0
+                    }
+                  ],
+                  "orderType": "LIMIT",
+                  "orderStrategyType": "SINGLE",
+                  "price": 9.0
+                }
+              ]
+            },
+            {
+              "orderStrategyType": "OCO",
+              "childOrderStrategies": [
+                {
+                  "session": "NORMAL",
+                  "duration": "DAY",
+                  "orderLegCollection": [
+                    {
+                      "orderLegType": "EQUITY",
+                      "instrument": {
+                        "assetType": "EQUITY",
+                        "symbol": "AAPL"
+                      },
+                      "instruction": "BUY_TO_COVER",
+                      "quantity": 99.0
+                    }
+                  ],
+                  "orderType": "STOP",
+                  "orderStrategyType": "SINGLE",
+                  "stopPrice": 10.51
+                },
+                {
+                  "session": "NORMAL",
+                  "duration": "DAY",
+                  "orderLegCollection": [
+                    {
+                      "orderLegType": "EQUITY",
+                      "instrument": {
+                        "assetType": "EQUITY",
+                        "symbol": "AAPL"
+                      },
+                      "instruction": "BUY_TO_COVER",
+                      "quantity": 99.0
+                    }
+                  ],
+                  "orderType": "LIMIT",
+                  "orderStrategyType": "SINGLE",
+                  "price": 7.47
+                }
+              ]
+            },
+            {
+              "orderStrategyType": "OCO",
+              "childOrderStrategies": [
+                {
+                  "session": "NORMAL",
+                  "duration": "DAY",
+                  "orderLegCollection": [
+                    {
+                      "orderLegType": "EQUITY",
+                      "instrument": {
+                        "assetType": "EQUITY",
+                        "symbol": "AAPL"
+                      },
+                      "instruction": "BUY_TO_COVER",
+                      "quantity": 99.0
+                    }
+                  ],
+                  "orderType": "STOP",
+                  "orderStrategyType": "SINGLE",
+                  "stopPrice": 10.51
+                },
+                {
+                  "session": "NORMAL",
+                  "duration": "DAY",
+                  "orderLegCollection": [
+                    {
+                      "orderLegType": "EQUITY",
+                      "instrument": {
+                        "assetType": "EQUITY",
+                        "symbol": "AAPL"
+                      },
+                      "instruction": "BUY_TO_COVER",
+                      "quantity": 99.0
                     }
                   ],
                   "orderType": "LIMIT",
@@ -4282,7 +4364,7 @@
                         "symbol": "AAPL"
                       },
                       "instruction": "BUY_TO_COVER",
-                      "quantity": 99
+                      "quantity": 99.0
                     }
                   ],
                   "orderType": "STOP",
@@ -4300,7 +4382,7 @@
                         "symbol": "AAPL"
                       },
                       "instruction": "BUY_TO_COVER",
-                      "quantity": 99
+                      "quantity": 99.0
                     }
                   ],
                   "orderType": "LIMIT",
@@ -4323,7 +4405,7 @@
                         "symbol": "AAPL"
                       },
                       "instruction": "BUY_TO_COVER",
-                      "quantity": 99
+                      "quantity": 99.0
                     }
                   ],
                   "orderType": "STOP",
@@ -4341,7 +4423,7 @@
                         "symbol": "AAPL"
                       },
                       "instruction": "BUY_TO_COVER",
-                      "quantity": 99
+                      "quantity": 99.0
                     }
                   ],
                   "orderType": "LIMIT",
@@ -4364,7 +4446,7 @@
                         "symbol": "AAPL"
                       },
                       "instruction": "BUY_TO_COVER",
-                      "quantity": 99
+                      "quantity": 99.0
                     }
                   ],
                   "orderType": "STOP",
@@ -4382,7 +4464,7 @@
                         "symbol": "AAPL"
                       },
                       "instruction": "BUY_TO_COVER",
-                      "quantity": 99
+                      "quantity": 99.0
                     }
                   ],
                   "orderType": "LIMIT",
@@ -4405,7 +4487,7 @@
                         "symbol": "AAPL"
                       },
                       "instruction": "BUY_TO_COVER",
-                      "quantity": 99
+                      "quantity": 99.0
                     }
                   ],
                   "orderType": "STOP",
@@ -4423,7 +4505,7 @@
                         "symbol": "AAPL"
                       },
                       "instruction": "BUY_TO_COVER",
-                      "quantity": 99
+                      "quantity": 99.0
                     }
                   ],
                   "orderType": "LIMIT",
@@ -4446,7 +4528,7 @@
                         "symbol": "AAPL"
                       },
                       "instruction": "BUY_TO_COVER",
-                      "quantity": 99
+                      "quantity": 99.0
                     }
                   ],
                   "orderType": "STOP",
@@ -4464,7 +4546,7 @@
                         "symbol": "AAPL"
                       },
                       "instruction": "BUY_TO_COVER",
-                      "quantity": 99
+                      "quantity": 99.0
                     }
                   ],
                   "orderType": "LIMIT",
@@ -4487,7 +4569,7 @@
                         "symbol": "AAPL"
                       },
                       "instruction": "BUY_TO_COVER",
-                      "quantity": 99
+                      "quantity": 99.0
                     }
                   ],
                   "orderType": "STOP",
@@ -4505,7 +4587,7 @@
                         "symbol": "AAPL"
                       },
                       "instruction": "BUY_TO_COVER",
-                      "quantity": 99
+                      "quantity": 99.0
                     }
                   ],
                   "orderType": "LIMIT",
@@ -4528,7 +4610,7 @@
                         "symbol": "AAPL"
                       },
                       "instruction": "BUY_TO_COVER",
-                      "quantity": 99
+                      "quantity": 99.0
                     }
                   ],
                   "orderType": "STOP",
@@ -4546,89 +4628,7 @@
                         "symbol": "AAPL"
                       },
                       "instruction": "BUY_TO_COVER",
-                      "quantity": 99
-                    }
-                  ],
-                  "orderType": "LIMIT",
-                  "orderStrategyType": "SINGLE",
-                  "price": 6.46
-                }
-              ]
-            },
-            {
-              "orderStrategyType": "OCO",
-              "childOrderStrategies": [
-                {
-                  "session": "NORMAL",
-                  "duration": "DAY",
-                  "orderLegCollection": [
-                    {
-                      "orderLegType": "EQUITY",
-                      "instrument": {
-                        "assetType": "EQUITY",
-                        "symbol": "AAPL"
-                      },
-                      "instruction": "BUY_TO_COVER",
-                      "quantity": 99
-                    }
-                  ],
-                  "orderType": "STOP",
-                  "orderStrategyType": "SINGLE",
-                  "stopPrice": 10.51
-                },
-                {
-                  "session": "NORMAL",
-                  "duration": "DAY",
-                  "orderLegCollection": [
-                    {
-                      "orderLegType": "EQUITY",
-                      "instrument": {
-                        "assetType": "EQUITY",
-                        "symbol": "AAPL"
-                      },
-                      "instruction": "BUY_TO_COVER",
-                      "quantity": 99
-                    }
-                  ],
-                  "orderType": "LIMIT",
-                  "orderStrategyType": "SINGLE",
-                  "price": 6.46
-                }
-              ]
-            },
-            {
-              "orderStrategyType": "OCO",
-              "childOrderStrategies": [
-                {
-                  "session": "NORMAL",
-                  "duration": "DAY",
-                  "orderLegCollection": [
-                    {
-                      "orderLegType": "EQUITY",
-                      "instrument": {
-                        "assetType": "EQUITY",
-                        "symbol": "AAPL"
-                      },
-                      "instruction": "BUY_TO_COVER",
-                      "quantity": 99
-                    }
-                  ],
-                  "orderType": "STOP",
-                  "orderStrategyType": "SINGLE",
-                  "stopPrice": 10.51
-                },
-                {
-                  "session": "NORMAL",
-                  "duration": "DAY",
-                  "orderLegCollection": [
-                    {
-                      "orderLegType": "EQUITY",
-                      "instrument": {
-                        "assetType": "EQUITY",
-                        "symbol": "AAPL"
-                      },
-                      "instruction": "BUY_TO_COVER",
-                      "quantity": 99
+                      "quantity": 99.0
                     }
                   ],
                   "orderType": "LIMIT",

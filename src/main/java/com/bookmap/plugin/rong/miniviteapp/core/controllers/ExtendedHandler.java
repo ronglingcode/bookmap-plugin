@@ -56,6 +56,9 @@ public final class ExtendedHandler {
     }
 
     public static Plan swap(Snapshot state) {
+        return swap(state, new JsonObject());
+    }
+    public static Plan swap(Snapshot state, JsonObject action) {
         Models.require(state.netQuantity != 0, "no position to swap");
         JsonObject context = state.entryContext;
         Models.require(context != null && context.has("activeBasePlan") && !context.get("activeBasePlan").isJsonNull(), "swap requires active base plan");
@@ -94,7 +97,7 @@ public final class ExtendedHandler {
         definition.add("basePlan", context.getAsJsonObject("activeBasePlan"));
         double requested = Models.number(definition.getAsJsonObject("basePlan").getAsJsonObject("planConfigs"), "sizingCount");
         int count = requested > 0 ? (int) requested : state.batchCount;
-        Plan reentry = OrderFlow.submitEntry(state, context, definition, new JsonObject(), isLong, false, price, stop, multiplier, count, "");
+        Plan reentry = OrderFlow.submitEntry(state, context, definition, action, isLong, false, price, stop, multiplier, count, "");
         reentry.requests.get(0).delayBeforeMs = 500;
         plan.requests.addAll(reentry.requests); plan.entry = reentry.entry;
         plan.entry.addProperty("preserveExistingTrade", false);

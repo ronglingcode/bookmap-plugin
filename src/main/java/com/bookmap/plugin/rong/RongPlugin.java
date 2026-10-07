@@ -169,6 +169,7 @@ public class RongPlugin implements CustomModuleAdapter,
             if (wallThresholdConfig == null) {
                 wallThresholdConfig = new WallThresholdConfig();
             }
+            sharedServer.setWallThresholdFloor(wallThresholdConfig::getThresholdFloor);
             if (chartHoverHotkeyHandler == null) {
                 chartHoverHotkeyHandler = new ChartHoverHotkeyHandler(
                         sharedServer, indicatorConfig);

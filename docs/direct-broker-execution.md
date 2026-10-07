@@ -34,11 +34,26 @@ The earlier flag-based rollout is historical; this document supersedes it.
 
 Local risk policy mirrors ViteApp entry-area boundaries, watchlist/startup
 eligibility, liquidity, daily loss and no-trade-zone rules. Native sizing includes
-ATR caps, one-cent slippage, fixed quantity, risk-method partial counts and even
-splits. If estimated buying power is insufficient, both apps halve targets once;
+ATR caps, one-cent slippage, fixed quantity and risk-method partial counts.
+If estimated buying power is insufficient, both apps halve targets once;
 if the half allocation remains insufficient they warn and submit for the broker
 to decide. This intentionally aligns the browser with the established native
 policy. There is no second balance preflight.
+
+New entries capture VWAP, the nearest three qualifying opposing depth walls,
+premarket high for longs or premarket low for shorts, and the 2R price. Prices
+are rounded to cents, deduplicated and filtered to be strictly beyond the
+calculation entry in the profitable direction. Each surviving level receives
+10% of the shares, rounded down to whole shares; the rest goes to 3R across
+the remaining protective brackets, with leftover shares distributed evenly.
+Native button and chart entries capture live Bookmap depth using the higher
+of the configured wall floor and depth percentile. Missing session levels or
+depth are omitted. Targets are captured at submission, using the existing
+one-cent entry adjustment and fixed-quantity stop adjustment, rather than
+moving with VWAP or depth after a fill. Smaller risk-method entries keep their
+bracket count, use at most count minus one nearest distinct levels at 10%
+each, and keep the remaining allocation at 3R. A single-bracket entry stays
+at 3R. Reset Targets restores the captured prices.
 
 Core protection is a separate optional trading rule, controlled by
 `tradingPolicy.coreTargetEnabled` (false by default, matching the browser feature

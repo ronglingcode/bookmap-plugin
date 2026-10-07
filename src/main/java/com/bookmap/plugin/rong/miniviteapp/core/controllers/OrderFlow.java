@@ -21,7 +21,7 @@ public final class OrderFlow {
         double cap = Models.number(context, "maxQuantity");
         if (!(fixed > 0) && cap > 0) shares = Math.min(shares, cap);
         JsonObject walls = action.has("orderbook") ? action.getAsJsonObject("orderbook") : null;
-        var targets = TakeProfit.getEntryProfitTargets(shares, orderEntry, fixed > 0 ? orderStop : riskPrice, isLong, walls, count);
+        var targets = TakeProfit.getEntryProfitTargets(shares, orderEntry, fixed > 0 ? orderStop : riskPrice, isLong, walls, count, context);
         double total = 0; for (var element : targets) total += Models.number(element.getAsJsonObject(), "quantity");
         double buyingPower = Models.number(context, "availableBuyingPower");
         Plan plan = new Plan("wall_reversal_entry");

@@ -77,6 +77,8 @@ public class SignalWebSocketServer extends WebSocketServer {
     }
     private java.util.function.Consumer<JsonObject> tradingDispatch = action -> PluginLog.action(SymbolUtils.cleanSymbol(getString(action, "symbol")), "Native runtime unavailable; no action sent");
     public void setTradingDispatch(java.util.function.Consumer<JsonObject> dispatch) { tradingDispatch = dispatch; }
+    private java.util.function.IntSupplier wallThresholdFloor = () -> WallThresholdConfig.DEFAULT_THRESHOLD_FLOOR;
+    public void setWallThresholdFloor(java.util.function.IntSupplier supplier) { wallThresholdFloor = supplier; }
     /** All local actions go directly to the standalone runtime. */
     public void dispatchTradingAction(JsonObject action) {
         JsonObject local = action.deepCopy(); String key = getString(local, "keyCode"); if (key.isEmpty()) key = getString(local, "key_code");
@@ -86,7 +88,33 @@ public class SignalWebSocketServer extends WebSocketServer {
             local.addProperty("retest_blocked", retest.isEntryRetestBlocked(isLong));
             if (retest.isEntryRetestPending(isLong)) local.addProperty("retest_warning", isLong ? "wait for bid retest" : "wait for offer retest");
         }
+        if (key.equals("KeyB") || key.equals("KeyS") || key.equals("KeyW")
+                || key.isEmpty() && !getString(local, "tradebook_id").isEmpty())
+            local.add("orderbook", entryWallSnapshot(getString(local, "symbol")));
         tradingDispatch.accept(local);
+    }
+    JsonObject entryWallSnapshot(String symbol) {
+        JsonObject result = new JsonObject();
+        BookmapPriceNormalizer.addWirePriceUnit(result);
+        String cleanSymbol = SymbolUtils.cleanSymbol(symbol);
+        OrderBookState book = symbolToOrderBook.get(cleanSymbol);
+        Double pips = symbolToPips.get(cleanSymbol);
+        if (book == null || pips == null || !Double.isFinite(pips) || pips <= 0) return result;
+        synchronized (book) {
+            WallThreshold threshold = WallThreshold.from(book, wallThresholdFloor.getAsInt(), orderbookPercentile);
+            result.addProperty("effectiveWallThreshold", threshold.effectiveMinSize);
+            for (boolean bid : new boolean[]{true, false}) {
+                JsonArray levels = new JsonArray();
+                for (Map.Entry<Integer, Integer> level : book.getLevelsSnapshot(bid).entrySet()) {
+                    if (level.getValue() < threshold.effectiveMinSize) continue;
+                    JsonArray value = new JsonArray();
+                    value.add(BookmapPriceNormalizer.toWirePrice(level.getKey(), pips));
+                    value.add(level.getValue()); levels.add(value);
+                }
+                result.add(bid ? "largeBids" : "largeAsks", levels);
+            }
+        }
+        return result;
     }
     private java.util.function.Function<String, JsonObject> manualInputs = symbol -> new JsonObject();
     public void setManualInputs(java.util.function.Function<String, JsonObject> inputs) { manualInputs = inputs; }

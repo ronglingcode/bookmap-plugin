@@ -141,7 +141,7 @@ public final class MiniViteApp implements AutoCloseable {
             Plan plan = entry ? EntryHandler.handleEntry(state, action, key, extended || sameDirection)
                     : directionalEntry ? EntryHandler.handleDirectionalEntry(state, action, key)
                     : key.equals("KeyA") ? ExtendedHandler.reload(state, shift, Models.number(action, "price"))
-                    : key.equals("KeyW") ? ExtendedHandler.swap(state)
+                    : key.equals("KeyW") ? ExtendedHandler.swap(state, action)
                     : KeyboardHandler.handleKeyPressed(state, key, shift, Models.number(action, "price"));
             for (String warning : plan.warnings) log.accept(symbol, warning);
             if (!key.equals("KeyC")) {

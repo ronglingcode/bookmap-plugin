@@ -486,7 +486,10 @@ class NativeExecutionTest {
             assertEquals(1, rig.mutations.get());
             var body = rig.bodies.get(0);
             assertEquals(11.5, body.getAsJsonArray("orderLegCollection").get(0).getAsJsonObject().get("quantity").getAsDouble());
-            assertEquals(1.5, body.getAsJsonArray("childOrderStrategies").get(0).getAsJsonObject()
+            assertEquals(1.0, body.getAsJsonArray("childOrderStrategies").get(0).getAsJsonObject()
+                .getAsJsonArray("childOrderStrategies").get(0).getAsJsonObject()
+                .getAsJsonArray("orderLegCollection").get(0).getAsJsonObject().get("quantity").getAsDouble());
+            assertEquals(1.5, body.getAsJsonArray("childOrderStrategies").get(1).getAsJsonObject()
                 .getAsJsonArray("childOrderStrategies").get(0).getAsJsonObject()
                 .getAsJsonArray("orderLegCollection").get(0).getAsJsonObject().get("quantity").getAsDouble());
         }

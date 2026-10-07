@@ -18,7 +18,14 @@ class ExtendedExecutionPlanTest {
                 .getResourceAsStream("/extended-execution-fixtures.json"), StandardCharsets.UTF_8)).getAsJsonArray();
     }
     static JsonObject longState() { return fixtures().get(0).getAsJsonObject().getAsJsonObject("state").deepCopy(); }
-    @Test void reloadAndSwapMatchRecordedProductionViteAppHandlers() {
+    @Test void swapReentryUsesSuppliedLiveWalls() {
+        JsonObject action = JsonParser.parseString("{\"orderbook\":{\"effectiveWallThreshold\":5000,\"largeAsks\":[[10.75,6000]]}}").getAsJsonObject();
+        Plan plan = ExtendedHandler.swap(new Snapshot(longState()), action);
+        JsonArray targets = plan.entry.getAsJsonObject("submitEntryResult").getAsJsonArray("profitTargets");
+        assertTrue(java.util.stream.StreamSupport.stream(targets.spliterator(), false)
+                .anyMatch(target -> target.getAsJsonObject().get("target").getAsDouble() == 10.75));
+    }
+    @Test void reloadAndSwapMatchNativePolicyFixtures() {
         for (var element : fixtures()) {
             var fixture = element.getAsJsonObject(); var state = new Snapshot(fixture.getAsJsonObject("state"));
             var action = fixture.getAsJsonObject("action"); String name = Models.string(fixture, "name");

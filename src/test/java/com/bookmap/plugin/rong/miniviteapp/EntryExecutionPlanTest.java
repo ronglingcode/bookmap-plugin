@@ -52,7 +52,7 @@ class EntryExecutionPlanTest {
         plan.addProperty("symbol", "AAPL");
         assertEquals("premarket shares below 500000 hard floor", StartupEligibility.evaluate(plan, 10, 100000000, stats, new JsonArray()));
     }
-    @Test void fixturesMatchProductionTsEntryHelpers() {
+    @Test void fixturesMatchNativeEntryPolicy() {
         var stream = getClass().getResourceAsStream("/direct-entry-fixtures.json"); assertNotNull(stream);
         var fixtures = JsonParser.parseReader(new InputStreamReader(stream, StandardCharsets.UTF_8)).getAsJsonArray();
         for (var element : fixtures) {
