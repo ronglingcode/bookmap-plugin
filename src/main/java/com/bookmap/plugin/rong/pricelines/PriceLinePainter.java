@@ -99,6 +99,7 @@ public class PriceLinePainter implements ScreenSpacePainterFactory {
         private final Map<String, CanvasIcon> activeShapes = new ConcurrentHashMap<>();
 
         private volatile int fullPixelsWidth;
+        private boolean disposed;
 
         PainterInstance(String painterAlias, String instrumentAlias, ScreenSpaceCanvas canvas) {
             this.painterAlias = painterAlias;
@@ -120,8 +121,11 @@ public class PriceLinePainter implements ScreenSpacePainterFactory {
             }
         }
 
-        private void rebuildLines() {
-            if (instrumentAlias == null) return;
+        private synchronized void rebuildLines() {
+            if (disposed || instrumentAlias == null) return;
+
+            // Canvas callbacks and account updates can arrive on different threads.
+            // Keep removal, tracking and replacement atomic so no shape is orphaned.
 
             // Remove all existing shapes
             for (CanvasIcon icon : activeShapes.values()) {
@@ -209,7 +213,9 @@ public class PriceLinePainter implements ScreenSpacePainterFactory {
         }
 
         @Override
-        public void dispose() {
+        public synchronized void dispose() {
+            if (disposed) return;
+            disposed = true;
             store.removeListener(this);
             for (CanvasIcon icon : activeShapes.values()) {
                 canvas.removeShape(icon);
