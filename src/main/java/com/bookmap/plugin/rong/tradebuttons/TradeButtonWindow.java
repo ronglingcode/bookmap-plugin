@@ -497,7 +497,7 @@ public class TradeButtonWindow {
         hotkeyPanel.add(createHotkeyButton("Swap", "swap", "KeyW"));
         JButton inputs = new JButton("Entry Inputs"); applyHotkeyButtonStyle(inputs); inputs.addActionListener(e -> showManualInputs()); hotkeyPanel.add(inputs);
         hotkeyPanel.add(createHotkeyButton("Reset Targets", "reset_targets", "KeyP"));
-        JButton refreshAccount = new JButton("Refresh Account");
+        JButton refreshAccount = new JButton("Refresh Acct");
         applyHotkeyButtonStyle(refreshAccount);
         refreshAccount.setToolTipText("Refresh broker positions, orders and fills for the account");
         refreshAccount.addActionListener(e -> {
