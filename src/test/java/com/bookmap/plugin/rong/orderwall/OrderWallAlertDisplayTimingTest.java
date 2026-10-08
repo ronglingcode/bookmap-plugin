@@ -49,7 +49,7 @@ class OrderWallAlertDisplayTimingTest {
                 8_000,
                 0,
                 8_000,
-                OrderWallChangeEvent.Type.BID_BREAKDOWN,
+                OrderWallChangeEvent.Type.REDUCED,
                 1L,
                 createdAtMs);
     }

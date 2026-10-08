@@ -42,46 +42,10 @@ public class SignalWebSocketServer extends WebSocketServer {
             targetMarketBroadcastAt.put(symbol, value.get("timestamp").getAsLong()); broadcast(value.toString());
         }
     }
-    private final com.bookmap.plugin.rong.patterns.CairoObservationExport observationExport = new com.bookmap.plugin.rong.patterns.CairoObservationExport();
     private final java.util.concurrent.ArrayBlockingQueue<Runnable> observationQueue = new java.util.concurrent.ArrayBlockingQueue<>(512);
-    private final java.util.concurrent.ScheduledExecutorService observationWorker = java.util.concurrent.Executors.newSingleThreadScheduledExecutor(r -> { Thread t = new Thread(r, "cairo-observations"); t.setDaemon(true); return t; });
-    private final Map<String, com.bookmap.plugin.rong.patterns.CairoEvidenceRecorder> evidenceRecorders = new ConcurrentHashMap<>();
-    public void registerEvidence(String alias, com.bookmap.plugin.rong.patterns.CairoEvidenceRecorder recorder) { evidenceRecorders.put(alias, recorder); }
-    private final Map<String, Boolean> observationReady = new ConcurrentHashMap<>();
-    private final Map<String, JsonObject> observationEpisodes = new LinkedHashMap<>();
-    public void observationReady(String alias, boolean ready) { observationReady.put(alias, ready); queueObservation(status(alias, "heartbeat")); }
-    private JsonObject status(String alias, String kind) {
-        JsonObject value = observationExport.envelope(alias, kind, "live"); value.addProperty("readiness", observationReady.getOrDefault(alias, false) ? "ready" : "not-ready"); return value;
-    }
-    private void queueObservation(JsonObject value) {
-        if (!observationQueue.offer(() -> broadcast(value.toString()))) {
-            observationQueue.clear();
-            synchronized (observationEpisodes) { observationEpisodes.clear(); }
-            for (String alias : observationReady.keySet()) {
-                JsonObject reset = status(alias, "reset"); observationQueue.offer(() -> broadcast(reset.toString()));
-            }
-        }
-    }
-    public java.util.List<JsonObject> observationSnapshot() {
-        java.util.List<JsonObject> values = new ArrayList<>();
-        synchronized (observationEpisodes) {
-            for (String alias : observationReady.keySet()) values.add(status(alias, "heartbeat"));
-            long oldest = System.currentTimeMillis() - 30_000;
-            for (JsonObject episode : observationEpisodes.values()) if (Long.parseLong(episode.get("receivedAt").getAsString()) / 1_000_000L >= oldest) values.add(observationExport.snapshot(episode));
-        }
-        return values;
-    }
-    public void exportPattern(com.bookmap.plugin.rong.patterns.BookmapPatternSignal signal) {
-        JsonObject observation = observationExport.episode(signal);
-        if (observation != null) {
-            observation.addProperty("readiness", observationReady.getOrDefault(signal.getInstrumentAlias(), false) ? "ready" : "not-ready");
-            synchronized (observationEpisodes) {
-                observationEpisodes.put(signal.getInstrumentAlias() + ":" + signal.getEpisodeKey(), observation);
-                while (observationEpisodes.size() > 400) observationEpisodes.remove(observationEpisodes.keySet().iterator().next());
-            }
-            queueObservation(observation);
-        }
-    }
+    private final java.util.concurrent.ScheduledExecutorService observationWorker = java.util.concurrent.Executors.newSingleThreadScheduledExecutor(r -> { Thread t = new Thread(r, "cairo-patterns"); t.setDaemon(true); return t; });
+    private final Map<String, com.bookmap.plugin.rong.signal.CairoPatternFeed> patternFeeds = new ConcurrentHashMap<>();
+    public void registerPatterns(String alias, com.bookmap.plugin.rong.signal.CairoPatternFeed feed) { patternFeeds.put(alias, feed); }
     private java.util.function.Consumer<JsonObject> tradingDispatch = action -> PluginLog.action(SymbolUtils.cleanSymbol(getString(action, "symbol")), "Native runtime unavailable; no action sent");
     public void setTradingDispatch(java.util.function.Consumer<JsonObject> dispatch) { tradingDispatch = dispatch; }
     private java.util.function.IntSupplier wallThresholdFloor = () -> WallThresholdConfig.DEFAULT_THRESHOLD_FLOOR;
@@ -216,10 +180,9 @@ public class SignalWebSocketServer extends WebSocketServer {
         setReuseAddr(true);
         this.orderbookPercentile = orderbookPercentile;
         observationWorker.scheduleWithFixedDelay(() -> {
-            try { for (com.bookmap.plugin.rong.patterns.CairoEvidenceRecorder recorder : evidenceRecorders.values()) for (JsonObject batch : recorder.drain(System.currentTimeMillis())) broadcast(batch.toString());
+            try { for (com.bookmap.plugin.rong.signal.CairoPatternFeed recorder : patternFeeds.values()) for (JsonObject batch : recorder.drain(System.currentTimeMillis())) broadcast(batch.toString());
             for (int i = 0; i < 64; i++) { Runnable next = observationQueue.poll(); if (next == null) break; next.run(); } } catch (RuntimeException ignored) { }
         }, 100, 100, java.util.concurrent.TimeUnit.MILLISECONDS);
-        observationWorker.scheduleWithFixedDelay(() -> { for (String alias : observationReady.keySet()) queueObservation(status(alias, "heartbeat")); }, 2, 2, java.util.concurrent.TimeUnit.SECONDS);
     }
 
     /** Register a symbol's order book and pips multiplier. */
@@ -230,10 +193,10 @@ public class SignalWebSocketServer extends WebSocketServer {
 
     /** Unregister a symbol when its plugin instance stops. */
     public void unregisterSymbol(String symbol) {
-        com.bookmap.plugin.rong.patterns.CairoEvidenceRecorder recorder = evidenceRecorders.remove(symbol);
-        if (recorder != null) { recorder.close(); observationWorker.execute(() -> { for (JsonObject batch : recorder.drain(System.currentTimeMillis())) broadcast(batch.toString()); }); }
-        if (observationReady.containsKey(symbol)) queueObservation(status(symbol, "reset")); observationReady.remove(symbol);
-        synchronized (observationEpisodes) { observationEpisodes.entrySet().removeIf(entry -> entry.getValue().getAsJsonObject("symbol").get("source").getAsString().equals(symbol)); }
+        com.bookmap.plugin.rong.signal.CairoPatternFeed feed = patternFeeds.remove(symbol);
+        if (feed != null) {
+            feed.close(); observationWorker.execute(() -> { JsonObject terminal = feed.terminal(); if (terminal != null) broadcast(terminal.toString()); });
+        }
         symbolToOrderBook.remove(symbol);
         symbolToPips.remove(symbol);
         symbolToRegularSessionHighLow.remove(symbol);
@@ -367,41 +330,6 @@ public class SignalWebSocketServer extends WebSocketServer {
         if (listeners.isEmpty()) {
             symbolToTradeButtonListeners.remove(cleanSymbol, listeners);
         }
-    }
-
-    public boolean hasEnabledWallBreakTradeButton(String symbol, boolean bidBreakdown) {
-        String cleanSymbol = SymbolUtils.cleanSymbol(symbol);
-        List<TradebookButtonGroup> tradebooks = symbolToTradebooks.get(cleanSymbol);
-        if (tradebooks == null || tradebooks.isEmpty()) {
-            return false;
-        }
-        for (TradebookButtonGroup tradebook : tradebooks) {
-            if (tradebook.getEntryMethods().isEmpty()) {
-                continue;
-            }
-            if (isMatchingWallBreakTradebook(tradebook, bidBreakdown)) {
-                return true;
-            }
-        }
-        return false;
-    }
-
-    /**
-     * Read-only tradebook eligibility for display-only Bookmap pattern badges.
-     * An enabled group must have an entry method, match direction, and describe the
-     * applicable Bookmap wall-reversal tradebook family.
-     */
-    public boolean hasEnabledPatternTradebook(String symbol, PatternType patternType) {
-        String cleanSymbol = SymbolUtils.cleanSymbol(symbol);
-        List<TradebookButtonGroup> tradebooks = symbolToTradebooks.get(cleanSymbol);
-        if (tradebooks == null || tradebooks.isEmpty()) return false;
-        for (TradebookButtonGroup tradebook : tradebooks) {
-            if (tradebook.getEntryMethods().isEmpty() || !matchesDirection(tradebook, patternType)) continue;
-            if (isMatchingWallReversalTradebook(tradebook, patternType)) {
-                return true;
-            }
-        }
-        return false;
     }
 
     /**
@@ -615,8 +543,8 @@ public class SignalWebSocketServer extends WebSocketServer {
     public void onOpen(WebSocket conn, ClientHandshake handshake) {
         conn.send("{\"type\":\"standalone_status\",\"native\":true}");
         for (JsonObject target : targetMarkets.values()) conn.send(target.toString());
-        observationQueue.offer(() -> { for (com.bookmap.plugin.rong.patterns.CairoEvidenceRecorder recorder : evidenceRecorders.values()) for (JsonObject batch : recorder.snapshot()) if (conn.isOpen()) conn.send(batch.toString());
-            for (JsonObject observation : observationSnapshot()) if (conn.isOpen()) conn.send(observation.toString()); });
+        observationQueue.offer(() -> { for (com.bookmap.plugin.rong.signal.CairoPatternFeed recorder : patternFeeds.values()) for (JsonObject batch : recorder.snapshot()) if (conn.isOpen()) conn.send(batch.toString());
+            });
     }
 
     @Override
@@ -1351,32 +1279,6 @@ public class SignalWebSocketServer extends WebSocketServer {
         }
     }
 
-    private boolean isMatchingWallBreakTradebook(TradebookButtonGroup tradebook, boolean bidBreakdown) {
-        if (bidBreakdown && tradebook.isLong()) {
-            return false;
-        }
-        if (!bidBreakdown && !tradebook.isLong()) {
-            return false;
-        }
-
-        String searchable = (
-                tradebook.getId() + " "
-                        + tradebook.getLabel() + " "
-                        + tradebook.getTradebookId() + " "
-                        + tradebook.getTradebookName())
-                .toLowerCase(Locale.US);
-        if (bidBreakdown) {
-            return searchable.contains("bidwallbreakdown")
-                    || searchable.contains("bid wall breakdown")
-                    || searchable.contains("bid_breakdown")
-                    || searchable.contains("bid breakdown");
-        }
-        return searchable.contains("offerwallbreakout")
-                || searchable.contains("offer wall breakout")
-                || searchable.contains("offer_breakout")
-                || searchable.contains("offer breakout");
-    }
-
     private boolean matchesDirection(TradebookButtonGroup tradebook, PatternType patternType) {
         return patternType.getDirection() == Direction.LONG
                 ? tradebook.isLong()
@@ -1775,10 +1677,8 @@ public class SignalWebSocketServer extends WebSocketServer {
     }
 
     public void shutdown() {
-        // Drain on the same writer thread to avoid concurrent file rotation during teardown.
-        java.util.List<com.bookmap.plugin.rong.patterns.CairoEvidenceRecorder> finalRecorders = new ArrayList<>(evidenceRecorders.values());
-        evidenceRecorders.clear();
-        observationWorker.execute(() -> { for (com.bookmap.plugin.rong.patterns.CairoEvidenceRecorder recorder : finalRecorders) { recorder.close(); recorder.drain(System.currentTimeMillis()); } });
+        patternFeeds.values().forEach(com.bookmap.plugin.rong.signal.CairoPatternFeed::close);
+        patternFeeds.clear();
         observationWorker.shutdown(); observationQueue.clear();
         try {
             stop(1000);

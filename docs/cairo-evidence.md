@@ -1,57 +1,54 @@
-# Cairo setup evidence and replay testing
+# Cairo aggregate patterns and replay
 
-The new evidence recorder defaults to disabled. Opt in with `evidenceEnabled: true` to recognize setups and forward their evidence to Cairo. When enabled, it is independent of existing detector buttons and indicator visibility, and records all attached equity charts unless `evidenceSymbols` restricts it.
+Bookmap is the sole pattern detector. Every event goes through SignalComposer before export. Cairo consumes canonical classifications, composed signals, developing contexts, rule metadata and bounded large-level liquidity. Cairo's wall/trade/BBO, mini-bounce and offer-rejection detectors are removed. The old `cairo_evidence` and `cairo_observation` protocols are removed and rejected by the new receiver.
 
-Preferences are read at plugin attachment from `%USERPROFILE%\bmtrader\cairo-observation.json`:
+## Settings and migration
+
+Preferences load at chart attachment from `%USERPROFILE%\bmtrader\cairo-observation.json`:
 
 ```json
 {
-  "enabled": true,
-  "observerOnly": true,
   "evidenceEnabled": true,
-  "evidenceSymbols": [],
+  "evidenceSymbols": ["PCVX"],
   "captureEvidence": true,
   "sourceMode": "replay",
-  "symbols": ["PCVX"],
-  "detectors": ["BID_STEP_UP", "BID_REAPPEAR"]
+  "observerOnly": true
 }
 ```
 
-- `evidenceEnabled`: **false by default**. Set true explicitly to enable the new recorder. Set false and reattach/restart to skip wall/history buffers, raw trade/BBO observation work, capture I/O and evidence exports. Set the separate older observer flag `enabled` to false as well to stop its pattern exports. Existing trading retains its own settings.
-- `evidenceSymbols`: optional chart restriction; empty/missing means all attached charts. It is separate from the older pattern detector's `symbols` list.
-- `captureEvidence`: true by default; false keeps the live stream/history but skips market-evidence files.
-- `sourceMode`: `replay`, `live`, or `unknown` (default). This is an explicit operator setting, not automatic detection. Bookmap's callbacks in use do not establish provider mode. Set replay for replay testing and live only when running live market data.
-- `observerOnly`: use true for replay to avoid starting the native broker runtime. For normal native trading, restore your original value (normally false).
+The preference names are retained for migration. `evidenceEnabled` now enables aggregate export and defaults to false; empty/missing `evidenceSymbols` covers all eligible attached charts. Existing `enabled: true` plus `symbols` also enables export for those charts. Old `detectors` lists no longer filter the feed: every Composer pattern is exported. `captureEvidence` defaults to true and now captures aggregate snapshots.
 
-## Restart and test
+Composer must be enabled with valid rules and the chart must satisfy its optional symbol filter. Disabling it resets the pipeline and leaves the feed not ready. The dynamic wall display threshold only controls liquidity summaries; it does not change pattern or signal thresholds.
 
-1. Build with `gradlew.bat build`; select `build/libs/lingrong1988_bmtrader_1.34.jar` in Bookmap API Plugins Configuration. Older registered JAR paths do not automatically follow the new build.
-2. Apply replay settings above, restart Bookmap in replay mode, attach bmtrader, and replay a recording with large bid/offer walls. Snapshot completion establishes depth readiness.
-3. Rebuild/restart Cairo (`npm run build`, then its normal launcher). Open live chat or Bookmap observations. The setup assistant shows replay, market time, coverage, recognized before/after bounces, measured highs, ask confirmation and prior offer rejection.
-4. Automatic AI explanations default on while Cairo's model is connected and idle. Turn off “AI explanations on setup changes” on the card to suppress them, or click “Explain with AI” for a focused review. Chat cancellation pauses automatic explanations. Replay remains advisory and cannot be accepted as a real-position tag.
-5. Replay backward/seek and reconnect: evidence should enter a new epoch or warmup and must not retain the old setup as current. When ready callbacks are absent after a seek, reattach the addon to establish a fresh snapshot.
-6. Compare recognized bounces with Bookmap. Correct through chat (“use the earlier bounce at ...”) and inspect the evidence. Initial filters are two ticks, 200 ms and five seconds of covered history for no-bounce; these are configurable engineering defaults, not validated trading definitions.
+`sourceMode` remains an explicit operator setting (`live`, `replay`, `unknown`; default unknown). Readiness callbacks cannot prove live data. `observerOnly: true` keeps native broker initialization off for replay. Stop and reattach all charts to reload preferences/rules.
 
-Before returning to live trading, set `sourceMode` to `live` and restore your original `observerOnly` value, then restart/reattach.
+## Aggregate contract
 
-## Data and limits
+`cairo_patterns`, version 1, is a complete per-chart snapshot every 500 ms. Metadata includes source identity, epoch, delivery sequence, nanosecond market time as a string, USD prices/tick size, mode, readiness/coverage, detector/config revisions and stream/snapshot delivery. Heartbeats never advance market time. A complete snapshot repairs skipped deliveries.
 
-The plugin keeps up to 20,000 evidence events or ten minutes per chart. Trades and BBO transitions are retained individually; qualifying wall changes are recorded with stable IDs. Non-qualifying full-depth changes are not exported. Qualification uses the existing dynamic wall threshold; trade attribution is a bounded two-second estimate and cannot identify individual orders.
+- `patterns`: latest revisions of up to 64 canonical events with aggregate measured evidence and occurrence/detection times. Retained for at most ten market minutes; active context references stay within this bound.
+- `signals`: up to 32 composed records whose referenced evidence remains in the exported window. Direction, trigger, first validation time, latest evidence time, thresholds, strength, lifecycle state/change time and evidence IDs are included. Wire revision changes on composition or lifecycle change; `compositionRevision` preserves the underlying decision revision.
+- `contexts`: up to two directional waiting contexts with confirmation ID, strength, required bid behavior/size and market-time expiry.
+- `candidateStates` and `rules`: bounded Composer state and effective observation/detector thresholds for explanation.
+- `liquidity`: up to eight qualifying displayed levels per side, dynamic threshold, current quote summary and as-of time. This is a bounded summary, not raw depth updates or a complete order book.
 
-Callback methods perform no file/network I/O. A background worker emits batches of up to 128 events. Pending queues are bounded; overflow or backward event time opens a new epoch and reports a drop. Reconnect sends bounded snapshots without allocating fresh event sequence numbers. Live delivery and snapshot delivery are distinct.
+Individual trades, quote transitions, wall-start/update/end records and full depth are not sent. Plugin callbacks perform no file/network I/O; the background worker reads snapshots under the composition lock and handles delivery/capture. Resets clear the epoch's history/context/signals. Chart removal sends an empty not-ready terminal snapshot.
 
-Capture uses dedicated `%USERPROFILE%\bmtrader\evidence\evidence-*.jsonl` files, rotating at 10 MiB and retaining approximately 100 MiB total. The recorder reports capture failures on the wire and in local action logs; file failures do not block trading. An abrupt exit can lose pending data. These are observed wall/trade/quote captures, not complete raw-depth recordings.
+Cairo validates the whole snapshot before mutation and tracks source/epoch per symbol. Old sources, epochs, sequences and revisions are rejected. Disconnect clears live data. Replay and reconnect snapshots remain context; a following heartbeat cannot promote their signals into new entry evidence. Live liquidity requires fresh receipt and market times plus live/ready/continuous status.
 
-The wire protocol is `cairo_evidence`, version 1, with per-recorder source identity, epoch, event sequence, nanosecond event time, USD prices/tick size, source mode, readiness and coverage/drop evidence. Its contract is implemented in `CairoEvidenceRecorder` and Cairo's `BookmapEvidence`; the earlier `cairo_observation` pattern protocol remains supported separately.
+## Cards, annotations and archives
 
-## Replay without Bookmap
+Cairo displays the plugin's events separately from composed signals and waiting context. AI may explain recorded IDs/prices, but cannot substitute a different classification or synthesize a bounce variant. Manual `/bookmap-pattern` tagging remains available. A generic `BID_BREAKDOWN` is not automatically mapped to one of the user's manual bounce tradebooks.
 
-From Cairo's repository, with Bookmap's server stopped:
+Live buy/sell fills associated with current long/short holdings can freeze a plugin composition available at the fill. Later revisions do not rewrite it. Replay, snapshot history, future evidence and invalidated signals cannot supply that assessment. Existing entry archives remain readable as historical data. Association still depends on broker timestamps and the available aggregate window.
 
-```powershell
-node scripts/replay-bookmap-evidence.mjs --file C:\Users\lingr\bmtrader\evidence\evidence-SESSION-0.jsonl --speed 1
-```
+Optional capture writes `%USERPROFILE%\bmtrader\patterns\patterns-*.jsonl`, rotates at 10 MiB and retains about 100 MiB of dedicated files. Errors appear in feed/UI status and do not stop detection. Existing raw evidence files are untouched and cannot be replayed through the new contract.
 
-The replay server uses `127.0.0.1:8765`; playback begins when Cairo connects. `--port` chooses another port and `--speed` changes speed. All captured modes are overridden to replay. The tool has no broker dependencies. At end of playback it keeps context available until Ctrl+C.
+## Verify and run
 
-Verification: `gradlew.bat build` covers native/release tests. `CairoEvidenceRecorderTest` generates `build/fixtures/cairo-evidence.jsonl`. From Cairo, `node --experimental-strip-types scripts/verify-bookmap-bridge.mjs` exercises the real Java output through the replay WebSocket, Cairo recognition, timeline tools and validated interpretation contract. It makes no model/broker calls.
+1. `gradlew.bat build` produces `build/libs/lingrong1988_bmtrader_1.34.jar`; select that JAR in Bookmap and reattach charts.
+2. Rebuild/restart Cairo with `npm run build`. Keep `sourceMode: replay` for replay tests; restore the intended mode/native-trading preference before live use.
+3. `CairoPatternSnapshotTest` generates `build/fixtures/cairo-patterns.jsonl` from actual callback-driven detection/composition. From Cairo, `node --experimental-strip-types scripts/verify-bookmap-bridge.mjs` verifies Java output through a loopback WebSocket, Cairo tools and annotation validation without model/broker calls.
+4. `node scripts/replay-bookmap-evidence.mjs --file <patterns-SESSION-0.jsonl> --speed 1` replays aggregates on `127.0.0.1:8765`; `--port` chooses another port. Captured modes are overridden to replay.
+
+Builds do not install, restart or alter live application settings automatically.

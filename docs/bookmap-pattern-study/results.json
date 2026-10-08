@@ -1,0 +1,566 @@
+[
+  {
+    "scenario": "partial_offer_consumption_without_break",
+    "legacyPatterns": [],
+    "observerEvents": [],
+    "composerUpdates": [],
+    "wallChanges": [
+      {
+        "type": "OFFER_BREAKOUT",
+        "before": 8000,
+        "after": 3000,
+        "tradeConsumption": true,
+        "retestFill": true,
+        "soundEligible": false
+      }
+    ],
+    "visibleLiquidityAlertCount": 0,
+    "waitingDirections": [],
+    "inspection": "Scanning \u00b7 Epoch 1\nMarket time: 2026-10-06 10:00:03.200 NY\nLatest observation: None since reset\nEvidence retained: 0 / 2048 \u00b7 Candidates: 0 / 64\nOffer context: none qualifying at current price / time\nBid candidates: none \u2014 waiting for bid hold / failure\nLast reset: None\nLatest diagnostic: None"
+  },
+  {
+    "scenario": "offer_loss_with_only_ten_percent_opposite_aggressor",
+    "legacyPatterns": [],
+    "observerEvents": [],
+    "composerUpdates": [],
+    "wallChanges": [
+      {
+        "type": "OFFER_BREAKOUT",
+        "before": 8000,
+        "after": 0,
+        "tradeConsumption": true,
+        "retestFill": true,
+        "soundEligible": false
+      }
+    ],
+    "visibleLiquidityAlertCount": 0,
+    "waitingDirections": [],
+    "inspection": "Scanning \u00b7 Epoch 1\nMarket time: 2026-10-06 10:00:03.200 NY\nLatest observation: None since reset\nEvidence retained: 0 / 2048 \u00b7 Candidates: 0 / 64\nOffer context: none qualifying at current price / time\nBid candidates: none \u2014 waiting for bid hold / failure\nLast reset: None\nLatest diagnostic: Measured wall clear 1:wall:1; removed\u003d8000; attribution\u003dINFERRED_WITHDRAWAL; coverage\u003dUSABLE"
+  },
+  {
+    "scenario": "confirmed_offer_breakout_without_bid_trigger",
+    "legacyPatterns": [],
+    "observerEvents": [
+      {
+        "type": "OFFER_BREAKOUT",
+        "size": 8000,
+        "revision": 1,
+        "meaning": "OFFER_BULLISH_CONFIRMATION",
+        "occurrenceMs": 2700,
+        "observedMs": 3200
+      }
+    ],
+    "composerUpdates": [],
+    "wallChanges": [
+      {
+        "type": "OFFER_BREAKOUT",
+        "before": 8000,
+        "after": 0,
+        "tradeConsumption": true,
+        "retestFill": true,
+        "soundEligible": false
+      }
+    ],
+    "visibleLiquidityAlertCount": 0,
+    "waitingDirections": [
+      "LONG"
+    ],
+    "inspection": "Scanning \u00b7 Epoch 1\nMarket time: 2026-10-06 10:00:03.200 NY\nLatest observation: OFFER_BREAKOUT \u00b7 OFFER_BULLISH_CONFIRMATION \u00b7 8000 @ 100 \u00b7 USABLE / PROBABLE_CONSUMPTION\nEvidence retained: 1 / 2048 \u00b7 Candidates: 0 / 64\n  Normal: 1 patterns\nLONG context: OFFER_BREAKOUT 8000 @ 100 \u00b7 Normal \u00b7 confirmation NORMAL\n  Waiting for BID_HOLD \u2265 5000 \u00b7 299.5s market time left\nBid candidates: none \u2014 waiting for bid hold / failure\nLast reset: None\nLatest diagnostic: Measured wall clear 1:wall:1; removed\u003d8000; attribution\u003dPROBABLE_CONSUMPTION; coverage\u003dUSABLE"
+  },
+  {
+    "scenario": "gradual_bid_consumption",
+    "legacyPatterns": [],
+    "observerEvents": [
+      {
+        "type": "BID_BREAKDOWN",
+        "size": 2000,
+        "revision": 1,
+        "meaning": "BID_FAIL",
+        "occurrenceMs": 2900,
+        "observedMs": 3400
+      }
+    ],
+    "composerUpdates": [],
+    "wallChanges": [
+      {
+        "type": "BID_BREAKDOWN",
+        "before": 8000,
+        "after": 0,
+        "tradeConsumption": true,
+        "retestFill": true,
+        "soundEligible": false
+      }
+    ],
+    "visibleLiquidityAlertCount": 0,
+    "waitingDirections": [],
+    "inspection": "Scanning \u00b7 Epoch 1\nMarket time: 2026-10-06 10:00:03.400 NY\nLatest observation: BID_BREAKDOWN \u00b7 BID_FAIL \u00b7 2000 @ 100 \u00b7 USABLE / PROBABLE_CONSUMPTION\nEvidence retained: 1 / 2048 \u00b7 Candidates: 0 / 64\n  Least significant: 1 patterns\nOffer context: none qualifying at current price / time\nBid candidates: none \u2014 waiting for bid hold / failure\nLast reset: None\nLatest diagnostic: Trigger below absolute minimum: TEST:1:BID_BREAKDOWN:1:wall:1"
+  },
+  {
+    "scenario": "offer_step_down_without_bid_trigger",
+    "legacyPatterns": [
+      {
+        "type": "OFFER_STEP_DOWN",
+        "referenceSize": 8000,
+        "score": 50,
+        "timeMs": 3100
+      },
+      {
+        "type": "OFFER_STEP_DOWN",
+        "referenceSize": 8000,
+        "score": 55,
+        "timeMs": 3600
+      }
+    ],
+    "observerEvents": [
+      {
+        "type": "OFFER_STEP_DOWN",
+        "size": 6000,
+        "revision": 1,
+        "meaning": "OFFER_BEARISH_CONFIRMATION",
+        "occurrenceMs": 3100,
+        "observedMs": 3100
+      },
+      {
+        "type": "OFFER_STEP_DOWN",
+        "size": 6000,
+        "revision": 2,
+        "meaning": "OFFER_BEARISH_CONFIRMATION",
+        "occurrenceMs": 3100,
+        "observedMs": 3600
+      }
+    ],
+    "composerUpdates": [],
+    "wallChanges": [
+      {
+        "type": "ADDED",
+        "before": 0,
+        "after": 6000,
+        "tradeConsumption": false,
+        "retestFill": false,
+        "soundEligible": true
+      }
+    ],
+    "visibleLiquidityAlertCount": 1,
+    "waitingDirections": [
+      "SHORT"
+    ],
+    "inspection": "Scanning \u00b7 Epoch 1\nMarket time: 2026-10-06 10:00:03.600 NY\nLatest observation: OFFER_STEP_DOWN \u00b7 OFFER_BEARISH_CONFIRMATION \u00b7 6000 @ 100.09 \u00b7 USABLE / UNKNOWN\nEvidence retained: 1 / 2048 \u00b7 Candidates: 0 / 64\n  Normal: 1 patterns\nSHORT context: OFFER_STEP_DOWN 6000 @ 100.09 \u00b7 Normal \u00b7 confirmation NORMAL\n  Waiting for BID_FAIL \u2265 5000 \u00b7 299.5s market time left\nBid candidates: none \u2014 waiting for bid hold / failure\nLast reset: None\nLatest diagnostic: None"
+  },
+  {
+    "scenario": "bid_reappear_and_step_same_interaction",
+    "legacyPatterns": [
+      {
+        "type": "BID_REAPPEAR",
+        "referenceSize": 8000,
+        "score": 55,
+        "timeMs": 3700
+      },
+      {
+        "type": "BID_STEP_UP",
+        "referenceSize": 8000,
+        "score": 50,
+        "timeMs": 3700
+      },
+      {
+        "type": "BID_STEP_UP",
+        "referenceSize": 8000,
+        "score": 55,
+        "timeMs": 4200
+      }
+    ],
+    "observerEvents": [
+      {
+        "type": "BID_REAPPEAR",
+        "size": 6000,
+        "revision": 1,
+        "meaning": "BID_HOLD",
+        "occurrenceMs": 3700,
+        "observedMs": 3700
+      },
+      {
+        "type": "BID_STEP_UP",
+        "size": 6000,
+        "revision": 1,
+        "meaning": "BID_HOLD",
+        "occurrenceMs": 3700,
+        "observedMs": 3700
+      },
+      {
+        "type": "BID_STEP_UP",
+        "size": 6000,
+        "revision": 2,
+        "meaning": "BID_HOLD",
+        "occurrenceMs": 3700,
+        "observedMs": 4200
+      }
+    ],
+    "composerUpdates": [
+      {
+        "type": "BID_REAPPEAR",
+        "triggerSize": 6000,
+        "revision": 1,
+        "direction": "LONG",
+        "appliedThreshold": 5000
+      },
+      {
+        "type": "BID_REAPPEAR",
+        "triggerSize": 6000,
+        "revision": 2,
+        "direction": "LONG",
+        "appliedThreshold": 5000
+      },
+      {
+        "type": "BID_REAPPEAR",
+        "triggerSize": 6000,
+        "revision": 3,
+        "direction": "LONG",
+        "appliedThreshold": 5000
+      }
+    ],
+    "wallChanges": [
+      {
+        "type": "BID_BREAKDOWN",
+        "before": 8000,
+        "after": 0,
+        "tradeConsumption": true,
+        "retestFill": true,
+        "soundEligible": false
+      },
+      {
+        "type": "ADDED",
+        "before": 0,
+        "after": 6000,
+        "tradeConsumption": false,
+        "retestFill": false,
+        "soundEligible": true
+      }
+    ],
+    "visibleLiquidityAlertCount": 1,
+    "waitingDirections": [],
+    "inspection": "Scanning \u00b7 Epoch 1\nMarket time: 2026-10-06 10:00:04.200 NY\nLatest observation: BID_STEP_UP \u00b7 BID_HOLD \u00b7 6000 @ 100.01 \u00b7 USABLE / UNKNOWN\nEvidence retained: 2 / 2048 \u00b7 Candidates: 1 / 64\n  Normal: 2 patterns\nOffer context: none qualifying at current price / time\nLONG VALID: BID_REAPPEAR 6000 @ 100.01 \u00b7 Normal \u00b7 299.5s left\n  Bid trigger meets applied threshold 5000\n  Validated: NONE \u00b7 applied \u2265 5000 \u00b7 revision 3\nLast reset: None\nLatest diagnostic: Measured wall clear 1:wall:1; removed\u003d8000; attribution\u003dPROBABLE_CONSUMPTION; coverage\u003dUSABLE"
+  },
+  {
+    "scenario": "step_wall_disappears_before_delayed_revision",
+    "legacyPatterns": [
+      {
+        "type": "BID_STEP_UP",
+        "referenceSize": 8000,
+        "score": 50,
+        "timeMs": 3100
+      },
+      {
+        "type": "BID_STEP_UP",
+        "referenceSize": 8000,
+        "score": 55,
+        "timeMs": 3600
+      }
+    ],
+    "observerEvents": [
+      {
+        "type": "BID_STEP_UP",
+        "size": 6000,
+        "revision": 1,
+        "meaning": "BID_HOLD",
+        "occurrenceMs": 3100,
+        "observedMs": 3100
+      }
+    ],
+    "composerUpdates": [
+      {
+        "type": "BID_STEP_UP",
+        "triggerSize": 6000,
+        "revision": 1,
+        "direction": "LONG",
+        "appliedThreshold": 5000
+      }
+    ],
+    "wallChanges": [],
+    "visibleLiquidityAlertCount": 0,
+    "waitingDirections": [],
+    "inspection": "Scanning \u00b7 Epoch 1\nMarket time: 2026-10-06 10:00:03.600 NY\nLatest observation: BID_STEP_UP \u00b7 BID_HOLD \u00b7 6000 @ 100.01 \u00b7 USABLE / UNKNOWN\nEvidence retained: 1 / 2048 \u00b7 Candidates: 1 / 64\n  Normal: 1 patterns\nOffer context: none qualifying at current price / time\nLONG VALID: BID_STEP_UP 6000 @ 100.01 \u00b7 Normal \u00b7 299.5s left\n  Bid trigger meets applied threshold 5000\n  Validated: NONE \u00b7 applied \u2265 5000 \u00b7 revision 1\nLast reset: None\nLatest diagnostic: None"
+  },
+  {
+    "scenario": "bid_step_initial_four_thousand_then_six_thousand",
+    "legacyPatterns": [
+      {
+        "type": "BID_STEP_UP",
+        "referenceSize": 6000,
+        "score": 60,
+        "timeMs": 3900
+      }
+    ],
+    "observerEvents": [
+      {
+        "type": "BID_STEP_UP",
+        "size": 4000,
+        "revision": 1,
+        "meaning": "BID_HOLD",
+        "occurrenceMs": 3100,
+        "observedMs": 3100
+      },
+      {
+        "type": "BID_STEP_UP",
+        "size": 6000,
+        "revision": 2,
+        "meaning": "BID_HOLD",
+        "occurrenceMs": 3100,
+        "observedMs": 3600
+      }
+    ],
+    "composerUpdates": [],
+    "wallChanges": [
+      {
+        "type": "ADDED",
+        "before": 4000,
+        "after": 6000,
+        "tradeConsumption": false,
+        "retestFill": false,
+        "soundEligible": true
+      }
+    ],
+    "visibleLiquidityAlertCount": 1,
+    "waitingDirections": [],
+    "inspection": "Scanning \u00b7 Epoch 1\nMarket time: 2026-10-06 10:00:03.900 NY\nLatest observation: BID_STEP_UP \u00b7 BID_HOLD \u00b7 6000 @ 100.01 \u00b7 USABLE / UNKNOWN\nEvidence retained: 1 / 2048 \u00b7 Candidates: 1 / 64\n  Normal: 1 patterns\nOffer context: none qualifying at current price / time\nLONG CANDIDATE: BID_STEP_UP 4000 @ 100.01 \u00b7 Below normal \u00b7 299.2s left\n  Waiting for sufficient confirmation\n  Confirmation NONE \u00b7 bid required \u2265 5000\nLast reset: None\nLatest diagnostic: Waiting for sufficient confirmation: TEST:1:LONG:1:wall:2; trigger\u003d4000; required\u003d5000"
+  },
+  {
+    "scenario": "same_day_backward_seek",
+    "legacyPatterns": [
+      {
+        "type": "BID_STEP_UP",
+        "referenceSize": 8000,
+        "score": 50,
+        "timeMs": 1700
+      }
+    ],
+    "observerEvents": [],
+    "composerUpdates": [],
+    "wallChanges": [
+      {
+        "type": "ADDED",
+        "before": 0,
+        "after": 6000,
+        "tradeConsumption": false,
+        "retestFill": false,
+        "soundEligible": true
+      }
+    ],
+    "visibleLiquidityAlertCount": 1,
+    "waitingDirections": [],
+    "inspection": "Waiting for snapshot / realtime readiness \u00b7 Epoch 2\nMarket time: 2026-10-06 10:00:01.700 NY\nLatest observation: None since reset\nEvidence retained: 0 / 2048 \u00b7 Candidates: 0 / 64\nOffer context: none qualifying at current price / time\nBid candidates: none \u2014 waiting for bid hold / failure\nLast reset: REPLAY_SEEK\nLatest diagnostic: Observation reset: REPLAY_SEEK"
+  },
+  {
+    "scenario": "large_wall_floor_twenty_thousand_bid_step_six_thousand",
+    "legacyPatterns": [],
+    "observerEvents": [
+      {
+        "type": "BID_STEP_UP",
+        "size": 6000,
+        "revision": 1,
+        "meaning": "BID_HOLD",
+        "occurrenceMs": 3100,
+        "observedMs": 3100
+      },
+      {
+        "type": "BID_STEP_UP",
+        "size": 6000,
+        "revision": 2,
+        "meaning": "BID_HOLD",
+        "occurrenceMs": 3100,
+        "observedMs": 3600
+      }
+    ],
+    "composerUpdates": [
+      {
+        "type": "BID_STEP_UP",
+        "triggerSize": 6000,
+        "revision": 1,
+        "direction": "LONG",
+        "appliedThreshold": 5000
+      },
+      {
+        "type": "BID_STEP_UP",
+        "triggerSize": 6000,
+        "revision": 2,
+        "direction": "LONG",
+        "appliedThreshold": 5000
+      }
+    ],
+    "wallChanges": [
+      {
+        "type": "ADDED",
+        "before": 0,
+        "after": 6000,
+        "tradeConsumption": false,
+        "retestFill": false,
+        "soundEligible": true
+      }
+    ],
+    "visibleLiquidityAlertCount": 1,
+    "waitingDirections": [],
+    "inspection": "Scanning \u00b7 Epoch 1\nMarket time: 2026-10-06 10:00:03.600 NY\nLatest observation: BID_STEP_UP \u00b7 BID_HOLD \u00b7 6000 @ 100.01 \u00b7 USABLE / UNKNOWN\nEvidence retained: 1 / 2048 \u00b7 Candidates: 1 / 64\n  Normal: 1 patterns\nOffer context: none qualifying at current price / time\nLONG VALID: BID_STEP_UP 6000 @ 100.01 \u00b7 Normal \u00b7 299.5s left\n  Bid trigger meets applied threshold 5000\n  Validated: NONE \u00b7 applied \u2265 5000 \u00b7 revision 2\nLast reset: None\nLatest diagnostic: None"
+  },
+  {
+    "scenario": "bid_step_far_from_current_quote",
+    "legacyPatterns": [
+      {
+        "type": "BID_STEP_UP",
+        "referenceSize": 8000,
+        "score": 30,
+        "timeMs": 3200
+      },
+      {
+        "type": "BID_STEP_UP",
+        "referenceSize": 8000,
+        "score": 35,
+        "timeMs": 3700
+      }
+    ],
+    "observerEvents": [
+      {
+        "type": "BID_STEP_UP",
+        "size": 6000,
+        "revision": 1,
+        "meaning": "BID_HOLD",
+        "occurrenceMs": 3200,
+        "observedMs": 3200
+      },
+      {
+        "type": "BID_STEP_UP",
+        "size": 6000,
+        "revision": 2,
+        "meaning": "BID_HOLD",
+        "occurrenceMs": 3200,
+        "observedMs": 3700
+      }
+    ],
+    "composerUpdates": [],
+    "wallChanges": [
+      {
+        "type": "ADDED",
+        "before": 0,
+        "after": 6000,
+        "tradeConsumption": false,
+        "retestFill": false,
+        "soundEligible": true
+      }
+    ],
+    "visibleLiquidityAlertCount": 1,
+    "waitingDirections": [],
+    "inspection": "Scanning \u00b7 Epoch 1\nMarket time: 2026-10-06 10:00:03.700 NY\nLatest observation: BID_STEP_UP \u00b7 BID_HOLD \u00b7 6000 @ 100.5 \u00b7 USABLE / UNKNOWN\nEvidence retained: 1 / 2048 \u00b7 Candidates: 0 / 64\n  Normal: 1 patterns\nOffer context: none qualifying at current price / time\nBid candidates: none \u2014 waiting for bid hold / failure\nLast reset: None\nLatest diagnostic: Trigger outside current local price: TEST:1:BID_STEP_UP:1:wall:2:1:wall:1"
+  },
+  {
+    "scenario": "peak_sixteen_thousand_shrinks_then_eight_thousand_consumed",
+    "legacyPatterns": [
+      {
+        "type": "BID_STEP_UP",
+        "referenceSize": 8000,
+        "score": 50,
+        "timeMs": 3900
+      },
+      {
+        "type": "BID_STEP_UP",
+        "referenceSize": 8000,
+        "score": 55,
+        "timeMs": 4400
+      }
+    ],
+    "observerEvents": [
+      {
+        "type": "BID_REAPPEAR",
+        "size": 6000,
+        "revision": 1,
+        "meaning": "BID_HOLD",
+        "occurrenceMs": 3900,
+        "observedMs": 3900
+      },
+      {
+        "type": "BID_STEP_UP",
+        "size": 6000,
+        "revision": 1,
+        "meaning": "BID_HOLD",
+        "occurrenceMs": 3900,
+        "observedMs": 3900
+      },
+      {
+        "type": "BID_STEP_UP",
+        "size": 6000,
+        "revision": 2,
+        "meaning": "BID_HOLD",
+        "occurrenceMs": 3900,
+        "observedMs": 4400
+      }
+    ],
+    "composerUpdates": [
+      {
+        "type": "BID_REAPPEAR",
+        "triggerSize": 6000,
+        "revision": 1,
+        "direction": "LONG",
+        "appliedThreshold": 5000
+      },
+      {
+        "type": "BID_REAPPEAR",
+        "triggerSize": 6000,
+        "revision": 2,
+        "direction": "LONG",
+        "appliedThreshold": 5000
+      },
+      {
+        "type": "BID_REAPPEAR",
+        "triggerSize": 6000,
+        "revision": 3,
+        "direction": "LONG",
+        "appliedThreshold": 5000
+      }
+    ],
+    "wallChanges": [
+      {
+        "type": "BID_BREAKDOWN",
+        "before": 8000,
+        "after": 0,
+        "tradeConsumption": true,
+        "retestFill": true,
+        "soundEligible": false
+      },
+      {
+        "type": "ADDED",
+        "before": 0,
+        "after": 6000,
+        "tradeConsumption": false,
+        "retestFill": false,
+        "soundEligible": true
+      }
+    ],
+    "visibleLiquidityAlertCount": 1,
+    "waitingDirections": [],
+    "inspection": "Scanning \u00b7 Epoch 1\nMarket time: 2026-10-06 10:00:04.400 NY\nLatest observation: BID_STEP_UP \u00b7 BID_HOLD \u00b7 6000 @ 100.01 \u00b7 USABLE / UNKNOWN\nEvidence retained: 2 / 2048 \u00b7 Candidates: 1 / 64\n  Normal: 2 patterns\nOffer context: none qualifying at current price / time\nLONG VALID: BID_REAPPEAR 6000 @ 100.01 \u00b7 Normal \u00b7 299.5s left\n  Bid trigger meets applied threshold 5000\n  Validated: NONE \u00b7 applied \u2265 5000 \u00b7 revision 3\nLast reset: None\nLatest diagnostic: Measured wall clear 1:wall:1; removed\u003d8000; attribution\u003dPROBABLE_CONSUMPTION; coverage\u003dUSABLE"
+  },
+  {
+    "scenario": "gradual_bid_consumption_with_slow_callback_receipt",
+    "legacyPatterns": [],
+    "observerEvents": [
+      {
+        "type": "BID_BREAKDOWN",
+        "size": 2000,
+        "revision": 1,
+        "meaning": "BID_FAIL",
+        "occurrenceMs": 2900,
+        "observedMs": 3400
+      }
+    ],
+    "composerUpdates": [],
+    "wallChanges": [
+      {
+        "type": "BID_BREAKDOWN",
+        "before": 8000,
+        "after": 4000,
+        "tradeConsumption": true,
+        "retestFill": true,
+        "soundEligible": false
+      }
+    ],
+    "visibleLiquidityAlertCount": 0,
+    "waitingDirections": [],
+    "inspection": "Scanning \u00b7 Epoch 1\nMarket time: 2026-10-06 10:00:03.400 NY\nLatest observation: BID_BREAKDOWN \u00b7 BID_FAIL \u00b7 2000 @ 100 \u00b7 USABLE / PROBABLE_CONSUMPTION\nEvidence retained: 1 / 2048 \u00b7 Candidates: 0 / 64\n  Least significant: 1 patterns\nOffer context: none qualifying at current price / time\nBid candidates: none \u2014 waiting for bid hold / failure\nLast reset: None\nLatest diagnostic: Trigger below absolute minimum: TEST:1:BID_BREAKDOWN:1:wall:1"
+  }
+]

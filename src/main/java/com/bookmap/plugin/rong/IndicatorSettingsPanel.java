@@ -115,24 +115,6 @@ public class IndicatorSettingsPanel extends StrategyPanel {
         add(wallChangeSoundCheckbox, gbc);
 
         gbc.gridy++;
-        JCheckBox wallBreakoutSignalsCheckbox = new JCheckBox(
-                "Order Wall Breakout / Breakdown Signals",
-                config.isEnabled(IndicatorConfig.ORDER_WALL_BREAKOUT_SIGNALS));
-        wallBreakoutSignalsCheckbox.addActionListener(e ->
-                config.setEnabled(
-                        IndicatorConfig.ORDER_WALL_BREAKOUT_SIGNALS,
-                        wallBreakoutSignalsCheckbox.isSelected()));
-        add(wallBreakoutSignalsCheckbox, gbc);
-
-        gbc.gridy++;
-        JCheckBox patternSignalsCheckbox = new JCheckBox(
-                "Bookmap Pattern Automation (display-only)",
-                config.isEnabled(IndicatorConfig.BOOKMAP_PATTERN_SIGNALS));
-        patternSignalsCheckbox.addActionListener(e ->
-                config.setEnabled(IndicatorConfig.BOOKMAP_PATTERN_SIGNALS, patternSignalsCheckbox.isSelected()));
-        add(patternSignalsCheckbox, gbc);
-
-        gbc.gridy++;
         JCheckBox composerCheckbox = new JCheckBox("SignalComposer (advisory)",
                 composerRules.valid && config.isEnabled(IndicatorConfig.SIGNAL_COMPOSER));
         composerCheckbox.setEnabled(composerRules.valid);

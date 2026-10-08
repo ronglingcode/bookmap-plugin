@@ -8,6 +8,8 @@ import com.bookmap.plugin.rong.patterns.PatternObservationEngine;
 /** One attachment's serialized callback-to-advisory path. No execution dependencies. */
 public final class SignalCompositionPipeline {
     private final SignalComposer composer;
+    private final CairoPatternSnapshot aggregate;
+    private final SignalComposerConfig rules;
     private final PatternObservationEngine observer;
     private final Consumer<CompositionUpdate> output;
     private int bid, ask, last;
@@ -19,15 +21,19 @@ public final class SignalCompositionPipeline {
     }
     public SignalCompositionPipeline(String alias, double pips, SignalComposerConfig config, Consumer<CompositionUpdate> output,
             Consumer<PatternEvent> rawEvents, Consumer<String> diagnostics, LongSupplier receiptClock) {
+        rules = config;
+        aggregate = new CairoPatternSnapshot(alias, pips, "unknown", config.revision);
         this.output = update -> {
+            aggregate.update(update);
             if (!update.diagnostics.isEmpty()) latestDiagnostic = update.diagnostics.get(update.diagnostics.size() - 1);
             output.accept(update);
         };
         composer = new SignalComposer(alias, 1, config, receiptClock);
         observer = new PatternObservationEngine(alias, pips, config, event -> {
-            latestEvent = event; rawEvents.accept(event); this.output.accept(composer.onPatternEvent(event));
+            latestEvent = event; this.output.accept(composer.onPatternEvent(event)); aggregate.event(event); rawEvents.accept(event);
         }, (reason, epoch) -> {
             bid = ask = last = 0; latestEvent = null; latestReset = reason.name(); latestDiagnostic = "None";
+            aggregate.reset(epoch);
             resetListener.accept(reason); this.output.accept(composer.reset(reason, epoch));
         }, message -> { latestDiagnostic = message; diagnostics.accept(message); });
     }
@@ -54,6 +60,18 @@ public final class SignalCompositionPipeline {
         output.accept(composer.onMarketTime(observer.nowNs()));
         output.accept(composer.onMarketPrice(bid, ask, last));
     }
+    public com.google.gson.JsonObject aggregateSnapshot(com.google.gson.JsonObject liquidity, boolean reconnect) {
+        com.google.gson.JsonObject value = aggregate.snapshot(observer.usable(), observer.nowNs(), liquidity, reconnect);
+        com.google.gson.JsonObject config = new com.google.gson.JsonObject();
+        config.addProperty("observationFloorSize", rules.observationFloorSize);
+        config.addProperty("normalTriggerSize", rules.normalTriggerSize);
+        config.addProperty("minimumTriggerSize", rules.minimumTriggerSize);
+        config.add("detectors", new com.google.gson.Gson().toJsonTree(rules.detectors));
+        value.add("rules", config);
+        return value;
+    }
+    public int bestBidTick() { return bid; }
+    public int bestAskTick() { return ask; }
     public void markReady() { observer.markReady(); }
     public void setResetListener(Consumer<ResetReason> listener) { resetListener = listener; }
     public void reset(ResetReason reason) { observer.reset(reason); }

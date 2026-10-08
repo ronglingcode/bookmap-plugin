@@ -12,7 +12,6 @@ public final class CairoObservationConfig {
     public final String sourceMode;
     private final Set<String> symbols = new HashSet<>();
     private final Set<String> evidenceSymbols = new HashSet<>();
-    private final Set<String> detectors = new HashSet<>();
     public CairoObservationConfig(JsonObject value) {
         evidenceEnabled = value.has("evidenceEnabled") && value.get("evidenceEnabled").getAsBoolean();
         captureEvidence = !value.has("captureEvidence") || value.get("captureEvidence").getAsBoolean();
@@ -22,10 +21,12 @@ public final class CairoObservationConfig {
         observerOnly = (enabled || evidenceEnabled) && value.has("observerOnly") && value.get("observerOnly").getAsBoolean();
         if (value.has("symbols")) value.getAsJsonArray("symbols").forEach(item -> symbols.add(SymbolUtils.cleanSymbol(item.getAsString()).toUpperCase(java.util.Locale.ROOT)));
         if (value.has("evidenceSymbols")) value.getAsJsonArray("evidenceSymbols").forEach(item -> evidenceSymbols.add(SymbolUtils.cleanSymbol(item.getAsString()).toUpperCase(java.util.Locale.ROOT)));
-        if (value.has("detectors")) value.getAsJsonArray("detectors").forEach(item -> detectors.add(item.getAsString()));
     }
-    public boolean recordEvidence(String symbol) { return evidenceEnabled && (evidenceSymbols.isEmpty() || evidenceSymbols.contains(SymbolUtils.cleanSymbol(symbol).toUpperCase(java.util.Locale.ROOT))); }
-    public boolean eligible(String symbol, PatternType type) { return enabled && symbols.contains(SymbolUtils.cleanSymbol(symbol).toUpperCase(java.util.Locale.ROOT)) && CairoObservationExport.allowed(type) && detectors.contains(type.name()); }
+    public boolean exportsPatterns(String symbol) {
+        String canonical = SymbolUtils.cleanSymbol(symbol).toUpperCase(java.util.Locale.ROOT);
+        return evidenceEnabled && (evidenceSymbols.isEmpty() || evidenceSymbols.contains(canonical))
+                || enabled && symbols.contains(canonical);
+    }
     public static CairoObservationConfig load() {
         try {
             Path path = Path.of(System.getProperty("bmtrader.observationConfig", Path.of(System.getProperty("user.home"), "bmtrader", "cairo-observation.json").toString()));

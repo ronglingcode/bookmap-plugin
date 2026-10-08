@@ -13,7 +13,6 @@ import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
 import java.util.function.DoubleSupplier;
 import java.util.function.IntSupplier;
-import java.util.function.Predicate;
 
 import com.bookmap.plugin.rong.BookmapPriceNormalizer;
 
@@ -34,7 +33,6 @@ public class OrderWallChangeTracker {
     private static final long DEFAULT_CHANGE_SURVIVAL_MS = 500;
     private static final int DEFAULT_LARGEST_ORDER_RANK = 5;
     private static final int MAX_ORDER_CHANGE_THRESHOLD = 10_000;
-    private static final Predicate<Boolean> WALL_BREAK_ALERTS_DISABLED = ignored -> false;
     private static final DoubleSupplier UNKNOWN_DAY_LEVEL = () -> Double.NaN;
 
     private final String instrumentAlias;
@@ -43,7 +41,6 @@ public class OrderWallChangeTracker {
     private final int largestOrderRank;
     private final long changeSurvivalMs;
     private final Consumer<OrderWallChangeEvent> alertConsumer;
-    private final Predicate<Boolean> wallBreakAlertEnabled;
     private final DoubleSupplier dayHighSupplier;
     private final DoubleSupplier dayLowSupplier;
     private DoubleSupplier cancellationStockPriceSupplier;
@@ -61,7 +58,7 @@ public class OrderWallChangeTracker {
                                   Consumer<OrderWallChangeEvent> alertConsumer) {
         this(instrumentAlias, pips, fixedThreshold(largeOrderThreshold), 0,
                 decreaseDecisionDelayMs, DEFAULT_CHANGE_SURVIVAL_MS, alertConsumer,
-                WALL_BREAK_ALERTS_DISABLED, UNKNOWN_DAY_LEVEL, UNKNOWN_DAY_LEVEL);
+                UNKNOWN_DAY_LEVEL, UNKNOWN_DAY_LEVEL);
     }
 
     public OrderWallChangeTracker(String instrumentAlias, double pips, int largeOrderThreshold,
@@ -71,7 +68,7 @@ public class OrderWallChangeTracker {
         this(instrumentAlias, pips, fixedThreshold(largeOrderThreshold),
                 rankForLegacyPercentile(largeOrderPercentile),
                 decreaseDecisionDelayMs, DEFAULT_CHANGE_SURVIVAL_MS, alertConsumer,
-                WALL_BREAK_ALERTS_DISABLED, UNKNOWN_DAY_LEVEL, UNKNOWN_DAY_LEVEL);
+                UNKNOWN_DAY_LEVEL, UNKNOWN_DAY_LEVEL);
     }
 
     public OrderWallChangeTracker(String instrumentAlias, double pips, int largeOrderThreshold,
@@ -80,30 +77,19 @@ public class OrderWallChangeTracker {
                                   Consumer<OrderWallChangeEvent> alertConsumer) {
         this(instrumentAlias, pips, fixedThreshold(largeOrderThreshold), largestOrderRank,
                 decreaseDecisionDelayMs, DEFAULT_CHANGE_SURVIVAL_MS, alertConsumer,
-                WALL_BREAK_ALERTS_DISABLED, UNKNOWN_DAY_LEVEL, UNKNOWN_DAY_LEVEL);
+                UNKNOWN_DAY_LEVEL, UNKNOWN_DAY_LEVEL);
     }
 
-    public OrderWallChangeTracker(String instrumentAlias, double pips, int largeOrderThreshold,
-                                  double largeOrderPercentile, double remainingRatio,
-                                  long decreaseDecisionDelayMs,
-                                  Consumer<OrderWallChangeEvent> alertConsumer,
-                                  Predicate<Boolean> wallBreakAlertEnabled) {
-        this(instrumentAlias, pips, fixedThreshold(largeOrderThreshold),
-                rankForLegacyPercentile(largeOrderPercentile),
-                decreaseDecisionDelayMs, DEFAULT_CHANGE_SURVIVAL_MS, alertConsumer,
-                wallBreakAlertEnabled, UNKNOWN_DAY_LEVEL, UNKNOWN_DAY_LEVEL);
-    }
 
     public OrderWallChangeTracker(String instrumentAlias, double pips,
                                   IntSupplier largeOrderThresholdSupplier,
                                   double largeOrderPercentile, double remainingRatio,
                                   long decreaseDecisionDelayMs,
-                                  Consumer<OrderWallChangeEvent> alertConsumer,
-                                  Predicate<Boolean> wallBreakAlertEnabled) {
+                                  Consumer<OrderWallChangeEvent> alertConsumer) {
         this(instrumentAlias, pips, largeOrderThresholdSupplier,
                 rankForLegacyPercentile(largeOrderPercentile),
                 decreaseDecisionDelayMs, DEFAULT_CHANGE_SURVIVAL_MS, alertConsumer,
-                wallBreakAlertEnabled, UNKNOWN_DAY_LEVEL, UNKNOWN_DAY_LEVEL);
+                UNKNOWN_DAY_LEVEL, UNKNOWN_DAY_LEVEL);
     }
 
     public OrderWallChangeTracker(String instrumentAlias, double pips,
@@ -111,12 +97,11 @@ public class OrderWallChangeTracker {
                                   int largestOrderRank, double remainingRatio,
                                   long decreaseDecisionDelayMs,
                                   Consumer<OrderWallChangeEvent> alertConsumer,
-                                  Predicate<Boolean> wallBreakAlertEnabled,
                                   DoubleSupplier dayHighSupplier,
                                   DoubleSupplier dayLowSupplier) {
         this(instrumentAlias, pips, largeOrderThresholdSupplier, largestOrderRank,
                 decreaseDecisionDelayMs, DEFAULT_CHANGE_SURVIVAL_MS, alertConsumer,
-                wallBreakAlertEnabled, dayHighSupplier, dayLowSupplier);
+                dayHighSupplier, dayLowSupplier);
     }
 
     public OrderWallChangeTracker(String instrumentAlias, double pips,
@@ -124,13 +109,12 @@ public class OrderWallChangeTracker {
                                   double largeOrderPercentile, double remainingRatio,
                                   long decreaseDecisionDelayMs,
                                   Consumer<OrderWallChangeEvent> alertConsumer,
-                                  Predicate<Boolean> wallBreakAlertEnabled,
                                   DoubleSupplier dayHighSupplier,
                                   DoubleSupplier dayLowSupplier) {
         this(instrumentAlias, pips, largeOrderThresholdSupplier,
                 rankForLegacyPercentile(largeOrderPercentile),
                 decreaseDecisionDelayMs, DEFAULT_CHANGE_SURVIVAL_MS, alertConsumer,
-                wallBreakAlertEnabled, dayHighSupplier, dayLowSupplier);
+                dayHighSupplier, dayLowSupplier);
     }
 
     OrderWallChangeTracker(String instrumentAlias, double pips, int largeOrderThreshold,
@@ -139,18 +123,9 @@ public class OrderWallChangeTracker {
                            Consumer<OrderWallChangeEvent> alertConsumer) {
         this(instrumentAlias, pips, fixedThreshold(largeOrderThreshold), 0,
                 decreaseDecisionDelayMs, minLargeOrderLifetimeMs, alertConsumer,
-                WALL_BREAK_ALERTS_DISABLED, UNKNOWN_DAY_LEVEL, UNKNOWN_DAY_LEVEL);
+                UNKNOWN_DAY_LEVEL, UNKNOWN_DAY_LEVEL);
     }
 
-    OrderWallChangeTracker(String instrumentAlias, double pips, int largeOrderThreshold,
-                           double remainingRatio, long decreaseDecisionDelayMs,
-                           long minLargeOrderLifetimeMs,
-                           Consumer<OrderWallChangeEvent> alertConsumer,
-                           Predicate<Boolean> wallBreakAlertEnabled) {
-        this(instrumentAlias, pips, fixedThreshold(largeOrderThreshold), 0,
-                decreaseDecisionDelayMs, minLargeOrderLifetimeMs, alertConsumer,
-                wallBreakAlertEnabled, UNKNOWN_DAY_LEVEL, UNKNOWN_DAY_LEVEL);
-    }
 
     OrderWallChangeTracker(String instrumentAlias, double pips, int largeOrderThreshold,
                            double largeOrderPercentile, double remainingRatio,
@@ -159,30 +134,28 @@ public class OrderWallChangeTracker {
         this(instrumentAlias, pips, fixedThreshold(largeOrderThreshold),
                 rankForLegacyPercentile(largeOrderPercentile),
                 decreaseDecisionDelayMs, minLargeOrderLifetimeMs, alertConsumer,
-                WALL_BREAK_ALERTS_DISABLED, UNKNOWN_DAY_LEVEL, UNKNOWN_DAY_LEVEL);
+                UNKNOWN_DAY_LEVEL, UNKNOWN_DAY_LEVEL);
     }
 
     OrderWallChangeTracker(String instrumentAlias, double pips,
                            IntSupplier largeOrderThresholdSupplier,
                            double largeOrderPercentile, double remainingRatio,
                            long decreaseDecisionDelayMs, long minLargeOrderLifetimeMs,
-                           Consumer<OrderWallChangeEvent> alertConsumer,
-                           Predicate<Boolean> wallBreakAlertEnabled) {
+                           Consumer<OrderWallChangeEvent> alertConsumer) {
         this(instrumentAlias, pips, largeOrderThresholdSupplier,
                 rankForLegacyPercentile(largeOrderPercentile),
                 decreaseDecisionDelayMs, minLargeOrderLifetimeMs, alertConsumer,
-                wallBreakAlertEnabled, UNKNOWN_DAY_LEVEL, UNKNOWN_DAY_LEVEL);
+                UNKNOWN_DAY_LEVEL, UNKNOWN_DAY_LEVEL);
     }
 
     OrderWallChangeTracker(String instrumentAlias, double pips,
                            IntSupplier largeOrderThresholdSupplier,
                            int largestOrderRank, long changeSurvivalMs,
                            Consumer<OrderWallChangeEvent> alertConsumer,
-                           Predicate<Boolean> wallBreakAlertEnabled,
                            DoubleSupplier dayHighSupplier,
                            DoubleSupplier dayLowSupplier) {
         this(instrumentAlias, pips, largeOrderThresholdSupplier, largestOrderRank,
-                changeSurvivalMs, changeSurvivalMs, alertConsumer, wallBreakAlertEnabled,
+                changeSurvivalMs, changeSurvivalMs, alertConsumer,
                 dayHighSupplier, dayLowSupplier);
     }
 
@@ -192,7 +165,6 @@ public class OrderWallChangeTracker {
                                    long decreaseDecisionDelayMs,
                                    long minLargeOrderLifetimeMs,
                                    Consumer<OrderWallChangeEvent> alertConsumer,
-                                   Predicate<Boolean> wallBreakAlertEnabled,
                                    DoubleSupplier dayHighSupplier,
                                    DoubleSupplier dayLowSupplier) {
         this.instrumentAlias = instrumentAlias;
@@ -204,9 +176,6 @@ public class OrderWallChangeTracker {
         this.changeSurvivalMs = Math.max(0,
                 Math.max(decreaseDecisionDelayMs, minLargeOrderLifetimeMs));
         this.alertConsumer = alertConsumer;
-        this.wallBreakAlertEnabled = wallBreakAlertEnabled == null
-                ? WALL_BREAK_ALERTS_DISABLED
-                : wallBreakAlertEnabled;
         this.dayHighSupplier = dayHighSupplier == null ? UNKNOWN_DAY_LEVEL : dayHighSupplier;
         this.dayLowSupplier = dayLowSupplier == null ? UNKNOWN_DAY_LEVEL : dayLowSupplier;
         this.scheduler = Executors.newSingleThreadScheduledExecutor(r -> {
@@ -227,13 +196,12 @@ public class OrderWallChangeTracker {
                                   int largestOrderRank, double remainingRatio,
                                   long decreaseDecisionDelayMs,
                                   Consumer<OrderWallChangeEvent> alertConsumer,
-                                  Predicate<Boolean> wallBreakAlertEnabled,
                                   DoubleSupplier dayHighSupplier,
                                   DoubleSupplier dayLowSupplier,
                                   DoubleSupplier stockPriceSupplier) {
         this(instrumentAlias, pips, largeOrderThresholdSupplier, largestOrderRank,
                 remainingRatio, decreaseDecisionDelayMs, alertConsumer,
-                wallBreakAlertEnabled, dayHighSupplier, dayLowSupplier);
+                dayHighSupplier, dayLowSupplier);
         cancellationStockPriceSupplier = Objects.requireNonNull(stockPriceSupplier);
     }
 
@@ -448,8 +416,7 @@ public class OrderWallChangeTracker {
         boolean withinDayRange = isWithinDayRange(change.key.bid, realPrice, dayHigh, dayLow);
 
         OrderWallChangeEvent.Type type = typeFor(
-                change.key, change.pending.previousSize, change.currentSize,
-                threshold, change.tradeConsumption);
+                change.pending.previousSize, change.currentSize, threshold);
         OrderWallChangeEvent event = new OrderWallChangeEvent(
                 instrumentAlias,
                 change.key.bid,
@@ -524,17 +491,11 @@ public class OrderWallChangeTracker {
                 : Double.isFinite(dayHigh) && realPrice < dayHigh;
     }
 
-    private OrderWallChangeEvent.Type typeFor(LevelKey key, int previousSize, int currentSize,
-                                               int threshold, boolean tradeConsumption) {
+    private OrderWallChangeEvent.Type typeFor(int previousSize, int currentSize, int threshold) {
         if (currentSize > previousSize) {
             return previousSize < threshold && currentSize >= threshold
                     ? OrderWallChangeEvent.Type.ADDED
                     : OrderWallChangeEvent.Type.INCREASED;
-        }
-        if (tradeConsumption && currentSize < threshold && isWallBreakAlertEnabled(key)) {
-            return key.bid
-                    ? OrderWallChangeEvent.Type.BID_BREAKDOWN
-                    : OrderWallChangeEvent.Type.OFFER_BREAKOUT;
         }
         return currentSize >= threshold
                 ? OrderWallChangeEvent.Type.REPLACED_SMALLER
@@ -639,14 +600,6 @@ public class OrderWallChangeTracker {
             } else {
                 break;
             }
-        }
-    }
-
-    private boolean isWallBreakAlertEnabled(LevelKey key) {
-        try {
-            return wallBreakAlertEnabled.test(key.bid);
-        } catch (RuntimeException ignored) {
-            return false;
         }
     }
 

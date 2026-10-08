@@ -4,11 +4,13 @@ bmtrader is a standalone Bookmap addon for Schwab equity trading. It reads Massi
 market data and Firestore configuration/state directly, refreshes local Schwab
 credentials, and executes trades without ViteApp or ProxyServer running.
 
-SignalComposer adds optional advisory LONG/SHORT markers and separate waiting context from
-Bookmap observations. It is enabled by default and independent of execution, legacy scores,
-tradebook eligibility, and Cairo export. See the [operator guide](docs/signal-composer.md)
-and [configuration template](config/signal-composer.template.json). Existing
-`observerOnly` replay mode exposes these settings without credentials or native trading.
+SignalComposer owns the Bookmap pattern pipeline and produces advisory LONG/SHORT markers
+and developing confirmation context. All detected patterns pass through it; the older
+wall-break checkbox and scored pattern automation have been removed. Cairo consumes
+aggregate pattern/composition snapshots from this pipeline. See the
+[operator guide](docs/signal-composer.md), [configuration template](config/signal-composer.template.json),
+and [Cairo bridge guide](docs/cairo-evidence.md). Existing `observerOnly` replay mode
+exposes these settings without credentials or native trading.
 
 ## Setup
 
@@ -145,7 +147,7 @@ and the private mapping remain under `build/intermediates` and
 
 ## Documentation
 
-- [Cairo setup evidence flag, capture and replay testing](docs/cairo-evidence.md)
+- [Cairo aggregate patterns, capture and replay testing](docs/cairo-evidence.md)
 - [Standalone setup, data sources and operations](docs/direct-broker-execution.md)
 - [Detailed design and source audit](docs/standalone-native-trading-plan.md)
 - [Progress, verification and resume checkpoint](docs/standalone-native-trading-progress.md)

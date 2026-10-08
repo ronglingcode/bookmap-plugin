@@ -5,8 +5,6 @@ import java.math.RoundingMode;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.Map;
-import java.util.ArrayList;
-import java.util.List;
 import java.util.function.Consumer;
 import com.bookmap.plugin.rong.signal.SignalComposerConfig;
 
@@ -39,22 +37,12 @@ public final class WallInteractionDetector {
     private final SignalComposerConfig config;
     private final EventTimeWallTracker walls;
     private final Consumer<PatternEvent> output;
-    private final EventTimeTradeAttribution trades;
-    private static final class Breakout {
-        final EventTimeWallTracker.Clear clear;
-        final PatternEvent.Evidence evidence;
-        final long epoch;
-        Breakout(EventTimeWallTracker.Clear clear, PatternEvent.Evidence evidence, long epoch) {
-            this.clear = clear; this.evidence = evidence; this.epoch = epoch;
-        }
-    }
-    private final List<Breakout> breakouts = new ArrayList<>();
     private final Map<String, Interaction> interactions = new LinkedHashMap<>();
     private int lastTrade, bestBid, bestAsk;
     public WallInteractionDetector(boolean bid, String alias, double pips, SignalComposerConfig config,
-            EventTimeWallTracker walls, EventTimeTradeAttribution trades, Consumer<PatternEvent> output) {
+            EventTimeWallTracker walls, Consumer<PatternEvent> output) {
         this.bid = bid; this.alias = alias; this.pips = pips; this.config = config;
-        this.walls = walls; this.output = output; this.trades = trades;
+        this.walls = walls; this.output = output;
     }
     private boolean quoteBroken(int price) {
         return bid ? bestAsk > 0 && bestAsk <= price : bestBid > 0 && bestBid >= price;
@@ -101,16 +89,6 @@ public final class WallInteractionDetector {
         lastTrade = price; onTime(nowNs, epoch);
     }
     public void onTime(long nowNs, long epoch) {
-        Iterator<Breakout> pending = breakouts.iterator();
-        while (pending.hasNext()) {
-            Breakout item = pending.next();
-            long printNs = trades.firstBreakout(item.clear, true, config.detectors.breakoutDistanceTicks);
-            if (printNs > 0) {
-                output.accept(PatternEvent.builder(alias, item.epoch, PatternEventType.OFFER_BREAKOUT, item.clear.phaseId)
-                        .size(item.clear.removedSize, PatternEvent.SizeBasis.DISPLAYED_REMOVED).price(item.clear.priceTick, pips)
-                        .times(printNs, nowNs).evidence(item.evidence).build()); pending.remove();
-            } else if (nowNs - item.clear.occurrenceNs > config.detectors.breakoutWindowMs * 1_000_000L) pending.remove();
-        }
         refresh();
         for (Interaction i : interactions.values()) {
             EventTimeWallTracker.Wall wall = walls.active(bid, i.price);
@@ -147,15 +125,8 @@ public final class WallInteractionDetector {
             i.completed = true; i.composite = composite;
         }
     }
-    public void onClear(EventTimeWallTracker.Clear clear, PatternEvent.Evidence evidence, long epoch) {
-        if (bid || clear.bid || clear.removedSize <= 0 || evidence.coverage != PatternEvent.Coverage.USABLE
-                || evidence.attribution != PatternEvent.Attribution.PROBABLE_CONSUMPTION) return;
-        breakouts.add(new Breakout(clear, evidence, epoch));
-        while (breakouts.size() > config.maxWallPhases) breakouts.remove(0);
-        onTime(clear.observedAtNs, epoch);
-    }
     public void onBbo(int bidTick, int askTick) {
         bestBid = bidTick; bestAsk = askTick; refresh();
     }
-    public void reset() { interactions.clear(); breakouts.clear(); lastTrade = bestBid = bestAsk = 0; }
+    public void reset() { interactions.clear(); lastTrade = bestBid = bestAsk = 0; }
 }

@@ -13,8 +13,6 @@ public class OrderWallChangeEvent {
         INCREASED,
         REDUCED,
         REPLACED_SMALLER,
-        OFFER_BREAKOUT,
-        BID_BREAKDOWN,
         OFFER_MOVED_UP,
         OFFER_MOVED_DOWN,
         BID_MOVED_UP,
@@ -260,10 +258,6 @@ public class OrderWallChangeEvent {
                 return "INCREASED";
             case REPLACED_SMALLER:
                 return "CHANGED";
-            case OFFER_BREAKOUT:
-                return "BREAKOUT";
-            case BID_BREAKDOWN:
-                return "BREAKDOWN";
             case OFFER_MOVED_UP:
             case BID_MOVED_UP:
                 return "MOVED UP";
@@ -282,10 +276,6 @@ public class OrderWallChangeEvent {
                     + PRICE_FORMAT.format(previousRealPrice) + " -> " + getPriceText()
                     + " " + formatSize(movedSize);
         }
-        if (isWallBreak()) {
-            return getSideText() + " " + getPriceText() + " " + getTypeText()
-                    + " filled " + formatSize(previousSize);
-        }
         String label = isMaterialChange()
                 ? getLabelType().getText()
                 : getSideText() + " " + getTypeText();
@@ -295,15 +285,12 @@ public class OrderWallChangeEvent {
 
     public String getLogMessage() {
         String message = instrumentAlias + " " + getShortMessage();
-        if (tradedSize > 0 && type != Type.ADDED && !isWallBreak()) {
+        if (tradedSize > 0 && type != Type.ADDED) {
             message += " (traded " + formatSize(tradedSize) + ")";
         }
         return message;
     }
 
-    public boolean isWallBreak() {
-        return type == Type.OFFER_BREAKOUT || type == Type.BID_BREAKDOWN;
-    }
 
     public static String formatSize(int size) {
         if (size == 0) {

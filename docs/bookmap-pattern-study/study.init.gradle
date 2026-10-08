@@ -1,0 +1,7 @@
+allprojects {
+    tasks.register('patternStudyClasspath') {
+        doLast {
+            file('build/private/pattern-study/classpath.txt').text = sourceSets.test.runtimeClasspath.asPath
+        }
+    }
+}

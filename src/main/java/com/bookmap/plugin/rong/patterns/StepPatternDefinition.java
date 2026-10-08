@@ -2,12 +2,10 @@ package com.bookmap.plugin.rong.patterns;
 
 import java.util.ArrayList;
 import java.util.Comparator;
-import java.util.EnumSet;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 
 final class StepPatternDefinition extends AbstractDirectionalPatternDefinition {
 
@@ -17,34 +15,6 @@ final class StepPatternDefinition extends AbstractDirectionalPatternDefinition {
 
     StepPatternDefinition(PatternType patternType, boolean bidWall) {
         super(patternType, bidWall);
-    }
-
-    @Override
-    public Set<PatternDetailKey> requiredDetails() {
-        return EnumSet.of(
-                PatternDetailKey.WALL_QUALITY,
-                PatternDetailKey.NEARBY_OPPOSING_LIQUIDITY,
-                PatternDetailKey.CONFIGURED_LEVEL_ALIGNMENT,
-                PatternDetailKey.COMPARABLE_REFERENCE_WALL,
-                PatternDetailKey.SESSION_EXTREMES);
-    }
-
-    @Override
-    public void score(PatternCandidate candidate, PatternScoringContext context,
-                      List<ScoreContribution> contributions) {
-        int nearTicks = context.nearDistanceTicks(candidate.referenceWall.priceTick);
-        if (Math.abs(candidate.triggerPriceTick - context.currentPriceTick()) <= nearTicks) {
-            contributions.add(new ScoreContribution(
-                    "step.near_quote", 10, "new wall is near the current quote"));
-        }
-        if (candidate.replacementSizeRatio >= 1.0) {
-            contributions.add(new ScoreContribution(
-                    "step.reference_size", 10, "new wall is at least as large as reference"));
-        }
-        if (candidate.defendedMs >= 1_000) {
-            contributions.add(new ScoreContribution(
-                    "step.defended_1s", 5, "price stayed on defended side for 1s"));
-        }
     }
 
     @Override

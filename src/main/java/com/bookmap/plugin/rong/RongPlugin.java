@@ -23,10 +23,6 @@ import com.bookmap.plugin.rong.orderwall.OrderWallChangeTracker;
 import com.bookmap.plugin.rong.orderwall.OrderWallLabelPainter;
 import com.bookmap.plugin.rong.orderwall.OrderWallLabelStore;
 import com.bookmap.plugin.rong.orderwall.OrderWallLabelTracker;
-import com.bookmap.plugin.rong.patterns.BookmapPatternEngine;
-import com.bookmap.plugin.rong.patterns.BookmapPatternSignal;
-import com.bookmap.plugin.rong.patterns.PatternSignalPainter;
-import com.bookmap.plugin.rong.patterns.PatternSignalStore;
 import com.bookmap.plugin.rong.pricelines.ChartHoverHotkeyHandler;
 import com.bookmap.plugin.rong.pricelines.PriceLinePainter;
 import com.bookmap.plugin.rong.pricelines.PriceLineStore;
@@ -104,8 +100,6 @@ public class RongPlugin implements CustomModuleAdapter,
     private static FilledExecutionStore filledExecutionStore;
     private static FilledExecutionPainter filledExecutionPainter;
     private static FilledExecutionManager filledExecutionManager;
-    private static PatternSignalStore patternSignalStore;
-    private static PatternSignalPainter patternSignalPainter;
     private static SignalComposerConfig signalComposerConfig;
     private static TradingSignalStore tradingSignalStore;
     private static TradingSignalPainter tradingSignalPainter;
@@ -118,7 +112,6 @@ public class RongPlugin implements CustomModuleAdapter,
     private OrderBookState orderBook;
     private OrderWallLabelTracker wallLabelTracker;
     private OrderWallChangeTracker wallChangeTracker;
-    private BookmapPatternEngine patternEngine;
     private SignalCompositionPipeline signalComposition;
     private SignalComposerConfig compositionRules;
     private SignalCompositionLog compositionLog;
@@ -126,10 +119,7 @@ public class RongPlugin implements CustomModuleAdapter,
     private volatile boolean compositionSnapshotComplete;
     private volatile boolean compositionSeedFromSharedBook = true;
     private final Object compositionLock = new Object();
-    private volatile boolean patternAutomationEnabled;
-    private volatile boolean patternSnapshotComplete;
     private final com.bookmap.plugin.rong.patterns.CairoObservationConfig observationConfig = com.bookmap.plugin.rong.patterns.CairoObservationConfig.load();
-    private com.bookmap.plugin.rong.patterns.CairoEvidenceRecorder evidenceRecorder;
     private boolean wallLabelsDirty;
     private long lastWallLabelRefreshMs;
     private long lastTimestampNs;
@@ -183,8 +173,6 @@ public class RongPlugin implements CustomModuleAdapter,
                 wallChangeStore = new OrderWallChangeStore();
                 wallLabelPainter = new OrderWallLabelPainter(wallLabelStore, indicatorConfig, wallChangeStore);
                 wallChangePainter = new OrderWallChangePainter(wallChangeStore, indicatorConfig);
-                patternSignalStore = new PatternSignalStore();
-                patternSignalPainter = new PatternSignalPainter(patternSignalStore, indicatorConfig);
                 keyLevelManager = new KeyLevelManager(priceLineStore);
                 sharedServer.registerKeyLevelConfigListener(keyLevelManager);
                 keyZoneManager = new KeyZoneManager(priceZoneStore);
@@ -223,25 +211,9 @@ public class RongPlugin implements CustomModuleAdapter,
                 WALL_CHANGE_REMAINING_RATIO,
                 WALL_CHANGE_DECISION_DELAY_MS,
                 this::handleWallChangeEvent,
-                this::isWallBreakAlertEnabled,
                 this::getWallChangeDayHigh,
                 this::getWallChangeDayLow,
                 () -> wallChangeStockPrice);
-        this.patternEngine = new BookmapPatternEngine(
-                cleanAlias,
-                info.pips,
-                wallThresholdConfig::getThresholdFloor,
-                ORDERBOOK_PERCENTILE,
-                orderBook,
-                priceLineStore,
-                priceZoneStore,
-                patternType -> observationConfig.eligible(cleanAlias, patternType) || (indicatorConfig != null
-                        && indicatorConfig.isEnabled(IndicatorConfig.BOOKMAP_PATTERN_SIGNALS)
-                        && sharedServer != null
-                        && sharedServer.hasEnabledPatternTradebook(cleanAlias, patternType)),
-                this::handlePatternSignal);
-        this.patternAutomationEnabled = indicatorConfig.isEnabled(
-                IndicatorConfig.BOOKMAP_PATTERN_SIGNALS);
         initializeSignalComposition(info.pips);
         synchronized (RongPlugin.class) {
             if (tradingSignalPainter == null) tradingSignalPainter = new TradingSignalPainter(tradingSignalStore, indicatorConfig);
@@ -249,19 +221,16 @@ public class RongPlugin implements CustomModuleAdapter,
         tradingSignalPainter.registerInstrument(cleanAlias);
         indicatorConfig.addChangeListener(this);
         sharedServer.registerSymbol(cleanAlias, orderBook, info.pips);
-        if (observationConfig.recordEvidence(cleanAlias)) {
-            evidenceRecorder = new com.bookmap.plugin.rong.patterns.CairoEvidenceRecorder(cleanAlias, info.pips,
-                    observationConfig.sourceMode, observationConfig.captureEvidence, this::getEffectiveWallThreshold);
-            sharedServer.registerEvidence(cleanAlias, evidenceRecorder);
+        if (observationConfig.exportsPatterns(cleanAlias) && signalComposition != null) {
+            sharedServer.registerPatterns(cleanAlias, new com.bookmap.plugin.rong.signal.CairoPatternFeed(
+                    reconnect -> cairoPatternSnapshot(reconnect), observationConfig.captureEvidence));
         }
-        if (observationConfig.enabled) sharedServer.observationReady(cleanAlias, false);
         sharedServer.registerVwapUpdateListener(cleanAlias, vwapUpdateListener);
         if (!observationConfig.observerOnly) chartHoverHotkeyHandler.registerSymbol(cleanAlias, info.pips);
         priceZonePainter.registerInstrument(cleanAlias);
         priceLinePainter.registerInstrument(cleanAlias);
         wallLabelPainter.registerInstrument(cleanAlias);
         wallChangePainter.registerInstrument(cleanAlias);
-        patternSignalPainter.registerInstrument(cleanAlias);
         filledExecutionPainter.registerInstrument(cleanAlias);
 
         // Register ScreenSpacePainter to receive chart coordinate mappings
@@ -296,12 +265,6 @@ public class RongPlugin implements CustomModuleAdapter,
         api.sendUserMessage(Layer1ApiUserMessageModifyScreenSpacePainter.builder(
                 RongPlugin.class, OrderWallChangePainter.PAINTER_NAME_PREFIX + cleanAlias)
                 .setScreenSpacePainterFactory(wallChangePainter)
-                .setAliasFilter(exactAliasFilter(rawAlias))
-                .setIsAdd(true)
-                .build());
-        api.sendUserMessage(Layer1ApiUserMessageModifyScreenSpacePainter.builder(
-                RongPlugin.class, PatternSignalPainter.PAINTER_NAME_PREFIX + cleanAlias)
-                .setScreenSpacePainterFactory(patternSignalPainter)
                 .setAliasFilter(exactAliasFilter(rawAlias))
                 .setIsAdd(true)
                 .build());
@@ -429,12 +392,6 @@ public class RongPlugin implements CustomModuleAdapter,
             wallChangeTracker.shutdown();
             wallChangeTracker = null;
         }
-        if (patternEngine != null) {
-            patternEngine.shutdown();
-            patternEngine = null;
-        }
-        patternAutomationEnabled = false;
-        patternSnapshotComplete = false;
         if (tradeButtonWindow != null) {
             tradeButtonWindow.dispose();
             tradeButtonWindow = null;
@@ -459,9 +416,6 @@ public class RongPlugin implements CustomModuleAdapter,
         }
         if (wallChangePainter != null) {
             wallChangePainter.unregisterInstrument(alias);
-        }
-        if (patternSignalPainter != null) {
-            patternSignalPainter.unregisterInstrument(alias);
         }
         if (tradingSignalPainter != null) {
             tradingSignalPainter.unregisterInstrument(alias);
@@ -496,11 +450,6 @@ public class RongPlugin implements CustomModuleAdapter,
         api.sendUserMessage(Layer1ApiUserMessageModifyScreenSpacePainter.builder(
                 RongPlugin.class, OrderWallChangePainter.PAINTER_NAME_PREFIX + alias)
                 .setScreenSpacePainterFactory(wallChangePainter)
-                .setIsAdd(false)
-                .build());
-        api.sendUserMessage(Layer1ApiUserMessageModifyScreenSpacePainter.builder(
-                RongPlugin.class, PatternSignalPainter.PAINTER_NAME_PREFIX + alias)
-                .setScreenSpacePainterFactory(patternSignalPainter)
                 .setIsAdd(false)
                 .build());
         api.sendUserMessage(Layer1ApiUserMessageModifyScreenSpacePainter.builder(
@@ -539,15 +488,11 @@ public class RongPlugin implements CustomModuleAdapter,
         if (wallChangeStore != null) {
             wallChangeStore.clearAll(alias);
         }
-        if (patternSignalStore != null) {
-            patternSignalStore.clearAll(alias);
-        }
         if (filledExecutionStore != null) {
             filledExecutionStore.clearAll(alias);
         }
         if (sharedServer != null) {
             sharedServer.unregisterSymbol(alias);
-            evidenceRecorder = null;
         }
         synchronized (RongPlugin.class) {
             nativeApis.remove(alias);
@@ -591,9 +536,6 @@ public class RongPlugin implements CustomModuleAdapter,
                 if (wallChangePainter != null) {
                     wallChangePainter.shutdown();
                 }
-                if (patternSignalPainter != null) {
-                    patternSignalPainter.shutdown();
-                }
                 if (filledExecutionPainter != null) {
                     filledExecutionPainter.shutdown();
                 }
@@ -612,8 +554,6 @@ public class RongPlugin implements CustomModuleAdapter,
                 wallLabelPainter = null;
                 wallChangeStore = null;
                 wallChangePainter = null;
-                patternSignalStore = null;
-                patternSignalPainter = null;
                 filledExecutionStore = null;
                 filledExecutionPainter = null;
                 indicatorConfig = null;
@@ -656,10 +596,6 @@ public class RongPlugin implements CustomModuleAdapter,
             wallChangeTracker.onDepth(isBid, price, size, eventTimeNs);
         }
         orderBook.update(isBid, price, size);
-        if (evidenceRecorder != null) evidenceRecorder.depth(isBid, price, size, eventTimeNs, lastTimestampNs <= 0);
-        if (shouldRunPatternAutomation()) {
-            patternEngine.onDepth(isBid, price, size, eventTimeNs);
-        }
         synchronized (compositionLock) {
             if (shouldRunSignalComposition()) signalComposition.onDepth(isBid, price, size, eventTimeNs, provenance);
         }
@@ -677,7 +613,6 @@ public class RongPlugin implements CustomModuleAdapter,
         double realPrice = BookmapPriceNormalizer.toWirePrice(price, instrumentInfo.pips);
         wallChangeStockPrice = realPrice;
         int priceTick = (int) Math.round(price);
-        if (evidenceRecorder != null) evidenceRecorder.trade(priceTick, size, tradeInfo == null ? null : tradeInfo.isBidAggressor, eventTimeNs, lastTimestampNs <= 0);
         if (sharedServer != null) {
             sharedServer.updateRegularSessionHighLow(alias, realPrice, eventTimeNs);
         }
@@ -688,9 +623,6 @@ public class RongPlugin implements CustomModuleAdapter,
         }
         flushPendingVwapPoints();
 
-        if (shouldRunPatternAutomation()) {
-            patternEngine.onTrade(price, size, tradeInfo, eventTimeNs);
-        }
         synchronized (compositionLock) {
             if (shouldRunSignalComposition()) signalComposition.onTrade(priceTick, size,
                     tradeInfo == null ? null : tradeInfo.isBidAggressor, eventTimeNs, provenance);
@@ -712,9 +644,6 @@ public class RongPlugin implements CustomModuleAdapter,
         }
         this.lastTimestampNs = timestampNs;
         flushPendingVwapPoints();
-        if (shouldRunPatternAutomation()) {
-            patternEngine.onTimestamp(timestampNs);
-        }
         synchronized (compositionLock) {
             if (shouldRunSignalComposition()) signalComposition.onTimestamp(timestampNs, compositionProvenance());
         }
@@ -729,10 +658,6 @@ public class RongPlugin implements CustomModuleAdapter,
         if (!initialized) return;
         long eventTimeNs = getEventTimeNs();
         PatternEvent.TimestampProvenance provenance = compositionProvenance();
-        if (evidenceRecorder != null) evidenceRecorder.bbo(bidPrice, bidSize, askPrice, askSize, eventTimeNs, lastTimestampNs <= 0);
-        if (shouldRunPatternAutomation()) {
-            patternEngine.onBbo(bidPrice, bidSize, askPrice, askSize, eventTimeNs);
-        }
         synchronized (compositionLock) {
             if (shouldRunSignalComposition()) signalComposition.onBbo(bidPrice, askPrice, eventTimeNs, provenance);
         }
@@ -741,15 +666,9 @@ public class RongPlugin implements CustomModuleAdapter,
     @Override
     public void onSnapshotEnd() {
         if (!initialized) return;
-        patternSnapshotComplete = true;
         compositionSnapshotComplete = true;
-        if (evidenceRecorder != null) evidenceRecorder.readiness(true, getEventTimeNs());
-        if (sharedServer != null && observationConfig.enabled) sharedServer.observationReady(alias, true);
         if (wallChangeTracker != null) {
             wallChangeTracker.markReady();
-        }
-        if (shouldRunPatternAutomation()) {
-            patternEngine.markReady();
         }
         markSignalCompositionReady();
     }
@@ -757,16 +676,10 @@ public class RongPlugin implements CustomModuleAdapter,
     @Override
     public void onRealtimeStart() {
         if (!initialized) return;
-        patternSnapshotComplete = true;
         compositionSnapshotComplete = true;
-        if (evidenceRecorder != null) evidenceRecorder.readiness(true, getEventTimeNs());
         // This callback alone does not prove a live provider (replay can catch up).
-        if (sharedServer != null && observationConfig.enabled) sharedServer.observationReady(alias, true);
         if (wallChangeTracker != null) {
             wallChangeTracker.markReady();
-        }
-        if (shouldRunPatternAutomation()) {
-            patternEngine.markReady();
         }
         markSignalCompositionReady();
     }
@@ -815,18 +728,7 @@ public class RongPlugin implements CustomModuleAdapter,
             }
             return;
         }
-        if (!IndicatorConfig.BOOKMAP_PATTERN_SIGNALS.equals(indicatorKey)) return;
-        patternAutomationEnabled = enabled;
-        BookmapPatternEngine engine = patternEngine;
-        if (engine != null) {
-            engine.resetForFeatureToggle();
-            if (enabled && patternSnapshotComplete) {
-                engine.markReady();
-            }
-        }
-        if (!enabled && patternSignalStore != null && alias != null) {
-            patternSignalStore.clearAll(alias);
-        }
+
     }
 
     private void handleWallChangeEvent(OrderWallChangeEvent event) {
@@ -850,16 +752,6 @@ public class RongPlugin implements CustomModuleAdapter,
         playWallChangeSound(event);
     }
 
-    private boolean isWallBreakAlertEnabled(boolean bidWall) {
-        if (indicatorConfig == null
-                || !indicatorConfig.areOrderChangeAlertsEnabled()
-                || !indicatorConfig.isEnabled(IndicatorConfig.ORDER_WALL_BREAKOUT_SIGNALS)) {
-            return false;
-        }
-        SignalWebSocketServer server = sharedServer;
-        return server != null && server.hasEnabledWallBreakTradeButton(alias, bidWall);
-    }
-
     private double getWallChangeDayHigh() {
         SignalWebSocketServer server = sharedServer;
         RegularSessionHighLowTracker.Snapshot snapshot = server == null ? null : server.getRegularSessionHighLow(alias);
@@ -872,9 +764,34 @@ public class RongPlugin implements CustomModuleAdapter,
         return snapshot == null ? Double.NaN : snapshot.getLowOfDay();
     }
 
-    private boolean shouldRunPatternAutomation() {
-        return (patternAutomationEnabled || observationConfig.enabled) && patternEngine != null;
+    private com.google.gson.JsonObject cairoPatternSnapshot(boolean reconnect) {
+        synchronized (compositionLock) {
+            if (signalComposition == null) return null;
+            com.google.gson.JsonObject liquidity = new com.google.gson.JsonObject();
+            synchronized (orderBook) {
+                int threshold = getEffectiveWallThreshold();
+                liquidity.addProperty("threshold", threshold);
+                liquidity.addProperty("bestBid", BookmapPriceNormalizer.toWirePrice(signalComposition.bestBidTick(), instrumentInfo.pips));
+                liquidity.addProperty("bestAsk", BookmapPriceNormalizer.toWirePrice(signalComposition.bestAskTick(), instrumentInfo.pips));
+                liquidity.addProperty("asOf", Long.toString(getEventTimeNs()));
+                for (boolean bid : new boolean[]{true, false}) {
+                    com.google.gson.JsonArray levels = new com.google.gson.JsonArray();
+                    orderBook.getLevelsSnapshot(bid).entrySet().stream().filter(e -> e.getValue() >= threshold)
+                            .sorted(bid ? java.util.Map.Entry.<Integer,Integer>comparingByKey().reversed() : java.util.Map.Entry.comparingByKey())
+                            .limit(8).forEach(e -> {
+                                com.google.gson.JsonObject level = new com.google.gson.JsonObject();
+                                level.addProperty("price", BookmapPriceNormalizer.toWirePrice(e.getKey(), instrumentInfo.pips));
+                                level.addProperty("displayedSize", e.getValue()); levels.add(level);
+                            });
+                    liquidity.add(bid ? "bids" : "offers", levels);
+                }
+            }
+            com.google.gson.JsonObject value = signalComposition.aggregateSnapshot(liquidity, reconnect);
+            value.addProperty("mode", observationConfig.sourceMode);
+            return value;
+        }
     }
+
     private boolean shouldRunSignalComposition() {
         return initialized && signalCompositionEnabled && signalComposition != null
                 && compositionRules != null && compositionRules.valid && compositionRules.eligible(alias);
@@ -951,12 +868,6 @@ public class RongPlugin implements CustomModuleAdapter,
                 : VWAP_HIDDEN_COLOR);
     }
 
-    private void handlePatternSignal(BookmapPatternSignal signal) {
-        PatternSignalStore store = patternSignalStore;
-        if (store != null) store.addOrUpdate(signal);
-        SignalWebSocketServer server = sharedServer;
-        if (server != null && observationConfig.eligible(alias, signal.getPatternType())) server.exportPattern(signal);
-    }
 
     private void playWallChangeSound(OrderWallChangeEvent event) {
         if (api == null || indicatorConfig == null

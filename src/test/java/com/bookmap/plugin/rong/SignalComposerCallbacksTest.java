@@ -42,7 +42,7 @@ class SignalComposerCallbacksTest {
             time(p, 3400); p.onDepth(true, 5105, 0); time(p, 3900);
             assertEquals(1, store().snapshot("TEST").signals.size());
             assertEquals(Direction.SHORT, store().snapshot("TEST").signals.get(0).direction);
-            assertFalse(field("patternAutomationEnabled").getBoolean(p)); assertNull(field("patternEngine").get(p));
+            assertThrows(NoSuchFieldException.class, () -> field("patternEngine"));
             assertNull(field("nativeTrading").get(null));
             assertEquals(0, ((OrderBookState)field("orderBook").get(p)).getSizeAt(true, 5105));
         });

@@ -2,10 +2,8 @@ package com.bookmap.plugin.rong.patterns;
 
 import java.util.ArrayList;
 import java.util.Comparator;
-import java.util.EnumSet;
 import java.util.Iterator;
 import java.util.List;
-import java.util.Set;
 
 final class ReappearPatternDefinition extends AbstractDirectionalPatternDefinition {
 
@@ -14,33 +12,6 @@ final class ReappearPatternDefinition extends AbstractDirectionalPatternDefiniti
 
     ReappearPatternDefinition(PatternType patternType, boolean bidWall) {
         super(patternType, bidWall);
-    }
-
-    @Override
-    public Set<PatternDetailKey> requiredDetails() {
-        return EnumSet.of(
-                PatternDetailKey.WALL_QUALITY,
-                PatternDetailKey.NEARBY_OPPOSING_LIQUIDITY,
-                PatternDetailKey.CONFIGURED_LEVEL_ALIGNMENT,
-                PatternDetailKey.COMPARABLE_REFERENCE_WALL);
-    }
-
-    @Override
-    public void score(PatternCandidate candidate, PatternScoringContext context,
-                      List<ScoreContribution> contributions) {
-        contributions.add(new ScoreContribution(
-                candidate.betterDefensivePrice ? "reappear.better_price" : "reappear.same_price",
-                candidate.betterDefensivePrice ? 10 : 5,
-                candidate.betterDefensivePrice
-                        ? "replacement is at a better defensive price"
-                        : "replacement is at the same price"));
-        if (candidate.replacementSizeRatio >= 1.0) {
-            contributions.add(new ScoreContribution(
-                    "reappear.size_100", 15, "replacement is 100%+ of original"));
-        } else if (candidate.replacementSizeRatio >= 0.75) {
-            contributions.add(new ScoreContribution(
-                    "reappear.size_75", 5, "replacement is 75%+ of original"));
-        }
     }
 
     @Override

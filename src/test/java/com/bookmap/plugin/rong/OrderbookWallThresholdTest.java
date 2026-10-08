@@ -63,41 +63,7 @@ class OrderbookWallThresholdTest {
         assertEquals(Arrays.asList(20_000, 12_000, 8_000), orderBook.getLargestLevelSizes(3));
     }
 
-    @Test
-    void wallBreakAlertAvailabilityFollowsBookmapTradeButtons() {
-        SignalWebSocketServer server = new SignalWebSocketServer(0, 90);
 
-        JsonObject config = new JsonObject();
-        config.addProperty("type", "trade_button_config");
-        config.addProperty("symbol", "WEN");
-        JsonArray tradebooks = new JsonArray();
-        tradebooks.add(tradebook("GapAndGoBookmapOfferWallBreakout", true, "0.25R"));
-        tradebooks.add(tradebook("GapAndCrapBookmapBidWallBreakdown", false, "0.25R"));
-        config.add("tradebooks", tradebooks);
-
-        localMessage(server, config.toString());
-
-        assertTrue(server.hasEnabledWallBreakTradeButton("WEN", false));
-        assertTrue(server.hasEnabledWallBreakTradeButton("WEN", true));
-    }
-
-    @Test
-    void wallBreakAlertAvailabilityRejectsWrongSideTradeButtons() {
-        SignalWebSocketServer server = new SignalWebSocketServer(0, 90);
-
-        JsonObject config = new JsonObject();
-        config.addProperty("type", "trade_button_config");
-        config.addProperty("symbol", "WEN");
-        JsonArray tradebooks = new JsonArray();
-        tradebooks.add(tradebook("GapAndGoBookmapOfferWallBreakout", false, "0.25R"));
-        tradebooks.add(tradebook("GapAndCrapBookmapBidWallBreakdown", true, "0.25R"));
-        config.add("tradebooks", tradebooks);
-
-        localMessage(server, config.toString());
-
-        assertFalse(server.hasEnabledWallBreakTradeButton("WEN", false));
-        assertFalse(server.hasEnabledWallBreakTradeButton("WEN", true));
-    }
 
     @Test
     void tradeButtonConfigRejectsMissingOrNonBooleanSide() {
@@ -116,28 +82,10 @@ class OrderbookWallThresholdTest {
 
         localMessage(server, config.toString());
 
-        assertFalse(server.hasEnabledWallBreakTradeButton("WEN", false));
-        assertFalse(server.hasEnabledWallBreakTradeButton("WEN", true));
+        assertEquals(null, server.getPrimaryWallReversalTradebook("WEN", true));
+        assertEquals(null, server.getPrimaryWallReversalTradebook("WEN", false));
     }
 
-    @Test
-    void patternEligibilityUsesActiveMatchingReversalTradebooks() {
-        SignalWebSocketServer server = new SignalWebSocketServer(0, 90);
-        JsonObject config = new JsonObject();
-        config.addProperty("type", "trade_button_config");
-        config.addProperty("symbol", "WEN");
-        JsonArray tradebooks = new JsonArray();
-        tradebooks.add(tradebook("GapAndGoBookmapOfferWallBreakout", true, "0.25R"));
-        tradebooks.add(tradebook("GapGiveAndGoBookmapReversal", true, "0.25R"));
-        tradebooks.add(tradebook("GapAndCrapOfferStepDownReappear", false, "0.25R"));
-        config.add("tradebooks", tradebooks);
-        localMessage(server, config.toString());
-
-        assertTrue(server.hasEnabledPatternTradebook("WEN", PatternType.BID_REAPPEAR));
-        assertTrue(server.hasEnabledPatternTradebook("WEN", PatternType.BID_STEP_UP));
-        assertTrue(server.hasEnabledPatternTradebook("WEN", PatternType.OFFER_REAPPEAR));
-        assertTrue(server.hasEnabledPatternTradebook("WEN", PatternType.OFFER_STEP_DOWN));
-    }
 
     @Test
     void primaryWallReversalFollowsTradeButtonOrderAndSide() {

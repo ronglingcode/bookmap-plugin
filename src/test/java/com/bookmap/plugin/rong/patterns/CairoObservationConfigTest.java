@@ -3,10 +3,12 @@ import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.*;
 import com.google.gson.JsonParser;
 class CairoObservationConfigTest {
-    @Test void separateReadOnlyEligibility() {
-        CairoObservationConfig config = new CairoObservationConfig(JsonParser.parseString("{\"enabled\":true,\"observerOnly\":true,\"symbols\":[\"AAPL\"],\"detectors\":[\"BID_STEP_UP\",\"BID_REAPPEAR\",\"OFFER_STEP_DOWN\"]}").getAsJsonObject());
-        assertTrue(config.observerOnly); assertTrue(config.eligible("AAPL:NASDAQ@BMD", PatternType.BID_STEP_UP)); assertTrue(config.eligible("AAPL", PatternType.BID_REAPPEAR));
-        assertFalse(config.eligible("MSFT", PatternType.BID_STEP_UP)); assertFalse(config.eligible("AAPL", PatternType.OFFER_STEP_DOWN));
-        assertFalse(new CairoObservationConfig(new com.google.gson.JsonObject()).enabled);
-    }
+ @Test void legacyPreferencesEnableAggregateExportForSelectedSymbols() {
+  CairoObservationConfig config = new CairoObservationConfig(JsonParser.parseString("{\"enabled\":true,\"observerOnly\":true,\"symbols\":[\"AAPL\"],\"detectors\":[\"BID_STEP_UP\"]}").getAsJsonObject());
+  assertTrue(config.observerOnly); assertTrue(config.exportsPatterns("AAPL:NASDAQ@BMD")); assertFalse(config.exportsPatterns("MSFT"));
+ }
+ @Test void evidencePreferenceMigratesToAggregatesWithoutRawExport() {
+  CairoObservationConfig config = new CairoObservationConfig(JsonParser.parseString("{\"evidenceEnabled\":true,\"evidenceSymbols\":[\"PCVX\"],\"sourceMode\":\"replay\"}").getAsJsonObject());
+  assertTrue(config.exportsPatterns("PCVX")); assertFalse(config.exportsPatterns("AAPL")); assertEquals("replay",config.sourceMode);
+ }
 }

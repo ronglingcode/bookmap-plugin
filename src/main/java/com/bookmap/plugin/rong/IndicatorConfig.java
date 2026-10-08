@@ -12,7 +12,6 @@ public class IndicatorConfig {
     public static final String CAM_PIVOTS = "cam_pivots";
     public static final String ORDER_WALL_SIZE_LABELS = "order_wall_size_labels";
     public static final String ORDER_WALL_CHANGE_ALERTS = "order_wall_change_alerts";
-    public static final String ORDER_WALL_BREAKOUT_SIGNALS = "order_wall_breakout_signals";
     public static final String ORDER_WALL_CHANGE_SOUND = "order_wall_change_sound";
     public static final String FIRE_KEYBOARD_EVENT = "fire_keyboard_event";
     /**
@@ -20,7 +19,6 @@ public class IndicatorConfig {
      * The stored key is retained for compatibility with the previous enable/disable setting.
      */
     public static final String FILLED_EXECUTION_MARKERS = "filled_execution_markers";
-    public static final String BOOKMAP_PATTERN_SIGNALS = "bookmap_pattern_signals";
     public static final String SIGNAL_COMPOSER = "signal_composer";
     public static final String VWAP = "vwap";
     public static final String TRADING_NOTIFICATION_SOUND = "trading_notification_sound";
@@ -40,11 +38,9 @@ public class IndicatorConfig {
         enabled.put(CAM_PIVOTS, false);
         enabled.put(ORDER_WALL_SIZE_LABELS, true);
         enabled.put(ORDER_WALL_CHANGE_ALERTS, true);
-        enabled.put(ORDER_WALL_BREAKOUT_SIGNALS, false);
         enabled.put(ORDER_WALL_CHANGE_SOUND, true);
         enabled.put(FIRE_KEYBOARD_EVENT, true);
         enabled.put(FILLED_EXECUTION_MARKERS, true);
-        enabled.put(BOOKMAP_PATTERN_SIGNALS, false);
         enabled.put(SIGNAL_COMPOSER, true);
         enabled.put(VWAP, true);
         enabled.put(TRADING_NOTIFICATION_SOUND, true);

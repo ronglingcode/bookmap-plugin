@@ -9,7 +9,7 @@ import java.util.function.Consumer;
 import com.bookmap.plugin.rong.signal.ResetReason;
 import com.bookmap.plugin.rong.signal.SignalComposerConfig;
 
-/** Serialized callback observer, independent from the legacy engine and execution runtime. */
+/** Canonical callback observer feeding SignalComposer; independent of execution. */
 public final class PatternObservationEngine implements PatternRuntimeContext {
     private final SignalComposerConfig config;
     private final ObservationClock clock = new ObservationClock();
@@ -18,6 +18,7 @@ public final class PatternObservationEngine implements PatternRuntimeContext {
     private final EventTimeRelocationTracker relocation;
     private final PatternEventNormalizer normalizer;
     private final BidFailureDetector bidFailures;
+    private final WallBreakDetector wallBreaks;
     private final WallInteractionDetector offers, bids;
     private final Consumer<PatternEvent> output;
     private final BiConsumer<ResetReason, Long> resets;
@@ -40,9 +41,10 @@ public final class PatternObservationEngine implements PatternRuntimeContext {
         Consumer<PatternEvent> usableOutput = event -> {
             if (pendingCoverageGap == null && event.size >= event.type.minimumTrackedSize()) output.accept(event);
         };
-        bidFailures = new BidFailureDetector(alias, pips, config, attribution, usableOutput);
-        offers = new WallInteractionDetector(false, alias, pips, config, walls, attribution, usableOutput);
-        bids = new WallInteractionDetector(true, alias, pips, config, walls, attribution, usableOutput);
+        wallBreaks = new WallBreakDetector(alias, pips, config, attribution, usableOutput);
+        bidFailures = new BidFailureDetector(alias, pips, usableOutput);
+        offers = new WallInteractionDetector(false, alias, pips, config, walls, usableOutput);
+        bids = new WallInteractionDetector(true, alias, pips, config, walls, usableOutput);
         definitions.add(new ReappearPatternDefinition(PatternType.BID_REAPPEAR, true));
         definitions.add(new ReappearPatternDefinition(PatternType.OFFER_REAPPEAR, false));
         definitions.add(new StepPatternDefinition(PatternType.BID_STEP_UP, true));
@@ -113,7 +115,7 @@ public final class PatternObservationEngine implements PatternRuntimeContext {
             diagnostics.accept("Measured wall clear " + clear.phaseId + "; removed=" + clear.removedSize
                     + "; attribution=" + evidence.attribution + "; coverage=" + evidence.coverage);
             bidFailures.onClear(clear, evidence, epoch());
-            offers.onClear(clear, evidence, epoch());
+            wallBreaks.onClear(clear, evidence, epoch());
             if (evidence.coverage != PatternEvent.Coverage.USABLE || evidence.attribution != PatternEvent.Attribution.PROBABLE_CONSUMPTION) continue;
             boundDefinitions();
             WallSnapshot wall = new WallSnapshot(clear.phaseId, clear.bid, clear.priceTick, safeInt(clear.previousSize),
@@ -136,7 +138,7 @@ public final class PatternObservationEngine implements PatternRuntimeContext {
     }
     private void dispatchTime() {
         if (!clock.usable()) return;
-        bidFailures.onTime(nowNs());
+        wallBreaks.onTime(nowNs());
         offers.onTime(nowNs(), epoch());
         bids.onTime(nowNs(), epoch());
         for (PatternDefinition definition : definitions) definition.onTime(this);
@@ -144,7 +146,7 @@ public final class PatternObservationEngine implements PatternRuntimeContext {
     }
     private static int safeInt(long value) { return (int)Math.min(Integer.MAX_VALUE, value); }
     private void clearState(long epoch) {
-        walls.reset(epoch); attribution.reset(); relocation.reset(); normalizer.reset(); bidFailures.reset(); offers.reset(); bids.reset();
+        walls.reset(epoch); attribution.reset(); relocation.reset(); normalizer.reset(); wallBreaks.reset(); offers.reset(); bids.reset();
         for (PatternDefinition definition : definitions) definition.reset();
         seeded = false; bid = ask = last = high = low = definitionObservations = 0;
         pendingCoverageGap = null;

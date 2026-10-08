@@ -12,7 +12,6 @@ class IndicatorConfigTest {
         IndicatorConfig config = new IndicatorConfig();
 
         assertTrue(config.areOrderChangeAlertsEnabled());
-        assertFalse(config.isEnabled(IndicatorConfig.ORDER_WALL_BREAKOUT_SIGNALS));
         assertTrue(config.isEnabled(IndicatorConfig.ORDER_WALL_CHANGE_SOUND));
         assertTrue(config.isOrderChangeSoundEnabled());
     }
@@ -42,26 +41,7 @@ class IndicatorConfigTest {
         assertFalse(config.isOrderChangeSoundEnabled());
     }
 
-    @Test
-    void wallBreakoutSignalsAreIndependentlyControllable() {
-        IndicatorConfig config = new IndicatorConfig();
 
-        config.setEnabled(IndicatorConfig.ORDER_WALL_CHANGE_ALERTS, true);
-        assertFalse(config.isEnabled(IndicatorConfig.ORDER_WALL_BREAKOUT_SIGNALS));
-        config.setEnabled(IndicatorConfig.ORDER_WALL_BREAKOUT_SIGNALS, true);
-        assertTrue(config.isEnabled(IndicatorConfig.ORDER_WALL_BREAKOUT_SIGNALS));
-    }
-
-    @Test
-    void bookmapPatternAutomationIsDisabledByDefaultAndControllable() {
-        IndicatorConfig config = new IndicatorConfig();
-
-        assertFalse(config.isEnabled(IndicatorConfig.BOOKMAP_PATTERN_SIGNALS));
-        config.setEnabled(IndicatorConfig.BOOKMAP_PATTERN_SIGNALS, true);
-        assertTrue(config.isEnabled(IndicatorConfig.BOOKMAP_PATTERN_SIGNALS));
-        config.setEnabled(IndicatorConfig.BOOKMAP_PATTERN_SIGNALS, false);
-        assertFalse(config.isEnabled(IndicatorConfig.BOOKMAP_PATTERN_SIGNALS));
-    }
 
     @Test
     void vwapIsEnabledByDefaultAndControllable() {

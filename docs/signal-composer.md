@@ -1,10 +1,10 @@
 # SignalComposer operator guide
 
-SignalComposer combines Bookmap depth and trade observations into advisory LONG/SHORT markers. It does not submit orders, calculate position size, select tradebooks, play an entry sound, or send a new WebSocket message. Native/manual execution, legacy scored badges, and Cairo export retain their existing behavior.
+SignalComposer owns the single live Bookmap pattern pipeline. All detected events pass through it before Cairo receives aggregate events, composed signals and developing confirmation context. It remains advisory and does not submit orders. The old wall-break checkbox and separate scored pattern automation have been removed.
 
 ## Enable and configure
 
-The default is enabled. **SignalComposer (advisory)** in addon settings is a shared switch across eligible charts, independent of **Bookmap Pattern Automation** and tradebook eligibility. All default rules are defined in the tracked `SignalComposerConfig.java` and compiled into the plugin JAR. No rule file needs to be created or copied between machines. The [tracked template](../config/signal-composer.template.json) documents these defaults and is tested against the compiled values.
+The default is enabled. **SignalComposer (advisory)** in addon settings is a shared switch across eligible charts, independent of manual tradebook eligibility. All default rules are defined in the tracked `SignalComposerConfig.java` and compiled into the plugin JAR. No rule file needs to be created or copied between machines. The [tracked template](../config/signal-composer.template.json) documents these defaults and is tested against the compiled values.
 
 The loader does not automatically read `%USERPROFILE%\bmtrader\signal-composer.json`. An optional file is used only when explicitly selected with `-Dbmtrader.signalComposerConfig=C:\absolute\path\signal-composer.json`; a blank property uses the compiled defaults. Uncheck the advisory checkbox to disable the feature. An explicitly selected malformed file disarms it, with the reason in the log and tooltip. Optional files are limited to 16 KiB. Empty `symbols` means all attached symbols; a list filters symbols after normalization. Quantities are equity shares, prices are integer Bookmap ticks, percentage hold distances use wall price, and durations are milliseconds.
 

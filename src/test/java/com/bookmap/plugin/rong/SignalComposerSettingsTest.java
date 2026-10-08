@@ -26,7 +26,8 @@ class SignalComposerSettingsTest {
         IndicatorSettingsPanel panel = new IndicatorSettingsPanel(config, new WallThresholdConfig());
         JCheckBox toggle = checkbox(panel, "SignalComposer (advisory)"); assertNotNull(toggle); assertTrue(toggle.isSelected());
         SwingUtilities.invokeAndWait(toggle::doClick); assertFalse(config.isEnabled(IndicatorConfig.SIGNAL_COMPOSER));
-        assertFalse(config.isEnabled(IndicatorConfig.BOOKMAP_PATTERN_SIGNALS));
+        assertNull(checkbox(panel, "Order Wall Breakout / Breakdown Signals"));
+        assertNull(checkbox(panel, "Bookmap Pattern Automation (display-only)"));
         SwingUtilities.invokeAndWait(toggle::doClick); assertTrue(config.isEnabled(IndicatorConfig.SIGNAL_COMPOSER));
         IndicatorSettingsPanel invalid = new IndicatorSettingsPanel(config, new WallThresholdConfig(), new NativeConnectionStatus(), SignalComposerConfig.invalid("bad JSON"));
         assertFalse(checkbox(invalid, "SignalComposer (advisory)").isEnabled());

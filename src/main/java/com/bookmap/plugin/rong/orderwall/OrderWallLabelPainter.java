@@ -66,8 +66,6 @@ public class OrderWallLabelPainter implements ScreenSpacePainterFactory,
     private static final Color ADDED_ACCENT = new Color(60, 220, 148);
     private static final Color REDUCED_ACCENT = new Color(255, 91, 78);
     private static final Color CHANGED_ACCENT = new Color(255, 196, 73);
-    private static final Color OFFER_BREAKOUT_ACCENT = new Color(57, 230, 255);
-    private static final Color BID_BREAKDOWN_ACCENT = new Color(255, 64, 214);
 
     private final OrderWallLabelStore store;
     private final IndicatorConfig config;
@@ -606,11 +604,6 @@ public class OrderWallLabelPainter implements ScreenSpacePainterFactory,
     }
 
     private static String formatChangeText(OrderWallChangeEvent event) {
-        if (event.isWallBreak()) {
-            String sideText = event.isBid() ? "BID" : "OFFER";
-            return sideText + " " + event.getTypeText()
-                    + " " + OrderWallChangeEvent.formatSize(event.getPreviousSize());
-        }
         return OrderWallChangeEvent.formatSize(event.getPreviousSize())
                 + " -> "
                 + OrderWallChangeEvent.formatSize(event.getCurrentSize());
@@ -623,10 +616,6 @@ public class OrderWallLabelPainter implements ScreenSpacePainterFactory,
                 return ADDED_ACCENT;
             case REPLACED_SMALLER:
                 return CHANGED_ACCENT;
-            case OFFER_BREAKOUT:
-                return OFFER_BREAKOUT_ACCENT;
-            case BID_BREAKDOWN:
-                return BID_BREAKDOWN_ACCENT;
             case REDUCED:
             default:
                 return REDUCED_ACCENT;
@@ -657,18 +646,6 @@ public class OrderWallLabelPainter implements ScreenSpacePainterFactory,
         g.setStroke(new BasicStroke(2.2f, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
 
         switch (type) {
-            case OFFER_BREAKOUT:
-                g.drawLine(centerX - 5, centerY + 5, centerX + 5, centerY + 5);
-                g.drawLine(centerX, centerY + 5, centerX, centerY - 6);
-                g.drawLine(centerX, centerY - 6, centerX - 4, centerY - 2);
-                g.drawLine(centerX, centerY - 6, centerX + 4, centerY - 2);
-                break;
-            case BID_BREAKDOWN:
-                g.drawLine(centerX - 5, centerY - 5, centerX + 5, centerY - 5);
-                g.drawLine(centerX, centerY - 5, centerX, centerY + 6);
-                g.drawLine(centerX, centerY + 6, centerX - 4, centerY + 2);
-                g.drawLine(centerX, centerY + 6, centerX + 4, centerY + 2);
-                break;
             case ADDED:
                 g.drawLine(centerX - 5, centerY, centerX + 5, centerY);
                 g.drawLine(centerX, centerY - 5, centerX, centerY + 5);

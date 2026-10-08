@@ -93,7 +93,7 @@ class OrderWallChangeTrackerTest {
             java.util.function.DoubleSupplier low, java.util.function.DoubleSupplier stock) {
         return new OrderWallChangeTracker("TEST", .01, () -> LARGE_THRESHOLD, 0, .5,
                 TEST_SURVIVAL_MS, event -> { events.add(event); seen.countDown(); },
-                bid -> false, high, low, stock);
+                high, low, stock);
     }
 
     @Test
@@ -257,7 +257,7 @@ class OrderWallChangeTrackerTest {
     }
 
     @Test
-    void matchingEnabledWallBreakRetainsDedicatedTypeAndTradeFlag() throws Exception {
+    void consumedWallIsOnlyAMaterialReductionAndRetestFill() throws Exception {
         List<OrderWallChangeEvent> events = new CopyOnWriteArrayList<>();
         CountDownLatch alertSeen = new CountDownLatch(1);
         OrderWallChangeTracker tracker = new OrderWallChangeTracker(
@@ -265,7 +265,7 @@ class OrderWallChangeTrackerTest {
                 event -> {
                     events.add(event);
                     alertSeen.countDown();
-                }, bidWall -> bidWall, () -> 110.0, () -> 90.0);
+                }, () -> 110.0, () -> 90.0);
 
         try {
             tracker.onDepth(true, 11_020, 8_000, 1L);
@@ -274,7 +274,7 @@ class OrderWallChangeTrackerTest {
             tracker.onDepth(true, 11_020, 0, 2L);
 
             assertTrue(alertSeen.await(500, TimeUnit.MILLISECONDS));
-            assertEquals(OrderWallChangeEvent.Type.BID_BREAKDOWN, events.get(0).getType());
+            assertEquals(OrderWallChangeEvent.Type.REDUCED, events.get(0).getType());
             assertTrue(events.get(0).isTradeConsumption());
         } finally {
             tracker.shutdown();
@@ -290,7 +290,7 @@ class OrderWallChangeTrackerTest {
                 event -> {
                     events.add(event);
                     alertsSeen.countDown();
-                }, bidWall -> false, () -> 110.0, () -> 90.0);
+                }, () -> 110.0, () -> 90.0);
 
         try {
             tracker.onDepth(true, 10_200, 8_000, 1L);
@@ -345,7 +345,7 @@ class OrderWallChangeTrackerTest {
                 event -> {
                     events.add(event);
                     alertsSeen.countDown();
-                }, bidWall -> false, () -> 110.0, () -> 90.0);
+                }, () -> 110.0, () -> 90.0);
         try {
             tracker.onDepth(false, 10_200, 8_000, 1L);
             tracker.markReady();
@@ -371,7 +371,7 @@ class OrderWallChangeTrackerTest {
                 event -> {
                     events.add(event);
                     alertsSeen.countDown();
-                }, bidWall -> false, () -> 110.0, () -> 90.0);
+                }, () -> 110.0, () -> 90.0);
 
         try {
             tracker.markReady();
@@ -446,7 +446,7 @@ class OrderWallChangeTrackerTest {
                 event -> {
                     events.add(event);
                     alertSeen.countDown();
-                }, bidWall -> false, () -> 110.0, () -> 90.0);
+                }, () -> 110.0, () -> 90.0);
 
         try {
             tracker.markReady();
@@ -490,7 +490,7 @@ class OrderWallChangeTrackerTest {
                 event -> {
                     events.add(event);
                     alertSeen.countDown();
-                }, bidWall -> false, () -> 110.0, () -> 90.0);
+                }, () -> 110.0, () -> 90.0);
         try {
             tracker.onDepth(bid, sourcePriceTick, 6_000, 1L);
             tracker.markReady();
@@ -527,7 +527,7 @@ class OrderWallChangeTrackerTest {
             java.util.function.Consumer<OrderWallChangeEvent> consumer) {
         return new OrderWallChangeTracker(
                 "TEST", 0.01, () -> LARGE_THRESHOLD, 5, survivalMs,
-                consumer, bidWall -> false, () -> 110.0, () -> 90.0);
+                consumer, () -> 110.0, () -> 90.0);
     }
 
     @FunctionalInterface
