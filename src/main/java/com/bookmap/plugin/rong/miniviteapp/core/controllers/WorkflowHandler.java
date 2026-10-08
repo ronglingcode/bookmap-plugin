@@ -31,10 +31,17 @@ public final class WorkflowHandler {
         }
         Models.require(state.netQuantity != 0, "workflow requires an open position");
         if (key.equals("KeyP")) {
-            Models.require(bool(active, "hasValue"), "profit reset requires captured trade state");
-            JsonArray targets = Workflows.profitResetTargets(array(object(active, "submitEntryResult"), "profitTargets"), Math.abs(state.netQuantity));
-            double stop = number(active, "stopLossPrice"); Models.require(Models.positive(stop), "profit reset protective stop unavailable");
+            JsonArray captured = array(object(active, "submitEntryResult"), "profitTargets");
+            double stop = number(active, "stopLossPrice");
+            boolean fallback = !bool(active, "hasValue") || captured.size() == 0 || !Models.positive(stop);
+            JsonArray targets;
+            if (fallback) {
+                JsonObject reset = Workflows.fallbackProfitReset(state.netQuantity, state.currentPrice,
+                        number(state.entryContext, "lowOfDay"), number(state.entryContext, "highOfDay"), state.batchCount);
+                targets = array(reset, "targets"); stop = number(reset, "stopLoss");
+            } else targets = Workflows.profitResetTargets(captured, Math.abs(state.netQuantity));
             Plan plan = new Plan("reset_profit_targets");
+            if (fallback) plan.warnings.add("Reset Targets using day stop and 2R from current price");
             for (ExitPair pair : state.pairs) { Models.require(pair.marketLeg().isBuy == (state.netQuantity < 0), "exit side disagrees with position"); if (pair.limit != null) Broker.cancelOrders(plan, pair.limit); if (pair.stop != null) Broker.cancelOrders(plan, pair.stop); }
             boolean first = true; for (JsonElement item : targets) {
                 JsonObject target = item.getAsJsonObject(); double price = number(target, "target");

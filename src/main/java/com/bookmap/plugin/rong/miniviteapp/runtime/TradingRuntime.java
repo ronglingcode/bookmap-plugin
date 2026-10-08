@@ -313,6 +313,13 @@ public final class TradingRuntime implements AutoCloseable {
         result.addProperty("currentPrice", price(symbol)); result.addProperty("bid", number(quotes.get(symbol), "bidPrice")); result.addProperty("ask", number(quotes.get(symbol), "askPrice"));
         result.addProperty("batchCount", number(policy, "batchCount")); result.addProperty("splitPartials", !bool(object(active, "submitEntryResult"), "isSingleOrder")); result.addProperty("hasPlan", bool(active, "hasValue")); result.addProperty("entryPrice", number(active, "entryPrice"));
         result.addProperty("coreTarget", number(object(active, "plan"), "coreTarget")); result.addProperty("coreCount", number(object(active, "plan"), "coreCount")); result.addProperty("coreRuleEnabled", bool(policy, "coreTargetEnabled")); result.addProperty("rulesSupported", true);
+        // Held symbols can reset exits even without an entry plan; fallback still needs live day levels.
+        JsonObject context = new JsonObject(); context.add("activeTrade", active.deepCopy());
+        var loaded = market.getState(symbol);
+        if (loaded != null && string(loaded.sessionLevels(), "sessionDate").equals(MarketClock.marketTime(now.getAsLong()).date)) {
+            JsonObject prices = loaded.metrics(); context.addProperty("lowOfDay", number(prices, "lowOfDay")); context.addProperty("highOfDay", number(prices, "highOfDay"));
+        }
+        result.add("entryContext", context);
         result.add("entries", array(object(account, "entryOrders"), symbol).deepCopy()); JsonArray pairs = com.bookmap.plugin.rong.miniviteapp.core.controllers.NativeViews.sortedExitPairs(array(object(account, "exitPairs"), symbol)); int index = 0; for (JsonElement item : pairs) item.getAsJsonObject().addProperty("originalPartial", Math.max(0, number(policy, "batchCount") - pairs.size()) + ++index); result.add("pairs", pairs); return result;
     }
     public boolean dispatch(JsonObject action) {

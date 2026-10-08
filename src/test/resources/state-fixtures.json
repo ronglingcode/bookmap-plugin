@@ -11234,5 +11234,312 @@
         "allowAddIfBelow": 1000
       }
     }
+  },
+  {
+    "name": "fallback reset: long uses current price and day low",
+    "kind": "workflow",
+    "method": "fallbackProfitReset",
+    "args": [
+      103,
+      10,
+      9,
+      11,
+      10
+    ],
+    "result": {
+      "stopLoss": 9,
+      "targets": [
+        {
+          "target": 12,
+          "quantity": 11
+        },
+        {
+          "target": 12,
+          "quantity": 11
+        },
+        {
+          "target": 12,
+          "quantity": 11
+        },
+        {
+          "target": 12,
+          "quantity": 10
+        },
+        {
+          "target": 12,
+          "quantity": 10
+        },
+        {
+          "target": 12,
+          "quantity": 10
+        },
+        {
+          "target": 12,
+          "quantity": 10
+        },
+        {
+          "target": 12,
+          "quantity": 10
+        },
+        {
+          "target": 12,
+          "quantity": 10
+        },
+        {
+          "target": 12,
+          "quantity": 10
+        }
+      ]
+    }
+  },
+  {
+    "name": "fallback reset: short uses current price and day high",
+    "kind": "workflow",
+    "method": "fallbackProfitReset",
+    "args": [
+      -53,
+      10,
+      9,
+      11,
+      10
+    ],
+    "result": {
+      "stopLoss": 11,
+      "targets": [
+        {
+          "target": 8,
+          "quantity": 6
+        },
+        {
+          "target": 8,
+          "quantity": 6
+        },
+        {
+          "target": 8,
+          "quantity": 6
+        },
+        {
+          "target": 8,
+          "quantity": 5
+        },
+        {
+          "target": 8,
+          "quantity": 5
+        },
+        {
+          "target": 8,
+          "quantity": 5
+        },
+        {
+          "target": 8,
+          "quantity": 5
+        },
+        {
+          "target": 8,
+          "quantity": 5
+        },
+        {
+          "target": 8,
+          "quantity": 5
+        },
+        {
+          "target": 8,
+          "quantity": 5
+        }
+      ]
+    }
+  },
+  {
+    "name": "fallback reset: small position avoids zero quantity pairs",
+    "kind": "workflow",
+    "method": "fallbackProfitReset",
+    "args": [
+      3,
+      10,
+      9,
+      11,
+      10
+    ],
+    "result": {
+      "stopLoss": 9,
+      "targets": [
+        {
+          "target": 12,
+          "quantity": 1
+        },
+        {
+          "target": 12,
+          "quantity": 1
+        },
+        {
+          "target": 12,
+          "quantity": 1
+        }
+      ]
+    }
+  },
+  {
+    "name": "fallback reset: fractional remainder preserved",
+    "kind": "workflow",
+    "method": "fallbackProfitReset",
+    "args": [
+      3.5,
+      10,
+      9,
+      11,
+      10
+    ],
+    "result": {
+      "stopLoss": 9,
+      "targets": [
+        {
+          "target": 12,
+          "quantity": 1.5
+        },
+        {
+          "target": 12,
+          "quantity": 1
+        },
+        {
+          "target": 12,
+          "quantity": 1
+        }
+      ]
+    }
+  },
+  {
+    "name": "fallback reset: prices rounded to cents",
+    "kind": "workflow",
+    "method": "fallbackProfitReset",
+    "args": [
+      50,
+      10.123,
+      9.456,
+      11.456,
+      10
+    ],
+    "result": {
+      "stopLoss": 9.46,
+      "targets": [
+        {
+          "target": 11.45,
+          "quantity": 5
+        },
+        {
+          "target": 11.45,
+          "quantity": 5
+        },
+        {
+          "target": 11.45,
+          "quantity": 5
+        },
+        {
+          "target": 11.45,
+          "quantity": 5
+        },
+        {
+          "target": 11.45,
+          "quantity": 5
+        },
+        {
+          "target": 11.45,
+          "quantity": 5
+        },
+        {
+          "target": 11.45,
+          "quantity": 5
+        },
+        {
+          "target": 11.45,
+          "quantity": 5
+        },
+        {
+          "target": 11.45,
+          "quantity": 5
+        },
+        {
+          "target": 11.45,
+          "quantity": 5
+        }
+      ]
+    }
+  },
+  {
+    "name": "fallback reset: flat reset blocked",
+    "kind": "workflow",
+    "method": "fallbackProfitReset",
+    "args": [
+      0,
+      10,
+      9,
+      11,
+      10
+    ],
+    "error": "No position for profit reset"
+  },
+  {
+    "name": "fallback reset: missing current price blocked",
+    "kind": "workflow",
+    "method": "fallbackProfitReset",
+    "args": [
+      50,
+      0,
+      9,
+      11,
+      10
+    ],
+    "error": "Profit reset fallback requires current price and a day stop on the protective side"
+  },
+  {
+    "name": "fallback reset: missing day low blocked",
+    "kind": "workflow",
+    "method": "fallbackProfitReset",
+    "args": [
+      50,
+      10,
+      0,
+      11,
+      10
+    ],
+    "error": "Profit reset fallback requires current price and a day stop on the protective side"
+  },
+  {
+    "name": "fallback reset: zero risk long blocked",
+    "kind": "workflow",
+    "method": "fallbackProfitReset",
+    "args": [
+      50,
+      10,
+      10,
+      11,
+      10
+    ],
+    "error": "Profit reset fallback requires current price and a day stop on the protective side"
+  },
+  {
+    "name": "fallback reset: wrong side short stop blocked",
+    "kind": "workflow",
+    "method": "fallbackProfitReset",
+    "args": [
+      -50,
+      10,
+      9,
+      9.5,
+      10
+    ],
+    "error": "Profit reset fallback requires current price and a day stop on the protective side"
+  },
+  {
+    "name": "fallback reset: nonpositive short target blocked",
+    "kind": "workflow",
+    "method": "fallbackProfitReset",
+    "args": [
+      -50,
+      10,
+      9,
+      16,
+      10
+    ],
+    "error": "Invalid profit reset fallback target"
   }
 ]

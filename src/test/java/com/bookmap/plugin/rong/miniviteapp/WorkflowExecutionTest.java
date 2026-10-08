@@ -10,6 +10,40 @@ import static org.junit.jupiter.api.Assertions.*;
 class WorkflowExecutionTest {
     static JsonObject json(String text) { return JsonParser.parseString(text).getAsJsonObject(); }
     static JsonObject active() { return json("{\"hasValue\":true,\"stopLossPrice\":9,\"sizeMultipler\":0.1,\"plan\":{\"coreTarget\":13},\"submitEntryResult\":{\"tradeBookID\":\"RangeBoundBidReversal\",\"profitTargets\":[{\"target\":11,\"quantity\":40},{\"target\":12,\"quantity\":40}]}}"); }
+    @Test void missingCaptureRebuildsLongAndShortExitsFromCurrentPrice() {
+        for (boolean isLong : new boolean[]{true, false}) {
+            JsonObject state = ExtendedExecutionPlanTest.longState(); state.addProperty("netQuantity", isLong ? 53 : -53);
+            state.addProperty("currentPrice", 10); state.addProperty("entryPrice", 20); state.addProperty("batchCount", 10);
+            JsonObject context = state.getAsJsonObject("entryContext"); context.add("activeTrade", new JsonObject());
+            context.addProperty("lowOfDay", 9); context.addProperty("highOfDay", 11);
+            for (JsonElement item : state.getAsJsonArray("pairs")) for (String leg : new String[]{"LIMIT", "STOP"}) {
+                JsonObject pair = item.getAsJsonObject(); if (pair.has(leg)) pair.getAsJsonObject(leg).addProperty("isBuy", !isLong);
+            }
+            Plan plan = WorkflowHandler.handle(new Snapshot(state), "KeyP", false); double total = 0; int posts = 0;
+            assertFalse(plan.warnings.isEmpty());
+            for (Request request : plan.requests) if (request.method.equals("POST")) {
+                JsonArray children = request.body.getAsJsonArray("childOrderStrategies");
+                JsonObject stop = children.get(0).getAsJsonObject(), limit = children.get(1).getAsJsonObject();
+                assertEquals(isLong ? 9 : 11, stop.get("stopPrice").getAsDouble());
+                assertEquals(isLong ? 12 : 8, limit.get("price").getAsDouble());
+                assertEquals(isLong ? "SELL" : "BUY_TO_COVER", stop.getAsJsonArray("orderLegCollection").get(0).getAsJsonObject().get("instruction").getAsString());
+                total += stop.getAsJsonArray("orderLegCollection").get(0).getAsJsonObject().get("quantity").getAsDouble();
+                assertEquals(posts++ == 0 ? 800 : 0, request.delayBeforeMs);
+            }
+            assertEquals(10, posts); assertEquals(53, total);
+            context.addProperty(isLong ? "lowOfDay" : "highOfDay", 10);
+            assertThrows(IllegalArgumentException.class, () -> WorkflowHandler.handle(new Snapshot(state), "KeyP", false));
+        }
+    }
+    @Test void missingTargetsOrStopUsesFallbackEvenWithCaptureFlag() {
+        for (String missing : new String[]{"targets", "stop"}) {
+            JsonObject state = ExtendedExecutionPlanTest.longState(); JsonObject trade = active();
+            if (missing.equals("targets")) trade.getAsJsonObject("submitEntryResult").add("profitTargets", new JsonArray());
+            else trade.remove("stopLossPrice");
+            state.getAsJsonObject("entryContext").add("activeTrade", trade);
+            assertFalse(WorkflowHandler.handle(new Snapshot(state), "KeyP", false).warnings.isEmpty());
+        }
+    }
     @Test void profitResetNeverRecreatesMoreSharesThanRemainingPosition() {
         JsonObject state = ExtendedExecutionPlanTest.longState(); state.addProperty("netQuantity", 50); state.getAsJsonObject("entryContext").add("activeTrade", active());
         Plan plan = WorkflowHandler.handle(new Snapshot(state), "KeyP", false); double shares = 0; boolean first = true;

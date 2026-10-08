@@ -6,6 +6,24 @@ import static com.bookmap.plugin.rong.miniviteapp.models.DomainJson.*;
 /** Mirrors TS workflows; no I/O, timers, globals or Bookmap API. */
 public final class Workflows {
     private Workflows() { }
+    public static JsonObject fallbackProfitReset(double netQuantity, double currentPrice, double low, double high, double batchCount) {
+        boolean isLong = netQuantity > 0; double remaining = Math.abs(netQuantity);
+        if (!Double.isFinite(remaining) || remaining <= 0) throw new IllegalArgumentException("No position for profit reset");
+        double stopLoss = Math.round((isLong ? low : high) * 100) / 100.0;
+        if (!Double.isFinite(currentPrice) || currentPrice <= 0 || !Double.isFinite(isLong ? low : high) || stopLoss <= 0
+                || (isLong ? stopLoss >= currentPrice : stopLoss <= currentPrice))
+            throw new IllegalArgumentException("Profit reset fallback requires current price and a day stop on the protective side");
+        double rawTarget = currentPrice + 2 * (currentPrice - stopLoss);
+        if (!Double.isFinite(rawTarget)) throw new IllegalArgumentException("Invalid profit reset fallback target");
+        double target = Math.round(rawTarget * 100) / 100.0;
+        if (!Double.isFinite(target) || target <= 0 || (isLong ? target <= currentPrice : target >= currentPrice))
+            throw new IllegalArgumentException("Invalid profit reset fallback target");
+        int count = (int) Math.min(Math.max(1, Math.floor(remaining)), Double.isFinite(batchCount) && batchCount > 0 ? Math.max(1, Math.floor(batchCount)) : 10);
+        double quantity = Math.floor(remaining / count); JsonArray targets = new JsonArray();
+        for (int index = 0; index < count; index++) { JsonObject value = new JsonObject(); value.addProperty("target", target);
+            value.addProperty("quantity", quantity + Math.min(1, Math.max(0, remaining - quantity * count - index))); targets.add(value); }
+        JsonObject result = new JsonObject(); result.addProperty("stopLoss", stopLoss); result.add("targets", targets); return result;
+    }
     public static JsonArray profitResetTargets(JsonArray targets, double remaining) {
         if (targets.size() <= 1) throw new IllegalArgumentException("Profit reset requires multiple captured targets");
         if (!(remaining > 0)) throw new IllegalArgumentException("No position for profit reset"); JsonArray result = new JsonArray();
