@@ -73,7 +73,7 @@ public final class WallInteractionDetector {
         }
         while (interactions.size() > config.maxWallPhases) interactions.remove(interactions.keySet().iterator().next());
     }
-    private PatternEventType holdType() { return bid ? PatternEventType.BID_HOLD : PatternEventType.OFFER_HOLD; }
+    private PatternEventType holdType() { return bid ? PatternEventType.BID_BOUNCE : PatternEventType.OFFER_BOUNCE; }
     public void onTrade(int price, long nowNs, long epoch) {
         refresh();
         for (Interaction i : interactions.values()) {
@@ -139,7 +139,7 @@ public final class WallInteractionDetector {
             metadata.put("holdRetreatRatio", Double.toString(config.detectors.holdRetreatRatio));
             output.accept(PatternEvent.builder(alias, epoch, composite ? PatternEventType.OFFER_SIZE_INCREASING_HOLD : holdType(), i.interactionId)
                     .revision(++i.holdRevision)
-                    .episodeKey((bid ? "bid-hold:" : "offer-hold:") + i.interactionId).size(wall.size, PatternEvent.SizeBasis.DISPLAYED_WALL)
+                    .episodeKey((bid ? "bid-bounce:" : "offer-bounce:") + i.interactionId).size(wall.size, PatternEvent.SizeBasis.DISPLAYED_WALL)
                     .price(i.price, pips).times(i.holdEventNs, nowNs)
                     .evidence(PatternEvent.Evidence.builder().wall(i.phaseId, wall.size, wall.size)
                             .interaction(i.baselineSize, i.approachNs, i.retreatNs).metadata(metadata)

@@ -74,7 +74,7 @@ class SignalCompositionPipelineTest {
         h.time(3200); assertTrue(h.signals.isEmpty());
         h.trade(5107, 1, true, 3200);
         assertEquals(1, h.signals.size());
-        assertEquals(PatternEventType.BID_HOLD, h.signals.get(0).trigger.type);
+        assertEquals(PatternEventType.BID_BOUNCE, h.signals.get(0).trigger.type);
         assertEquals(Direction.LONG, h.signals.get(0).direction);
         assertEquals(ConfirmationStrength.NONE, h.signals.get(0).firstValidation.confirmationStrength);
         assertTrue(h.signals.get(0).explanation.contains("test low"));

@@ -203,7 +203,7 @@ class ReleaseJarTest {
         Method observe = mappedMethod(composerName, root + "signal.CompositionUpdate onPatternEvent(" + eventName + ")", mappedClass(eventName));
         Object pending = observe.invoke(composer, releaseEvent("BIDS_CANCELLED", 3000, 5105, 100, "bid"));
         assertTrue(((List<?>)mappedField(root + "signal.CompositionUpdate", "java.util.List signals", pending)).isEmpty());
-        Object update = observe.invoke(composer, releaseEvent("OFFER_HOLD", 60000, 5120, 200, "offer"));
+        Object update = observe.invoke(composer, releaseEvent("OFFER_BOUNCE", 60000, 5120, 200, "offer"));
         List<?> signals = (List<?>)mappedField(root + "signal.CompositionUpdate", "java.util.List signals", update);
         assertEquals(1, signals.size()); Object signal = signals.get(0); String signalName = root + "signal.TradingSignal";
         assertEquals("SHORT", ((Enum<?>)mappedField(signalName, root + "patterns.Direction direction", signal)).name());

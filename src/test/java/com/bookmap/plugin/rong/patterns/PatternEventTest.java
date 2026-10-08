@@ -45,7 +45,7 @@ class PatternEventTest {
         assertThrows(IllegalArgumentException.class, () -> PatternEvent.Evidence.builder().trades(-1, null).build());
     }
     @Test void compositeUpgradeCanPreserveOneEpisodeIdentity() {
-        PatternEvent rejection = PatternEvent.builder("TEST", 1, PatternEventType.OFFER_HOLD, "w")
+        PatternEvent rejection = PatternEvent.builder("TEST", 1, PatternEventType.OFFER_BOUNCE, "w")
                 .episodeKey("offer-interaction:w:1").size(60000, PatternEvent.SizeBasis.DISPLAYED_WALL)
                 .price(5120, .01).times(100, 100).build();
         PatternEvent composite = PatternEvent.builder("TEST", 1, PatternEventType.OFFER_SIZE_INCREASING_HOLD, "w")

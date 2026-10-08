@@ -29,7 +29,7 @@ class SignalExplanationBuilderTest {
     @Test void laterEvidenceCannotRewriteAcceptanceAndExactSizesRemainVisible() {
         PatternEvent bid = event(PatternEventType.BID_BREAKDOWN, 5000, 5105, 100, "b");
         TradingSignal.FirstValidation validation = new TradingSignal.FirstValidation(100, 5000, 5000, ConfirmationStrength.NONE, Collections.emptyList(), null);
-        ConfirmationMatch after = new ConfirmationMatch(bid, event(PatternEventType.OFFER_HOLD, 60000, 5120, 200, "o"));
+        ConfirmationMatch after = new ConfirmationMatch(bid, event(PatternEventType.OFFER_BOUNCE, 60000, 5120, 200, "o"));
         String text = builder.build(bid, validation, List.of(after));
         assertTrue(text.contains("observed after validation")); assertTrue(text.contains("Applied trigger threshold: 5K"));
         assertTrue(text.contains("First validation time and applied threshold are unchanged"));

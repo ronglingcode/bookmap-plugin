@@ -10,7 +10,7 @@ class ConfirmationMatcherTest {
     private final ConfirmationMatcher matcher = new ConfirmationMatcher(SignalComposerConfig.defaults());
     private final long t = 900_000_000_000L;
     private PatternEvent bid() { return event(PatternEventType.BIDS_CANCELLED, 3000, 5105, t, "bid"); }
-    private PatternEvent offer(long time, int price) { return event(PatternEventType.OFFER_HOLD, 60000, price, time, "offer:" + time + ":" + price); }
+    private PatternEvent offer(long time, int price) { return event(PatternEventType.OFFER_BOUNCE, 60000, price, time, "offer:" + time + ":" + price); }
     @Test void acceptsBeforeAfterAndExactTimeBoundary() {
         assertEquals(1, matcher.find(bid(), List.of(offer(t - 300_000_000_000L, 5120)), t).size());
         assertTrue(matcher.find(bid(), List.of(offer(t - 300_000_000_001L, 5120)), t).isEmpty());
@@ -34,10 +34,10 @@ class ConfirmationMatcherTest {
     @Test void excludesFutureUnobservedStaleAndForeignEvidence() {
         assertTrue(matcher.find(bid(), List.of(offer(t + 1, 5120)), t).isEmpty());
         assertTrue(matcher.find(bid(), List.of(offer(t - 1, 5120)), t + 300_000_000_000L).isEmpty());
-        PatternEvent foreign = PatternEvent.builder("OTHER", 2, PatternEventType.OFFER_HOLD, "w")
+        PatternEvent foreign = PatternEvent.builder("OTHER", 2, PatternEventType.OFFER_BOUNCE, "w")
                 .size(60000, PatternEvent.SizeBasis.DISPLAYED_WALL).price(5120, .01).times(t, t).build();
         assertTrue(matcher.find(bid(), List.of(foreign), t).isEmpty());
-        PatternEvent warmup = PatternEvent.builder("TEST", 1, PatternEventType.OFFER_HOLD, "w")
+        PatternEvent warmup = PatternEvent.builder("TEST", 1, PatternEventType.OFFER_BOUNCE, "w")
                 .size(60000, PatternEvent.SizeBasis.DISPLAYED_WALL).price(5120, .01).times(t, t).build();
         assertTrue(matcher.find(bid(), List.of(warmup), t).isEmpty());
     }

@@ -29,7 +29,7 @@ class PercentageWallHoldTest {
         void time(long ms) { engine.onTimestamp(BASE + ms * 1_000_000L, MARKET); }
         void depth(long size, long ms) { engine.onDepth(bid, wall, size, BASE + ms * 1_000_000L, MARKET); }
         List<PatternEvent> holds() {
-            return events.stream().filter(e -> e.type == PatternEventType.BID_HOLD || e.type == PatternEventType.OFFER_HOLD
+            return events.stream().filter(e -> e.type == PatternEventType.BID_BOUNCE || e.type == PatternEventType.OFFER_BOUNCE
                     || e.type == PatternEventType.OFFER_SIZE_INCREASING_HOLD).collect(Collectors.toList());
         }
     }
@@ -43,7 +43,7 @@ class PercentageWallHoldTest {
             f.time(3300); assertTrue(f.holds().isEmpty());
             f.trade(f.defended(75), 3300);
             PatternEvent e = f.holds().get(0);
-            assertEquals(bid ? PatternEventType.BID_HOLD : PatternEventType.OFFER_HOLD, e.type);
+            assertEquals(bid ? PatternEventType.BID_BOUNCE : PatternEventType.OFFER_BOUNCE, e.type);
             assertEquals(bid ? PatternMeaning.BID_HOLD : PatternMeaning.OFFER_BEARISH_CONFIRMATION, e.meaning);
             assertEquals(650, e.price); assertEquals(65578, e.size);
             assertEquals(BASE + 3_300_000_000L, e.eventTimeNs);

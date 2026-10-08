@@ -9,7 +9,7 @@ class TradingSignalPainterTest {
     @Test void shortBadgeExplainsTriggerBandAndAppliedSizeWithoutScore() {
         SignalComposer c = new SignalComposer("TEST", 1, SignalComposerConfig.defaults(), () -> 1000);
         c.onPatternEvent(event(PatternEventType.BIDS_CANCELLED, 3000, 5105, 100, "b"));
-        TradingSignal signal = c.onPatternEvent(event(PatternEventType.OFFER_HOLD, 60000, 5120, 200, "o")).signals.get(0);
+        TradingSignal signal = c.onPatternEvent(event(PatternEventType.OFFER_BOUNCE, 60000, 5120, 200, "o")).signals.get(0);
         String text = String.join("\n", TradingSignalPainter.badgeLines(signal));
         assertTrue(text.contains("SHORT")); assertTrue(text.contains("3K")); assertTrue(text.contains("EXCEPTIONAL"));
         assertTrue(text.contains("normal 5K / applied 3K")); assertTrue(text.contains("60K")); assertFalse(text.toLowerCase().contains("score"));

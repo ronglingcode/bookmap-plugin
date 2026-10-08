@@ -10,9 +10,9 @@ class SignalComposerInspectionTest {
     @Test void everyGroupIsBoundedAndRevisionsReplaceRatherThanDuplicateAnEvent() {
         SignalComposer composer = new SignalComposer("TEST", 1, SignalComposerConfig.defaults());
         PatternEventType[] types = {PatternEventType.BID_STEP_UP, PatternEventType.BIDS_CANCELLED,
-                PatternEventType.OFFER_BREAKOUT, PatternEventType.OFFER_HOLD};
+                PatternEventType.OFFER_BREAKOUT, PatternEventType.OFFER_BOUNCE};
         for (int i = 0; i < 12; i++) composer.onPatternEvent(event(types[i % 4], 60000, 5105, i + 1, "event" + i));
-        composer.onPatternEvent(PatternEvent.builder("TEST", 1, PatternEventType.OFFER_HOLD, "event11")
+        composer.onPatternEvent(PatternEvent.builder("TEST", 1, PatternEventType.OFFER_BOUNCE, "event11")
                 .revision(2).size(65000, PatternEvent.SizeBasis.DISPLAYED_WALL).price(5105, .01).times(12, 13)
                 .evidence(PatternEvent.Evidence.builder().attribution(PatternEvent.Attribution.UNKNOWN, PatternEvent.Coverage.USABLE).build()).build());
         for (SignalComposerInspection.Section section : composer.inspectionSections()) {
@@ -31,7 +31,7 @@ class SignalComposerInspectionTest {
         for (int i = 1; i <= 3; i++) composer.onPatternEvent(event(PatternEventType.BID_STEP_UP, 5000, 5105, i, "long" + i));
         composer.onPatternEvent(event(PatternEventType.BIDS_CANCELLED, 5000, 5105, 4, "short"));
         composer.onPatternEvent(event(PatternEventType.OFFER_BREAKOUT, 60000, 5105, 5, "longOffer"));
-        composer.onPatternEvent(event(PatternEventType.OFFER_HOLD, 60000, 5105, 6, "shortOffer"));
+        composer.onPatternEvent(event(PatternEventType.OFFER_BOUNCE, 60000, 5105, 6, "shortOffer"));
         composer.onPatternEvent(event(PatternEventType.OFFER_SIZE_INCREASE, 60000, 5105, 7, "unknown"));
         java.util.List<SignalComposerInspection.Section> sections = composer.inspectionSections();
         assertEquals(2, sections.size());
@@ -43,7 +43,7 @@ class SignalComposerInspectionTest {
         assertEquals(PatternEventType.OFFER_BREAKOUT, longs.offers.get(0).pattern.type);
         assertEquals(Direction.SHORT, shorts.direction);
         assertEquals(PatternEventType.BIDS_CANCELLED, shorts.bids.get(0).pattern.type);
-        assertEquals(PatternEventType.OFFER_HOLD, shorts.offers.get(0).pattern.type);
+        assertEquals(PatternEventType.OFFER_BOUNCE, shorts.offers.get(0).pattern.type);
         assertEquals(1, shorts.offers.size());
         assertTrue(longs.offers.get(0).status.isEmpty());
         composer.onMarketPrice(5200, 5202, 0);
@@ -69,7 +69,7 @@ class SignalComposerInspectionTest {
         assertTrue(pending.contains("bid required ≥ 5000"));
         assertTrue(pending.contains("300.0s left"));
         assertEquals(pending, String.join("\n", composer.inspectionLines()));
-        composer.onPatternEvent(event(PatternEventType.OFFER_HOLD, 60000, 5120, 200, "offer"));
+        composer.onPatternEvent(event(PatternEventType.OFFER_BOUNCE, 60000, 5120, 200, "offer"));
         String valid = String.join("\n", composer.inspectionLines());
         assertTrue(valid.contains("SHORT VALID"));
         assertTrue(valid.contains("Validated: EXCEPTIONAL · applied ≥ 3000"));

@@ -39,15 +39,15 @@ how SignalComposer uses it, rather than guaranteeing the next price move.
 
 | Pattern (event identifier) | What was observed | Meaning and composer role |
 | --- | --- | --- |
-| **Bid Hold** (`BID_HOLD`) | Price approaches a persistent bid from above within 0.05% of wall price, then rebounds at least 0.1% of wall price from the test low. Subsequent trades confirm 500 ms at/above the rebound threshold within a 15-second interaction. The bid remains present and unbroken. | `BID_HOLD`: tested support with a confirmed rebound; can trigger LONG. |
+| **Bid Bounce** (`BID_BOUNCE`) | Price approaches a persistent bid from above within 0.05% of wall price, then rebounds at least 0.1% of wall price from the test low. Subsequent trades confirm 500 ms at/above the rebound threshold within a 15-second interaction. The bid remains present and unbroken. | `BID_HOLD`: tested support with a confirmed rebound; can trigger LONG. |
 | **Bid Reappear** (`BID_REAPPEAR`) | After a bid wall is cleared by probable consumption, a persistent bid wall appears at the same or higher price within five minutes, with at least 50% of the reference size. The best ask remains above the new wall. | `BID_HOLD`: bullish quote defense; can trigger LONG. |
 | **Bid Step Up** (`BID_STEP_UP`) | A persistent bid wall appears above a reference bid wall from the preceding five minutes, with at least 50% of its size. The new wall is above the observed session low and the best ask remains above it. The reference can be active or previously cleared by probable consumption. | `BID_HOLD`: support moves higher; can trigger LONG. |
 | **Bids Cancelled** (`BIDS_CANCELLED`) | A qualified bid wall loses at least 90% of its immediately pre-clear size, the loss remains stable for 500 ms, known sell trades explain at most 10%, coverage is usable, and no likely relocation is identified. | `BID_FAIL`: inferred support withdrawal; can trigger SHORT. The name does not prove an exchange cancellation. |
 | **Bid Breakdown** (`BID_BREAKDOWN`) | Known sell trades explain at least 70% of a qualified bid wall's loss, followed by an actual trade at least one tick below within three seconds. | `BID_FAIL`: support is consumed and price breaks below; can trigger SHORT. |
 | **Offer Reappear** (`OFFER_REAPPEAR`) | After an offer wall is cleared by probable consumption, a persistent offer wall appears at the same or lower price within five minutes, with at least 50% of the reference size. The best bid remains below the new wall. | `OFFER_BEARISH_CONFIRMATION`: renewed resistance; confirms a compatible SHORT bid trigger or shows SHORT waiting context. |
 | **Offer Step Down** (`OFFER_STEP_DOWN`) | A persistent offer wall appears below a reference offer wall from the preceding five minutes, with at least 50% of its size. The new wall is below the observed session high and the best bid remains below it. The reference can be active or previously cleared by probable consumption. | `OFFER_BEARISH_CONFIRMATION`: resistance moves lower; confirms a compatible SHORT bid trigger or shows SHORT waiting context. |
-| **Offer Hold** (`OFFER_HOLD`) | Price approaches a persistent offer from below within 0.05% of wall price, then retreats at least 0.1% of wall price from the test high. Subsequent trades confirm 500 ms at/below the retreat threshold within a 15-second interaction. The offer remains present and unbroken. | `OFFER_BEARISH_CONFIRMATION`: tested resistance with a confirmed retreat; confirms a compatible SHORT bid trigger or shows SHORT waiting context. |
-| **Offer Size Increasing Hold** (`OFFER_SIZE_INCREASING_HOLD`) | An offer grows at least 25% relative to its interaction baseline, then meets the offer-hold conditions with fresh retreat confirmation after growth in the same interaction. | `OFFER_BEARISH_CONFIRMATION`: growing resistance followed by a completed hold; upgrades the same hold episode. |
+| **Offer Bounce** (`OFFER_BOUNCE`) | Price approaches a persistent offer from below within 0.05% of wall price, then retreats at least 0.1% of wall price from the test high. Subsequent trades confirm 500 ms at/below the retreat threshold within a 15-second interaction. The offer remains present and unbroken. | `OFFER_BEARISH_CONFIRMATION`: tested resistance with a confirmed retreat; confirms a compatible SHORT bid trigger or shows SHORT waiting context. |
+| **Offer Size Increasing Hold** (`OFFER_SIZE_INCREASING_HOLD`) | An offer grows at least 25% relative to its interaction baseline, then meets the offer-bounce conditions with fresh retreat confirmation after growth in the same interaction. | `OFFER_BEARISH_CONFIRMATION`: growing resistance followed by a completed hold; upgrades the same hold episode. |
 | **Offer Breakout** (`OFFER_BREAKOUT`) | Known buy trades explain at least 70% of a qualified offer wall's loss, followed by an actual trade at least one tick above within three seconds. | `OFFER_BULLISH_CONFIRMATION`: resistance is consumed and price breaks above; confirms a compatible LONG bid trigger or shows LONG waiting context. |
 | **Offer Size Increase** (`OFFER_SIZE_INCREASE`) | A persistent offer grows at least 25% relative to its baseline; no hold is required for this observation. | `UNKNOWN`: recorded in history and inspection, with no directional confirmation or bid-size reduction. Growth alone does not establish bearish meaning. |
 
@@ -76,15 +76,15 @@ wall price, and `T` a subsequent trade price.
 
 | Pattern | Price range tracked / required price interaction | Minimum tracked size |
 | --- | --- | --- |
-| **Bid Hold** (`BID_HOLD`) | All tracked bid levels; approach trade in `[W, W + 0.0005 * W]`, then rebound at least `0.001 * W` from the test low. A trade below `W` or best ask at/below `W` breaks the interaction. | 3K displayed shares, inclusive |
+| **Bid Bounce** (`BID_BOUNCE`) | All tracked bid levels; approach trade in `[W, W + 0.0005 * W]`, then rebound at least `0.001 * W` from the test low. A trade below `W` or best ask at/below `W` breaks the interaction. | 3K displayed shares, inclusive |
 | **Bid Reappear** (`BID_REAPPEAR`) | Replacement wall strictly inside `L < W < H`, with `W >= R` and best ask above `W`. No maximum distance from the reference wall or current price at detection. | 3K displayed shares, inclusive |
 | **Bid Step Up** (`BID_STEP_UP`) | New wall strictly inside `L < W < H`, with `W > R` and best ask above `W`. The same range applies to delayed revisions. No maximum step distance at detection. | 3K displayed shares, inclusive |
 | **Bids Cancelled** (`BIDS_CANCELLED`) | All tracked bid levels. This independent observer event has no day-high/day-low or 2% filter; the chart's BID PULL filter below does not apply to it. | 3K shares removed, inclusive |
 | **Bid Breakdown** (`BID_BREAKDOWN`) | All tracked bid levels; requires a subsequent print `T <= W - 1 tick`. No daily-range filter or maximum distance below the wall. | 1K shares removed, inclusive |
 | **Offer Reappear** (`OFFER_REAPPEAR`) | Replacement wall strictly inside `L < W < H`, with `W <= R` and best bid below `W`. No maximum distance from the reference wall or current price at detection. | 3K displayed shares, inclusive |
 | **Offer Step Down** (`OFFER_STEP_DOWN`) | New wall strictly inside `L < W < H`, with `W < R` and best bid below `W`. The same range applies to delayed revisions. No maximum step distance at detection. | 3K displayed shares, inclusive |
-| **Offer Hold** (`OFFER_HOLD`) | All tracked offer levels; approach trade in `[W - 0.0005 * W, W]`, then retreat at least `0.001 * W` from the test high. A trade above `W` or best bid at/above `W` breaks the interaction. | 3K displayed shares, inclusive |
-| **Offer Size Increasing Hold** (`OFFER_SIZE_INCREASING_HOLD`) | Same price range and approach/retreat requirements as Offer Hold; growth does not widen the range. | 3K displayed shares, inclusive |
+| **Offer Bounce** (`OFFER_BOUNCE`) | All tracked offer levels; approach trade in `[W - 0.0005 * W, W]`, then retreat at least `0.001 * W` from the test high. A trade above `W` or best bid at/above `W` breaks the interaction. | 3K displayed shares, inclusive |
+| **Offer Size Increasing Hold** (`OFFER_SIZE_INCREASING_HOLD`) | Same price range and approach/retreat requirements as Offer Bounce; growth does not widen the range. | 3K displayed shares, inclusive |
 | **Offer Breakout** (`OFFER_BREAKOUT`) | All tracked offer levels; requires a subsequent print `T >= W + 1 tick`. No daily-range filter or maximum distance above the wall. | 1K shares removed, inclusive |
 | **Offer Size Increase** (`OFFER_SIZE_INCREASE`) | All qualified tracked offer levels. No approach to current price, daily-range filter, or percentage-distance limit is required. | 3K displayed shares, inclusive |
 | **Unknown Bid Loss** (`UNKNOWN_BID_LOSS`) | Not emitted by the current observer; no active tracking range. | Not emitted (3K policy if admitted) |
@@ -187,18 +187,23 @@ evict older records sooner as observation volume increases.
 | --- | --- |
 | Bid withdrawal | At least 90% loss of immediately pre-clear size, stable for 500 ms; known sell volume explains at most 10%; intact coverage and no likely relocation |
 | Bid breakdown | Known sell volume explains at least 70% of loss, then an actual trade at least one tick below within three seconds |
-| Bid hold | Persistent bid approached from above within 0.05% of wall price; rebound at least 0.1% of wall price from the test low, confirmed by trades over 500 ms within 15 seconds; bid remains present and unbroken |
-| Offer hold | Persistent offer approached from below within 0.05% of wall price; retreat at least 0.1% of wall price from the test high, confirmed by trades over 500 ms within 15 seconds; offer remains present and unbroken |
-| Offer growth plus hold | At least 25% growth, followed by fresh offer-hold retreat confirmation in the same interaction; upgrades one hold episode |
+| Bid bounce | Persistent bid approached from above within 0.05% of wall price; rebound at least 0.1% of wall price from the test low, confirmed by trades over 500 ms within 15 seconds; bid remains present and unbroken |
+| Offer bounce | Persistent offer approached from below within 0.05% of wall price; retreat at least 0.1% of wall price from the test high, confirmed by trades over 500 ms within 15 seconds; offer remains present and unbroken |
+| Offer growth plus hold | At least 25% growth, followed by fresh offer-bounce retreat confirmation in the same interaction; upgrades one hold episode |
 | Offer breakout | Known buy volume explains at least 70% of loss, then an actual trade at least one tick above within three seconds |
 
 Trade attribution uses the same price, known aggressor side, a two-second lookback, and the clear-decision interval. Probable moves pair same-side replacement within 500 ms and 10% size tolerance. Unknown aggressor, ambiguous losses, pruned evidence, or buffer discontinuities do not prove withdrawal. “Inferred withdrawal” is an observation-based attribution, not proof of an exchange cancellation; quote defense is not proof of executed absorption.
 
 Wall phases and relocation/reference data are bounded at 4,096; trade attribution is bounded at 8,192 trades. Observation buffer overflow clears dependent composition state, begins a new epoch, and requires fresh readiness. Diagnostics identify the reason.
 
-### Percentage hold rules and migration
+### Percentage bounce rules and migration
 
-Bid Hold and Offer Hold share `detectors.holdApproachRatio = 0.0005` (0.05%),
+Pattern names `BID_HOLD` and `OFFER_HOLD` are now `BID_BOUNCE` and
+`OFFER_BOUNCE`. Detection rules and configuration keys are unchanged. The
+composer meaning `BID_HOLD` still covers bullish bid defense, including
+bid bounce, bid reappear, and bid step up.
+
+Bid Bounce and Offer Bounce share `detectors.holdApproachRatio = 0.0005` (0.05%),
 `holdRetreatRatio = 0.001` (0.1%), `holdConfirmationMs = 500`, and
 `interactionWindowMs = 15000`. Percentage distances use the wall price, with no
 fixed tick minimum. Prices are still observed on the instrument's trade grid:
@@ -214,7 +219,7 @@ rearms after price leaves the approach zone and returns. Removal, a drop below
 3K, quote/trade crossing, replay seek, or coverage reset discards pending tests.
 No session-high/session-low restriction applies to these hold observations.
 
-`OFFER_REJECTION` and `OFFER_SIZE_INCREASING_REJECTION` are now `OFFER_HOLD` and
+`OFFER_REJECTION` and `OFFER_SIZE_INCREASING_REJECTION` are now `OFFER_BOUNCE` and
 `OFFER_SIZE_INCREASING_HOLD`. Update consumers of these event names. Legacy
 `approachDistanceTicks`, `rejectionDistanceTicks`, and `rejectionHoldMs` settings
 are ignored. Normal startup uses the compiled defaults on every machine. If
@@ -223,7 +228,7 @@ you explicitly opt into a custom file, use the new keys; its existing
 The evidence field `rejectionTimeNs` retains its serialized name and now records
 the start of retreat/rebound confirmation. `testExtremeTick` in evidence metadata
 records the actual test high/low. Existing Bid Reappear and Bid Step Up still
-provide their own BID_HOLD evidence independently of the new tested Bid Hold.
+provide their own BID_HOLD evidence independently of the new tested Bid Bounce.
 
 The composer's separate 20-tick confirmation-distance and trigger-drift defaults
 still apply. A raw hold observation can therefore appear in retained history

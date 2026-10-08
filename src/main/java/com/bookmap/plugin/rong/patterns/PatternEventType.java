@@ -2,14 +2,14 @@ package com.bookmap.plugin.rong.patterns;
 
 /** Observation semantics, deliberately independent of legacy tradebook routing. */
 public enum PatternEventType {
-    BID_HOLD(PatternSide.BID, PatternMeaning.BID_HOLD),
+    BID_BOUNCE(PatternSide.BID, PatternMeaning.BID_HOLD),
     BID_REAPPEAR(PatternSide.BID, PatternMeaning.BID_HOLD),
     BID_STEP_UP(PatternSide.BID, PatternMeaning.BID_HOLD),
     OFFER_REAPPEAR(PatternSide.OFFER, PatternMeaning.OFFER_BEARISH_CONFIRMATION),
     OFFER_STEP_DOWN(PatternSide.OFFER, PatternMeaning.OFFER_BEARISH_CONFIRMATION),
     BIDS_CANCELLED(PatternSide.BID, PatternMeaning.BID_FAIL),
     BID_BREAKDOWN(PatternSide.BID, PatternMeaning.BID_FAIL),
-    OFFER_HOLD(PatternSide.OFFER, PatternMeaning.OFFER_BEARISH_CONFIRMATION),
+    OFFER_BOUNCE(PatternSide.OFFER, PatternMeaning.OFFER_BEARISH_CONFIRMATION),
     OFFER_SIZE_INCREASING_HOLD(PatternSide.OFFER, PatternMeaning.OFFER_BEARISH_CONFIRMATION),
     OFFER_BREAKOUT(PatternSide.OFFER, PatternMeaning.OFFER_BULLISH_CONFIRMATION),
     OFFER_SIZE_INCREASE(PatternSide.OFFER, PatternMeaning.UNKNOWN),

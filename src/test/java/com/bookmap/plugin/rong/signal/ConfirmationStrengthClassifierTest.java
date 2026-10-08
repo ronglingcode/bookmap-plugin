@@ -29,9 +29,9 @@ class ConfirmationStrengthClassifierTest {
     }
     @Test void tiesAreStableAndPreferSizeThenTimeThenId() {
         PatternEvent bid = event(PatternEventType.BIDS_CANCELLED, 3000, 5105, 100, "bid");
-        ConfirmationMatch a = new ConfirmationMatch(bid, event(PatternEventType.OFFER_HOLD, 60000, 5120, 99, "a"));
-        ConfirmationMatch b = new ConfirmationMatch(bid, event(PatternEventType.OFFER_HOLD, 60000, 5120, 98, "b"));
-        ConfirmationMatch z = new ConfirmationMatch(bid, event(PatternEventType.OFFER_HOLD, 60000, 5120, 99, "z"));
+        ConfirmationMatch a = new ConfirmationMatch(bid, event(PatternEventType.OFFER_BOUNCE, 60000, 5120, 99, "a"));
+        ConfirmationMatch b = new ConfirmationMatch(bid, event(PatternEventType.OFFER_BOUNCE, 60000, 5120, 98, "b"));
+        ConfirmationMatch z = new ConfirmationMatch(bid, event(PatternEventType.OFFER_BOUNCE, 60000, 5120, 99, "z"));
         assertSame(a, classifier.select(List.of(z, b, a)).strongest);
         assertSame(a, classifier.select(List.of(a, b, z)).strongest);
         assertEquals(ConfirmationStrength.NONE, classifier.select(Collections.emptyList()).strength);
