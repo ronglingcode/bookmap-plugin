@@ -600,9 +600,6 @@ public class TradeButtonWindow {
                         BorderFactory.createEtchedBorder(),
                         BorderFactory.createEmptyBorder(6, 6, 6, 6))));
 
-        JLabel tradebookLabel = new JLabel(tradebook.getLabel());
-        tradebookPanel.add(tradebookLabel, BorderLayout.NORTH);
-
         JPanel entryMethodPanel = createEntryMethodPanel(tradebook);
         tradebookPanel.add(entryMethodPanel, BorderLayout.CENTER);
         return tradebookPanel;
