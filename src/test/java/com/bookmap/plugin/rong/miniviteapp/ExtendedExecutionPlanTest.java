@@ -63,6 +63,41 @@ class ExtendedExecutionPlanTest {
         assertEquals(9.5, Models.number(plan.requests.get(0).body, "stopPrice"));
         assertEquals("POST", plan.requests.get(4).method);
     }
+    @Test void hoverBsEntriesStayOneCentBeyondOppositeStopsIncludingQuoteAdjustments() {
+        for (boolean isLong : new boolean[] { false, true }) {
+            for (boolean adjusted : new boolean[] { false, true }) {
+                JsonObject json = longState();
+                json.addProperty("netQuantity", isLong ? -1000 : 1000);
+                json.addProperty("currentPrice", isLong ? 10 : 12);
+                double protectivePrice = adjusted ? (isLong ? 11.01 : 10.99) : 11;
+                json.addProperty("bid", adjusted ? protectivePrice : (isLong ? 10 : 12));
+                json.addProperty("ask", adjusted ? protectivePrice : (isLong ? 10 : 12));
+                json.getAsJsonObject("entryContext").addProperty("customStopShort", 13);
+                for (var element : json.getAsJsonArray("pairs")) {
+                    element.getAsJsonObject().getAsJsonObject("STOP").addProperty("isBuy", isLong);
+                    element.getAsJsonObject().getAsJsonObject("LIMIT").addProperty("isBuy", isLong);
+                }
+                JsonObject action = new JsonObject();
+                action.addProperty("source", "bookmap_chart_hotkey");
+                action.addProperty("tradebook_id", isLong ? "RangeBoundBidReversal" : "RangeBoundOfferReversal");
+                action.addProperty("price", 11);
+                action.addProperty("shiftKey", true); // Hover B/S must still submit stop entries.
+                String key = isLong ? "KeyB" : "KeyS";
+                assertTrue(EntryHandler.supports(action, key));
+                Plan plan = EntryHandler.handleEntry(new Snapshot(json), action, key, true);
+                assertEquals(5, plan.requests.size());
+                for (int i = 0; i < 4; i++) {
+                    assertEquals("PUT", plan.requests.get(i).method);
+                    assertEquals(protectivePrice, Models.number(plan.requests.get(i).body, "stopPrice"));
+                }
+                var opening = plan.requests.get(4);
+                assertEquals("POST", opening.method);
+                assertEquals("STOP", Models.string(opening.body, "orderType"));
+                assertEquals(protectivePrice + (isLong ? 0.01 : -0.01), Models.number(opening.body, "stopPrice"), 0.000001);
+                assertEquals(isLong ? "BUY" : "SELL_SHORT", Models.string(opening.body.getAsJsonArray("orderLegCollection").get(0).getAsJsonObject(), "instruction"));
+            }
+        }
+    }
     @Test void existingRiskReducesEntryBeforeMethodAndLiquidityMultipliers() {
         JsonObject json = longState();
         json.addProperty("averagePrice", 10.6); // 1100 risk: only 0.1R remains below the 1.2R cap.
