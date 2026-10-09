@@ -3,6 +3,7 @@ package com.bookmap.plugin.rong.executions;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
@@ -14,6 +15,7 @@ import java.util.concurrent.CopyOnWriteArrayList;
 public class FilledExecutionStore {
 
     public static final long TRANSIENT_DISPLAY_TTL_NS = 30_000_000_000L;
+    public static final long GROUP_WINDOW_NS = 2_000_000_000L;
 
     @FunctionalInterface
     public interface ChangeListener {
@@ -49,11 +51,13 @@ public class FilledExecutionStore {
     }
 
     /**
-     * Returns every marker in persistent mode, or only executions no more than 30 seconds old.
+     * Groups same-side fills within two seconds of the first fill. Groups use total
+     * quantity, volume-weighted price, and the latest fill time. Transient groups
+     * remain visible for 30 seconds after their latest fill.
      */
     public List<FilledExecutionMarker> getMarkersForDisplay(
             String instrumentAlias, boolean persistent, long nowNs) {
-        List<FilledExecutionMarker> markers = getMarkers(instrumentAlias);
+        List<FilledExecutionMarker> markers = groupMarkers(getMarkers(instrumentAlias));
         if (persistent || markers.isEmpty()) {
             return markers;
         }
@@ -65,6 +69,46 @@ public class FilledExecutionStore {
             }
         }
         return Collections.unmodifiableList(recent);
+    }
+
+    private List<FilledExecutionMarker> groupMarkers(List<FilledExecutionMarker> markers) {
+        List<FilledExecutionMarker> sorted = new ArrayList<>(markers);
+        sorted.sort(Comparator.comparingLong(FilledExecutionMarker::getTimeNs));
+        List<FilledExecutionMarker> grouped = new ArrayList<>();
+        // Independent windows allow interleaved buys and sells to group by side.
+        for (boolean buy : new boolean[] {true, false}) {
+            FilledExecutionMarker aggregate = null;
+            long firstTimeNs = 0;
+            for (FilledExecutionMarker marker : sorted) {
+                if (marker.isBuy() != buy) {
+                    continue;
+                }
+                if (aggregate == null || marker.getTimeNs() - firstTimeNs > GROUP_WINDOW_NS) {
+                    if (aggregate != null) {
+                        grouped.add(aggregate);
+                    }
+                    aggregate = marker;
+                    firstTimeNs = marker.getTimeNs();
+                } else {
+                    double quantity = aggregate.getQuantity() + marker.getQuantity();
+                    double weight = marker.getQuantity() / quantity;
+                    aggregate = new FilledExecutionMarker(
+                            marker.getInstrumentAlias(),
+                            aggregate.getPriceInTicks()
+                                    + (marker.getPriceInTicks() - aggregate.getPriceInTicks()) * weight,
+                            aggregate.getRealPrice()
+                                    + (marker.getRealPrice() - aggregate.getRealPrice()) * weight,
+                            quantity, buy,
+                            aggregate.isOpening() || marker.isOpening(),
+                            marker.getTimeNs());
+                }
+            }
+            if (aggregate != null) {
+                grouped.add(aggregate);
+            }
+        }
+        grouped.sort(Comparator.comparingLong(FilledExecutionMarker::getTimeNs));
+        return Collections.unmodifiableList(grouped);
     }
 
     public void clearAll(String instrumentAlias) {
