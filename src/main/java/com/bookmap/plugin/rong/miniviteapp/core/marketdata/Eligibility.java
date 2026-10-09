@@ -7,7 +7,7 @@ import java.util.List;
 
 public final class Eligibility {
     // These symbols may trade without meeting the premarket volume thresholds.
-    public static final List<String> PREMARKET_VOLUME_WHITELIST = List.of("AMD", "MU");
+    public static final List<String> PREMARKET_VOLUME_WHITELIST = List.of("AMD", "MU", "TSLA");
     public static boolean isPremarketVolumeWhitelisted(String symbol) {
         return PREMARKET_VOLUME_WHITELIST.contains(symbol);
     }
