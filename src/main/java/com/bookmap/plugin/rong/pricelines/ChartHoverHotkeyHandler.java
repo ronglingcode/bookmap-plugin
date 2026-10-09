@@ -5,6 +5,7 @@ import java.awt.Component;
 import java.awt.Container;
 import java.awt.Frame;
 import java.awt.KeyboardFocusManager;
+import java.awt.KeyEventDispatcher;
 import java.awt.MouseInfo;
 import java.awt.Point;
 import java.awt.PointerInfo;
@@ -93,6 +94,8 @@ public class ChartHoverHotkeyHandler implements ScreenSpacePainterFactory {
 
     /** Shared AWT listener — registered once. */
     private static volatile AWTEventListener awtListener;
+    private static KeyEventDispatcher keyDispatcher;
+    private static KeyboardFocusManager keyFocusManager;
     private static final Object listenerLock = new Object();
 
     private final SignalWebSocketServer wsServer;
@@ -133,6 +136,9 @@ public class ChartHoverHotkeyHandler implements ScreenSpacePainterFactory {
         synchronized (listenerLock) {
             if (awtListener != null) {
                 Toolkit.getDefaultToolkit().removeAWTEventListener(awtListener);
+                keyFocusManager.removeKeyEventDispatcher(keyDispatcher);
+                keyDispatcher = null;
+                keyFocusManager = null;
                 awtListener = null;
                 painterCoords.clear();
                 componentToInstrument.clear();
@@ -147,20 +153,24 @@ public class ChartHoverHotkeyHandler implements ScreenSpacePainterFactory {
         if (awtListener != null) return;
         synchronized (listenerLock) {
             if (awtListener != null) return;
-            awtListener = event -> {
+            // Capture before component bindings and focus traversal can consume the press.
+            // Keep normal Bookmap key processing; only this dispatcher handles plugin hotkeys.
+            keyDispatcher = event -> {
                 if (event.getID() == KeyEvent.KEY_PRESSED) {
-                    KeyEvent ke = (KeyEvent) event;
-                    handleChartHotkey(ke, normalizeKey(ke));
-                    return;
+                    handleChartHotkey(event, normalizeKey(event));
                 }
-
+                return false;
+            };
+            keyFocusManager = KeyboardFocusManager.getCurrentKeyboardFocusManager();
+            keyFocusManager.addKeyEventDispatcher(keyDispatcher);
+            awtListener = event -> {
                 if (event.getID() == MouseEvent.MOUSE_MOVED || event.getID() == MouseEvent.MOUSE_DRAGGED) {
                     updateHoverContext((MouseEvent) event);
                     return;
                 }
             };
             Toolkit.getDefaultToolkit().addAWTEventListener(awtListener,
-                AWTEvent.MOUSE_MOTION_EVENT_MASK | AWTEvent.KEY_EVENT_MASK);
+                AWTEvent.MOUSE_MOTION_EVENT_MASK);
         }
     }
 
@@ -170,6 +180,16 @@ public class ChartHoverHotkeyHandler implements ScreenSpacePainterFactory {
         ResolvedChartPrice price = resolveChartPrice(component, event.getY());
         if (price != null) {
             lastHoverContext = new HoverContext(price.instrument, price.price, component);
+            if (config != null && config.isEnabled(IndicatorConfig.FIRE_KEYBOARD_EVENT)) {
+                KeyboardFocusManager manager = KeyboardFocusManager.getCurrentKeyboardFocusManager();
+                // Only transfer focus within an active Bookmap session. Hovering must not
+                // activate Bookmap over another application or interrupt an editor.
+                if (manager.getActiveWindow() != null
+                        && !hasTextEntryMarker(manager.getActiveWindow())
+                        && !hasTextEntryMarker(manager.getFocusedWindow())) {
+                    focusHoveredChart(component, manager.getFocusOwner());
+                }
+            }
             return;
         }
 
@@ -181,7 +201,29 @@ public class ChartHoverHotkeyHandler implements ScreenSpacePainterFactory {
                 instrument == null ? null : new HoverContext(instrument, null, component);
     }
 
-    private void handleChartHotkey(KeyEvent event, String normalizedKey) {
+    static void focusHoveredChart(Component component, Component focusOwner) {
+        if (component == null || isTextEntryComponent(component) || isTextEntryComponent(focusOwner)) {
+            return;
+        }
+        if (focusOwner == component
+                || focusOwner != null && SwingUtilities.isDescendingFrom(focusOwner, component)) {
+            return;
+        }
+        Component target = component;
+        while (target != null && !(target instanceof Window)) {
+            if (target.isShowing() && target.isEnabled() && target.isFocusable()) {
+                // requestFocusInWindow handles another panel in the same window. The fallback
+                // also handles Bookmap's separate floating panels when Bookmap is active.
+                if (!target.requestFocusInWindow()) {
+                    target.requestFocus();
+                }
+                return;
+            }
+            target = target.getParent();
+        }
+    }
+
+    void handleChartHotkey(KeyEvent event, String normalizedKey) {
         if (!isChartHotkey(normalizedKey)) {
             return;
         }
@@ -190,6 +232,7 @@ public class ChartHoverHotkeyHandler implements ScreenSpacePainterFactory {
         }
         updateHighlightedInstrumentFromWindowTitle(event.getComponent());
         if (isTextEntryEvent(event)) {
+            logIgnoredHotkey(event, normalizedKey, "keyboard focus is in a text editor or the event was already consumed");
             return;
         }
 
@@ -197,6 +240,9 @@ public class ChartHoverHotkeyHandler implements ScreenSpacePainterFactory {
                 || event.isShiftDown() && ("g".equals(normalizedKey) || "h".equals(normalizedKey)));
         HoverContext hover = resolveCurrentHoverContext(priceRequired);
         if (hover == null) {
+            logIgnoredHotkey(event, normalizedKey, priceRequired
+                    ? "no current chart hover price; move the mouse over the chart"
+                    : "no current chart hover instrument; move the mouse over the chart");
             return;
         }
 
@@ -209,7 +255,8 @@ public class ChartHoverHotkeyHandler implements ScreenSpacePainterFactory {
         boolean shiftDown = event.isShiftDown();
         String actionLog = formatHoverHotkeyActionLog(
                 hover.instrument, keyCode, hover.price, shiftDown);
-        PluginLog.detail(hover.instrument, "Bookmap", actionLog);
+        PluginLog.summary(hover.instrument, "Bookmap",
+                actionLog + " key_event_time=" + event.getWhen(), actionLog);
         if (isEntryHotkeyDisabledAt(normalizedKey, Instant.now())) {
             PluginLog.action(hover.instrument, "Bookmap", "Entry hotkey ignored after the entry cutoff; no native action requested");
             return;
@@ -243,6 +290,12 @@ public class ChartHoverHotkeyHandler implements ScreenSpacePainterFactory {
         }
 
         wsServer.dispatchTradingAction(json);
+    }
+
+    private static void logIgnoredHotkey(KeyEvent event, String key, String reason) {
+        String message = "Chart hotkey " + key.toUpperCase(Locale.ROOT) + " ignored: " + reason;
+        PluginLog.summary(currentHighlightedInstrument(), "Bookmap",
+                message + " key_event_time=" + event.getWhen(), message);
     }
 
     static void addWallReversalEntryFields(
@@ -305,6 +358,10 @@ public class ChartHoverHotkeyHandler implements ScreenSpacePainterFactory {
 
         Point point = pointerInfo.getLocation();
         SwingUtilities.convertPointFromScreen(point, hover.component);
+        return resolveHoverContextAtPointer(hover, point, priceRequired);
+    }
+
+    static HoverContext resolveHoverContextAtPointer(HoverContext hover, Point point, boolean priceRequired) {
         if (!hover.component.contains(point)) {
             return null;
         }
@@ -312,7 +369,8 @@ public class ChartHoverHotkeyHandler implements ScreenSpacePainterFactory {
         ResolvedChartPrice current = resolveChartPrice(hover.component, point.y);
         if (current == null) {
             if (priceRequired) {
-                lastHoverContext = null;
+                // Keep the component so the next press can retry after painter mappings recover,
+                // even if the mouse has not moved. Never dispatch with the cached price.
                 return null;
             }
             return hover;
@@ -465,14 +523,13 @@ public class ChartHoverHotkeyHandler implements ScreenSpacePainterFactory {
         return instruments.iterator().next();
     }
 
-    private static boolean isTextEntryEvent(KeyEvent event) {
+    static boolean isTextEntryEvent(KeyEvent event) {
         if (event == null || event.isConsumed()) {
             return true;
         }
 
         KeyboardFocusManager manager = KeyboardFocusManager.getCurrentKeyboardFocusManager();
         if (isTextEntryComponent(manager.getFocusOwner())
-                || isTextEntryComponent(manager.getPermanentFocusOwner())
                 || isTextEntryComponent(event.getComponent())) {
             return true;
         }
@@ -500,7 +557,10 @@ public class ChartHoverHotkeyHandler implements ScreenSpacePainterFactory {
             if (current instanceof JTable && ((JTable) current).isEditing()) {
                 return true;
             }
-            if (hasTextEntryMarker(current)) {
+            // Read-only log areas receive focus too, but are not editors. Their JTextArea
+            // class name must not turn a read-only component into a text-entry blocker.
+            if (!(current instanceof JTextComponent) && !(current instanceof TextComponent)
+                    && hasTextEntryMarker(current)) {
                 return true;
             }
             current = current.getParent();
@@ -784,7 +844,7 @@ public class ChartHoverHotkeyHandler implements ScreenSpacePainterFactory {
         }
     }
 
-    private static class HoverContext {
+    static class HoverContext {
         final String instrument;
         final Double price;
         final Component component;
