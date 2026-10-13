@@ -6857,6 +6857,7 @@
             "color": "green"
           }
         ],
+        "bookmapPatternsToMonitor": [],
         "waitForBidRetest": "yes",
         "waitForOfferRetest": "warning",
         "previousDay": {
@@ -7483,6 +7484,7 @@
             "color": "green"
           }
         ],
+        "bookmapPatternsToMonitor": [],
         "waitForBidRetest": "yes",
         "waitForOfferRetest": "warning",
         "previousDay": {
@@ -7993,6 +7995,7 @@
             "color": "green"
           }
         ],
+        "bookmapPatternsToMonitor": [],
         "waitForBidRetest": "yes",
         "waitForOfferRetest": "warning",
         "previousDay": {
@@ -8558,6 +8561,7 @@
             "color": "green"
           }
         ],
+        "bookmapPatternsToMonitor": [],
         "waitForBidRetest": "yes",
         "waitForOfferRetest": "warning",
         "previousDay": {
@@ -8719,6 +8723,7 @@
         "priceUnit": "real",
         "levels": [],
         "zones": [],
+        "bookmapPatternsToMonitor": [],
         "waitForBidRetest": "no",
         "waitForOfferRetest": "no",
         "premarket": {
@@ -9013,6 +9018,7 @@
         "priceUnit": "real",
         "levels": [],
         "zones": [],
+        "bookmapPatternsToMonitor": [],
         "waitForBidRetest": "no",
         "waitForOfferRetest": "no",
         "premarket": {

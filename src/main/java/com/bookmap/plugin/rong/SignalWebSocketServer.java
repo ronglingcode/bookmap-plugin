@@ -106,6 +106,23 @@ public class SignalWebSocketServer extends WebSocketServer {
     }
 
     @FunctionalInterface
+    public interface PatternMonitorConfigListener {
+        void onPatternsChanged(String symbol, List<String> patterns);
+    }
+
+    private final Map<String, List<String>> symbolToPatternsToMonitor = new ConcurrentHashMap<>();
+    private final List<PatternMonitorConfigListener> patternMonitorListeners = new java.util.concurrent.CopyOnWriteArrayList<>();
+
+    public void registerPatternMonitorConfigListener(PatternMonitorConfigListener listener) {
+        patternMonitorListeners.add(listener);
+        symbolToPatternsToMonitor.forEach(listener::onPatternsChanged);
+    }
+
+    public void unregisterPatternMonitorConfigListener(PatternMonitorConfigListener listener) {
+        patternMonitorListeners.remove(listener);
+    }
+
+    @FunctionalInterface
     public interface KeyZoneConfigListener {
         void onKeyZonesChanged(String symbol, List<KeyZoneDefinition> zones);
     }
@@ -751,6 +768,9 @@ public class SignalWebSocketServer extends WebSocketServer {
         }
 
         List<KeyLevelDefinition> immutableLevels = Collections.unmodifiableList(levels);
+        List<String> patterns = List.copyOf(getStringArray(json, "bookmapPatternsToMonitor"));
+        symbolToPatternsToMonitor.put(symbol, patterns);
+        for (PatternMonitorConfigListener listener : patternMonitorListeners) listener.onPatternsChanged(symbol, patterns);
         symbolToKeyLevels.put(symbol, immutableLevels);
         notifyKeyLevelConfigListeners(symbol, immutableLevels);
 

@@ -53,6 +53,7 @@ public final class NativeViews {
         zone(zones, zoneKeys, object(object(object(plan, "long"), "gapAndGoPlan"), "support"), "gap & go support", "green"); zone(zones, zoneKeys, object(object(object(plan, "long"), "gapDownAndGoUpPlan"), "support"), "gap down & go up support", "green");
         zone(zones, zoneKeys, object(object(object(plan, "short"), "gapAndCrapPlan"), "resistance"), "gap & crap resistance", "red"); zone(zones, zoneKeys, object(object(object(plan, "short"), "gapDownAndGoDownPlan"), "resistance"), "gap down & go down resistance", "red");
         keys.add("levels", levels); keys.add("zones", zones); keys.addProperty("waitForBidRetest", mode(object(plan, "analysis"), "waitForBidRetest")); keys.addProperty("waitForOfferRetest", mode(object(plan, "analysis"), "waitForOfferRetest"));
+        keys.add("bookmapPatternsToMonitor", array(plan, "bookmapPatternsToMonitor").deepCopy());
         result.add(keys);
         JsonObject exits = msg(view, "exit_order_pairs_config"); JsonArray indexed = pairs.deepCopy(); for (int i = 0; i < indexed.size(); i++) indexed.get(i).getAsJsonObject().addProperty("index", i + 1); exits.add("pairs", indexed); result.add(exits);
         JsonObject accountView = msg(view, "account_state"); JsonArray open = new JsonArray(); entries.forEach(item -> order(open, item.getAsJsonObject(), "ENTRY", null, 0)); for (int i = 0; i < pairs.size(); i++) { JsonObject pair = pairs.get(i).getAsJsonObject(); order(open, object(pair, "STOP"), "STOP", pair, i + 1); order(open, object(pair, "LIMIT"), "LIMIT", pair, i + 1); }
