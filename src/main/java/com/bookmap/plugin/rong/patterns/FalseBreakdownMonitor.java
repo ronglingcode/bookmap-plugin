@@ -35,6 +35,7 @@ public final class FalseBreakdownMonitor {
     }
 
     private final TreeMap<Integer, Integer> bids = new TreeMap<>();
+    private final TreeMap<Integer, Integer> asks = new TreeMap<>();
     private final Map<Integer, Long> largeSince = new HashMap<>();
     private final Set<Integer> clearedPrices = new HashSet<>();
     private final List<Level> levels = new ArrayList<>();
@@ -42,11 +43,12 @@ public final class FalseBreakdownMonitor {
     private LocalDate sessionDate;
     private long lastTimeNs;
     private Integer currentPrice, activeBid;
+    private Integer latestBid, latestAsk;
 
     public synchronized void setEnabled(boolean value) { enabled = value; selectBid(); }
     public synchronized void reset() {
-        bids.clear(); largeSince.clear(); clearedPrices.clear(); levels.clear();
-        lastTimeNs = 0; sessionDate = null; currentPrice = activeBid = null; regularSession = false;
+        bids.clear(); asks.clear(); largeSince.clear(); clearedPrices.clear(); levels.clear();
+        lastTimeNs = 0; sessionDate = null; currentPrice = activeBid = latestBid = latestAsk = null; regularSession = false;
     }
     private void advanceTime(long timeNs) {
         if (timeNs <= 0) { regularSession = false; return; }
@@ -55,6 +57,7 @@ public final class FalseBreakdownMonitor {
         ZonedDateTime time = Instant.ofEpochSecond(timeNs / 1_000_000_000L, timeNs % 1_000_000_000L).atZone(NEW_YORK);
         if (!time.toLocalDate().equals(sessionDate)) {
             levels.clear(); clearedPrices.clear(); largeSince.clear(); activeBid = currentPrice = null;
+            latestBid = latestAsk = null;
             sessionDate = time.toLocalDate();
             bids.forEach((tick, size) -> { if (size > SIZE_THRESHOLD) largeSince.put(tick, timeNs); });
         }
@@ -68,15 +71,25 @@ public final class FalseBreakdownMonitor {
     }
     public synchronized void onDepth(boolean bid, int price, int size, long timeNs, boolean ready) {
         advanceTime(timeNs); selectBid();
-        if (!bid) return;
+        if (!bid) {
+            if (size > 0) asks.put(price, size); else asks.remove(price);
+            updateDepthQuote(timeNs, ready); selectBid(); return;
+        }
         if (size > SIZE_THRESHOLD) largeSince.putIfAbsent(price, timeNs); else largeSince.remove(price);
         if (size > 0) bids.put(price, size); else bids.remove(price);
-        if (Integer.valueOf(price).equals(activeBid) && size <= 0) {
+        // The tracked large wall can be consumed while smaller residual orders remain.
+        if (Integer.valueOf(price).equals(activeBid) && size <= SIZE_THRESHOLD) {
             if (enabled && ready && regularSession && levels.size() < MAX_ENTRIES && clearedPrices.add(price))
                 levels.add(new Level(price, levels.size() + 1, timeNs, 0, 0));
             activeBid = null;
         }
+        updateDepthQuote(timeNs, ready);
+        if (enabled && ready && regularSession) evaluateQuote(timeNs);
         selectBid();
+    }
+    private void updateDepthQuote(long timeNs, boolean ready) {
+        // Replay can deliver top-of-book changes through depth without a separate BBO callback.
+        if (!bids.isEmpty() && !asks.isEmpty()) onBbo(bids.lastKey(), asks.firstKey(), timeNs, ready);
     }
     public synchronized void onTrade(int price, int size, Boolean buy, long timeNs, boolean ready) {
         advanceTime(timeNs); currentPrice = price; selectBid();
@@ -86,16 +99,22 @@ public final class FalseBreakdownMonitor {
         advanceTime(timeNs);
         if (bidPrice <= 0 || askPrice <= bidPrice) return;
         currentPrice = bidPrice;
-        if (enabled && ready && regularSession) {
-            for (int i = 0; i < levels.size(); i++) {
-                Level level = levels.get(i);
-                if (level.phase == Phase.CLEARED && timeNs >= level.clearedTimeNs && askPrice < level.bidTick)
-                    levels.set(i, new Level(level.bidTick, level.number, level.clearedTimeNs, timeNs, 0));
-                else if (level.phase == Phase.BREAKDOWN && timeNs >= level.breakdownTimeNs && bidPrice > level.bidTick)
-                    levels.set(i, new Level(level.bidTick, level.number, level.clearedTimeNs, level.breakdownTimeNs, timeNs));
-            }
+        if (ready && regularSession) {
+            latestBid = bidPrice; latestAsk = askPrice;
+            if (enabled) evaluateQuote(timeNs);
         }
         selectBid();
+    }
+    private void evaluateQuote(long timeNs) {
+        if (latestBid == null || latestAsk == null) return;
+        // Quotes persist until changed. Depth may clear the wall after an ask-below callback.
+        for (int i = 0; i < levels.size(); i++) {
+                Level level = levels.get(i);
+                if (level.phase == Phase.CLEARED && timeNs >= level.clearedTimeNs && latestAsk < level.bidTick)
+                    levels.set(i, new Level(level.bidTick, level.number, level.clearedTimeNs, timeNs, 0));
+                else if (level.phase == Phase.BREAKDOWN && timeNs >= level.breakdownTimeNs && latestBid > level.bidTick)
+                    levels.set(i, new Level(level.bidTick, level.number, level.clearedTimeNs, level.breakdownTimeNs, timeNs));
+        }
     }
     private void selectBid() {
         if (!enabled || !regularSession || currentPrice == null || levels.size() >= MAX_ENTRIES) { activeBid = null; return; }

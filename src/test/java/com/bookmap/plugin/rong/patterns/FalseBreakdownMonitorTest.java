@@ -56,6 +56,24 @@ class FalseBreakdownMonitorTest {
         assertEquals(FalseBreakdownMonitor.Phase.RECLAIMED, m.snapshot().entries.get(0).phase);
     }
 
+    @Test void residualSmallBidCannotKeepFirstBidLabelStuckAfterAskTradesBelow() {
+        FalseBreakdownMonitor m = matureBids();
+        m.onDepth(true, 107, 200, MATURE);
+        m.onBbo(105, 106, MATURE + 1, true);
+        assertEquals(1, m.snapshot().entries.size());
+        assertEquals(FalseBreakdownMonitor.Phase.BREAKDOWN, m.snapshot().entries.get(0).phase);
+        assertEquals(105, m.snapshot().highlightedTick);
+        assertEquals(2, m.snapshot().highlightedNumber);
+    }
+
+    @Test void quoteBelowArrivingBeforeDepthClearStillConfirmsWithoutAnotherQuoteChange() {
+        FalseBreakdownMonitor m = matureBids();
+        m.onBbo(105, 106, MATURE, true);
+        m.onDepth(true, 107, 0, MATURE + 1);
+        assertEquals(FalseBreakdownMonitor.Phase.BREAKDOWN, m.snapshot().entries.get(0).phase);
+        assertEquals(MATURE + 1, m.snapshot().entries.get(0).breakdownTimeNs);
+    }
+
     @Test void threeClearsLimitTrackingButPendingQuotesStillConfirmAndReclaim() {
         FalseBreakdownMonitor m = matureBids();
         m.onDepth(true, 107, 0, MATURE); m.onDepth(true, 105, 0, MATURE + 1);
@@ -70,15 +88,16 @@ class FalseBreakdownMonitorTest {
         for (FalseBreakdownMonitor.Level level : m.snapshot().entries) assertEquals(FalseBreakdownMonitor.Phase.RECLAIMED, level.phase);
     }
 
-    @Test void tradeBeforeDepthClearDoesNotLoseTrackedLevelAndPartialFillsDoNotClear() {
+    @Test void residualBidClearsLargeWallButOnlyAskBelowConfirmsBreakdown() {
         FalseBreakdownMonitor m = matureBids();
         m.onDepth(true, 107, 1000, MATURE);
-        assertEquals(107, m.snapshot().highlightedTick); assertTrue(m.snapshot().entries.isEmpty());
+        assertEquals(105, m.snapshot().highlightedTick);
+        assertEquals(FalseBreakdownMonitor.Phase.CLEARED, m.snapshot().entries.get(0).phase);
         m.onTrade(106, 500, false, MATURE + 1, true);
         m.onBbo(105, 106, MATURE + 2, true);
-        assertTrue(m.snapshot().entries.isEmpty());
+        assertEquals(FalseBreakdownMonitor.Phase.BREAKDOWN, m.snapshot().entries.get(0).phase);
         m.onDepth(true, 107, 0, MATURE + 3);
-        assertEquals(FalseBreakdownMonitor.Phase.CLEARED, m.snapshot().entries.get(0).phase);
+        assertEquals(FalseBreakdownMonitor.Phase.BREAKDOWN, m.snapshot().entries.get(0).phase);
         m.onBbo(105, 106, MATURE + 4, true);
         assertEquals(FalseBreakdownMonitor.Phase.BREAKDOWN, m.snapshot().entries.get(0).phase);
     }

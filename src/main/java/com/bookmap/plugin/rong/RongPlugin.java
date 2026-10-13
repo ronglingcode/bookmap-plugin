@@ -122,6 +122,7 @@ public class RongPlugin implements CustomModuleAdapter,
     private SignalCompositionLog compositionLog;
     private volatile boolean signalCompositionEnabled;
     private volatile boolean compositionSnapshotComplete;
+    private volatile boolean patternMonitorSnapshotComplete;
     private volatile boolean compositionSeedFromSharedBook = true;
     private final Object compositionLock = new Object();
     private final com.bookmap.plugin.rong.patterns.CairoObservationConfig observationConfig = com.bookmap.plugin.rong.patterns.CairoObservationConfig.load();
@@ -138,6 +139,7 @@ public class RongPlugin implements CustomModuleAdapter,
     public void initialize(String alias, InstrumentInfo info, Api api, InitialState initialState) {
         if (!LocalCredentials.fileExists() && !observationConfig.observerOnly) return;
         this.rawAlias = alias;
+        patternMonitorSnapshotComplete = false;
         String cleanAlias = SymbolUtils.cleanSymbol(alias);
         this.alias = cleanAlias;
         this.api = api;
@@ -637,7 +639,7 @@ public class RongPlugin implements CustomModuleAdapter,
             falseBreakoutPainter.refresh();
         }
         if (falseBreakdownMonitor != null) {
-            falseBreakdownMonitor.onDepth(isBid, price, size, lastTimestampNs, compositionSnapshotComplete);
+            falseBreakdownMonitor.onDepth(isBid, price, size, lastTimestampNs, patternMonitorSnapshotComplete);
             falseBreakdownPainter.refresh();
         }
         synchronized (compositionLock) {
@@ -664,7 +666,7 @@ public class RongPlugin implements CustomModuleAdapter,
         }
         if (falseBreakdownMonitor != null) {
             falseBreakdownMonitor.onTrade(priceTick, size, tradeInfo == null ? null : tradeInfo.isBidAggressor,
-                    lastTimestampNs, compositionSnapshotComplete);
+                    lastTimestampNs, patternMonitorSnapshotComplete);
             falseBreakdownPainter.refresh();
         }
         if (sharedServer != null) {
@@ -719,7 +721,7 @@ public class RongPlugin implements CustomModuleAdapter,
     public void onBbo(int bidPrice, int bidSize, int askPrice, int askSize) {
         if (!initialized) return;
         if (falseBreakdownMonitor != null) {
-            falseBreakdownMonitor.onBbo(bidPrice, askPrice, lastTimestampNs, compositionSnapshotComplete);
+            falseBreakdownMonitor.onBbo(bidPrice, askPrice, lastTimestampNs, patternMonitorSnapshotComplete);
             falseBreakdownPainter.refresh();
         }
         long eventTimeNs = getEventTimeNs();
@@ -732,6 +734,7 @@ public class RongPlugin implements CustomModuleAdapter,
     @Override
     public void onSnapshotEnd() {
         if (!initialized) return;
+        patternMonitorSnapshotComplete = true;
         compositionSnapshotComplete = true;
         if (wallChangeTracker != null) {
             wallChangeTracker.markReady();
@@ -742,6 +745,7 @@ public class RongPlugin implements CustomModuleAdapter,
     @Override
     public void onRealtimeStart() {
         if (!initialized) return;
+        patternMonitorSnapshotComplete = true;
         compositionSnapshotComplete = true;
         // This callback alone does not prove a live provider (replay can catch up).
         if (wallChangeTracker != null) {
