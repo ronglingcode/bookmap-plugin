@@ -16,18 +16,18 @@ import velox.api.layer1.layers.strategies.interfaces.ScreenSpacePainterAdapter;
 import velox.api.layer1.layers.strategies.interfaces.ScreenSpacePainterFactory;
 
 /** Live bid labels and persistent quote-confirmed breakdown/reclaim markers. */
-public final class FalseBreakdownPainter implements ScreenSpacePainterFactory {
-    private final FalseBreakdownMonitor monitor;
-    private final String title = "False breakdown";
-    private final int maxEntries = FalseBreakdownMonitor.MAX_ENTRIES, captionY = 120;
+public final class ReclaimSecondBidPainter implements ScreenSpacePainterFactory {
+    private final ReclaimSecondBidMonitor monitor;
+    private final String title = "Reclaim 2nd bid";
+    private final int captionY = 120;
 
     private final List<Instance> instances = new CopyOnWriteArrayList<>();
     private final java.util.concurrent.atomic.AtomicBoolean dirty = new java.util.concurrent.atomic.AtomicBoolean(true);
     private final java.util.concurrent.ScheduledExecutorService scheduler = java.util.concurrent.Executors.newSingleThreadScheduledExecutor(task -> {
-        Thread thread = new Thread(task, "false-breakdown-painter"); thread.setDaemon(true); return thread;
+        Thread thread = new Thread(task, "reclaim-second-bid-painter"); thread.setDaemon(true); return thread;
     });
-    public static final String NAME_PREFIX = "falseBreakdown_";
-    public FalseBreakdownPainter(FalseBreakdownMonitor monitor) {
+    public static final String NAME_PREFIX = "reclaim2ndBid_";
+    public ReclaimSecondBidPainter(ReclaimSecondBidMonitor monitor) {
         this.monitor = monitor;
         scheduler.scheduleAtFixedRate(() -> { if (dirty.getAndSet(false)) refreshNow(); }, 100, 100, java.util.concurrent.TimeUnit.MILLISECONDS);
     }
@@ -49,27 +49,25 @@ public final class FalseBreakdownPainter implements ScreenSpacePainterFactory {
         public synchronized void onHeatmapFullPixelsWidth(int width) { this.width = Math.max(1, width); signature = ""; refresh(); }
         synchronized void refresh() {
             if (disposed) return;
-            FalseBreakdownMonitor.Snapshot state = monitor.snapshot();
-            String next = state.enabled + ":" + state.regularSession + ":" + state.highlightedNumber + ":" + state.highlightedTick
-                    + ":" + state.highlightedSize + ":" + state.entries;
+            ReclaimSecondBidMonitor.Snapshot state = monitor.snapshot();
+            String next = state.enabled + ":" + state.regularSession + ":" + state.nextBidTick + ":" + state.fills + ":" + state.signals;
             if (next.equals(signature)) return;
             signature = next; clear();
             if (!state.enabled) return;
-            String status = !state.regularSession ? "waiting for market open" : "cleared " + state.entries.size() + "/" + maxEntries;
+            String status = !state.regularSession ? "waiting for market open" : "fills " + state.fills.size() + "/2";
             BufferedImage caption = label(title + " · " + status, new Color(255, 196, 64));
             add(new CanvasIcon(new PreparedImage(caption), pixelX(10), pixelY(captionY), pixelX(10 + caption.getWidth()), pixelY(captionY + caption.getHeight())));
-            if (state.highlightedTick != null) {
-                Color color = new Color(255, 196, 64);
-                BufferedImage wall = new BufferedImage(width, 24, BufferedImage.TYPE_INT_ARGB);
-                Graphics2D g = wall.createGraphics(); g.setColor(color); g.fillRect(0, 11, width, 2);
-                BufferedImage text = label("bid " + state.highlightedNumber, color);
-                g.drawImage(text, Math.max(0, width - text.getWidth() - 10), 0, null); g.dispose();
-                add(new CanvasIcon(new PreparedImage(wall), pixelX(0), dataY(state.highlightedTick, -12), pixelX(width), dataY(state.highlightedTick, 12)));
-            }
-            for (FalseBreakdownMonitor.Level level : state.entries) {
-                if (level.breakdownTimeNs > 0) marker("breakdown " + level.number, new Color(255, 100, 100), level.bidTick, level.breakdownTimeNs, false);
-                if (level.reclaimTimeNs > 0) marker("long " + level.number, new Color(48, 214, 137), level.bidTick, level.reclaimTimeNs, true);
-            }
+            if (state.nextBidTick != null) level("next bid", new Color(255, 196, 64), state.nextBidTick);
+            for (int i = 0; i < state.fills.size(); i++) level("fill " + (i + 1), new Color(100, 185, 255), state.fills.get(i).bidTick);
+            for (ReclaimSecondBidMonitor.LongSignal signal : state.signals)
+                marker("long", new Color(48, 214, 137), signal.priceTick, signal.timeNs, true);
+        }
+        private void level(String text, Color color, int tick) {
+            BufferedImage wall = new BufferedImage(width, 24, BufferedImage.TYPE_INT_ARGB);
+            Graphics2D g = wall.createGraphics(); g.setColor(color); g.fillRect(0, 11, width, 2);
+            BufferedImage badge = label(text, color);
+            g.drawImage(badge, Math.max(0, width - badge.getWidth() - 10), 0, null); g.dispose();
+            add(new CanvasIcon(new PreparedImage(wall), pixelX(0), dataY(tick, -12), pixelX(width), dataY(tick, 12)));
         }
         private void marker(String text, Color color, int tick, long timeNs, boolean longSignal) {
             BufferedImage badge = entryMarker(text, color, longSignal);

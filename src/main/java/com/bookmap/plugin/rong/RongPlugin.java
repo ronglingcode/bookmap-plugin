@@ -115,8 +115,8 @@ public class RongPlugin implements CustomModuleAdapter,
     private SignalCompositionPipeline signalComposition;
     private com.bookmap.plugin.rong.patterns.FalseBreakoutMonitor falseBreakoutMonitor;
     private com.bookmap.plugin.rong.patterns.FalseBreakoutPainter falseBreakoutPainter;
-    private com.bookmap.plugin.rong.patterns.FalseBreakdownMonitor falseBreakdownMonitor;
-    private com.bookmap.plugin.rong.patterns.FalseBreakdownPainter falseBreakdownPainter;
+    private com.bookmap.plugin.rong.patterns.ReclaimSecondBidMonitor reclaimSecondBidMonitor;
+    private com.bookmap.plugin.rong.patterns.ReclaimSecondBidPainter reclaimSecondBidPainter;
     private SignalWebSocketServer.PatternMonitorConfigListener patternMonitorConfigListener;
     private SignalComposerConfig compositionRules;
     private SignalCompositionLog compositionLog;
@@ -224,22 +224,22 @@ public class RongPlugin implements CustomModuleAdapter,
         initializeSignalComposition(info.pips);
         falseBreakoutMonitor = new com.bookmap.plugin.rong.patterns.FalseBreakoutMonitor();
         falseBreakoutPainter = new com.bookmap.plugin.rong.patterns.FalseBreakoutPainter(falseBreakoutMonitor);
-        falseBreakdownMonitor = new com.bookmap.plugin.rong.patterns.FalseBreakdownMonitor();
-        falseBreakdownPainter = new com.bookmap.plugin.rong.patterns.FalseBreakdownPainter(falseBreakdownMonitor);
+        reclaimSecondBidMonitor = new com.bookmap.plugin.rong.patterns.ReclaimSecondBidMonitor();
+        reclaimSecondBidPainter = new com.bookmap.plugin.rong.patterns.ReclaimSecondBidPainter(reclaimSecondBidMonitor);
         patternMonitorConfigListener = (symbol, patterns) -> {
             if (!cleanAlias.equals(symbol)) return;
             falseBreakoutMonitor.setEnabled(patterns.contains(com.bookmap.plugin.rong.patterns.FalseBreakoutMonitor.PATTERN));
             falseBreakoutPainter.refresh();
-            falseBreakdownMonitor.setEnabled(patterns.contains(com.bookmap.plugin.rong.patterns.FalseBreakdownMonitor.PATTERN));
-            falseBreakdownPainter.refresh();
+            reclaimSecondBidMonitor.setEnabled((patterns.contains(com.bookmap.plugin.rong.patterns.ReclaimSecondBidMonitor.PATTERN) || patterns.contains("falseBreakdown")));
+            reclaimSecondBidPainter.refresh();
         };
         sharedServer.registerPatternMonitorConfigListener(patternMonitorConfigListener);
         api.sendUserMessage(Layer1ApiUserMessageModifyScreenSpacePainter.builder(RongPlugin.class,
                 com.bookmap.plugin.rong.patterns.FalseBreakoutPainter.NAME_PREFIX + cleanAlias)
                 .setScreenSpacePainterFactory(falseBreakoutPainter).setAliasFilter(exactAliasFilter(rawAlias)).setIsAdd(true).build());
         api.sendUserMessage(Layer1ApiUserMessageModifyScreenSpacePainter.builder(RongPlugin.class,
-                com.bookmap.plugin.rong.patterns.FalseBreakdownPainter.NAME_PREFIX + cleanAlias)
-                .setScreenSpacePainterFactory(falseBreakdownPainter).setAliasFilter(exactAliasFilter(rawAlias)).setIsAdd(true).build());
+                com.bookmap.plugin.rong.patterns.ReclaimSecondBidPainter.NAME_PREFIX + cleanAlias)
+                .setScreenSpacePainterFactory(reclaimSecondBidPainter).setAliasFilter(exactAliasFilter(rawAlias)).setIsAdd(true).build());
         synchronized (RongPlugin.class) {
             if (tradingSignalPainter == null) tradingSignalPainter = new TradingSignalPainter(tradingSignalStore, indicatorConfig);
         }
@@ -407,11 +407,11 @@ public class RongPlugin implements CustomModuleAdapter,
                     .setScreenSpacePainterFactory(falseBreakoutPainter).setIsAdd(false).build());
             falseBreakoutPainter.shutdown();
         }
-        if (falseBreakdownPainter != null) {
+        if (reclaimSecondBidPainter != null) {
             api.sendUserMessage(Layer1ApiUserMessageModifyScreenSpacePainter.builder(RongPlugin.class,
-                    com.bookmap.plugin.rong.patterns.FalseBreakdownPainter.NAME_PREFIX + alias)
-                    .setScreenSpacePainterFactory(falseBreakdownPainter).setIsAdd(false).build());
-            falseBreakdownPainter.shutdown();
+                    com.bookmap.plugin.rong.patterns.ReclaimSecondBidPainter.NAME_PREFIX + alias)
+                    .setScreenSpacePainterFactory(reclaimSecondBidPainter).setIsAdd(false).build());
+            reclaimSecondBidPainter.shutdown();
         }
         synchronized (compositionLock) {
             signalCompositionEnabled = false; compositionSnapshotComplete = false;
@@ -638,9 +638,9 @@ public class RongPlugin implements CustomModuleAdapter,
             falseBreakoutMonitor.onDepth(isBid, price, size, lastTimestampNs);
             falseBreakoutPainter.refresh();
         }
-        if (falseBreakdownMonitor != null) {
-            falseBreakdownMonitor.onDepth(isBid, price, size, lastTimestampNs, patternMonitorSnapshotComplete);
-            falseBreakdownPainter.refresh();
+        if (reclaimSecondBidMonitor != null) {
+            reclaimSecondBidMonitor.onDepth(isBid, price, size, lastTimestampNs, patternMonitorSnapshotComplete);
+            reclaimSecondBidPainter.refresh();
         }
         synchronized (compositionLock) {
             if (shouldRunSignalComposition()) signalComposition.onDepth(isBid, price, size, eventTimeNs, provenance);
@@ -664,10 +664,10 @@ public class RongPlugin implements CustomModuleAdapter,
                     lastTimestampNs, compositionSnapshotComplete);
             falseBreakoutPainter.refresh();
         }
-        if (falseBreakdownMonitor != null) {
-            falseBreakdownMonitor.onTrade(priceTick, size, tradeInfo == null ? null : tradeInfo.isBidAggressor,
+        if (reclaimSecondBidMonitor != null) {
+            reclaimSecondBidMonitor.onTrade(priceTick, size, tradeInfo == null ? null : tradeInfo.isBidAggressor,
                     lastTimestampNs, patternMonitorSnapshotComplete);
-            falseBreakdownPainter.refresh();
+            reclaimSecondBidPainter.refresh();
         }
         if (sharedServer != null) {
             sharedServer.updateRegularSessionHighLow(alias, realPrice, eventTimeNs);
@@ -703,9 +703,9 @@ public class RongPlugin implements CustomModuleAdapter,
             falseBreakoutMonitor.onTimestamp(timestampNs);
             falseBreakoutPainter.refresh();
         }
-        if (falseBreakdownMonitor != null) {
-            falseBreakdownMonitor.onTimestamp(timestampNs);
-            falseBreakdownPainter.refresh();
+        if (reclaimSecondBidMonitor != null) {
+            reclaimSecondBidMonitor.onTimestamp(timestampNs);
+            reclaimSecondBidPainter.refresh();
         }
         flushPendingVwapPoints();
         synchronized (compositionLock) {
@@ -720,9 +720,9 @@ public class RongPlugin implements CustomModuleAdapter,
     @Override
     public void onBbo(int bidPrice, int bidSize, int askPrice, int askSize) {
         if (!initialized) return;
-        if (falseBreakdownMonitor != null) {
-            falseBreakdownMonitor.onBbo(bidPrice, askPrice, lastTimestampNs, patternMonitorSnapshotComplete);
-            falseBreakdownPainter.refresh();
+        if (reclaimSecondBidMonitor != null) {
+            reclaimSecondBidMonitor.onBbo(bidPrice, askPrice, lastTimestampNs, patternMonitorSnapshotComplete);
+            reclaimSecondBidPainter.refresh();
         }
         long eventTimeNs = getEventTimeNs();
         PatternEvent.TimestampProvenance provenance = compositionProvenance();
