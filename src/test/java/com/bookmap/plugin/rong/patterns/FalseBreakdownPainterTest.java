@@ -10,7 +10,7 @@ import velox.api.layer1.layers.strategies.interfaces.*;
 import velox.api.layer1.layers.strategies.interfaces.ScreenSpaceCanvas.*;
 
 class FalseBreakdownPainterTest {
-    @Test void markerStaysAtBrokenBidPriceRatherThanCrossingTradePrice() {
+    @Test void clearRemovesLiveLabelAndAskBreakdownAndBidReclaimLeaveSeparateMarkers() {
         FalseBreakdownMonitor monitor = new FalseBreakdownMonitor(); monitor.setEnabled(true);
         monitor.onTrade(110, 1, true, OPEN, true); monitor.onDepth(true, 105, 6000, OPEN);
         List<CanvasIcon> shapes = new CopyOnWriteArrayList<>();
@@ -23,13 +23,17 @@ class FalseBreakdownPainterTest {
         try {
             painter.createScreenSpacePainter("TEST", "falseBreakdown_TEST", factory);
             long time = OPEN + WallPatternMonitor.BID_MIN_DURATION_NS + 1;
-            monitor.onTrade(104, 1, false, time, true); painter.refreshNow();
+            monitor.onTimestamp(time); painter.refreshNow(); assertEquals(2, shapes.size());
+            monitor.onDepth(true, 105, 0, time); painter.refreshNow();
+            assertEquals(1, shapes.size()); // Caption only: clearing does not leave a bid marker.
+            monitor.onBbo(103, 104, time + 1, true); painter.refreshNow();
             CanvasIcon marker = shapes.stream().filter(shape -> shape.getX1().compose().base == CompositeCoordinateBase.DATA_ZERO).findFirst().orElseThrow();
-            assertEquals(time, marker.getX1().compose().timeX);
+            assertEquals(time + 1, marker.getX1().compose().timeX);
             assertEquals(105, marker.getY1().compose().dataY);
-            monitor.onTrade(100, 1, false, time + 1, true); painter.refreshNow();
+            monitor.onBbo(106, 107, time + 2, true); painter.refreshNow();
+            assertEquals(2, shapes.stream().filter(shape -> shape.getX1().compose().base == CompositeCoordinateBase.DATA_ZERO).count());
             assertTrue(shapes.stream().anyMatch(shape -> shape.getX1().compose().base == CompositeCoordinateBase.DATA_ZERO
-                    && shape.getX1().compose().timeX == time && shape.getY1().compose().dataY == 105));
+                    && shape.getX1().compose().timeX == time + 1 && shape.getY1().compose().dataY == 105));
             monitor.setEnabled(false); painter.refreshNow(); assertTrue(shapes.isEmpty());
         } finally { painter.shutdown(); }
     }

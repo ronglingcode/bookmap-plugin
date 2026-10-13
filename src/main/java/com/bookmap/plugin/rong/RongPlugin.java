@@ -637,7 +637,7 @@ public class RongPlugin implements CustomModuleAdapter,
             falseBreakoutPainter.refresh();
         }
         if (falseBreakdownMonitor != null) {
-            falseBreakdownMonitor.onDepth(isBid, price, size, lastTimestampNs);
+            falseBreakdownMonitor.onDepth(isBid, price, size, lastTimestampNs, compositionSnapshotComplete);
             falseBreakdownPainter.refresh();
         }
         synchronized (compositionLock) {
@@ -718,6 +718,10 @@ public class RongPlugin implements CustomModuleAdapter,
     @Override
     public void onBbo(int bidPrice, int bidSize, int askPrice, int askSize) {
         if (!initialized) return;
+        if (falseBreakdownMonitor != null) {
+            falseBreakdownMonitor.onBbo(bidPrice, askPrice, lastTimestampNs, compositionSnapshotComplete);
+            falseBreakdownPainter.refresh();
+        }
         long eventTimeNs = getEventTimeNs();
         PatternEvent.TimestampProvenance provenance = compositionProvenance();
         synchronized (compositionLock) {

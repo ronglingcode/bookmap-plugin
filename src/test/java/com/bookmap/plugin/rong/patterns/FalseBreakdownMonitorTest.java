@@ -5,57 +5,109 @@ import static com.bookmap.plugin.rong.patterns.FalseBreakoutMonitorTest.OPEN;
 import org.junit.jupiter.api.Test;
 
 class FalseBreakdownMonitorTest {
-    private static FalseBreakdownMonitor started() {
+    private static final long MATURE = OPEN + FalseBreakdownMonitor.BID_MIN_DURATION_NS + 1;
+    static FalseBreakdownMonitor started() {
         FalseBreakdownMonitor m = new FalseBreakdownMonitor(); m.setEnabled(true);
         m.onTrade(110, 1, true, OPEN, true); return m;
     }
-
-    @Test void startsWithBidsWithoutOfferBreakoutAndStopsAtThreeDistinctBids() {
+    static FalseBreakdownMonitor matureBids() {
         FalseBreakdownMonitor m = started();
-        m.onDepth(true, 108, 5000, OPEN);
-        for (int bid : new int[]{107, 105, 103, 101}) m.onDepth(true, bid, 6000, OPEN);
-        long now = OPEN + WallPatternMonitor.BID_MIN_DURATION_NS + 1;
-        m.onTimestamp(now); assertEquals(107, m.snapshot().highlightedTick);
-        m.onTrade(106, 1, false, now, true);
-        assertEquals(107, m.snapshot().entries.get(0).bidTick);
-        assertEquals(106, m.snapshot().entries.get(0).priceTick);
-        m.onTrade(110, 1, true, now, true); m.onDepth(true, 107, 9000, now);
-        assertEquals(105, m.snapshot().highlightedTick);
-        m.onTrade(104, 1, false, now, true); m.onTrade(102, 1, false, now, true);
-        assertEquals(3, m.snapshot().entries.size());
-        assertEquals(WallPatternMonitor.Phase.COMPLETE, m.snapshot().phase);
-        assertNull(m.snapshot().highlightedTick);
-        m.onTrade(100, 1, false, now, true); assertEquals(3, m.snapshot().entries.size());
-        FalseBreakoutMonitor breakout = FalseBreakoutMonitorTest.started();
-        assertEquals(WallPatternMonitor.Phase.BREAKOUT, breakout.snapshot().phase);
-        assertTrue(breakout.snapshot().entries.isEmpty());
+        for (int tick : new int[]{107, 105, 103, 101}) m.onDepth(true, tick, 6000, OPEN);
+        m.onTimestamp(MATURE); return m;
     }
 
-    @Test void usesOneSecondQualificationAndRetargetsNewClosestMatureBid() {
-        FalseBreakdownMonitor m = started(); m.onDepth(true, 100, 6000, OPEN);
-        m.onDepth(true, 105, 7000, OPEN + 500_000_000L);
-        long now = OPEN + WallPatternMonitor.BID_MIN_DURATION_NS + 1;
-        m.onTimestamp(now); assertEquals(100, m.snapshot().highlightedTick);
-        m.onTimestamp(now + 500_000_000L); assertEquals(105, m.snapshot().highlightedTick);
-        m.onTrade(104, 1, false, now + 500_000_001L, true);
-        assertEquals(105, m.snapshot().entries.get(0).bidTick);
-        FalseBreakdownMonitor brief = started(); brief.onDepth(true, 105, 6000, OPEN);
-        brief.onTrade(104, 1, false, OPEN + WallPatternMonitor.BID_MIN_DURATION_NS, true);
-        assertTrue(brief.snapshot().entries.isEmpty());
-    }
-
-    @Test void respectsEnableSnapshotAndDailyResetAndReplayClearsOldBook() {
-        FalseBreakdownMonitor m = new FalseBreakdownMonitor();
-        m.onTrade(110, 1, true, OPEN, true); m.onDepth(true, 105, 6000, OPEN);
-        long now = OPEN + WallPatternMonitor.BID_MIN_DURATION_NS + 1;
-        m.onTrade(104, 1, false, now, true); assertTrue(m.snapshot().entries.isEmpty());
-        m.setEnabled(true); m.onTrade(110, 1, true, now, true);
-        m.onTrade(104, 1, false, now, false); assertTrue(m.snapshot().entries.isEmpty());
-        m.onTrade(110, 1, true, now, true); m.onTrade(104, 1, false, now + 1, true);
+    @Test void clearingRemovesBidLabelAndImmediatelyMonitorsNextBidWithoutBreakdown() {
+        FalseBreakdownMonitor m = matureBids();
+        assertEquals(107, m.snapshot().highlightedTick); assertEquals(1, m.snapshot().highlightedNumber);
+        m.onDepth(true, 107, 0, MATURE);
         assertEquals(1, m.snapshot().entries.size());
-        m.onTimestamp(now + 86_400_000_000_000L);
-        assertTrue(m.snapshot().entries.isEmpty()); assertEquals(WallPatternMonitor.Phase.BID_BREAKDOWN, m.snapshot().phase);
-        m.onTrade(110, 1, true, now + 86_400_000_000_001L, true);
-        m.onTimestamp(OPEN); assertNull(m.snapshot().highlightedTick); assertTrue(m.snapshot().entries.isEmpty());
+        assertEquals(FalseBreakdownMonitor.Phase.CLEARED, m.snapshot().entries.get(0).phase);
+        assertEquals(105, m.snapshot().highlightedTick); assertEquals(2, m.snapshot().highlightedNumber);
+        m.onTrade(106, 10, false, MATURE + 1, true);
+        m.onBbo(106, 107, MATURE + 2, true); // Ask equal to cleared price is not below.
+        assertEquals(FalseBreakdownMonitor.Phase.CLEARED, m.snapshot().entries.get(0).phase);
+        m.onBbo(105, 106, MATURE + 3, true);
+        assertEquals(FalseBreakdownMonitor.Phase.BREAKDOWN, m.snapshot().entries.get(0).phase);
+        assertEquals(MATURE + 3, m.snapshot().entries.get(0).breakdownTimeNs);
+        assertEquals(105, m.snapshot().highlightedTick);
+    }
+
+    @Test void longReclaimRequiresBidStrictlyAboveAndBreakdownFirst() {
+        FalseBreakdownMonitor m = matureBids(); m.onDepth(true, 107, 0, MATURE);
+        m.onBbo(108, 109, MATURE + 1, true); // No preceding breakdown.
+        assertEquals(FalseBreakdownMonitor.Phase.CLEARED, m.snapshot().entries.get(0).phase);
+        m.onBbo(105, 106, MATURE + 2, true);
+        m.onBbo(106, 108, MATURE + 3, true); // Ask above is insufficient.
+        m.onTrade(109, 100, true, MATURE + 4, true); // Last trade above is insufficient.
+        m.onBbo(107, 108, MATURE + 5, true); // Bid equal is insufficient.
+        assertEquals(FalseBreakdownMonitor.Phase.BREAKDOWN, m.snapshot().entries.get(0).phase);
+        m.onBbo(108, 109, MATURE + 6, true);
+        assertEquals(FalseBreakdownMonitor.Phase.RECLAIMED, m.snapshot().entries.get(0).phase);
+        assertEquals(MATURE + 6, m.snapshot().entries.get(0).reclaimTimeNs);
+        m.onBbo(105, 106, MATURE + 7, true); m.onBbo(108, 109, MATURE + 8, true);
+        assertEquals(MATURE + 6, m.snapshot().entries.get(0).reclaimTimeNs);
+    }
+
+    @Test void successiveQuoteCallbacksMayShareTheSameMarketTimestamp() {
+        FalseBreakdownMonitor m = matureBids(); m.onDepth(true, 107, 0, MATURE);
+        m.onBbo(105, 106, MATURE, true);
+        assertEquals(FalseBreakdownMonitor.Phase.BREAKDOWN, m.snapshot().entries.get(0).phase);
+        m.onBbo(108, 109, MATURE, true);
+        assertEquals(FalseBreakdownMonitor.Phase.RECLAIMED, m.snapshot().entries.get(0).phase);
+    }
+
+    @Test void threeClearsLimitTrackingButPendingQuotesStillConfirmAndReclaim() {
+        FalseBreakdownMonitor m = matureBids();
+        m.onDepth(true, 107, 0, MATURE); m.onDepth(true, 105, 0, MATURE + 1);
+        assertEquals(103, m.snapshot().highlightedTick); assertEquals(3, m.snapshot().highlightedNumber);
+        m.onDepth(true, 103, 0, MATURE + 2);
+        assertNull(m.snapshot().highlightedTick); assertEquals(3, m.snapshot().entries.size());
+        m.onDepth(true, 101, 0, MATURE + 3);
+        assertEquals(3, m.snapshot().entries.size());
+        m.onBbo(100, 101, MATURE + 4, true);
+        for (FalseBreakdownMonitor.Level level : m.snapshot().entries) assertEquals(FalseBreakdownMonitor.Phase.BREAKDOWN, level.phase);
+        m.onBbo(108, 109, MATURE + 5, true);
+        for (FalseBreakdownMonitor.Level level : m.snapshot().entries) assertEquals(FalseBreakdownMonitor.Phase.RECLAIMED, level.phase);
+    }
+
+    @Test void tradeBeforeDepthClearDoesNotLoseTrackedLevelAndPartialFillsDoNotClear() {
+        FalseBreakdownMonitor m = matureBids();
+        m.onDepth(true, 107, 1000, MATURE);
+        assertEquals(107, m.snapshot().highlightedTick); assertTrue(m.snapshot().entries.isEmpty());
+        m.onTrade(106, 500, false, MATURE + 1, true);
+        m.onBbo(105, 106, MATURE + 2, true);
+        assertTrue(m.snapshot().entries.isEmpty());
+        m.onDepth(true, 107, 0, MATURE + 3);
+        assertEquals(FalseBreakdownMonitor.Phase.CLEARED, m.snapshot().entries.get(0).phase);
+        m.onBbo(105, 106, MATURE + 4, true);
+        assertEquals(FalseBreakdownMonitor.Phase.BREAKDOWN, m.snapshot().entries.get(0).phase);
+    }
+
+    @Test void sizeDurationAndDistinctPricesAreRequired() {
+        FalseBreakdownMonitor brief = started(); brief.onDepth(true, 107, 6000, OPEN);
+        brief.onDepth(true, 107, 0, OPEN + FalseBreakdownMonitor.BID_MIN_DURATION_NS);
+        assertTrue(brief.snapshot().entries.isEmpty());
+        FalseBreakdownMonitor m = matureBids(); m.onDepth(true, 107, 0, MATURE);
+        m.onDepth(true, 107, 9000, MATURE + 1); m.onTimestamp(MATURE + 2_000_000_000L);
+        assertEquals(105, m.snapshot().highlightedTick);
+        m.onDepth(true, 107, 0, MATURE + 2_000_000_001L);
+        assertEquals(1, m.snapshot().entries.size());
+    }
+
+    @Test void disabledPreSnapshotInvalidQuotesAndDailyResetCannotGenerateEvents() {
+        FalseBreakdownMonitor m = matureBids();
+        m.onDepth(true, 107, 0, MATURE, false); assertTrue(m.snapshot().entries.isEmpty());
+        m.onDepth(true, 105, 0, MATURE + 1, true);
+        m.onBbo(100, 101, MATURE + 2, false);
+        m.onBbo(105, 104, MATURE + 3, true); // Crossed quote.
+        m.onBbo(0, 104, MATURE + 4, true);
+        assertEquals(FalseBreakdownMonitor.Phase.CLEARED, m.snapshot().entries.get(0).phase);
+        m.setEnabled(false); m.onBbo(100, 101, MATURE + 5, true); m.setEnabled(true);
+        assertEquals(FalseBreakdownMonitor.Phase.CLEARED, m.snapshot().entries.get(0).phase);
+        m.onBbo(100, 101, MATURE + 6, true);
+        assertEquals(FalseBreakdownMonitor.Phase.BREAKDOWN, m.snapshot().entries.get(0).phase);
+        m.onTimestamp(MATURE + 86_400_000_000_000L);
+        assertTrue(m.snapshot().entries.isEmpty());
+        m.onTimestamp(OPEN); assertNull(m.snapshot().highlightedTick);
     }
 }
