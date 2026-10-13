@@ -349,6 +349,20 @@ class NativeExecutionTest {
             }
         }
     }
+    @Test void doublePartialButtonsRouteTwoRequestsWhileHotkeysKeepOne() throws Exception {
+        for (boolean reload : new boolean[]{true, false}) {
+            for (boolean doubled : new boolean[]{true, false}) try (var rig = new Rig()) {
+                JsonObject command;
+                if (reload) command = rig.connectExtended("long market reload");
+                else { rig.connect(); command = action("KeyM"); }
+                if (doubled) command.addProperty("button_id", reload
+                        ? "hotkey:add_2_partials" : "hotkey:market_out_2_partials");
+                assertTrue(rig.engine.route(command));
+                assertEquals("accepted", rig.finish().get("outcome").getAsString());
+                assertEquals(doubled ? 2 : 1, rig.mutations.get());
+            }
+        }
+    }
     @Test void blockedEntryLogsAndEmitsTheActualStartupRuleWithoutBrokerRequests() throws Exception {
         try (var rig = new Rig()) {
             var command = rig.connectEntry();

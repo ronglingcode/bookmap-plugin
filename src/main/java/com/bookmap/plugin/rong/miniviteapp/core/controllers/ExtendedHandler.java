@@ -14,6 +14,11 @@ public final class ExtendedHandler {
     private ExtendedHandler() { }
 
     public static Plan reload(Snapshot state, boolean shift, double price) {
+        return reload(state, shift, price, 1);
+    }
+
+    public static Plan reload(Snapshot state, boolean shift, double price, int partials) {
+        Models.require(partials == 1 || partials == 2, "unsupported reload partial count");
         JsonObject context = state.entryContext;
         Models.require(context != null, "partial entry context unavailable");
         boolean isLong = Models.bool(context, "reloadIsLong");
@@ -39,7 +44,7 @@ public final class ExtendedHandler {
             if (!id.isEmpty() && Models.string(definition, "tradebookID").equals(id))
                 BookmapWallReversal.checkEntryPrice(definition, price, isLong);
         }
-        ExtendedEntryRules.checkPartial(state, direction, isLong, quantity, price, stop);
+        ExtendedEntryRules.checkPartial(state, direction, isLong, quantity * partials, price, stop);
         // Broker.submitEntryOrderWithBracket checks attendance even after the low-risk override.
         Models.require(Models.bool(context, "attendanceAllowed"), "attendance blocks partial entry");
         String type = shift ? "MARKET" : (isLong ? price > state.currentPrice : price < state.currentPrice) ? "STOP" : "LIMIT";
@@ -50,7 +55,7 @@ public final class ExtendedHandler {
         Models.require(Models.positive(target), "partial target unavailable");
         Plan plan = new Plan("reload_partial");
         if (state.entries.size() > 3) Broker.cancelOrders(plan, state.entries.get(0));
-        plan.requests.add(new Request("POST", null, OrderFactory.createOneEntryWithTwoExits(
+        for (int i = 0; i < partials; i++) plan.requests.add(new Request("POST", null, OrderFactory.createOneEntryWithTwoExits(
                 state.symbol, isLong, type, quantity, price, target, stop)));
         return plan;
     }

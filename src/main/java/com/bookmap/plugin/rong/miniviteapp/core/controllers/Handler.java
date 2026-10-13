@@ -32,6 +32,18 @@ public final class Handler {
         }
         return plan;
     }
+    public static Plan marketOutPartials(Snapshot state, int count) {
+        requireExits(state); Models.require(state.splitPartials, "partial execution requires split protective orders");
+        Models.require(count > 0, "invalid exit partial count");
+        Plan plan = new Plan("market_out_partial");
+        List<ExitPair> remaining = new java.util.ArrayList<>(state.pairs);
+        for (int i = 0; i < count && !remaining.isEmpty(); i++) {
+            ExitPair pair = remaining.remove(ExitPairSelection.getFirstSmallestQuantityExitPairIndex(remaining));
+            CoreTargetExitRules.check(state, pair, state.currentPrice, true);
+            Broker.instantOutOneExitPair(plan, pair);
+        }
+        return plan;
+    }
     public static Plan numberKeyPressedAtPrice(Snapshot state, String key, double price) {
         requireExits(state); boolean stop = isStopLeg(state, price);
         Models.require(state.splitPartials || stop, "target adjustment requires split protective orders");

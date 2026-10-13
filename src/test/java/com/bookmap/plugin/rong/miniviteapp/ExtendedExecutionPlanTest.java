@@ -18,6 +18,19 @@ class ExtendedExecutionPlanTest {
                 .getResourceAsStream("/extended-execution-fixtures.json"), StandardCharsets.UTF_8)).getAsJsonArray();
     }
     static JsonObject longState() { return fixtures().get(0).getAsJsonObject().getAsJsonObject("state").deepCopy(); }
+    @Test void doubleReloadCreatesTwoSeparatelyProtectedPartialsForBothSides() {
+        for (var element : fixtures()) {
+            var fixture = element.getAsJsonObject();
+            if (!Models.string(fixture, "name").matches("(long|short) market reload")) continue;
+            var state = new Snapshot(fixture.getAsJsonObject("state"));
+            Plan single = ExtendedHandler.reload(state, true, 0);
+            Plan doubled = ExtendedHandler.reload(state, true, 0, 2);
+            assertEquals(1, single.requests.size());
+            assertEquals(2, doubled.requests.size());
+            assertEquals(single.requests.get(0).body, doubled.requests.get(0).body);
+            assertEquals(single.requests.get(0).body, doubled.requests.get(1).body);
+        }
+    }
     @Test void swapReentryUsesSuppliedLiveWalls() {
         JsonObject action = JsonParser.parseString("{\"orderbook\":{\"effectiveWallThreshold\":5000,\"largeAsks\":[[10.75,6000]]}}").getAsJsonObject();
         Plan plan = ExtendedHandler.swap(new Snapshot(longState()), action);

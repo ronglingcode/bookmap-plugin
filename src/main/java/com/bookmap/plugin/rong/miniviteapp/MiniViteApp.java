@@ -5,6 +5,7 @@ import com.bookmap.plugin.rong.miniviteapp.config.ExecutionConfig;
 import com.bookmap.plugin.rong.miniviteapp.core.controllers.KeyboardHandler;
 import com.bookmap.plugin.rong.miniviteapp.core.controllers.EntryHandler;
 import com.bookmap.plugin.rong.miniviteapp.core.controllers.ExtendedHandler;
+import com.bookmap.plugin.rong.miniviteapp.core.controllers.Handler;
 import com.bookmap.plugin.rong.miniviteapp.models.Models;
 import com.bookmap.plugin.rong.miniviteapp.models.Models.*;
 import com.google.gson.JsonArray;
@@ -140,7 +141,10 @@ public final class MiniViteApp implements AutoCloseable {
             }
             Plan plan = entry ? EntryHandler.handleEntry(state, action, key, extended || sameDirection)
                     : directionalEntry ? EntryHandler.handleDirectionalEntry(state, action, key)
-                    : key.equals("KeyA") ? ExtendedHandler.reload(state, shift, Models.number(action, "price"))
+                    : key.equals("KeyA") ? ExtendedHandler.reload(state, shift, Models.number(action, "price"),
+                            Models.string(action, "button_id").equals("hotkey:add_2_partials") ? 2 : 1)
+                    : key.equals("KeyM") && Models.string(action, "button_id").equals("hotkey:market_out_2_partials")
+                            ? Handler.marketOutPartials(state, 2)
                     : key.equals("KeyW") ? ExtendedHandler.swap(state, action)
                     : KeyboardHandler.handleKeyPressed(state, key, shift, Models.number(action, "price"));
             for (String warning : plan.warnings) log.accept(symbol, warning);

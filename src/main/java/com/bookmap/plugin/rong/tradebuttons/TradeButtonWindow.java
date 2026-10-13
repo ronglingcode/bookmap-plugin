@@ -506,6 +506,9 @@ public class TradeButtonWindow {
             server.dispatchTradingAction(action);
         });
         hotkeyPanel.add(refreshAccount);
+        hotkeyPanel.add(new JLabel());
+        hotkeyPanel.add(createHotkeyButton("Add Partial 2", "add_2_partials", "KeyA", true));
+        hotkeyPanel.add(createHotkeyButton("Market Out 2", "market_out_2_partials", "KeyM"));
         return hotkeyPanel;
     }
 
