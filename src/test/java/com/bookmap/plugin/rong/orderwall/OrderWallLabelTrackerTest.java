@@ -16,6 +16,26 @@ import org.junit.jupiter.api.Test;
 class OrderWallLabelTrackerTest {
 
     @Test
+    void thresholdChangeReevaluatesUnchangedDepthOnTimestamp() {
+        OrderWallLabelStore store = new OrderWallLabelStore();
+        AtomicInteger minimum = new AtomicInteger(20000);
+        OrderWallLabelTracker tracker = new OrderWallLabelTracker("TEST", .01, store, minimum::get, 2000, null);
+        try {
+            long start = 10_000_000_000L;
+            tracker.onDepth(true, 10000, 3000, start);
+            tracker.onTimestamp(start);
+            assertNull(store.getActiveLabel("TEST", true, 10000));
+            minimum.set(2000);
+            tracker.onTimestamp(start + 1_000_000_000L);
+            tracker.onTimestamp(start + 2_000_000_000L);
+            assertNotNull(store.getActiveLabel("TEST", true, 10000));
+            minimum.set(20000);
+            tracker.onTimestamp(start + 3_000_000_000L);
+            assertNull(store.getActiveLabel("TEST", true, 10000));
+        } finally { tracker.shutdown(); }
+    }
+
+    @Test
     void tracksLevelsAtOrAboveConfiguredMinimumSize() {
         OrderWallLabelStore store = new OrderWallLabelStore();
         OrderWallLabelTracker tracker = newImmediateTracker(store, 5_000);

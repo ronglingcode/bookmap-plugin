@@ -125,31 +125,7 @@ public class IndicatorSettingsPanel extends StrategyPanel {
         add(composerCheckbox, gbc);
 
         gbc.gridy++;
-        JPanel wallThresholdPanel = new JPanel(new GridBagLayout());
-        GridBagConstraints thresholdGbc = new GridBagConstraints();
-        thresholdGbc.insets = new Insets(0, 0, 0, 8);
-        thresholdGbc.anchor = GridBagConstraints.WEST;
-        thresholdGbc.gridx = 0;
-        thresholdGbc.gridy = 0;
-        wallThresholdPanel.add(new JLabel("Wall threshold floor"), thresholdGbc);
-
-        thresholdGbc.gridx++;
-        SpinnerNumberModel thresholdModel = new SpinnerNumberModel(
-                wallThresholdConfig.getThresholdFloor(),
-                0,
-                WallThresholdConfig.MAX_THRESHOLD_FLOOR,
-                500);
-        JSpinner thresholdSpinner = new JSpinner(thresholdModel);
-        thresholdSpinner.setPreferredSize(new Dimension(96, thresholdSpinner.getPreferredSize().height));
-        if (thresholdSpinner.getEditor() instanceof JSpinner.DefaultEditor) {
-            JFormattedTextField textField =
-                    ((JSpinner.DefaultEditor) thresholdSpinner.getEditor()).getTextField();
-            textField.setColumns(7);
-        }
-        thresholdSpinner.addChangeListener(e ->
-                wallThresholdConfig.setThresholdFloor(((Number) thresholdSpinner.getValue()).intValue()));
-        wallThresholdPanel.add(thresholdSpinner, thresholdGbc);
-        add(wallThresholdPanel, gbc);
+        add(new JLabel("<html>Wall labels / liquidity / False Breakout bids: fixed 5K<br>Entry / alerts / False Breakout offers / Reclaim bids: premarket volume (2K / 5K / 10K / 15K / 20K; fallback 5K)</html>"), gbc);
 
         if (!observerOnly) {
         gbc.gridy++;

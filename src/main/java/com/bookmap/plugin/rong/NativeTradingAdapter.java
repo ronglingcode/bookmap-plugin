@@ -60,6 +60,11 @@ public final class NativeTradingAdapter implements AutoCloseable {
         NativeRuntime current = runtime;
         if (current != null && !closed) current.trading.observeBookmapTrade(symbol, price, timestampNs / 1_000_000L);
     }
+    public List<Candle> premarketMinuteBars(String symbol, long from, long toInclusive) throws Exception {
+        NativeRuntime current = runtime;
+        if (current == null || closed) throw new IllegalStateException("Schwab runtime unavailable");
+        return current.trading.premarketMinuteBars(symbol, from, toInclusive);
+    }
     public void authorize(String callbackUrl) { if (runtime != null && !closed) runtime.trading.exchangeAuthorizationCode(callbackUrl); }
     public void openAuthorization() {
         if (runtime == null || closed) { PluginLog.action("", "Load local secrets and restart native trading first"); return; }

@@ -36,6 +36,7 @@ public final class TradingRuntime implements AutoCloseable {
     private final OAuth oauth;
     private final CredentialPort credentials;
     private final ReadApi reads;
+    private final PriceHistoryApi priceHistory;
     private final com.bookmap.plugin.rong.miniviteapp.libraries.firestore.Api firestore;
     private final com.bookmap.plugin.rong.miniviteapp.libraries.massive.Api massive;
     private final SocketPort sockets;
@@ -80,6 +81,7 @@ public final class TradingRuntime implements AutoCloseable {
             return response;
         };
         reads = new ReadApi(authenticatedReads);
+        priceHistory = new PriceHistoryApi(authenticatedReads);
         JsonObject firebase = object(sections, "firebaseConfig");
         firestore = new com.bookmap.plugin.rong.miniviteapp.libraries.firestore.Api(http, string(firebase, "projectId"), () -> string(firebase, "apiKey"));
         massiveKey = string(object(sections, "massive"), "apiKey"); massive = new com.bookmap.plugin.rong.miniviteapp.libraries.massive.Api(http, () -> massiveKey);
@@ -124,6 +126,10 @@ public final class TradingRuntime implements AutoCloseable {
     public void observeBookmapTrade(String symbol, double price, long timestampMs) {
         if (stopped) return;
         if (market.acceptBookmapTrade(symbol, price, timestampMs)) synchronized (lock) { dirty.add(symbol); }
+    }
+    public List<Candle> premarketMinuteBars(String symbol, long from, long toInclusive) throws Exception {
+        if (stopped) throw new IllegalStateException("Native runtime stopped");
+        return priceHistory.getMinuteBars(symbol, from, toInclusive, oauth.accessToken(false));
     }
     public JsonObject sessionLevels(String symbol) {
         var state = market.getState(symbol);

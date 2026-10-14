@@ -20,6 +20,7 @@ public final class MarketState {
     private long liveFrom, latestPriceTime;
     private Long firstRegularBucketTime;
     private double totalVolume, totalDollars, premarketDollars, currentPrice, highOfDay, lowOfDay, premarketHigh, premarketLow, liquidityScale;
+    private double premarketShares;
     private boolean lockedAtMax;
     private boolean corrected;
     private double correctionVolume, correctionDollars;
@@ -36,6 +37,7 @@ public final class MarketState {
     }
     public synchronized void initialize(List<Candle> history, long liveFrom, double correctionVolume, double correctionDollars) {
         buckets.clear(); seen.clear(); vwaps.clear(); this.liveFrom = liveFrom;
+        premarketShares = 0;
         totalVolume = totalDollars = premarketDollars = currentPrice = highOfDay = lowOfDay = premarketHigh = premarketLow = liquidityScale = 0;
         latestPriceTime = 0; firstRegularBucketTime = null; lockedAtMax = false; corrected = false;
         this.correctionVolume = correctionVolume; this.correctionDollars = correctionDollars;
@@ -49,6 +51,7 @@ public final class MarketState {
             if (time.minutesSinceMarketOpen >= 0 && time.minutesSinceMarketOpen < 390
                     && firstRegularBucketTime == null) firstRegularBucketTime = candle.datetime;
             totalVolume += candle.volume; totalDollars += dollars; if (time.isPremarket) premarketDollars += dollars;
+            if (time.minutesSinceMarketOpen >= -330 && time.minutesSinceMarketOpen < 0) premarketShares += candle.volume;
             updateLevels(candle.high, candle.low, time);
             currentPrice = candle.close; latestPriceTime = candle.datetime + 59999;
             vwaps.put(candle.datetime, totalVolume > 0 ? totalDollars / totalVolume : 0);
@@ -75,6 +78,7 @@ public final class MarketState {
         candle.high = Math.max(candle.high, trade.price); candle.low = Math.min(candle.low, trade.price);
         candle.volume += trade.size; candle.dollars += trade.price * trade.size; candle.vwap = candle.dollars / candle.volume;
         totalVolume += trade.size; totalDollars += trade.price * trade.size; if (time.isPremarket) premarketDollars += trade.price * trade.size;
+        if (time.minutesSinceMarketOpen >= -330 && time.minutesSinceMarketOpen < 0) premarketShares += trade.size;
         updateLevels(trade.price, trade.price, time);
         if (trade.timestamp >= latestPriceTime) { currentPrice = trade.price; latestPriceTime = trade.timestamp; }
         vwaps.put(bucketTime, totalDollars / totalVolume); updateLiquidity(); return true;
@@ -128,6 +132,7 @@ public final class MarketState {
     public synchronized JsonObject sessionLevels() {
         JsonObject json = new JsonObject();
         json.addProperty("sessionDate", date);
+        json.addProperty("premarketShareVolume", premarketShares);
         json.addProperty("highOfDay", highOfDay);
         json.addProperty("lowOfDay", lowOfDay);
         if (firstRegularBucketTime != null

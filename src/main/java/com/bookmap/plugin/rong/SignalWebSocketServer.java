@@ -48,6 +48,21 @@ public class SignalWebSocketServer extends WebSocketServer {
     public void registerPatterns(String alias, com.bookmap.plugin.rong.signal.CairoPatternFeed feed) { patternFeeds.put(alias, feed); }
     private java.util.function.Consumer<JsonObject> tradingDispatch = action -> PluginLog.action(SymbolUtils.cleanSymbol(getString(action, "symbol")), "Native runtime unavailable; no action sent");
     public void setTradingDispatch(java.util.function.Consumer<JsonObject> dispatch) { tradingDispatch = dispatch; }
+    private final Map<String, PremarketSizeThreshold> sizeThresholds = new ConcurrentHashMap<>();
+    public void registerSizeThreshold(String symbol, PremarketSizeThreshold threshold) { sizeThresholds.put(SymbolUtils.cleanSymbol(symbol), threshold); }
+    public String premarketVolumeUnavailableReason(String symbol) {
+        PremarketSizeThreshold value = sizeThresholds.get(SymbolUtils.cleanSymbol(symbol));
+        return value == null ? "history unavailable" : value.unavailableReason();
+    }
+    public double premarketShareVolume(String symbol) {
+        PremarketSizeThreshold value = sizeThresholds.get(SymbolUtils.cleanSymbol(symbol));
+        return value == null ? Double.NaN : value.volume();
+    }
+    private WallThreshold effectiveThreshold(String symbol, OrderBookState book, int floor) {
+        PremarketSizeThreshold value = sizeThresholds.get(symbol);
+        return value == null ? WallThreshold.from(book, floor, orderbookPercentile)
+                : new WallThreshold(value.threshold(), 0, value.threshold());
+    }
     private java.util.function.IntSupplier wallThresholdFloor = () -> WallThresholdConfig.DEFAULT_THRESHOLD_FLOOR;
     public void setWallThresholdFloor(java.util.function.IntSupplier supplier) { wallThresholdFloor = supplier; }
     /** All local actions go directly to the standalone runtime. */
@@ -72,7 +87,7 @@ public class SignalWebSocketServer extends WebSocketServer {
         Double pips = symbolToPips.get(cleanSymbol);
         if (book == null || pips == null || !Double.isFinite(pips) || pips <= 0) return result;
         synchronized (book) {
-            WallThreshold threshold = WallThreshold.from(book, wallThresholdFloor.getAsInt(), orderbookPercentile);
+            WallThreshold threshold = effectiveThreshold(cleanSymbol, book, wallThresholdFloor.getAsInt());
             result.addProperty("effectiveWallThreshold", threshold.effectiveMinSize);
             for (boolean bid : new boolean[]{true, false}) {
                 JsonArray levels = new JsonArray();
@@ -214,6 +229,7 @@ public class SignalWebSocketServer extends WebSocketServer {
         if (feed != null) {
             feed.close(); observationWorker.execute(() -> { JsonObject terminal = feed.terminal(); if (terminal != null) broadcast(terminal.toString()); });
         }
+        sizeThresholds.remove(symbol);
         symbolToOrderBook.remove(symbol);
         symbolToPips.remove(symbol);
         symbolToRegularSessionHighLow.remove(symbol);
@@ -313,7 +329,7 @@ public class SignalWebSocketServer extends WebSocketServer {
         }
 
         synchronized (orderBook) {
-            WallThreshold threshold = WallThreshold.from(orderBook, absoluteMinSize, orderbookPercentile);
+            WallThreshold threshold = effectiveThreshold(cleanSymbol, orderBook, absoluteMinSize);
             return OrderbookWallThreshold.available(
                     cleanSymbol,
                     orderbookPercentile,

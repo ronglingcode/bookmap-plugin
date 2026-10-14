@@ -65,8 +65,7 @@ public class RongPlugin implements CustomModuleAdapter,
 
     private static final int WS_PORT = 8765;
     private static final double ORDERBOOK_PERCENTILE = 97;
-    private static final int ORDER_CHANGE_THRESHOLD_FLOOR = 5_000;
-    private static final int ORDER_CHANGE_LARGEST_ORDER_RANK = 5;
+    private static final int DISPLAY_LIQUIDITY_MIN_SIZE = 5_000;
     private static final int WALL_LABEL_RETAIN_TICKS = 2_000;
     private static final int WALL_LABEL_REFRESH_MS = 200;
     private static final double WALL_CHANGE_REMAINING_RATIO = 0.50;
@@ -128,7 +127,8 @@ public class RongPlugin implements CustomModuleAdapter,
     private final com.bookmap.plugin.rong.patterns.CairoObservationConfig observationConfig = com.bookmap.plugin.rong.patterns.CairoObservationConfig.load();
     private boolean wallLabelsDirty;
     private long lastWallLabelRefreshMs;
-    private long lastTimestampNs;
+    private volatile long lastTimestampNs;
+    private PremarketSizeThreshold premarketSizeThreshold;
     private volatile double wallChangeStockPrice = Double.NaN;
     private TradeButtonWindow tradeButtonWindow;
     private VwapTracker vwapTracker;
@@ -206,15 +206,24 @@ public class RongPlugin implements CustomModuleAdapter,
         this.vwapIndicator = api.registerIndicatorModifiable("VWAP", GraphType.PRIMARY);
         this.vwapIndicator.setWidth(2);
         updateVwapIndicatorVisibility();
+        premarketSizeThreshold = new PremarketSizeThreshold(cleanAlias,
+                () -> "replay".equals(observationConfig.sourceMode) ? 0L : lastTimestampNs / 1_000_000L,
+                (symbol, from, to) -> {
+                    NativeTradingAdapter trading = nativeTrading;
+                    if (trading == null) throw new IllegalStateException("Schwab runtime unavailable");
+                    return trading.premarketMinuteBars(symbol, from, to);
+                });
+        sharedServer.registerSizeThreshold(cleanAlias, premarketSizeThreshold);
+        premarketSizeThreshold.start();
         this.wallLabelTracker = new OrderWallLabelTracker(
-                cleanAlias, info.pips, wallLabelStore, this::getEffectiveWallThreshold,
+                cleanAlias, info.pips, wallLabelStore, () -> DISPLAY_LIQUIDITY_MIN_SIZE,
                 WALL_LABEL_RETAIN_TICKS,
                 this::handleWallLabelTrackerChange);
         this.wallChangeTracker = new OrderWallChangeTracker(
                 cleanAlias,
                 info.pips,
-                () -> ORDER_CHANGE_THRESHOLD_FLOOR,
-                ORDER_CHANGE_LARGEST_ORDER_RANK,
+                this::getEffectiveWallThreshold,
+                0,
                 WALL_CHANGE_REMAINING_RATIO,
                 WALL_CHANGE_DECISION_DELAY_MS,
                 this::handleWallChangeEvent,
@@ -222,9 +231,9 @@ public class RongPlugin implements CustomModuleAdapter,
                 this::getWallChangeDayLow,
                 () -> wallChangeStockPrice);
         initializeSignalComposition(info.pips);
-        falseBreakoutMonitor = new com.bookmap.plugin.rong.patterns.FalseBreakoutMonitor();
+        falseBreakoutMonitor = new com.bookmap.plugin.rong.patterns.FalseBreakoutMonitor(this::getEffectiveWallThreshold);
         falseBreakoutPainter = new com.bookmap.plugin.rong.patterns.FalseBreakoutPainter(falseBreakoutMonitor);
-        reclaimSecondBidMonitor = new com.bookmap.plugin.rong.patterns.ReclaimSecondBidMonitor();
+        reclaimSecondBidMonitor = new com.bookmap.plugin.rong.patterns.ReclaimSecondBidMonitor(this::getEffectiveWallThreshold);
         reclaimSecondBidPainter = new com.bookmap.plugin.rong.patterns.ReclaimSecondBidPainter(reclaimSecondBidMonitor);
         patternMonitorConfigListener = (symbol, patterns) -> {
             if (!cleanAlias.equals(symbol)) return;
@@ -529,6 +538,7 @@ public class RongPlugin implements CustomModuleAdapter,
         if (filledExecutionStore != null) {
             filledExecutionStore.clearAll(alias);
         }
+        if (premarketSizeThreshold != null) premarketSizeThreshold.close();
         if (sharedServer != null) {
             sharedServer.unregisterSymbol(alias);
         }
@@ -839,7 +849,7 @@ public class RongPlugin implements CustomModuleAdapter,
             if (signalComposition == null) return null;
             com.google.gson.JsonObject liquidity = new com.google.gson.JsonObject();
             synchronized (orderBook) {
-                int threshold = getEffectiveWallThreshold();
+                int threshold = DISPLAY_LIQUIDITY_MIN_SIZE;
                 liquidity.addProperty("threshold", threshold);
                 liquidity.addProperty("bestBid", BookmapPriceNormalizer.toWirePrice(signalComposition.bestBidTick(), instrumentInfo.pips));
                 liquidity.addProperty("bestAsk", BookmapPriceNormalizer.toWirePrice(signalComposition.bestAskTick(), instrumentInfo.pips));
@@ -884,12 +894,7 @@ public class RongPlugin implements CustomModuleAdapter,
     }
 
     private int getEffectiveWallThreshold() {
-        int thresholdFloor = wallThresholdConfig == null
-                ? WallThresholdConfig.DEFAULT_THRESHOLD_FLOOR
-                : Math.max(0, wallThresholdConfig.getThresholdFloor());
-        return orderBook == null
-                ? thresholdFloor
-                : orderBook.getSizeThreshold(thresholdFloor, ORDERBOOK_PERCENTILE);
+        return premarketSizeThreshold == null ? PremarketSizeThreshold.FALLBACK : premarketSizeThreshold.threshold();
     }
 
     private void flushPendingVwapPoints() {

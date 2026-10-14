@@ -831,15 +831,11 @@ public class TradeButtonWindow {
             return;
         }
 
-        String percentileSize = threshold.getPercentileMinSize() > 0
-                ? formatShareSize(threshold.getPercentileMinSize())
-                : "n/a";
+        double volume = server.premarketShareVolume(symbol);
+        String source = Double.isFinite(volume) ? "Schwab premarket: " + String.format(java.util.Locale.US, "%,.0f", volume) + " shares"
+                : "Premarket: " + server.premarketVolumeUnavailableReason(symbol) + "; default 5K";
         wallThresholdLabel.setText("<html><center>Wall: " + formatShareSize(threshold.getEffectiveMinSize())
-                + " (P" + formatPercentile(threshold.getPercentile())
-                + "=" + percentileSize
-                + ", Top3=" + formatLargestSizes(threshold.getLargestLevelSizes())
-                + ", floor=" + formatShareSize(threshold.getAbsoluteMinSize()) + ")"
-                + "<br>" + getRegularSessionHighLowText() + "</center></html>");
+                + " (" + source + ")<br>" + getRegularSessionHighLowText() + "</center></html>");
     }
 
     private String getRegularSessionHighLowText() {

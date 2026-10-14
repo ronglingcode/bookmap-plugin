@@ -5,6 +5,30 @@ import java.time.Instant;
 import org.junit.jupiter.api.Test;
 
 class FalseBreakoutMonitorTest {
+    @Test void offerUsesPremarketThresholdWhileBidAlwaysUsesFiveThousand() {
+        for (int threshold : new int[]{2000, 20000}) {
+            java.util.concurrent.atomic.AtomicInteger offerThreshold = new java.util.concurrent.atomic.AtomicInteger(threshold);
+            FalseBreakoutMonitor monitor = new FalseBreakoutMonitor(offerThreshold::get);
+            monitor.setEnabled(true);
+            monitor.onTrade(100, 1, true, OPEN, true);
+            monitor.onDepth(false, 130, threshold, OPEN);
+            assertNull(monitor.snapshot().highlightedTick);
+            monitor.onDepth(false, 130, threshold + 1, OPEN);
+            assertEquals(130, monitor.snapshot().highlightedTick);
+            monitor.onDepth(true, 105, 5000, OPEN);
+            monitor.onDepth(true, 104, 6000, OPEN);
+            long mature = OPEN + FalseBreakoutMonitor.BID_MIN_DURATION_NS + 1;
+            monitor.onTrade(130, threshold + 1, true, mature, true);
+            assertEquals(FalseBreakoutMonitor.Phase.BID_BREAKDOWN, monitor.snapshot().phase);
+            assertEquals(104, monitor.snapshot().highlightedTick);
+            offerThreshold.set(50000);
+            monitor.onTimestamp(mature + 1);
+            assertEquals(104, monitor.snapshot().highlightedTick);
+            monitor.onTrade(103, 1, false, mature + 2, true);
+            assertEquals(1, monitor.snapshot().entries.size());
+            assertEquals(104, monitor.snapshot().entries.get(0).bidTick);
+        }
+    }
     static final long OPEN = Instant.parse("2026-10-06T13:30:00Z").getEpochSecond() * 1_000_000_000L;
     static FalseBreakoutMonitor started() {
         FalseBreakoutMonitor monitor = new FalseBreakoutMonitor(); monitor.setEnabled(true);

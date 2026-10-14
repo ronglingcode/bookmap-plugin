@@ -32,6 +32,8 @@ public class OrderWallLabelTracker {
     private final Runnable labelChangeListener;
     private final ScheduledExecutorService scheduler;
     private final Map<LevelKey, Integer> currentDisplaySizes = new HashMap<>();
+    private final Map<LevelKey, Integer> currentRawSizes = new HashMap<>();
+    private int lastMinimumSize = -1;
     private final Map<LevelKey, PendingLabel> pendingLabels = new HashMap<>();
     private final Map<LevelKey, PendingDecrease> pendingDecreases = new HashMap<>();
     private boolean shutdown;
@@ -105,6 +107,7 @@ public class OrderWallLabelTracker {
             return false;
         }
         LevelKey key = new LevelKey(isBid, priceTick);
+        if (size > 0) currentRawSizes.put(key, size); else currentRawSizes.remove(key);
         updateCurrentDisplaySize(key, size);
 
         OrderWallLabel existing = store.getActiveLabel(instrumentAlias, isBid, priceTick);
@@ -181,11 +184,19 @@ public class OrderWallLabelTracker {
     }
 
     public synchronized boolean onTimestamp(long timestampNs) {
-        if (shutdown || timestampNs <= 0 || pendingLabels.isEmpty()) {
+        if (shutdown || timestampNs <= 0) {
             return false;
         }
 
         boolean changed = false;
+        int minimum = getMinimumSize();
+        if (lastMinimumSize != minimum) {
+            lastMinimumSize = minimum;
+            for (Map.Entry<LevelKey, Integer> entry : new ArrayList<>(currentRawSizes.entrySet())) {
+                LevelKey key = entry.getKey();
+                changed |= onDepth(key.bid, key.priceTick, entry.getValue(), timestampNs);
+            }
+        }
         List<Map.Entry<LevelKey, PendingLabel>> candidates =
                 new ArrayList<>(pendingLabels.entrySet());
         for (Map.Entry<LevelKey, PendingLabel> entry : candidates) {
@@ -410,6 +421,7 @@ public class OrderWallLabelTracker {
         pendingLabels.clear();
         pendingDecreases.clear();
         currentDisplaySizes.clear();
+        currentRawSizes.clear();
         scheduler.shutdownNow();
     }
 

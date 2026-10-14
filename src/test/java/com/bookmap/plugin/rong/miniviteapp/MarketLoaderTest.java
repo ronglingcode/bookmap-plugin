@@ -13,6 +13,21 @@ import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.*;
 
 class MarketLoaderTest {
+    @Test void premarketSharesReuseMinuteHistoryAndFreezeAfterOpen() {
+        long start = java.time.Instant.parse("2026-10-14T08:00:00Z").toEpochMilli();
+        long open = java.time.Instant.parse("2026-10-14T13:30:00Z").toEpochMilli();
+        var state = new com.bookmap.plugin.rong.miniviteapp.core.marketdata.MarketState("CRWV", "2026-10-14", 10000);
+        state.initialize(List.of(
+                new com.bookmap.plugin.rong.miniviteapp.models.Candle("CRWV", start - 60000, 10, 10, 10, 10, 9000000, 10),
+                new com.bookmap.plugin.rong.miniviteapp.models.Candle("CRWV", start, 10, 10, 10, 10, 1000000, 10),
+                new com.bookmap.plugin.rong.miniviteapp.models.Candle("CRWV", open - 120000, 10, 10, 10, 10, 1000000, 10)),
+                open - 60000, 0, 0);
+        assertEquals(2000000, state.sessionLevels().get("premarketShareVolume").getAsDouble());
+        state.applyTrade(new Trade("CRWV", open - 30000, 10, 2500000, "pre", null, null, List.of()));
+        assertEquals(4500000, state.sessionLevels().get("premarketShareVolume").getAsDouble());
+        state.applyTrade(new Trade("CRWV", open, 10, 9000000, "regular", null, null, List.of()));
+        assertEquals(4500000, state.sessionLevels().get("premarketShareVolume").getAsDouble());
+    }
     @Test void retainedSessionLevelsFeedBothOrderSnapshotAndDisplayAfterLateLoad() throws Exception {
         long open = java.time.Instant.parse("2026-10-02T13:30:00Z").toEpochMilli();
         long late = open + 22 * 60_000;

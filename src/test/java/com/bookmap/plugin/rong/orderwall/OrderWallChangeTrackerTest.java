@@ -462,6 +462,23 @@ class OrderWallChangeTrackerTest {
         }
     }
 
+    @Test
+    void absolutePremarketThresholdIsNotCappedAtTenThousand() throws Exception {
+        List<OrderWallChangeEvent> events = new CopyOnWriteArrayList<>();
+        CountDownLatch alertSeen = new CountDownLatch(1);
+        OrderWallChangeTracker tracker = new OrderWallChangeTracker(
+                "TEST", 0.01, () -> 20000, 0, TEST_SURVIVAL_MS,
+                event -> { events.add(event); alertSeen.countDown(); }, () -> 110.0, () -> 90.0);
+        try {
+            tracker.markReady();
+            tracker.onDepth(true, 10000, 15000, 1L);
+            assertFalse(alertSeen.await(200, TimeUnit.MILLISECONDS));
+            tracker.onDepth(true, 10010, 21000, 2L);
+            assertTrue(alertSeen.await(500, TimeUnit.MILLISECONDS));
+            assertEquals(20000, events.get(0).getEffectiveThreshold());
+        } finally { tracker.shutdown(); }
+    }
+
     private static OrderWallChangeEvent captureSingleEvent(TrackerAction action) throws Exception {
         List<OrderWallChangeEvent> events = new CopyOnWriteArrayList<>();
         CountDownLatch alertSeen = new CountDownLatch(1);

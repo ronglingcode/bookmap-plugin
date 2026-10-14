@@ -7,6 +7,11 @@ import java.util.*;
 public final class ReclaimSecondBidMonitor {
     public static final String PATTERN = "reclaim2ndBid";
     public static final int SIZE_THRESHOLD = WallPatternMonitor.SIZE_THRESHOLD;
+    private final java.util.function.IntSupplier sizeThreshold;
+    public ReclaimSecondBidMonitor() { this(() -> SIZE_THRESHOLD); }
+    public ReclaimSecondBidMonitor(java.util.function.IntSupplier threshold) { sizeThreshold = threshold; }
+    private int minimumSize() { return sizeThreshold.getAsInt(); }
+    private int lastMinimumSize;
     public static final long BID_MIN_DURATION_NS = WallPatternMonitor.BID_MIN_DURATION_NS;
     private static final long FILL_CALLBACK_GRACE_NS = 250_000_000L;
     private static final ZoneId NEW_YORK = ZoneId.of("America/New_York");
@@ -54,10 +59,17 @@ public final class ReclaimSecondBidMonitor {
         if (timeNs <= 0) { regularSession = false; return; }
         if (lastTimeNs > 0 && timeNs < lastTimeNs) reset();
         lastTimeNs = timeNs;
+        int minimum = minimumSize();
+        if (minimum != lastMinimumSize) {
+            largeSince.entrySet().removeIf(entry -> bids.getOrDefault(entry.getKey(), 0) <= minimum);
+            bids.forEach((tick, size) -> { if (size > minimum) largeSince.putIfAbsent(tick, timeNs); });
+            recentlyReduced.clear();
+            lastMinimumSize = minimum;
+        }
         ZonedDateTime time = Instant.ofEpochSecond(timeNs / 1_000_000_000L, timeNs % 1_000_000_000L).atZone(NEW_YORK);
         if (!time.toLocalDate().equals(sessionDate)) {
             resetSession(); sessionDate = time.toLocalDate();
-            bids.forEach((tick, size) -> { if (size > SIZE_THRESHOLD) largeSince.put(tick, timeNs); });
+            bids.forEach((tick, size) -> { if (size > minimumSize()) largeSince.put(tick, timeNs); });
         }
         LocalTime local = time.toLocalTime();
         regularSession = time.getDayOfWeek().getValue() <= 5
@@ -66,7 +78,7 @@ public final class ReclaimSecondBidMonitor {
     }
     public synchronized void onTimestamp(long timeNs) { advanceTime(timeNs); selectNextBid(); }
     private int qualifiedSize(int tick, long timeNs) {
-        if (bids.getOrDefault(tick, 0) > SIZE_THRESHOLD
+        if (bids.getOrDefault(tick, 0) > minimumSize()
                 && timeNs - largeSince.getOrDefault(tick, timeNs) > BID_MIN_DURATION_NS) return bids.get(tick);
         ReducedBid reduced = recentlyReduced.get(tick);
         return reduced != null && timeNs <= reduced.expiresAtNs ? reduced.qualifiedSize : 0;
@@ -74,9 +86,9 @@ public final class ReclaimSecondBidMonitor {
     public synchronized void onDepth(boolean bid, int price, int size, long timeNs, boolean ready) {
         advanceTime(timeNs);
         if (bid) {
-            if (size <= SIZE_THRESHOLD) {
+            if (size <= minimumSize()) {
                 int qualified = qualifiedSize(price, timeNs);
-                if (bids.getOrDefault(price, 0) > SIZE_THRESHOLD && qualified > 0)
+                if (bids.getOrDefault(price, 0) > minimumSize() && qualified > 0)
                     recentlyReduced.put(price, new ReducedBid(qualified, timeNs + FILL_CALLBACK_GRACE_NS));
                 largeSince.remove(price);
             } else {
@@ -121,7 +133,7 @@ public final class ReclaimSecondBidMonitor {
         nextBid = null;
         if (!enabled || !regularSession || currentPrice == null) return;
         for (Map.Entry<Integer, Integer> bid : bids.headMap(currentPrice, true).descendingMap().entrySet()) {
-            if (bid.getValue() <= SIZE_THRESHOLD || qualifiedSize(bid.getKey(), lastTimeNs) == 0) continue;
+            if (bid.getValue() <= minimumSize() || qualifiedSize(bid.getKey(), lastTimeNs) == 0) continue;
             boolean filled = false;
             for (Fill fill : fills) if (fill.bidTick == bid.getKey()) filled = true;
             if (!filled) { nextBid = bid.getKey(); break; }

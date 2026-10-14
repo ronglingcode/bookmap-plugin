@@ -519,7 +519,7 @@ public class OrderWallChangeTracker {
     private int getEffectiveLargeOrderThreshold() {
         int thresholdFloor = getAbsoluteLargeOrderThreshold();
         if (largestOrderRank <= 0 || totalLevels < largestOrderRank) {
-            return capOrderChangeThreshold(thresholdFloor);
+            return thresholdFloor;
         }
         return capOrderChangeThreshold(
                 Math.max(thresholdFloor, getNthLargestSize(largestOrderRank)));

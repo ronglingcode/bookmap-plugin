@@ -47,15 +47,23 @@ public abstract class WallPatternMonitor {
     private boolean enabled, regularSession;
     private LocalDate sessionDate;
     private long lastTimeNs;
+    private int lastOfferMinimumSize;
     private Integer currentPrice, highlightedTick, armedOffer, armedBid;
     private int highlightedSize, offerSize;
     private long offerExecuted;
     private long armedBidRetainUntilNs;
+    private final java.util.function.IntSupplier offerThreshold;
+    private int offerMinimumSize() { return offerThreshold.getAsInt(); }
+    private int bidMinimumSize() { return SIZE_THRESHOLD; }
     private final Phase initialPhase;
     private final int maxEntries;
     private Phase phase;
 
     protected WallPatternMonitor(Phase initialPhase, int maxEntries) {
+        this(initialPhase, maxEntries, () -> SIZE_THRESHOLD);
+    }
+    protected WallPatternMonitor(Phase initialPhase, int maxEntries, java.util.function.IntSupplier threshold) {
+        offerThreshold = threshold;
         this.initialPhase = initialPhase; this.maxEntries = maxEntries; phase = initialPhase;
     }
 
@@ -84,16 +92,21 @@ public abstract class WallPatternMonitor {
         if (timeNs <= 0) { regularSession = false; return; }
         if (lastTimeNs > 0 && timeNs < lastTimeNs) reset();
         lastTimeNs = timeNs;
+        int minimum = offerMinimumSize();
+        if (minimum != lastOfferMinimumSize) {
+            if (armedOffer != null && offers.getOrDefault(armedOffer, 0) <= minimum) { armedOffer = null; offerExecuted = 0; }
+            lastOfferMinimumSize = minimum;
+        }
         ZonedDateTime time = Instant.ofEpochSecond(timeNs / 1_000_000_000L, timeNs % 1_000_000_000L).atZone(NEW_YORK);
         if (!time.toLocalDate().equals(sessionDate)) {
             // Overnight depth remains useful, but yesterday's last trade does not arm a new target.
             resetSession(); currentPrice = null; sessionDate = time.toLocalDate();
-            bids.forEach((tick, size) -> { if (size > SIZE_THRESHOLD) bidLargeSince.put(tick, timeNs); });
+            bids.forEach((tick, size) -> { if (size > bidMinimumSize()) bidLargeSince.put(tick, timeNs); });
         }
         LocalTime local = time.toLocalTime();
         regularSession = time.getDayOfWeek().getValue() <= 5
                 && !local.isBefore(LocalTime.of(9, 30)) && local.isBefore(LocalTime.of(16, 0));
-        if (armedBid != null && bids.getOrDefault(armedBid, 0) <= SIZE_THRESHOLD && timeNs > armedBidRetainUntilNs) armedBid = null;
+        if (armedBid != null && bids.getOrDefault(armedBid, 0) <= bidMinimumSize() && timeNs > armedBidRetainUntilNs) armedBid = null;
     }
 
     public synchronized void onDepth(boolean bid, int priceTick, int size, long timeNs) {
@@ -101,12 +114,12 @@ public abstract class WallPatternMonitor {
         selectHighlight();
         TreeMap<Integer, Integer> book = bid ? bids : offers;
         if (bid) {
-            if (size > SIZE_THRESHOLD) bidLargeSince.putIfAbsent(priceTick, timeNs);
+            if (size > bidMinimumSize()) bidLargeSince.putIfAbsent(priceTick, timeNs);
             else {
                 bidLargeSince.remove(priceTick);
                 if (Integer.valueOf(priceTick).equals(armedBid)) {
                     // Briefly preserve callback ordering, not an indefinitely canceled wall.
-                    if (book.getOrDefault(priceTick, 0) > SIZE_THRESHOLD || size == 0)
+                    if (book.getOrDefault(priceTick, 0) > bidMinimumSize() || size == 0)
                         armedBidRetainUntilNs = timeNs + DEPTH_TRADE_GRACE_NS;
                 }
             }
@@ -140,7 +153,7 @@ public abstract class WallPatternMonitor {
         }
         currentPrice = priceTick;
         // Replace an offer that disappeared without any buying execution after this callback.
-        if (armedOffer != null && offers.getOrDefault(armedOffer, 0) <= SIZE_THRESHOLD && offerExecuted == 0) armedOffer = null;
+        if (armedOffer != null && offers.getOrDefault(armedOffer, 0) <= offerMinimumSize() && offerExecuted == 0) armedOffer = null;
         // Partial fills retain a mature bid briefly; canceled walls expire in market time.
         selectHighlight();
     }
@@ -151,18 +164,18 @@ public abstract class WallPatternMonitor {
         boolean bid = phase == Phase.BID_BREAKDOWN;
         Map<Integer, Integer> eligible = bid ? bids.headMap(currentPrice, true).descendingMap() : offers.tailMap(currentPrice, false);
         for (Map.Entry<Integer, Integer> level : eligible.entrySet()) {
-            if (level.getValue() <= SIZE_THRESHOLD || bid && signaledBids.contains(level.getKey())) continue;
+            if (level.getValue() <= (bid ? bidMinimumSize() : offerMinimumSize()) || bid && signaledBids.contains(level.getKey())) continue;
             if (bid && lastTimeNs - bidLargeSince.getOrDefault(level.getKey(), lastTimeNs) <= BID_MIN_DURATION_NS) continue;
             highlightedTick = level.getKey(); highlightedSize = level.getValue(); break;
         }
         if (bid) {
             if (highlightedTick != null && (armedBid == null || highlightedTick > armedBid
-                    || bids.getOrDefault(armedBid, 0) > SIZE_THRESHOLD)) {
+                    || bids.getOrDefault(armedBid, 0) > bidMinimumSize())) {
                 if (!highlightedTick.equals(armedBid)) armedBidRetainUntilNs = 0;
                 armedBid = highlightedTick;
             }
         } else if (highlightedTick != null && (armedOffer == null
-                || armedOffer > currentPrice && offers.getOrDefault(armedOffer, 0) > SIZE_THRESHOLD)) {
+                || armedOffer > currentPrice && offers.getOrDefault(armedOffer, 0) > offerMinimumSize())) {
             if (!highlightedTick.equals(armedOffer)) { offerExecuted = 0; offerSize = highlightedSize; }
             armedOffer = highlightedTick;
             // Before the first execution, use the current displayed size of the tracked offer.
