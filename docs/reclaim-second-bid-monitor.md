@@ -19,12 +19,8 @@ one to fill 1, and label the new one fill 2. Subsequent fills at either tracked
 level accumulate without changing its position or consuming another slot.
 There is no session-wide three-bid limit.
 
-Once two levels are tracked, a valid Level 1 bid strictly above both produces a
-green **long** marker at that quote's time and price. An ask above, a trade above,
-or a bid equal to the higher level does not qualify. Each rolling pair signals
-once; a new filled level creates a new pair eligible for another signal.
-No ask-below/breakdown phase is required, and no orders are submitted.
+This monitor only tracks bids. It produces no long or entry markers and submits
+no orders. Level 1 quotes still locate the next bid and attribute unknown-side fills.
 
-The two fill lines update as tracking rolls; prior long markers remain (up to
-64 per session). Daily resets clear tracking and signals. Replay seeks also clear
+The two fill lines update as tracking rolls. Daily resets clear tracking. Replay seeks also clear
 depth. Quotes can come from BBO callbacks or valid depth-derived best bid/ask.

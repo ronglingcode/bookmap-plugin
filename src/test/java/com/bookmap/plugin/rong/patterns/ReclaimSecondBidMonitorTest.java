@@ -31,22 +31,16 @@ class ReclaimSecondBidMonitorTest {
         assertEquals(107, m.snapshot().nextBidTick); // A rolled-out refilled level can be tracked again.
     }
 
-    @Test void longRequiresLevelOneBidAboveBothAndOnlySignalsOnceForEachPair() {
-        ReclaimSecondBidMonitor m = mature(); m.onTrade(107, 1, false, MATURE, true);
-        m.onBbo(110, 111, MATURE + 1, true); assertTrue(m.snapshot().signals.isEmpty());
-        m.onTrade(105, 1, false, MATURE + 2, true);
-        m.onTrade(110, 1, true, MATURE + 3, true); assertTrue(m.snapshot().signals.isEmpty());
-        m.onBbo(106, 110, MATURE + 4, true); assertTrue(m.snapshot().signals.isEmpty());
-        m.onBbo(107, 108, MATURE + 5, true); assertTrue(m.snapshot().signals.isEmpty());
-        m.onBbo(108, 109, MATURE + 6, true); assertEquals(1, m.snapshot().signals.size());
-        assertEquals(107, m.snapshot().signals.get(0).olderBidTick);
-        assertEquals(105, m.snapshot().signals.get(0).newerBidTick);
-        m.onBbo(104, 105, MATURE + 7, true); m.onBbo(110, 111, MATURE + 8, true);
-        assertEquals(1, m.snapshot().signals.size());
-        m.onTrade(103, 1, false, MATURE + 9, true); m.onBbo(106, 107, MATURE + 10, true);
-        assertEquals(2, m.snapshot().signals.size());
+    @Test void quotesAboveFilledLevelsContinueTrackingTheNextBid() {
+        ReclaimSecondBidMonitor m = mature();
+        m.onTrade(107, 1, false, MATURE, true); m.onTrade(105, 1, false, MATURE + 1, true);
+        m.onBbo(108, 109, MATURE + 2, true);
+        assertEquals(java.util.List.of(107, 105), prices(m));
+        assertEquals(103, m.snapshot().nextBidTick);
+        m.onTrade(103, 1, false, MATURE + 3, true);
+        assertEquals(java.util.List.of(105, 103), prices(m));
+        assertEquals(101, m.snapshot().nextBidTick);
     }
-
     @Test void repeatedFillsAtTrackedLevelAccumulateWithoutReorderingOrDuplicating() {
         ReclaimSecondBidMonitor m = mature(); m.onTrade(107, 10, false, MATURE, true);
         m.onTrade(105, 20, false, MATURE + 1, true);

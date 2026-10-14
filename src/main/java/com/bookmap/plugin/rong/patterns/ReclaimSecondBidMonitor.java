@@ -3,7 +3,7 @@ package com.bookmap.plugin.rong.patterns;
 import java.time.*;
 import java.util.*;
 
-/** Rolling two filled bid levels and advisory Level 1 bid reclaim signals. */
+/** Tracks the two most recently filled bid levels and the next qualifying bid. */
 public final class ReclaimSecondBidMonitor {
     public static final String PATTERN = "reclaim2ndBid";
     public static final int SIZE_THRESHOLD = WallPatternMonitor.SIZE_THRESHOLD;
@@ -19,22 +19,13 @@ public final class ReclaimSecondBidMonitor {
         }
         public String toString() { return bidTick + ":" + firstFillTimeNs + ":" + filledSize; }
     }
-    public static final class LongSignal {
-        public final int priceTick, olderBidTick, newerBidTick;
-        public final long timeNs;
-        LongSignal(int price, int older, int newer, long time) {
-            priceTick = price; olderBidTick = older; newerBidTick = newer; timeNs = time;
-        }
-        public String toString() { return priceTick + ":" + timeNs; }
-    }
     public static final class Snapshot {
         public final boolean enabled, regularSession;
         public final Integer nextBidTick;
         public final List<Fill> fills;
-        public final List<LongSignal> signals;
-        Snapshot(boolean enabled, boolean regular, Integer next, List<Fill> fills, List<LongSignal> signals) {
+        Snapshot(boolean enabled, boolean regular, Integer next, List<Fill> fills) {
             this.enabled = enabled; regularSession = regular; nextBidTick = next;
-            this.fills = List.copyOf(fills); this.signals = List.copyOf(signals);
+            this.fills = List.copyOf(fills);
         }
     }
     private static final class ReducedBid {
@@ -46,8 +37,7 @@ public final class ReclaimSecondBidMonitor {
     private final Map<Integer, Long> largeSince = new HashMap<>();
     private final Map<Integer, ReducedBid> recentlyReduced = new HashMap<>();
     private final List<Fill> fills = new ArrayList<>();
-    private final List<LongSignal> signals = new ArrayList<>();
-    private boolean enabled, regularSession, pairSignaled;
+    private boolean enabled, regularSession;
     private LocalDate sessionDate;
     private long lastTimeNs;
     private Integer currentPrice, nextBid, latestBid;
@@ -57,8 +47,8 @@ public final class ReclaimSecondBidMonitor {
         bids.clear(); asks.clear(); resetSession(); sessionDate = null; lastTimeNs = 0; regularSession = false;
     }
     private void resetSession() {
-        largeSince.clear(); recentlyReduced.clear(); fills.clear(); signals.clear();
-        pairSignaled = false; currentPrice = nextBid = latestBid = null;
+        largeSince.clear(); recentlyReduced.clear(); fills.clear();
+        currentPrice = nextBid = latestBid = null;
     }
     private void advanceTime(long timeNs) {
         if (timeNs <= 0) { regularSession = false; return; }
@@ -112,7 +102,7 @@ public final class ReclaimSecondBidMonitor {
                 int qualified = qualifiedSize(price, timeNs);
                 if (qualified > 0) {
                     if (fills.size() == 2) fills.remove(0);
-                    fills.add(new Fill(price, qualified, timeNs, size)); pairSignaled = false;
+                    fills.add(new Fill(price, qualified, timeNs, size));
                 }
             }
         }
@@ -124,12 +114,6 @@ public final class ReclaimSecondBidMonitor {
         currentPrice = bidPrice;
         if (ready && regularSession) {
             latestBid = bidPrice;
-            if (enabled && fills.size() == 2 && !pairSignaled
-                    && bidPrice > fills.get(0).bidTick && bidPrice > fills.get(1).bidTick) {
-                signals.add(new LongSignal(bidPrice, fills.get(0).bidTick, fills.get(1).bidTick, timeNs));
-                if (signals.size() > 64) signals.remove(0);
-                pairSignaled = true;
-            }
         }
         selectNextBid();
     }
@@ -144,6 +128,6 @@ public final class ReclaimSecondBidMonitor {
         }
     }
     public synchronized Snapshot snapshot() {
-        return new Snapshot(enabled, regularSession, nextBid, enabled ? fills : List.of(), enabled ? signals : List.of());
+        return new Snapshot(enabled, regularSession, nextBid, enabled ? fills : List.of());
     }
 }

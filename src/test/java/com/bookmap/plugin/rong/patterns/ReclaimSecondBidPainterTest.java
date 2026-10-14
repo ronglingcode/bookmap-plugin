@@ -9,7 +9,7 @@ import velox.api.layer1.layers.strategies.interfaces.*;
 import velox.api.layer1.layers.strategies.interfaces.ScreenSpaceCanvas.*;
 
 class ReclaimSecondBidPainterTest {
-    @Test void rollingFillLinesReplaceOldestAndLongMarkerStaysAtQuoteTimeAndPrice() {
+    @Test void rollingFillLinesReplaceOldestAndQuotesAboveBothNeverPaintEntryMarkers() {
         ReclaimSecondBidMonitor monitor = ReclaimSecondBidMonitorTest.mature();
         List<CanvasIcon> shapes = new CopyOnWriteArrayList<>();
         ScreenSpaceCanvas canvas = (ScreenSpaceCanvas) Proxy.newProxyInstance(ScreenSpaceCanvas.class.getClassLoader(), new Class<?>[]{ScreenSpaceCanvas.class}, (object, method, args) -> {
@@ -27,8 +27,8 @@ class ReclaimSecondBidPainterTest {
             assertTrue(shapes.stream().anyMatch(shape -> shape.getY1().compose().dataY == 105));
             assertTrue(shapes.stream().anyMatch(shape -> shape.getY1().compose().dataY == 103));
             monitor.onBbo(106, 107, now + 3, true); painter.refreshNow();
-            CanvasIcon signal = shapes.stream().filter(shape -> shape.getX1().compose().base == CompositeCoordinateBase.DATA_ZERO).findFirst().orElseThrow();
-            assertEquals(now + 3, signal.getX1().compose().timeX); assertEquals(106, signal.getY1().compose().dataY);
+            assertTrue(shapes.stream().noneMatch(shape -> shape.getX1().compose().base == CompositeCoordinateBase.DATA_ZERO));
+            assertEquals(4, shapes.size()); // Caption, two fill lines, and next bid.
             monitor.setEnabled(false); painter.refreshNow(); assertTrue(shapes.isEmpty());
         } finally { painter.shutdown(); }
     }

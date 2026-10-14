@@ -8,7 +8,7 @@ import java.time.Instant;
 import org.junit.jupiter.api.Test;
 
 class ReclaimSecondBidCallbacksTest {
-    @Test void replaySellingAtBidTracksPartialFillsAndLevelOneBidReclaimsBoth() throws Exception {
+    @Test void replaySellingAtBidTracksPartialFillsAndQuotesAboveBothKeepTracking() throws Exception {
         withIsolatedActivation(() -> {
             RongPlugin plugin = SignalComposerCallbacksTest.callbackPlugin();
             ReclaimSecondBidMonitor monitor = new ReclaimSecondBidMonitor(); monitor.setEnabled(true);
@@ -21,10 +21,10 @@ class ReclaimSecondBidCallbacksTest {
                 plugin.onTimestamp(time + 1_000_000_001L); plugin.onTrade(107, 10, null);
                 assertEquals(1, monitor.snapshot().fills.size()); assertEquals(105, monitor.snapshot().nextBidTick);
                 plugin.onDepth(true, 107, 0); plugin.onTrade(105, 20, null);
-                assertEquals(2, monitor.snapshot().fills.size()); assertTrue(monitor.snapshot().signals.isEmpty());
-                plugin.onBbo(106, 1, 109, 1); assertTrue(monitor.snapshot().signals.isEmpty());
-                plugin.onBbo(108, 1, 109, 1); assertEquals(1, monitor.snapshot().signals.size());
-                assertEquals(108, monitor.snapshot().signals.get(0).priceTick);
+                assertEquals(2, monitor.snapshot().fills.size());
+                plugin.onBbo(106, 1, 109, 1); plugin.onBbo(108, 1, 109, 1);
+                assertEquals(107, monitor.snapshot().fills.get(0).bidTick);
+                assertEquals(105, monitor.snapshot().fills.get(1).bidTick);
             } finally { painter.shutdown(); }
         });
     }

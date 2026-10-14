@@ -15,7 +15,7 @@ import velox.api.layer1.layers.strategies.interfaces.ScreenSpacePainter;
 import velox.api.layer1.layers.strategies.interfaces.ScreenSpacePainterAdapter;
 import velox.api.layer1.layers.strategies.interfaces.ScreenSpacePainterFactory;
 
-/** Live bid labels and persistent quote-confirmed breakdown/reclaim markers. */
+/** Compact rolling fill labels and the next qualifying bid. */
 public final class ReclaimSecondBidPainter implements ScreenSpacePainterFactory {
     private final ReclaimSecondBidMonitor monitor;
     private final String title = "Reclaim 2nd bid";
@@ -50,7 +50,7 @@ public final class ReclaimSecondBidPainter implements ScreenSpacePainterFactory 
         synchronized void refresh() {
             if (disposed) return;
             ReclaimSecondBidMonitor.Snapshot state = monitor.snapshot();
-            String next = state.enabled + ":" + state.regularSession + ":" + state.nextBidTick + ":" + state.fills + ":" + state.signals;
+            String next = state.enabled + ":" + state.regularSession + ":" + state.nextBidTick + ":" + state.fills;
             if (next.equals(signature)) return;
             signature = next; clear();
             if (!state.enabled) return;
@@ -59,8 +59,6 @@ public final class ReclaimSecondBidPainter implements ScreenSpacePainterFactory 
             add(new CanvasIcon(new PreparedImage(caption), pixelX(10), pixelY(captionY), pixelX(10 + caption.getWidth()), pixelY(captionY + caption.getHeight())));
             if (state.nextBidTick != null) level("next bid", new Color(255, 196, 64), state.nextBidTick);
             for (int i = 0; i < state.fills.size(); i++) level("fill " + (i + 1), new Color(100, 185, 255), state.fills.get(i).bidTick);
-            for (ReclaimSecondBidMonitor.LongSignal signal : state.signals)
-                marker("long", new Color(48, 214, 137), signal.priceTick, signal.timeNs, true);
         }
         private void level(String text, Color color, int tick) {
             BufferedImage wall = new BufferedImage(width, 24, BufferedImage.TYPE_INT_ARGB);
@@ -69,14 +67,6 @@ public final class ReclaimSecondBidPainter implements ScreenSpacePainterFactory 
             g.drawImage(badge, Math.max(0, width - badge.getWidth() - 10), 0, null); g.dispose();
             add(new CanvasIcon(new PreparedImage(wall), pixelX(0), dataY(tick, -12), pixelX(width), dataY(tick, 12)));
         }
-        private void marker(String text, Color color, int tick, long timeNs, boolean longSignal) {
-            BufferedImage badge = entryMarker(text, color, longSignal);
-            CompositeHorizontalCoordinate time = new CompositeHorizontalCoordinate(CompositeCoordinateBase.DATA_ZERO, 0, timeNs);
-            int offset = longSignal ? 0 : -badge.getHeight();
-            add(new CanvasIcon(new PreparedImage(badge), new RelativePixelHorizontalCoordinate(time, -badge.getWidth() / 2),
-                    dataY(tick, offset), new RelativePixelHorizontalCoordinate(time, badge.getWidth() - badge.getWidth() / 2),
-                    dataY(tick, offset + badge.getHeight())));
-        }
         private void add(CanvasIcon shape) { canvas.addShape(shape); shapes.add(shape); }
         private void clear() { for (CanvasIcon shape : shapes) { try { canvas.removeShape(shape); } catch (IllegalArgumentException ignored) { } } shapes.clear(); }
         public synchronized void dispose() { if (disposed) return; disposed = true; clear(); canvas.dispose(); instances.remove(this); }
@@ -84,15 +74,6 @@ public final class ReclaimSecondBidPainter implements ScreenSpacePainterFactory 
     private static CompositeHorizontalCoordinate pixelX(int x) { return new CompositeHorizontalCoordinate(CompositeCoordinateBase.PIXEL_ZERO, x, 0); }
     private static CompositeVerticalCoordinate pixelY(int y) { return new CompositeVerticalCoordinate(CompositeCoordinateBase.PIXEL_ZERO, y, 0); }
     private static CompositeVerticalCoordinate dataY(int price, int offset) { return new CompositeVerticalCoordinate(CompositeCoordinateBase.DATA_ZERO, offset, price); }
-    private static BufferedImage entryMarker(String text, Color color, boolean longSignal) {
-        BufferedImage badge = label(text, color);
-        BufferedImage marker = new BufferedImage(badge.getWidth(), badge.getHeight() + 8, BufferedImage.TYPE_INT_ARGB);
-        Graphics2D g = marker.createGraphics(); g.drawImage(badge, 0, longSignal ? 8 : 0, null); g.setColor(color);
-        int center = marker.getWidth() / 2;
-        g.fillPolygon(new int[]{center - 5, center + 5, center}, longSignal
-                ? new int[]{8, 8, 0} : new int[]{badge.getHeight(), badge.getHeight(), marker.getHeight() - 1}, 3);
-        g.dispose(); return marker;
-    }
     private static BufferedImage label(String text, Color color) {
         Font font = new Font("SansSerif", Font.BOLD, 12);
         Graphics2D probe = new BufferedImage(1, 1, BufferedImage.TYPE_INT_ARGB).createGraphics(); probe.setFont(font);
