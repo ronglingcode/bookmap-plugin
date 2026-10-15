@@ -31,7 +31,7 @@ class PremarketSizeThresholdTest {
         AtomicLong now = new AtomicLong(time("13:00:00"));
         AtomicInteger calls = new AtomicInteger();
         try (PremarketSizeThreshold policy = new PremarketSizeThreshold("TEST", now::get, now::get, (symbol, start, end) -> {
-            calls.incrementAndGet(); assertEquals(time("08:00:00"), start);
+            calls.incrementAndGet(); assertEquals(time("05:00:00"), start);
             assertTrue(end < time("13:30:00"));
             return List.of(candle(start - 1, 9000000), candle(start, 1500000),
                     candle(time("13:00:00"), 1000000), candle(time("13:30:00"), 9000000));

@@ -11,7 +11,7 @@ Wall labels and exported liquidity summaries always use a fixed minimum of 5,000
 | Above 4,000,000 | 20,000 |
 | Unavailable | 5,000 |
 
-The policy uses Schwab's price-history endpoint with one-minute candles and extended-hours data enabled. It shares the native trading runtime's OAuth token and refresh handling. Requests cover 04:00 Eastern until 09:30 Eastern exclusive. Returned candles are deduplicated by timestamp and filtered to the requested range, because Schwab may return additional session candles. Empty or malformed responses are unavailable, rather than zero volume.
+The policy uses Schwab's price-history endpoint with one-minute candles and extended-hours data enabled. It shares the native trading runtime's OAuth token and refresh handling. Requests cover 01:00 Eastern until 09:30 Eastern exclusive, matching the Thinkorswim study's start time. Returned candles are deduplicated by timestamp and filtered to the requested range, because Schwab may return additional session candles. Empty or malformed responses are unavailable, rather than zero volume.
 
 The background worker replaces the sum every minute before open. A successful fetch at or after open freezes the session's total; failed final fetches retry. The threshold does not use Massive history or Massive stream volume. Massive remains the source for other native market-data features.
 

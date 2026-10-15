@@ -40,7 +40,7 @@ public final class PremarketSizeThreshold implements AutoCloseable {
         ZonedDateTime time = Instant.ofEpochMilli(now.getAsLong()).atZone(NEW_YORK);
         LocalDate today = time.toLocalDate();
         if (!today.equals(date)) { volume = Double.NaN; date = today; finalized = false; }
-        long start = today.atTime(4, 0).atZone(NEW_YORK).toInstant().toEpochMilli();
+        long start = today.atTime(1, 0).atZone(NEW_YORK).toInstant().toEpochMilli();
         long open = today.atTime(9, 30).atZone(NEW_YORK).toInstant().toEpochMilli();
         if (finalized || time.toInstant().toEpochMilli() <= start) return;
         long end = Math.min(Math.min(now.getAsLong(), marketTime.getAsLong()), open);

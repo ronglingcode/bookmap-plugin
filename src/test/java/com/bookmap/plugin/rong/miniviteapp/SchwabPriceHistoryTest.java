@@ -8,7 +8,7 @@ import java.time.Instant;
 import static org.junit.jupiter.api.Assertions.*;
 
 class SchwabPriceHistoryTest {
-    private static final long START = Instant.parse("2026-10-14T08:00:00Z").toEpochMilli();
+    private static final long START = Instant.parse("2026-10-14T05:00:00Z").toEpochMilli();
     private static final long OPEN = Instant.parse("2026-10-14T13:30:00Z").toEpochMilli();
     private static String bar(long time, String volume) {
         return "{\"datetime\":" + time + ",\"open\":71,\"high\":72,\"low\":70,\"close\":71,\"volume\":" + volume + "}";
