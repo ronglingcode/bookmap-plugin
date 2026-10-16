@@ -14,6 +14,9 @@ public final class PriceHistoryApi {
     private final HttpPort http;
     public PriceHistoryApi(HttpPort http) { this.http = http; }
     public List<Candle> getMinuteBars(String symbol, long from, long toInclusive, String token) throws Exception {
+        return getMinuteBars(symbol, from, toInclusive, token, false);
+    }
+    public List<Candle> getMinuteBars(String symbol, long from, long toInclusive, String token, boolean allowEmpty) throws Exception {
         String query = "symbol=" + URLEncoder.encode(symbol, StandardCharsets.UTF_8)
                 + "&periodType=day&frequencyType=minute&frequency=1&startDate=" + from
                 + "&endDate=" + toInclusive + "&needExtendedHoursData=true&needPreviousClose=false";
@@ -33,7 +36,7 @@ public final class PriceHistoryApi {
                 candles.put(timestamp, new Candle(symbol, timestamp, number(value, "open"), number(value, "high"),
                         number(value, "low"), number(value, "close"), volume, 0));
             }
-            if (candles.isEmpty()) throw new IOException("Schwab returned no premarket candles");
+            if (candles.isEmpty() && !allowEmpty) throw new IOException("Schwab returned no premarket candles");
             return new ArrayList<>(candles.values());
         } catch (RuntimeException malformed) { throw new IOException("Schwab price history returned invalid candles"); }
     }

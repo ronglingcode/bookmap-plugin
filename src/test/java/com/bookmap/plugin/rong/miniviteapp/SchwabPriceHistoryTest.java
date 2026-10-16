@@ -42,4 +42,11 @@ class SchwabPriceHistoryTest {
         PriceHistoryApi api = new PriceHistoryApi((uri, method, headers, body) -> new HttpPort.Response(401, "{}"));
         assertThrows(IOException.class, () -> api.getMinuteBars("CRWV", START, OPEN - 1, "test-token"));
     }
+    @Test void emptyCandlesCanBeReturnedForMassiveBackfillWithoutAcceptingMalformedHistory() throws Exception {
+        PriceHistoryApi api = new PriceHistoryApi((uri, method, headers, body) ->
+                new HttpPort.Response(200, "{\"candles\":[]}"));
+        assertTrue(api.getMinuteBars("TSLA", START, OPEN - 1, "test-token", true).isEmpty());
+        PriceHistoryApi malformed = new PriceHistoryApi((uri, method, headers, body) -> new HttpPort.Response(200, "{}"));
+        assertThrows(IOException.class, () -> malformed.getMinuteBars("TSLA", START, OPEN - 1, "test-token", true));
+    }
 }

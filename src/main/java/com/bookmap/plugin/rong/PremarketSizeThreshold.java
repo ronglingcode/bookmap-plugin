@@ -50,7 +50,7 @@ public final class PremarketSizeThreshold implements AutoCloseable {
             if (!Double.isFinite(total)) { volume = Double.NaN; unavailableReason = "invalid aggregate volume"; return; }
             volume = total; finalized = end == open;
             unavailableReason = "";
-            PluginLog.detail(symbol, "Premarket threshold: Schwab 1-minute history shares=" + total + "; size=" + forVolume(total));
+            PluginLog.detail(symbol, "Premarket threshold: Schwab + Massive backfill 1-minute history shares=" + total + "; size=" + forVolume(total));
         } catch (Exception unavailable) {
             volume = Double.NaN;
             unavailableReason = "history fetch failed (" + unavailable.getClass().getSimpleName() + ")";

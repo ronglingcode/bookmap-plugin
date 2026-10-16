@@ -9,6 +9,7 @@ import com.bookmap.plugin.rong.miniviteapp.core.configuration.TradingConfig;
 import com.bookmap.plugin.rong.miniviteapp.core.controllers.ExecutionInputs;
 import com.bookmap.plugin.rong.miniviteapp.core.controllers.Workflows;
 import com.bookmap.plugin.rong.miniviteapp.core.marketdata.MarketClock;
+import com.bookmap.plugin.rong.miniviteapp.core.marketdata.PremarketHistory;
 import com.bookmap.plugin.rong.miniviteapp.core.marketdata.StartupEligibility;
 import com.bookmap.plugin.rong.miniviteapp.core.state.TradeState;
 import com.bookmap.plugin.rong.miniviteapp.libraries.broker.schwab.*;
@@ -129,7 +130,12 @@ public final class TradingRuntime implements AutoCloseable {
     }
     public List<Candle> premarketMinuteBars(String symbol, long from, long toInclusive) throws Exception {
         if (stopped) throw new IllegalStateException("Native runtime stopped");
-        return priceHistory.getMinuteBars(symbol, from, toInclusive, oauth.accessToken(false));
+        PremarketHistory.Result result = PremarketHistory.load(symbol, from, toInclusive,
+                (ticker, start, end) -> priceHistory.getMinuteBars(ticker, start, end, oauth.accessToken(false), true),
+                massive::getMinuteBars);
+        events.detail(symbol, "Premarket history: Schwab shares=" + result.schwabShares
+                + "; Massive backfill shares=" + result.massiveShares + "; backfilled minutes=" + result.backfilledMinutes);
+        return result.candles;
     }
     public JsonObject sessionLevels(String symbol) {
         var state = market.getState(symbol);

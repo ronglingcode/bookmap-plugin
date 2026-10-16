@@ -74,6 +74,9 @@ public final class Api {
     public List<Candle> getPriceHistory(String symbol, int timeframe, String today) throws Exception {
         return getBars(symbol, aggregatePath(symbol, timeframe, "minute", today, MarketClock.addDays(today, 1), 50000));
     }
+    public List<Candle> getMinuteBars(String symbol, long from, long toInclusive) throws Exception {
+        return getBars(symbol, aggregatePath(symbol, 1, "minute", Long.toString(from), Long.toString(toInclusive), 50000));
+    }
     public List<Candle> getPriceHistoryFromOldDateForHigherTimeframe(String symbol, int timeframe, String start, String end) throws Exception {
         return getBars(symbol, aggregatePath(symbol, timeframe, "minute", start, end, 50000));
     }
