@@ -36,7 +36,8 @@ class ServiceParityTest {
                 JsonObject page = fixture.getAsJsonArray("pages").get(requests.size() - 1).getAsJsonObject();
                 return new HttpPort.Response(page.get("status").getAsInt(), page.get("body").getAsString());
             };
-            Api firestore = new Api(http, "test-project", () -> "test-firestore-key");
+            Api firestore = new Api(http, "test-project", () -> "test-firestore-key", () -> "",
+                    () -> fixture.has("now") ? fixture.get("now").getAsLong() : 0L);
             AtomicReference<JsonObject> stored = new AtomicReference<>(fixture.has("credentials") ? fixture.getAsJsonObject("credentials").deepCopy() : new JsonObject());
             CredentialPort credentials = new CredentialPort() {
                 public JsonObject loadSchwab() { return stored.get().deepCopy(); }

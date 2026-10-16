@@ -84,7 +84,7 @@ public final class TradingRuntime implements AutoCloseable {
         reads = new ReadApi(authenticatedReads);
         priceHistory = new PriceHistoryApi(authenticatedReads);
         JsonObject firebase = object(sections, "firebaseConfig");
-        firestore = new com.bookmap.plugin.rong.miniviteapp.libraries.firestore.Api(http, string(firebase, "projectId"), () -> string(firebase, "apiKey"));
+        firestore = new com.bookmap.plugin.rong.miniviteapp.libraries.firestore.Api(http, string(firebase, "projectId"), () -> string(firebase, "apiKey"), () -> "", now);
         massiveKey = string(object(sections, "massive"), "apiKey"); massive = new com.bookmap.plugin.rong.miniviteapp.libraries.massive.Api(http, () -> massiveKey);
         market = new MarketLoader(massive, executor, now);
         if (object(sections, "tradingPolicy").has("coreTargetEnabled")) policy.addProperty("coreTargetEnabled", bool(object(sections, "tradingPolicy"), "coreTargetEnabled"));
