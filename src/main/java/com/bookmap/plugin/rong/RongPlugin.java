@@ -207,7 +207,7 @@ public class RongPlugin implements CustomModuleAdapter,
         this.vwapIndicator.setWidth(2);
         updateVwapIndicatorVisibility();
         premarketSizeThreshold = new PremarketSizeThreshold(cleanAlias,
-                () -> "replay".equals(observationConfig.sourceMode) ? 0L : lastTimestampNs / 1_000_000L,
+                () -> lastTimestampNs / 1_000_000L,
                 (symbol, from, to) -> {
                     NativeTradingAdapter trading = nativeTrading;
                     if (trading == null) throw new IllegalStateException("Schwab runtime unavailable");
@@ -663,7 +663,7 @@ public class RongPlugin implements CustomModuleAdapter,
         if (wallChangeTracker != null) {
             wallChangeTracker.onDepth(isBid, price, size, eventTimeNs);
         }
-        if (sharedServer != null) sharedServer.observeSessionDepth(alias, price, size, lastTimestampNs);
+        if (sharedServer != null) sharedServer.observeSessionDepth(alias, isBid, price, size, lastTimestampNs);
         orderBook.update(isBid, price, size);
         if (falseBreakoutMonitor != null) {
             falseBreakoutMonitor.onDepth(isBid, price, size, lastTimestampNs);
@@ -731,6 +731,7 @@ public class RongPlugin implements CustomModuleAdapter,
             compositionSeedFromSharedBook = false;
         }
         this.lastTimestampNs = timestampNs;
+        if (premarketSizeThreshold != null) premarketSizeThreshold.onMarketTime();
         if (sharedServer != null) sharedServer.observeSessionTime(alias, timestampNs);
         if (falseBreakoutMonitor != null) {
             falseBreakoutMonitor.onTimestamp(timestampNs);

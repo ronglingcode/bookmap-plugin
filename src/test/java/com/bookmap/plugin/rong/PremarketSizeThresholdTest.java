@@ -43,8 +43,8 @@ class PremarketSizeThresholdTest {
             now.set(time("15:00:00") + 86400000); assertEquals(5000, policy.threshold());
         }
     }
-    @Test void replayAndFailuresUseFallbackAndRetry() {
-        AtomicLong now = new AtomicLong(time("13:00:00")), market = new AtomicLong(now.get() - 86400000);
+    @Test void unknownChartTimeAndFailuresUseFallbackAndRetry() {
+        AtomicLong now = new AtomicLong(time("13:00:00")), market = new AtomicLong(0);
         AtomicInteger calls = new AtomicInteger();
         try (PremarketSizeThreshold policy = new PremarketSizeThreshold("TEST", market::get, now::get, (symbol, start, end) -> {
             if (calls.incrementAndGet() == 1) throw new IllegalStateException("unavailable");
@@ -53,7 +53,63 @@ class PremarketSizeThresholdTest {
             policy.refresh(); assertEquals(0, calls.get()); assertEquals(5000, policy.threshold());
             market.set(now.get()); policy.refresh(); assertEquals(5000, policy.threshold());
             policy.refresh(); assertEquals(20000, policy.threshold());
-            market.set(now.get() - 86400000); assertEquals(5000, policy.threshold());
+            market.set(0); assertEquals(5000, policy.threshold());
+        }
+    }
+    @Test void historicalReplayUsesItsOwnPremarketSessionAndRewindExcludesLaterVolume() {
+        AtomicLong now = new AtomicLong(time("18:00:00") + 86400000), market = new AtomicLong(time("13:30:05"));
+        AtomicInteger calls = new AtomicInteger();
+        try (PremarketSizeThreshold policy = new PremarketSizeThreshold("TEST", market::get, now::get, (symbol, start, end) -> {
+            calls.incrementAndGet(); assertEquals(time("05:00:00"), start); assertEquals(time("13:30:00") - 1, end);
+            return List.of(candle(start, 500000), candle(time("13:29:00"), 3000000));
+        })) {
+            policy.refresh(); assertEquals(15000, policy.threshold()); assertEquals(3500000, policy.volume());
+            market.set(time("13:29:05"));
+            assertEquals(500000, policy.volume()); assertEquals(2000, policy.threshold());
+            policy.refresh(); assertEquals(1, calls.get());
+            market.set(time("13:30:05")); assertEquals(15000, policy.threshold());
+            assertEquals(1, calls.get());
+        }
+    }
+
+    @Test void liveAndDelayedReplayExcludeUnfinishedPremarketMinute() {
+        for (long wall : new long[]{time("13:29:05"), time("18:00:00")}) {
+            AtomicLong market = new AtomicLong(time("13:29:05"));
+            try (PremarketSizeThreshold policy = new PremarketSizeThreshold("TEST", market::get, () -> wall,
+                    (symbol, start, end) -> {
+                        assertEquals(time("13:29:00") - 1, end);
+                        return List.of(candle(start, 500000), candle(time("13:29:00"), 3000000));
+                    })) {
+                policy.refresh(); assertEquals(500000, policy.volume()); assertEquals(2000, policy.threshold());
+            }
+        }
+    }
+    @Test void replayCrossingOpenRefreshesWithoutWaitingForSixtyRealSeconds() throws Exception {
+        AtomicLong market = new AtomicLong(time("13:29:55"));
+        AtomicInteger calls = new AtomicInteger();
+        try (PremarketSizeThreshold policy = new PremarketSizeThreshold("TEST", market::get, () -> time("18:00:00"),
+                (symbol, start, end) -> { calls.incrementAndGet(); return List.of(candle(start, 500000), candle(time("13:29:00"), 3000000)); })) {
+            policy.onMarketTime();
+            assertTimeoutPreemptively(java.time.Duration.ofSeconds(2), () -> {
+                while (!Double.isFinite(policy.volume())) Thread.sleep(5);
+            });
+            assertEquals(2000, policy.threshold());
+            market.set(time("13:30:05")); policy.onMarketTime();
+            assertTimeoutPreemptively(java.time.Duration.ofSeconds(2), () -> {
+                while (policy.threshold() != 15000) Thread.sleep(5);
+            });
+            assertEquals(2, calls.get());
+        }
+    }
+    @Test void historicalSessionUsesEasternOpenAfterDaylightSavingEnds() {
+        long chart = Instant.parse("2026-11-03T14:30:05Z").toEpochMilli();
+        try (PremarketSizeThreshold policy = new PremarketSizeThreshold("TEST", () -> chart, () -> chart + 86400000,
+                (symbol, start, end) -> {
+                    assertEquals(Instant.parse("2026-11-03T06:00:00Z").toEpochMilli(), start);
+                    assertEquals(Instant.parse("2026-11-03T14:30:00Z").toEpochMilli() - 1, end);
+                    return List.of(candle(start, 3500000));
+                })) {
+            policy.refresh(); assertEquals(15000, policy.threshold());
         }
     }
     @Test void entryAndDisplayIgnorePercentileAndManualFloor() {

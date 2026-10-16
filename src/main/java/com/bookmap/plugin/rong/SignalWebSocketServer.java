@@ -50,15 +50,18 @@ public class SignalWebSocketServer extends WebSocketServer {
     public void setTradingDispatch(java.util.function.Consumer<JsonObject> dispatch) { tradingDispatch = dispatch; }
     private final Map<String, PremarketSizeThreshold> sizeThresholds = new ConcurrentHashMap<>();
     private final Map<String, SessionOrderSizeTracker> sessionOrderSizes = new ConcurrentHashMap<>();
-    public void observeSessionDepth(String symbol, int price, int size, long timestampNs) {
+    public void observeSessionDepth(String symbol, boolean isBid, int price, int size, long timestampNs) {
+        if (price <= 0) return;
         String clean = SymbolUtils.cleanSymbol(symbol);
         OrderBookState book = symbolToOrderBook.get(clean); Double pips = symbolToPips.get(clean);
         if (book == null || pips == null || !Double.isFinite(pips) || pips <= 0) return;
         sessionOrderSizes.computeIfAbsent(clean, ignored -> new SessionOrderSizeTracker())
-                .onDepth(BookmapPriceNormalizer.toWirePrice(price, pips), size, timestampNs, book, pips);
+                .onDepth(isBid, BookmapPriceNormalizer.toWirePrice(price, pips), size, timestampNs, book, pips);
     }
     public void observeSessionTime(String symbol, long timestampNs) {
         String clean = SymbolUtils.cleanSymbol(symbol);
+        if (clean.isEmpty()) return;
+        symbolToRegularSessionHighLow.computeIfAbsent(clean, ignored -> new RegularSessionHighLowTracker()).onTimestamp(timestampNs);
         OrderBookState book = symbolToOrderBook.get(clean); Double pips = symbolToPips.get(clean);
         if (book == null || pips == null || !Double.isFinite(pips) || pips <= 0) return;
         sessionOrderSizes.computeIfAbsent(clean, ignored -> new SessionOrderSizeTracker()).advance(timestampNs, book, pips);
@@ -73,11 +76,18 @@ public class SignalWebSocketServer extends WebSocketServer {
         if (day != null && localDay != null && day.getSessionDate().equals(localDay.getSessionDate())) {
             low = Math.min(low, localDay.getLowOfDay()); high = Math.max(high, localDay.getHighOfDay());
         }
-        int largest = tracker == null || day == null ? 0 : tracker.largest(day.getSessionDate(), low, high);
+        SessionOrderSizeTracker.Observation counted = tracker == null || day == null ? null
+                : tracker.largestObservation(day.getSessionDate(), low, high);
+        int largest = counted == null ? 0 : counted.size;
         PremarketSizeThreshold policy = sizeThresholds.get(clean);
         int required = policy == null ? PremarketSizeThreshold.FALLBACK : policy.threshold();
         JsonObject cap = new JsonObject(); cap.addProperty("largestOrderSize", largest);
         cap.addProperty("requiredOrderSize", required); cap.addProperty("maxRiskMultiple", (double) largest / required);
+        if (counted != null) {
+            cap.addProperty("largestOrderPrice", counted.price);
+            cap.addProperty("largestOrderSide", counted.isBid ? "bid" : "offer");
+            cap.addProperty("largestOrderObservedAt", counted.timestampNs / 1_000_000L);
+        }
         if (day != null) cap.addProperty("sessionDate", day.getSessionDate());
         return cap;
     }
@@ -342,6 +352,7 @@ public class SignalWebSocketServer extends WebSocketServer {
         }
         RegularSessionHighLowTracker tracker = symbolToRegularSessionHighLow.get(cleanSymbol);
         RegularSessionHighLowTracker.Snapshot local = tracker == null ? null : tracker.snapshot();
+        if (tracker != null && tracker.isChartDriven()) return local;
         RegularSessionHighLowTracker.Snapshot market =
                 RegularSessionHighLowTracker.fromMarketState(sessionLevelsProvider.apply(cleanSymbol));
         return market != null && (local == null || market.getSessionDate().compareTo(local.getSessionDate()) >= 0)

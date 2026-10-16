@@ -3,7 +3,9 @@ package com.bookmap.plugin.rong;
 import com.bookmap.plugin.rong.miniviteapp.models.Candle;
 import java.time.*;
 import java.util.List;
+import java.util.ArrayList;
 import java.util.concurrent.*;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.LongSupplier;
 
 /** Per-chart premarket share policy. Network work never runs on Bookmap callbacks. */
@@ -15,10 +17,26 @@ public final class PremarketSizeThreshold implements AutoCloseable {
     private final LongSupplier marketTime, now;
     private final Bars bars;
     private final ScheduledExecutorService worker;
-    private volatile LocalDate date;
-    private volatile double volume = Double.NaN;
-    private boolean finalized;
+    private volatile History history;
+    private volatile Projection projection;
     private volatile String unavailableReason = "waiting for history";
+    private final AtomicBoolean refreshQueued = new AtomicBoolean();
+    private volatile long requestedMinute = Long.MIN_VALUE;
+    private volatile boolean closed;
+    private static final class History {
+        final LocalDate date;
+        final List<Candle> candles;
+        final long start, end;
+        History(LocalDate date, List<Candle> candles, long start, long end) {
+            this.date = date; this.candles = new ArrayList<>(candles); this.start = start; this.end = end;
+        }
+    }
+    private static final class Projection {
+        final History history;
+        final long end;
+        final double volume;
+        Projection(History history, long end, double volume) { this.history = history; this.end = end; this.volume = volume; }
+    }
 
     public PremarketSizeThreshold(String symbol, LongSupplier marketTime, Bars bars) {
         this(symbol, marketTime, System::currentTimeMillis, bars);
@@ -30,29 +48,51 @@ public final class PremarketSizeThreshold implements AutoCloseable {
         });
     }
     public void start() { worker.scheduleWithFixedDelay(this::refresh, 0, 60, TimeUnit.SECONDS); }
-    private boolean currentMarket() {
+    /** Coalesce chart-minute/open/session changes without running network work on a callback. */
+    public void onMarketTime() {
         long time = marketTime.getAsLong();
-        return time > 0 && Instant.ofEpochMilli(time).atZone(NEW_YORK).toLocalDate()
-                .equals(Instant.ofEpochMilli(now.getAsLong()).atZone(NEW_YORK).toLocalDate());
+        if (time <= 0 || closed) return;
+        LocalDate date = Instant.ofEpochMilli(time).atZone(NEW_YORK).toLocalDate();
+        long open = date.atTime(9, 30).atZone(NEW_YORK).toInstant().toEpochMilli();
+        long minute = Math.min(time, open) / 60000;
+        if (minute == requestedMinute) return;
+        requestedMinute = minute; queueRefresh();
+    }
+    private void queueRefresh() {
+        if (closed || !refreshQueued.compareAndSet(false, true)) return;
+        try { worker.execute(() -> {
+            long requested = requestedMinute;
+            try { refresh(); } finally {
+                refreshQueued.set(false);
+                if (requested != requestedMinute) queueRefresh();
+            }
+        }); } catch (RejectedExecutionException stopped) { refreshQueued.set(false); }
+    }
+    private LocalDate chartDate() {
+        long time = marketTime.getAsLong();
+        return time > 0 ? Instant.ofEpochMilli(time).atZone(NEW_YORK).toLocalDate() : null;
     }
     void refresh() {
-        if (!currentMarket()) { unavailableReason = "chart session is historical or unknown"; return; }
-        ZonedDateTime time = Instant.ofEpochMilli(now.getAsLong()).atZone(NEW_YORK);
-        LocalDate today = time.toLocalDate();
-        if (!today.equals(date)) { volume = Double.NaN; date = today; finalized = false; }
-        long start = today.atTime(1, 0).atZone(NEW_YORK).toInstant().toEpochMilli();
-        long open = today.atTime(9, 30).atZone(NEW_YORK).toInstant().toEpochMilli();
-        if (finalized || time.toInstant().toEpochMilli() <= start) return;
-        long end = Math.min(Math.min(now.getAsLong(), marketTime.getAsLong()), open);
+        LocalDate date = chartDate();
+        if (date == null) { unavailableReason = "chart time unknown"; return; }
+        long start = date.atTime(1, 0).atZone(NEW_YORK).toInstant().toEpochMilli();
+        long open = date.atTime(9, 30).atZone(NEW_YORK).toInstant().toEpochMilli();
+        // Minute history may contain a completed candle from later in a replayed minute.
+        long end = Math.min(Math.min(now.getAsLong(), marketTime.getAsLong()) / 60000 * 60000, open);
         if (end <= start) return;
+        History cached = history;
+        if (cached != null && date.equals(cached.date) && cached.end >= end) return;
         try {
-            double total = sum(bars.load(symbol, start, end - 1), start, end);
-            if (!Double.isFinite(total)) { volume = Double.NaN; unavailableReason = "invalid aggregate volume"; return; }
-            volume = total; finalized = end == open;
+            List<Candle> candles = bars.load(symbol, start, end - 1);
+            double total = sum(candles, start, end);
+            if (!date.equals(chartDate())) return; // A session seek happened during the history request.
+            if (!Double.isFinite(total)) { history = null; unavailableReason = "invalid aggregate volume"; return; }
+            history = new History(date, candles, start, end);
             unavailableReason = "";
             PluginLog.detail(symbol, "Premarket threshold: Schwab + Massive backfill 1-minute history shares=" + total + "; size=" + forVolume(total));
         } catch (Exception unavailable) {
-            volume = Double.NaN;
+            if (!date.equals(chartDate())) return;
+            history = null;
             unavailableReason = "history fetch failed (" + unavailable.getClass().getSimpleName() + ")";
             PluginLog.detail(symbol, "Premarket threshold: " + unavailableReason);
         }
@@ -66,11 +106,20 @@ public final class PremarketSizeThreshold implements AutoCloseable {
         return total;
     }
     public double volume() {
-        LocalDate today = Instant.ofEpochMilli(now.getAsLong()).atZone(NEW_YORK).toLocalDate();
-        if (!currentMarket()) return Double.NaN;
-        return today.equals(date) ? volume : Double.NaN;
+        History cached = history;
+        if (cached == null || !cached.date.equals(chartDate())) return Double.NaN;
+        long end = Math.min(cached.end, Math.min(now.getAsLong(), marketTime.getAsLong()) / 60000 * 60000);
+        if (end < cached.start) return Double.NaN;
+        Projection value = projection;
+        if (value == null || value.history != cached || value.end != end) {
+            value = new Projection(cached, end, sum(cached.candles, cached.start, end)); projection = value;
+        }
+        return value.volume;
     }
-    public String unavailableReason() { return currentMarket() ? unavailableReason : "chart session is historical or unknown"; }
+    public String unavailableReason() {
+        if (chartDate() == null) return "chart time unknown";
+        return Double.isFinite(volume()) ? "" : history != null ? "waiting for chart-session history" : unavailableReason;
+    }
     public int threshold() { return forVolume(volume()); }
     public static int forVolume(double shares) {
         if (!Double.isFinite(shares) || shares < 0) return FALLBACK;
@@ -79,5 +128,5 @@ public final class PremarketSizeThreshold implements AutoCloseable {
         if (shares > 2000000) return 10000;
         return shares >= 1000000 ? 5000 : 2000;
     }
-    @Override public void close() { worker.shutdownNow(); }
+    @Override public void close() { closed = true; worker.shutdownNow(); }
 }

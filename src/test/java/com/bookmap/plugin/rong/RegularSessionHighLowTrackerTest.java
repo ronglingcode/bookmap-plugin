@@ -18,6 +18,51 @@ class RegularSessionHighLowTrackerTest {
     private static final long NS_PER_SECOND = 1_000_000_000L;
     private static final ZoneId NEW_YORK_TIME = ZoneId.of("America/New_York");
 
+    @Test void chartClockExcludesFutureAndUnfinishedMinuteExtremesUntilTheyAreKnown() {
+        RegularSessionHighLowTracker tracker = new RegularSessionHighLowTracker();
+        long open = timestampNs(2026, 10, 16, 9, 30);
+        tracker.onTimestamp(open + 5 * NS_PER_SECOND);
+        tracker.onTrade(369.24, open + 5 * NS_PER_SECOND);
+        tracker.onMinuteBars("2026-10-16", List.of(
+                bar(2026, 10, 16, 9, 30, 369.15, 370, 368),
+                bar(2026, 10, 16, 10, 0, 369, 370.58, 356.33)));
+        assertEquals(369.24, tracker.snapshot().getHighOfDay());
+        assertEquals(369.24, tracker.snapshot().getLowOfDay());
+        assertEquals(369.15, tracker.snapshot().getOpenPrice());
+        tracker.onTimestamp(open + 60 * NS_PER_SECOND);
+        assertEquals(370, tracker.snapshot().getHighOfDay());
+        assertEquals(368, tracker.snapshot().getLowOfDay());
+        tracker.onTimestamp(timestampNs(2026, 10, 16, 10, 1));
+        assertEquals(370.58, tracker.snapshot().getHighOfDay());
+        assertEquals(356.33, tracker.snapshot().getLowOfDay());
+        tracker.onTimestamp(open + 5 * NS_PER_SECOND);
+        assertNull(tracker.snapshot());
+        tracker.onTrade(369.24, open + 5 * NS_PER_SECOND);
+        assertEquals(369.24, tracker.snapshot().getLowOfDay());
+    }
+
+    @Test void chartClockAlsoBoundsHistoryLoadedBeforeFirstTimestamp() {
+        RegularSessionHighLowTracker tracker = new RegularSessionHighLowTracker();
+        tracker.onMinuteBars("2026-10-16", List.of(bar(2026, 10, 16, 9, 30, 369, 371, 356)));
+        tracker.onTimestamp(timestampNs(2026, 10, 16, 9, 30));
+        assertNull(tracker.snapshot());
+        tracker.onTrade(369, timestampNs(2026, 10, 16, 9, 30));
+        assertEquals(369, tracker.snapshot().getLowOfDay());
+    }
+
+    @Test void liveLateAttachmentRepairsEarlierRangeFromCompletedHistoryAndKeepsIncomingTrades() {
+        RegularSessionHighLowTracker tracker = new RegularSessionHighLowTracker();
+        long current = timestampNs(2026, 10, 16, 11, 0) + 5 * NS_PER_SECOND;
+        tracker.onTimestamp(current); tracker.onTrade(107, current);
+        tracker.onMinuteBars("2026-10-16", List.of(
+                bar(2026, 10, 16, 9, 30, 100, 104, 98),
+                bar(2026, 10, 16, 10, 59, 102, 106, 99),
+                bar(2026, 10, 16, 11, 0, 103, 120, 70)));
+        assertEquals(107, tracker.snapshot().getHighOfDay());
+        assertEquals(98, tracker.snapshot().getLowOfDay());
+        assertEquals(100, tracker.snapshot().getOpenPrice());
+    }
+
     @Test
     void ignoresTradesBeforeRegularMarketOpen() {
         RegularSessionHighLowTracker tracker = new RegularSessionHighLowTracker();

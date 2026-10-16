@@ -833,6 +833,13 @@ public class TradeButtonWindow {
                 + " | Cap: " + String.format(Locale.US, "%.2fR", cappedR);
         String capDescription = "Largest bid/offer observed since market open within the session low/high, including cleared orders. "
                 + String.format(Locale.US, "%,d / %,d = %.6fR total risk ceiling; existing position and pending entries consume this budget.", largest, required, cappedR);
+        if (cap.has("largestOrderPrice")) {
+            String observed = java.time.Instant.ofEpochMilli(cap.get("largestOrderObservedAt").getAsLong())
+                    .atZone(java.time.ZoneId.of("America/New_York"))
+                    .format(java.time.format.DateTimeFormatter.ofPattern("HH:mm:ss.SSS z", Locale.US));
+            capDescription += String.format(Locale.US, " Counted %s: %,d shares at %.4f, observed %s.",
+                    cap.get("largestOrderSide").getAsString(), largest, cap.get("largestOrderPrice").getAsDouble(), observed);
+        }
         wallThresholdLabel.setToolTipText(capDescription);
         wallThresholdLabel.getAccessibleContext().setAccessibleDescription(capDescription);
         if (!threshold.isAvailable()) {

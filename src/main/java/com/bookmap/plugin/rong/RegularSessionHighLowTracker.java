@@ -6,6 +6,8 @@ import java.time.LocalTime;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
 import java.util.List;
+import java.util.Map;
+import java.util.TreeMap;
 
 import com.bookmap.plugin.rong.miniviteapp.models.Candle;
 import com.google.gson.JsonObject;
@@ -23,6 +25,38 @@ final class RegularSessionHighLowTracker {
     private double openPrice = Double.NaN;
     private boolean hasMinuteHistory;
     private long updatedAtMs;
+    private long chartTimeNs;
+    private final TreeMap<Long, Candle> minuteHistory = new TreeMap<>();
+    private long appliedHistoryThroughMs = Long.MIN_VALUE;
+
+    synchronized boolean isChartDriven() { return chartTimeNs > 0; }
+
+    /** Chart time, rather than the live feed's clock, bounds replay history. */
+    synchronized void onTimestamp(long timestampNs) {
+        if (timestampNs <= 0) return;
+        LocalDate date = toInstant(timestampNs).atZone(NEW_YORK_TIME).toLocalDate();
+        if (chartTimeNs == 0 || timestampNs < chartTimeNs || !date.equals(sessionDate)) reset(date);
+        chartTimeNs = timestampNs;
+        applyAvailableHistory();
+    }
+
+    private void applyAvailableHistory() {
+        long cutoff = chartTimeNs / 1_000_000L;
+        Map.Entry<Long, Candle> next;
+        while ((next = minuteHistory.higherEntry(appliedHistoryThroughMs)) != null) {
+            Candle bar = next.getValue();
+            // A current minute's final high/low would reveal up to 59 seconds of future prices.
+            if (bar.datetime + 60_000 > cutoff) break;
+            applyBar(bar); appliedHistoryThroughMs = bar.datetime;
+        }
+        // The opening print is already known at 09:30, even while its minute is unfinished.
+        Map.Entry<Long, Candle> first = minuteHistory.firstEntry();
+        if (first != null && first.getKey() <= cutoff) {
+            Candle bar = first.getValue();
+            if (Instant.ofEpochMilli(bar.datetime).atZone(NEW_YORK_TIME).toLocalTime().equals(MARKET_OPEN_NEW_YORK)
+                    && Double.isFinite(bar.open) && bar.open > 0) openPrice = bar.open;
+        }
+    }
 
     synchronized void onTrade(double price, long timestampNs) {
         if (!Double.isFinite(price) || price <= 0) {
@@ -53,6 +87,7 @@ final class RegularSessionHighLowTracker {
 
     synchronized void onMinuteBars(String date, List<Candle> bars) {
         LocalDate historyDate = LocalDate.parse(date);
+        if (chartTimeNs > 0 && !historyDate.equals(sessionDate)) return;
         if (sessionDate != null && historyDate.isBefore(sessionDate)) {
             return;
         }
@@ -66,15 +101,19 @@ final class RegularSessionHighLowTracker {
                     || bar.high <= 0 || bar.low <= 0 || bar.high < bar.low) {
                 continue;
             }
-            highOfDay = Double.isFinite(highOfDay) ? Math.max(highOfDay, bar.high) : bar.high;
-            lowOfDay = Double.isFinite(lowOfDay) ? Math.min(lowOfDay, bar.low) : bar.low;
-            hasMinuteHistory = true;
-            if (time.toLocalTime().equals(MARKET_OPEN_NEW_YORK)
-                    && Double.isFinite(bar.open) && bar.open > 0) {
-                openPrice = bar.open;
-            }
-            updatedAtMs = Math.max(updatedAtMs, bar.datetime);
+            minuteHistory.put(bar.datetime, bar);
+            if (chartTimeNs == 0 || bar.datetime + 60_000 <= chartTimeNs / 1_000_000L) applyBar(bar);
         }
+        if (chartTimeNs > 0) applyAvailableHistory();
+    }
+
+    private void applyBar(Candle bar) {
+        highOfDay = Double.isFinite(highOfDay) ? Math.max(highOfDay, bar.high) : bar.high;
+        lowOfDay = Double.isFinite(lowOfDay) ? Math.min(lowOfDay, bar.low) : bar.low;
+        hasMinuteHistory = true;
+        if (Instant.ofEpochMilli(bar.datetime).atZone(NEW_YORK_TIME).toLocalTime().equals(MARKET_OPEN_NEW_YORK)
+                && Double.isFinite(bar.open) && bar.open > 0) openPrice = bar.open;
+        updatedAtMs = Math.max(updatedAtMs, bar.datetime);
     }
 
     private static boolean isRegularSession(LocalTime time) {
@@ -106,6 +145,8 @@ final class RegularSessionHighLowTracker {
     }
 
     private void reset(LocalDate newSessionDate) {
+        if (!newSessionDate.equals(sessionDate)) minuteHistory.clear();
+        appliedHistoryThroughMs = Long.MIN_VALUE;
         sessionDate = newSessionDate;
         highOfDay = Double.NaN;
         lowOfDay = Double.NaN;
