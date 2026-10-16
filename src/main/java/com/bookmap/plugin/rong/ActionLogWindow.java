@@ -39,6 +39,7 @@ public class ActionLogWindow {
     private static final Map<String, AccountStateDefinition> accountStates = new LinkedHashMap<>();
     private static final String[] POSITION_COLUMNS = {"Symbol", "Side", "Risk (R)", "Avg"};
     private static final String[] ORDER_COLUMNS = {"Symbol", "Role", "Side", "Qty", "Type", "Price", "Ref"};
+    private static Object session;
     private static JFrame frame;
     private static JLabel highlightedSymbolLabel;
     private static JLabel accountStatusLabel;
@@ -53,8 +54,21 @@ public class ActionLogWindow {
 
     private ActionLogWindow() {}
 
-    public static void showWindow() {
-        SwingUtilities.invokeLater(ActionLogWindow::ensureWindow);
+    public static synchronized void showWindow() {
+        if (session == null) session = new Object();
+        invokeWhenActive(ActionLogWindow::ensureWindow);
+    }
+
+    // Invalidate queued callbacks on removal, including callbacks from an older attachment.
+    private static synchronized void invokeWhenActive(Runnable update) {
+        Object owner = session;
+        if (owner == null) return;
+        SwingUtilities.invokeLater(() -> {
+            synchronized (ActionLogWindow.class) {
+                if (session != owner) return;
+                update.run();
+            }
+        });
     }
 
     public static void append(String line) {
@@ -63,7 +77,7 @@ public class ActionLogWindow {
 
     static void appendSummary(String line, String group) {
         long captured = System.nanoTime();
-        SwingUtilities.invokeLater(() -> {
+        invokeWhenActive(() -> {
             ensureWindow();
             lines.append(line, group, captured);
             textArea.setText(String.join("\n", lines.lines()));
@@ -72,7 +86,7 @@ public class ActionLogWindow {
     }
 
     public static void updatePersistenceStatus(String status) {
-        SwingUtilities.invokeLater(() -> {
+        invokeWhenActive(() -> {
             persistenceStatus = status;
             if (persistenceStatusLabel != null) persistenceStatusLabel.setText(status);
         });
@@ -82,7 +96,7 @@ public class ActionLogWindow {
         if (state == null || state.getSymbol().isEmpty()) {
             return;
         }
-        SwingUtilities.invokeLater(() -> {
+        invokeWhenActive(() -> {
             ensureWindow();
             accountStates.put(state.getSymbol(), state);
             renderAccountState();
@@ -90,12 +104,17 @@ public class ActionLogWindow {
     }
 
     public static void updateHighlightedSymbol(String symbol) {
-        highlightedSymbol = symbol == null ? "" : symbol.trim();
-        SwingUtilities.invokeLater(ActionLogWindow::renderHighlightedSymbol);
+        invokeWhenActive(() -> {
+            highlightedSymbol = symbol == null ? "" : symbol.trim();
+            renderHighlightedSymbol();
+        });
     }
 
-    public static void dispose() {
+    public static synchronized void dispose() {
+        session = null;
         SwingUtilities.invokeLater(() -> {
+            highlightedSymbol = "";
+            persistenceStatus = "Local logs: starting";
             lines.clear();
             accountStates.clear();
             if (frame != null) {

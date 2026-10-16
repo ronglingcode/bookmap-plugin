@@ -155,10 +155,10 @@ public class RongPlugin implements CustomModuleAdapter,
 
         synchronized (RongPlugin.class) {
             if (sharedServer == null) {
+                ActionLogWindow.showWindow();
                 PluginLog.start();
                 sharedServer = new SignalWebSocketServer(WS_PORT, ORDERBOOK_PERCENTILE);
                 sharedServer.start();
-                ActionLogWindow.showWindow();
             }
             if (indicatorConfig == null) {
                 indicatorConfig = new IndicatorConfig();
@@ -406,20 +406,28 @@ public class RongPlugin implements CustomModuleAdapter,
     }
 
     @Override
-    public void stop() {
+    public synchronized void stop() {
         if (!initialized) return;
         initialized = false;
+        try {
+            stopAttachment();
+        } finally {
+            releaseSharedResources();
+        }
+    }
+
+    private void stopAttachment() {
         if (sharedServer != null && patternMonitorConfigListener != null) sharedServer.unregisterPatternMonitorConfigListener(patternMonitorConfigListener);
         if (falseBreakoutPainter != null) {
-            api.sendUserMessage(Layer1ApiUserMessageModifyScreenSpacePainter.builder(RongPlugin.class,
+            cleanup("remove chart painter", () -> api.sendUserMessage(Layer1ApiUserMessageModifyScreenSpacePainter.builder(RongPlugin.class,
                     com.bookmap.plugin.rong.patterns.FalseBreakoutPainter.NAME_PREFIX + alias)
-                    .setScreenSpacePainterFactory(falseBreakoutPainter).setIsAdd(false).build());
+                    .setScreenSpacePainterFactory(falseBreakoutPainter).setIsAdd(false).build()));
             falseBreakoutPainter.shutdown();
         }
         if (reclaimSecondBidPainter != null) {
-            api.sendUserMessage(Layer1ApiUserMessageModifyScreenSpacePainter.builder(RongPlugin.class,
+            cleanup("remove chart painter", () -> api.sendUserMessage(Layer1ApiUserMessageModifyScreenSpacePainter.builder(RongPlugin.class,
                     com.bookmap.plugin.rong.patterns.ReclaimSecondBidPainter.NAME_PREFIX + alias)
-                    .setScreenSpacePainterFactory(reclaimSecondBidPainter).setIsAdd(false).build());
+                    .setScreenSpacePainterFactory(reclaimSecondBidPainter).setIsAdd(false).build()));
             reclaimSecondBidPainter.shutdown();
         }
         synchronized (compositionLock) {
@@ -466,44 +474,44 @@ public class RongPlugin implements CustomModuleAdapter,
         }
         if (tradingSignalPainter != null) {
             tradingSignalPainter.unregisterInstrument(alias);
-            api.sendUserMessage(Layer1ApiUserMessageModifyScreenSpacePainter.builder(RongPlugin.class,
+            cleanup("remove chart painter", () -> api.sendUserMessage(Layer1ApiUserMessageModifyScreenSpacePainter.builder(RongPlugin.class,
                     TradingSignalPainter.PAINTER_NAME_PREFIX + alias).setScreenSpacePainterFactory(tradingSignalPainter)
-                    .setIsAdd(false).build());
+                    .setIsAdd(false).build()));
         }
         if (filledExecutionPainter != null) {
             filledExecutionPainter.unregisterInstrument(alias);
         }
         // Unregister ScreenSpacePainters
-        api.sendUserMessage(Layer1ApiUserMessageModifyScreenSpacePainter.builder(
+        cleanup("remove chart painter", () -> api.sendUserMessage(Layer1ApiUserMessageModifyScreenSpacePainter.builder(
                 RongPlugin.class, ChartHoverHotkeyHandler.PAINTER_NAME_PREFIX + alias)
                 .setScreenSpacePainterFactory(chartHoverHotkeyHandler)
                 .setIsAdd(false)
-                .build());
-        api.sendUserMessage(Layer1ApiUserMessageModifyScreenSpacePainter.builder(
+                .build()));
+        cleanup("remove chart painter", () -> api.sendUserMessage(Layer1ApiUserMessageModifyScreenSpacePainter.builder(
                 RongPlugin.class, PriceZonePainter.PAINTER_NAME_PREFIX + alias)
                 .setScreenSpacePainterFactory(priceZonePainter)
                 .setIsAdd(false)
-                .build());
-        api.sendUserMessage(Layer1ApiUserMessageModifyScreenSpacePainter.builder(
+                .build()));
+        cleanup("remove chart painter", () -> api.sendUserMessage(Layer1ApiUserMessageModifyScreenSpacePainter.builder(
                 RongPlugin.class, "priceLines_" + alias)
                 .setScreenSpacePainterFactory(priceLinePainter)
                 .setIsAdd(false)
-                .build());
-        api.sendUserMessage(Layer1ApiUserMessageModifyScreenSpacePainter.builder(
+                .build()));
+        cleanup("remove chart painter", () -> api.sendUserMessage(Layer1ApiUserMessageModifyScreenSpacePainter.builder(
                 RongPlugin.class, OrderWallLabelPainter.PAINTER_NAME_PREFIX + alias)
                 .setScreenSpacePainterFactory(wallLabelPainter)
                 .setIsAdd(false)
-                .build());
-        api.sendUserMessage(Layer1ApiUserMessageModifyScreenSpacePainter.builder(
+                .build()));
+        cleanup("remove chart painter", () -> api.sendUserMessage(Layer1ApiUserMessageModifyScreenSpacePainter.builder(
                 RongPlugin.class, OrderWallChangePainter.PAINTER_NAME_PREFIX + alias)
                 .setScreenSpacePainterFactory(wallChangePainter)
                 .setIsAdd(false)
-                .build());
-        api.sendUserMessage(Layer1ApiUserMessageModifyScreenSpacePainter.builder(
+                .build()));
+        cleanup("remove chart painter", () -> api.sendUserMessage(Layer1ApiUserMessageModifyScreenSpacePainter.builder(
                 RongPlugin.class, FilledExecutionPainter.PAINTER_NAME_PREFIX + alias)
                 .setScreenSpacePainterFactory(filledExecutionPainter)
                 .setIsAdd(false)
-                .build());
+                .build()));
 
         if (keyLevelManager != null) {
             keyLevelManager.onInstrumentStopped(alias);
@@ -542,56 +550,60 @@ public class RongPlugin implements CustomModuleAdapter,
         if (sharedServer != null) {
             sharedServer.unregisterSymbol(alias);
         }
+    }
+
+    private void releaseSharedResources() {
         synchronized (RongPlugin.class) {
             nativeApis.remove(alias);
-            if (nativeTrading != null) nativeTrading.detach(alias);
+            if (nativeTrading != null) cleanup("detach native trading", () -> nativeTrading.detach(alias));
             instanceCount--;
-            if (instanceCount <= 0 && sharedServer != null) {
-                ChartHoverHotkeyHandler.removeAwtListener();
+            if (instanceCount <= 0) {
+                // Close the UI first so shutdown callbacks cannot recreate it.
+                ActionLogWindow.dispose();
+                cleanup("remove hotkey listener", ChartHoverHotkeyHandler::removeAwtListener);
                 if (keyLevelManager != null) {
-                    sharedServer.unregisterKeyLevelConfigListener(keyLevelManager);
-                    keyLevelManager.shutdown();
+                    if (sharedServer != null) cleanup("unregister shared listener", () -> sharedServer.unregisterKeyLevelConfigListener(keyLevelManager));
+                    cleanup("shut down shared resource", () -> keyLevelManager.shutdown());
                     keyLevelManager = null;
                 }
                 if (keyZoneManager != null) {
-                    sharedServer.unregisterKeyZoneConfigListener(keyZoneManager);
-                    keyZoneManager.shutdown();
+                    if (sharedServer != null) cleanup("unregister shared listener", () -> sharedServer.unregisterKeyZoneConfigListener(keyZoneManager));
+                    cleanup("shut down shared resource", () -> keyZoneManager.shutdown());
                     keyZoneManager = null;
                 }
                 if (marketLevelManager != null) {
-                    sharedServer.unregisterMarketLevelConfigListener(marketLevelManager);
-                    marketLevelManager.shutdown();
+                    if (sharedServer != null) cleanup("unregister shared listener", () -> sharedServer.unregisterMarketLevelConfigListener(marketLevelManager));
+                    cleanup("shut down shared resource", () -> marketLevelManager.shutdown());
                     marketLevelManager = null;
                 }
                 if (exitOrderManager != null) {
-                    sharedServer.unregisterExitOrderPairsConfigListener(exitOrderManager);
-                    exitOrderManager.shutdown();
+                    if (sharedServer != null) cleanup("unregister shared listener", () -> sharedServer.unregisterExitOrderPairsConfigListener(exitOrderManager));
+                    cleanup("shut down shared resource", () -> exitOrderManager.shutdown());
                     exitOrderManager = null;
                 }
                 if (pendingEntryOrderManager != null) {
-                    sharedServer.unregisterAccountStateListener(pendingEntryOrderManager);
-                    pendingEntryOrderManager.shutdown();
+                    if (sharedServer != null) cleanup("unregister shared listener", () -> sharedServer.unregisterAccountStateListener(pendingEntryOrderManager));
+                    cleanup("shut down shared resource", () -> pendingEntryOrderManager.shutdown());
                     pendingEntryOrderManager = null;
                 }
                 if (filledExecutionManager != null) {
-                    sharedServer.unregisterAccountStateListener(filledExecutionManager);
-                    filledExecutionManager.shutdown();
+                    if (sharedServer != null) cleanup("unregister shared listener", () -> sharedServer.unregisterAccountStateListener(filledExecutionManager));
+                    cleanup("shut down shared resource", () -> filledExecutionManager.shutdown());
                     filledExecutionManager = null;
                 }
                 if (wallLabelPainter != null) {
-                    wallLabelPainter.shutdown();
+                    cleanup("shut down shared resource", () -> wallLabelPainter.shutdown());
                 }
                 if (wallChangePainter != null) {
-                    wallChangePainter.shutdown();
+                    cleanup("shut down shared resource", () -> wallChangePainter.shutdown());
                 }
                 if (filledExecutionPainter != null) {
-                    filledExecutionPainter.shutdown();
+                    cleanup("shut down shared resource", () -> filledExecutionPainter.shutdown());
                 }
-                if (nativeTrading != null) { nativeTrading.close(); nativeTrading = null; }
+                if (nativeTrading != null) { cleanup("close native trading", () -> nativeTrading.close()); nativeTrading = null; }
                 nativeApis.clear();
-                sharedServer.shutdown();
-                PluginLog.stop();
-                ActionLogWindow.dispose();
+                if (sharedServer != null) cleanup("stop WebSocket server", () -> sharedServer.shutdown());
+                cleanup("stop logging", PluginLog::stop);
                 sharedServer = null;
                 chartHoverHotkeyHandler = null;
                 priceLineStore = null;
@@ -610,10 +622,18 @@ public class RongPlugin implements CustomModuleAdapter,
                 instanceCount = 0;
             }
             if (instanceCount <= 0) {
-                if (tradingSignalPainter != null) tradingSignalPainter.shutdown();
+                if (tradingSignalPainter != null) cleanup("stop trading signal painter", () -> tradingSignalPainter.shutdown());
                 tradingSignalPainter = null;
                 signalComposerConfig = null; tradingSignalStore = null;
             }
+        }
+    }
+
+    private static void cleanup(String operation, Runnable action) {
+        try {
+            action.run();
+        } catch (RuntimeException error) {
+            PluginLog.detail("", "Shutdown", operation + " failed: " + error);
         }
     }
 
