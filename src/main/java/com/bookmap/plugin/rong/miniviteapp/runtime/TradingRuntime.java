@@ -62,7 +62,7 @@ public final class TradingRuntime implements AutoCloseable {
     private MarketStreams streams;
     private CompletableFuture<Void> persistence = CompletableFuture.completedFuture(null);
     private volatile boolean stopped;
-    private long revision, nextAccountRead, accountBackoffUntil;
+    private long revision, nextAccountRead, accountBackoffUntil, accountReadStartedAt;
     private Runnable accountRetry;
     private String lastNativeOrdersLog, lastNativeFillsLog;
     public TradingRuntime(HttpPort http, CredentialPort credentials, JsonObject sections, SocketPort sockets, SocketPort.Scheduler scheduler,
@@ -97,6 +97,7 @@ public final class TradingRuntime implements AutoCloseable {
                 TradingConfig.Result loaded = TradingConfig.readTradingConfig(firestore.fetchConfigData(), 1);
                 validateProfile(loaded.profile);
                 String token = oauth.accessToken(false), date = MarketClock.marketTime(now.getAsLong()).date;
+                long readStartedAt = now.getAsLong();
                 JsonObject raw = reads.getAccount(token);
                 JsonArray orders = reads.getOrders(accountHash(), token, date, false, 59);
                 logNativeOrders(orders, date);
@@ -104,7 +105,7 @@ public final class TradingRuntime implements AutoCloseable {
                 logNativeFills(projected, date);
                 JsonObject restored = firestore.getTradingState(loaded.profile);
                 synchronized (lock) {
-                    if (stopped) return; config = loaded; account = projected; ledger = TradeLedger.projectTradeLedger(object(projected, "executions"), number(policy, "dailyMaxLoss"));
+                    if (stopped) return; config = loaded; account = projected; accountReadStartedAt = readStartedAt; ledger = TradeLedger.projectTradeLedger(object(projected, "executions"), number(policy, "dailyMaxLoss"));
                     state = new TradeState(date, number(projected, "currentBalance"), now.getAsLong(), restored);
                 }
                 publishToken(); startStreamsAndHistory(); publishAccount();
@@ -244,11 +245,12 @@ public final class TradingRuntime implements AutoCloseable {
         executor.execute(() -> {
             try {
                 String token = oauth.accessToken(false), date = MarketClock.marketTime(now.getAsLong()).date;
+                long readStartedAt = now.getAsLong();
                 JsonObject raw = reads.getAccount(token); JsonArray orders = reads.getOrders(accountHash(), token, date, false, 59);
                 logNativeOrders(orders, date);
                 JsonObject projected = AccountProjection.projectAccount(raw, orders, date, this::price);
                 logNativeFills(projected, date);
-                synchronized (lock) { if (stopped) return; account = projected; ledger = TradeLedger.projectTradeLedger(object(projected, "executions"), number(policy, "dailyMaxLoss")); }
+                synchronized (lock) { if (stopped) return; account = projected; accountReadStartedAt = readStartedAt; ledger = TradeLedger.projectTradeLedger(object(projected, "executions"), number(policy, "dailyMaxLoss")); }
                 publishToken(); publishAccount(); disciplineJobs(); accountNotifications();
             } catch (Exception error) { failure("", "Account refresh", error); accountAgain.set(true); }
             finally { accountReading.set(false); boolean urgent = accountUrgentAgain.getAndSet(false); if (accountAgain.getAndSet(false) || urgent) refreshAccount(urgent); }
@@ -303,6 +305,8 @@ public final class TradingRuntime implements AutoCloseable {
             if (account != null) value.add("account", account.deepCopy()); if (ledger != null) value.add("ledger", ledger.deepCopy()); if (state != null) value.add("state", state.snapshot()); if (histories.containsKey(symbol)) value.add("history", histories.get(symbol).deepCopy()); }
         var loaded = market.getState(symbol); if (loaded != null) value.add("market", loaded.snapshot()); return value;
     }
+    private volatile java.util.function.Function<String, JsonObject> entrySizeCapProvider;
+    public void setEntrySizeCapProvider(java.util.function.Function<String, JsonObject> provider) { entrySizeCapProvider = provider; }
     private void publishInputs(String symbol) {
         JsonObject input; var loaded = market.getState(symbol);
         synchronized (lock) {
@@ -316,6 +320,13 @@ public final class TradingRuntime implements AutoCloseable {
             String reason = eligibility.getOrDefault(symbol, "startup eligibility pending");
             input.getAsJsonObject("entryContext").addProperty("startupBlockReason", reason);
             }
+            input.getAsJsonObject("entryContext").addProperty("bookmapAccountReadStartedAt", accountReadStartedAt);
+        }
+        var capProvider = entrySizeCapProvider;
+        if (capProvider != null) {
+            JsonObject cap = capProvider.apply(symbol).deepCopy();
+            if (!string(cap, "sessionDate").equals(MarketClock.marketTime(now.getAsLong()).date)) cap.addProperty("maxRiskMultiple", 0);
+            input.getAsJsonObject("entryContext").add("bookmapSizeCap", cap);
         }
         JsonObject update = message("execution_state"); JsonArray symbols = new JsonArray(); symbols.add(input); update.add("symbols", symbols); execution.receive(this, update);
     }

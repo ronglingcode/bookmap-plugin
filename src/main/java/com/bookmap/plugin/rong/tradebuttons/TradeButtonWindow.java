@@ -825,9 +825,19 @@ public class TradeButtonWindow {
         int thresholdFloor = getWallThresholdFloor();
         SignalWebSocketServer.OrderbookWallThreshold threshold =
                 server.getOrderbookWallThreshold(symbol, thresholdFloor);
+        JsonObject cap = server.entrySizeCap(symbol);
+        int largest = cap.get("largestOrderSize").getAsInt();
+        int required = cap.get("requiredOrderSize").getAsInt();
+        double cappedR = cap.get("maxRiskMultiple").getAsDouble();
+        String capText = "Max counted: " + formatShareSize(largest)
+                + " | Cap: " + String.format(Locale.US, "%.2fR", cappedR);
+        String capDescription = "Largest bid/offer observed since market open within the session low/high, including cleared orders. "
+                + String.format(Locale.US, "%,d / %,d = %.6fR total risk ceiling; existing position and pending entries consume this budget.", largest, required, cappedR);
+        wallThresholdLabel.setToolTipText(capDescription);
+        wallThresholdLabel.getAccessibleContext().setAccessibleDescription(capDescription);
         if (!threshold.isAvailable()) {
             wallThresholdLabel.setText("<html><center>Wall: waiting<br>"
-                    + getRegularSessionHighLowText() + "</center></html>");
+                    + capText + "<br>" + getRegularSessionHighLowText() + "</center></html>");
             return;
         }
 
@@ -835,7 +845,7 @@ public class TradeButtonWindow {
         String source = Double.isFinite(volume) ? "Schwab + Massive premarket: " + String.format(java.util.Locale.US, "%,.0f", volume) + " shares"
                 : "Premarket: " + server.premarketVolumeUnavailableReason(symbol) + "; default 5K";
         wallThresholdLabel.setText("<html><center>Wall: " + formatShareSize(threshold.getEffectiveMinSize())
-                + " (" + source + ")<br>" + getRegularSessionHighLowText() + "</center></html>");
+                + " (" + source + ")<br>" + capText + "<br>" + getRegularSessionHighLowText() + "</center></html>");
     }
 
     private String getRegularSessionHighLowText() {

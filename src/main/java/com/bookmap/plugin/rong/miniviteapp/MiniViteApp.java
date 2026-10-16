@@ -6,6 +6,7 @@ import com.bookmap.plugin.rong.miniviteapp.core.controllers.KeyboardHandler;
 import com.bookmap.plugin.rong.miniviteapp.core.controllers.EntryHandler;
 import com.bookmap.plugin.rong.miniviteapp.core.controllers.ExtendedHandler;
 import com.bookmap.plugin.rong.miniviteapp.core.controllers.Handler;
+import com.bookmap.plugin.rong.miniviteapp.core.controllers.BookmapSizeCap;
 import com.bookmap.plugin.rong.miniviteapp.models.Models;
 import com.bookmap.plugin.rong.miniviteapp.models.Models.*;
 import com.google.gson.JsonArray;
@@ -32,6 +33,7 @@ public final class MiniViteApp implements AutoCloseable {
     private String account = "", token = "";
     private long expiresAt;
     private final Map<String, Snapshot> snapshots = new HashMap<>();
+    private final Map<String, Long> cappedEntryRefreshAfter = new HashMap<>();
     private final Map<String, JsonObject> marketData = new HashMap<>();
     public MiniViteApp(BiConsumer<Object, JsonObject> sender) {
         this(new Api(), sender);
@@ -82,6 +84,9 @@ public final class MiniViteApp implements AutoCloseable {
                 for (var element : json.getAsJsonArray("symbols")) {
                     Snapshot state = new Snapshot(element.getAsJsonObject());
                     snapshots.put(state.symbol, state);
+                    if (state.entryContext != null && Models.number(state.entryContext, "bookmapAccountReadStartedAt")
+                            > cappedEntryRefreshAfter.getOrDefault(state.symbol, Long.MAX_VALUE))
+                        cappedEntryRefreshAfter.remove(state.symbol);
                 }
             } else if (type.equals("execution_market_data")) {
                 marketData.put(symbolKey.apply(Models.string(json, "symbol")), json.deepCopy());
@@ -147,6 +152,9 @@ public final class MiniViteApp implements AutoCloseable {
                             ? Handler.marketOutPartials(state, 2)
                     : key.equals("KeyW") ? ExtendedHandler.swap(state, action)
                     : KeyboardHandler.handleKeyPressed(state, key, shift, Models.number(action, "price"));
+            boolean cappedOpening = state.entryContext != null && state.entryContext.has("bookmapSizeCap") && BookmapSizeCap.hasOpening(plan);
+            if (cappedOpening) Models.require(!cappedEntryRefreshAfter.containsKey(symbol), "Bookmap size cap: wait for broker account refresh before another entry");
+            BookmapSizeCap.apply(state, plan);
             for (String warning : plan.warnings) log.accept(symbol, warning);
             if (!key.equals("KeyC")) {
                 double total = plan.requests.stream().filter(request -> request.body != null).mapToDouble(request -> closingQuantity(request.body)).sum();
@@ -167,6 +175,7 @@ public final class MiniViteApp implements AutoCloseable {
                 started.addProperty("exitPairCount", state.pairs.size());
             }
             started.addProperty("clearPending", plan.clearPending); started.addProperty("revision", state.revision);
+            if (cappedOpening) cappedEntryRefreshAfter.put(symbol, Long.MAX_VALUE);
             sender.accept(connection, started);
             log.detail(symbol, "Native " + plan.action + " planned " + plan.requests.size()
                     + " broker request(s); actionId=" + actionId + "; no requests attempted yet");
@@ -284,6 +293,10 @@ public final class MiniViteApp implements AutoCloseable {
             String outcome, String reason, boolean unknown) {
         synchronized (this) {
             if (unknown) { requiresReview = true; reviewReason = reason; }
+            if (cappedEntryRefreshAfter.containsKey(state.symbol) && BookmapSizeCap.hasOpening(plan)) {
+                if (acknowledged == 0 && uncertain == 0) cappedEntryRefreshAfter.remove(state.symbol);
+                else cappedEntryRefreshAfter.put(state.symbol, System.currentTimeMillis());
+            }
             JsonObject finished = message("execution_result"); finished.addProperty("actionId", actionId);
             finished.addProperty("symbol", state.symbol); finished.addProperty("action", plan.action);
             finished.addProperty("outcome", outcome); finished.addProperty("reason", reason);

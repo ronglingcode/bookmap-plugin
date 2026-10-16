@@ -663,6 +663,7 @@ public class RongPlugin implements CustomModuleAdapter,
         if (wallChangeTracker != null) {
             wallChangeTracker.onDepth(isBid, price, size, eventTimeNs);
         }
+        if (sharedServer != null) sharedServer.observeSessionDepth(alias, price, size, lastTimestampNs);
         orderBook.update(isBid, price, size);
         if (falseBreakoutMonitor != null) {
             falseBreakoutMonitor.onDepth(isBid, price, size, lastTimestampNs);
@@ -700,6 +701,7 @@ public class RongPlugin implements CustomModuleAdapter,
             reclaimSecondBidPainter.refresh();
         }
         if (sharedServer != null) {
+            sharedServer.observeSessionTime(alias, lastTimestampNs);
             sharedServer.updateRegularSessionHighLow(alias, realPrice, eventTimeNs);
         }
         NativeTradingAdapter trading = nativeTrading;
@@ -729,6 +731,7 @@ public class RongPlugin implements CustomModuleAdapter,
             compositionSeedFromSharedBook = false;
         }
         this.lastTimestampNs = timestampNs;
+        if (sharedServer != null) sharedServer.observeSessionTime(alias, timestampNs);
         if (falseBreakoutMonitor != null) {
             falseBreakoutMonitor.onTimestamp(timestampNs);
             falseBreakoutPainter.refresh();

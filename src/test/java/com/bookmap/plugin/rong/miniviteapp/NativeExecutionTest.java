@@ -13,6 +13,48 @@ import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.*;
 
 class NativeExecutionTest {
+    @Test void repeatedEntriesWaitForAnAccountReadStartedAfterBrokerCompletion() throws Exception {
+        try (var rig = new Rig()) {
+            JsonObject action = rig.connectEntry();
+            rig.state.getAsJsonObject("entryContext").add("bookmapSizeCap", json("{\"maxRiskMultiple\":0.4}"));
+            rig.state.getAsJsonObject("entryContext").addProperty("bookmapAccountReadStartedAt", 1);
+            rig.updateState(System.currentTimeMillis()); rig.mutationStatus = 201;
+            rig.engine.route(action); rig.finish();
+            rig.updateState(System.currentTimeMillis()); // Price/plan updates cannot unlock the old account snapshot.
+            rig.engine.route(action);
+            assertEquals(1, rig.mutations.get());
+            assertTrue(rig.events.stream().anyMatch(event -> event.get("type").getAsString().equals("execution_blocked")
+                    && event.get("reason").getAsString().contains("wait for broker account refresh")));
+            rig.state.getAsJsonObject("entryContext").addProperty("bookmapAccountReadStartedAt", System.currentTimeMillis() + 1);
+            rig.updateState(System.currentTimeMillis()); rig.engine.route(action); rig.finish(2);
+            assertEquals(2, rig.mutations.get());
+        }
+    }
+    @Test void bookmapCapReachesBrokerAndCapturedTradingState() throws Exception {
+        try (var rig = new Rig()) {
+            JsonObject action = rig.connectEntry();
+            rig.state.getAsJsonObject("entryContext").add("bookmapSizeCap", json("{\"maxRiskMultiple\":0.3333333333333333}"));
+            rig.updateState(System.currentTimeMillis()); rig.mutationStatus = 201;
+            rig.engine.route(action); JsonObject result = rig.finish();
+            assertEquals("accepted", result.get("outcome").getAsString());
+            JsonObject body = rig.bodies.get(0);
+            double quantity = body.getAsJsonArray("orderLegCollection").get(0).getAsJsonObject().get("quantity").getAsDouble();
+            double price = body.get(body.has("price") ? "price" : "stopPrice").getAsDouble();
+            double stop = body.getAsJsonArray("childOrderStrategies").get(0).getAsJsonObject().getAsJsonArray("childOrderStrategies").get(0).getAsJsonObject().get("stopPrice").getAsDouble();
+            assertTrue(quantity * Math.abs(price - stop) <= 1000.0 / 3);
+            assertEquals(quantity, result.getAsJsonObject("entry").getAsJsonObject("submitEntryResult").get("totalQuantity").getAsDouble());
+        }
+    }
+    @Test void zeroBookmapCapBlocksBeforeAnyBrokerRequest() throws Exception {
+        try (var rig = new Rig()) {
+            JsonObject action = rig.connectEntry();
+            rig.state.getAsJsonObject("entryContext").add("bookmapSizeCap", json("{\"maxRiskMultiple\":0}"));
+            rig.updateState(System.currentTimeMillis()); rig.engine.route(action);
+            assertEquals(0, rig.mutations.get());
+            assertTrue(rig.events.stream().anyMatch(event -> event.get("type").getAsString().equals("execution_blocked")
+                    && event.get("reason").getAsString().contains("Bookmap size cap")));
+        }
+    }
     @Test void oneParentEntryWithTenProtectivePairsProducesOneScreenResult() throws Exception {
         try (var rig = new Rig()) {
             JsonObject entry = rig.connectEntry();

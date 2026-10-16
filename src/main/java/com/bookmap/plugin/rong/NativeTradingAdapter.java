@@ -52,7 +52,7 @@ public final class NativeTradingAdapter implements AutoCloseable {
             public void minuteBarsLoaded(String symbol, String date, List<Candle> bars) {
                 if (!closed) display.updateRegularSessionMinuteBars(symbol, date, bars);
             }
-        }); runtime.start(); }
+        }); runtime.trading.setEntrySizeCapProvider(display::entrySizeCap); runtime.start(); }
         catch (Exception error) { connectionStatus.setUnavailable("startup failed"); PluginLog.action("", "Native startup unavailable. Check local secrets at " + LocalCredentials.defaultPath() + "; then use Restart Native Trading."); }
     }
     public void dispatch(JsonObject action) { if (runtime == null || closed || !runtime.trading.dispatch(action)) PluginLog.action(string(action, "symbol"), "Native runtime unavailable; no native action dispatched"); }

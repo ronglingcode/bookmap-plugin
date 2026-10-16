@@ -24,3 +24,19 @@ Charts on a different Eastern session date and explicitly configured replay mode
 The UI shows the threshold and premarket shares or the fallback reason. Percentile, top-five size, manual floor, and the former 10K alert cap do not affect attached charts. Size remains in the existing Bookmap depth/share units; no round-lot conversion is performed. Existing strict-greater-than size comparisons in the specialized monitors remain; labels and entry liquidity use greater-than-or-equal. Material alerts still qualify by crossing the threshold or an absolute delta strictly exceeding it.
 
 Canonical observation (1K) and Composer trigger/confirmation policies are unchanged.
+
+## Absolute entry size cap
+
+Every opening order from the native Bookmap adapter is capped after the button/hotkey's requested sizing and all entry rules:
+
+`maximum risk in R = largest qualifying session depth size / premarket size threshold`
+
+The trade window shows `Max counted: 5K | Cap: 0.33R` on a separate line beneath the premarket-volume/threshold display. It refreshes every second using the sizing tracker, including changes from range expansion and cleared orders. The tooltip shows the exact share-size numerator/denominator and the ratio to six decimal places, and identifies the cap as a total risk ceiling shared with existing positions and pending entries. Before any order qualifies, it shows `Max counted: 0 | Cap: 0.00R`.
+
+The denominator uses the existing tier table above, including its boundary rules and unavailable-volume fallback. For a 15K threshold and a largest qualifying 5K depth level, the cap is exactly one third of R. This is a ceiling, not a multiplier on the selected button: a smaller request stays smaller. Ratios above 1R are allowed when the existing rules also permit that size.
+
+The tracker observes both bids and offers from 09:30 Eastern through the regular session, using Bookmap market timestamps. It retains the maximum size observed at each price even after that level is canceled, reduced, or traded through. Resting depth still present at the open is included; depth removed before the open is excluded. At sizing time, only prices inside the current regular-session low/high, including equality, qualify. Expanding the range can therefore qualify an earlier cleared level. Tracking resets on the next session date and is removed when the chart detaches. Only depth actually delivered to this plugin can be tracked; minute-candle history cannot reconstruct unseen historical depth.
+
+The cap applies to risk-sized and fixed-share buttons, chart/directional hotkeys, partial reloads, swaps/reentries, and automatic pending-entry replacements. Existing same-direction position risk and pending-entry risk consume the budget. A PUT replacement excludes the pending order it replaces. Entries submitted before old entries are canceled still reserve those old entries' risk. Swap reentries are sized after their preceding position-close stage. Low-risk reload overrides and favorable VWAP conditions cannot bypass the ceiling.
+
+The final protected order quantities are rounded down to whole shares, with matching quantities in their stop/target brackets and captured trade state. No qualifying level, unavailable session range, a stale session date, or insufficient budget for one share blocks the opening action; exits remain available. Repeated opening actions wait for a broker account read started after the preceding opening action finishes, so repeated buttons/hotkeys cannot reuse the same cached risk budget while a submission is in flight. Broker account visibility and market-order fill prices can lag: the cap is calculated from observed positions/orders and estimated entry prices, rather than guaranteeing realized loss or an eventual fill price.
