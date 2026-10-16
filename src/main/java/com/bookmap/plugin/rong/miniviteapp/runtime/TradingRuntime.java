@@ -8,6 +8,7 @@ import com.bookmap.plugin.rong.miniviteapp.core.account.ExecutionExports;
 import com.bookmap.plugin.rong.miniviteapp.core.configuration.TradingConfig;
 import com.bookmap.plugin.rong.miniviteapp.core.controllers.ExecutionInputs;
 import com.bookmap.plugin.rong.miniviteapp.core.controllers.Workflows;
+import com.bookmap.plugin.rong.miniviteapp.core.controllers.StopLossMonitor;
 import com.bookmap.plugin.rong.miniviteapp.core.marketdata.MarketClock;
 import com.bookmap.plugin.rong.miniviteapp.core.marketdata.PremarketHistory;
 import com.bookmap.plugin.rong.miniviteapp.core.marketdata.StartupEligibility;
@@ -55,6 +56,7 @@ public final class TradingRuntime implements AutoCloseable {
     private final Map<String, JsonObject> quotes = new HashMap<>(), manual = new HashMap<>(), histories = new HashMap<>();
     private final Map<String, String> eligibility = new HashMap<>();
     private final Map<String, String> pendingReplacements = new HashMap<>();
+    private final StopLossMonitor stopLossMonitor = new StopLossMonitor();
     private final Map<String, Long> reminders = new HashMap<>(), entryWarnings = new HashMap<>();
     private JsonObject account, ledger, policy = ExecutionInputs.defaultPolicy();
     private TradingConfig.Result config;
@@ -108,8 +110,8 @@ public final class TradingRuntime implements AutoCloseable {
                     if (stopped) return; config = loaded; account = projected; accountReadStartedAt = readStartedAt; ledger = TradeLedger.projectTradeLedger(object(projected, "executions"), number(policy, "dailyMaxLoss"));
                     state = new TradeState(date, number(projected, "currentBalance"), now.getAsLong(), restored);
                 }
-                publishToken(); startStreamsAndHistory(); publishAccount();
-                repeat(30000, this::refreshToken); repeat(30000, this::refreshAccount); repeat(60000, this::refreshConfig); repeat(100, this::publishDirty);
+                publishToken(); startStreamsAndHistory(); publishAccount(); checkStopLossProtection();
+                repeat(30000, this::refreshToken); repeat(3000, this::refreshAccount); repeat(60000, this::refreshConfig); repeat(100, this::publishDirty);
                 repeat(1000, this::pendingJobs); repeat(20000, this::disciplineJobs);
                 events.log("", "Native trading runtime initialized; account and configuration loaded; stream startup requested");
             } catch (Exception error) {
@@ -251,10 +253,24 @@ public final class TradingRuntime implements AutoCloseable {
                 JsonObject projected = AccountProjection.projectAccount(raw, orders, date, this::price);
                 logNativeFills(projected, date);
                 synchronized (lock) { if (stopped) return; account = projected; accountReadStartedAt = readStartedAt; ledger = TradeLedger.projectTradeLedger(object(projected, "executions"), number(policy, "dailyMaxLoss")); }
-                publishToken(); publishAccount(); disciplineJobs(); accountNotifications();
+                publishToken(); publishAccount(); checkStopLossProtection(); disciplineJobs(); accountNotifications();
             } catch (Exception error) { failure("", "Account refresh", error); accountAgain.set(true); }
             finally { accountReading.set(false); boolean urgent = accountUrgentAgain.getAndSet(false); if (accountAgain.getAndSet(false) || urgent) refreshAccount(urgent); }
         });
+    }
+    private void checkStopLossProtection() {
+        StopLossMonitor.Decision decision;
+        synchronized (lock) {
+            if (stopped || state == null || config == null || account == null) return;
+            decision = stopLossMonitor.observe(account, now.getAsLong());
+        }
+        decision.warnings.forEach((symbol, uncovered) -> events.notify(symbol,
+                "ERROR: " + uncovered + " shares without stop loss; will close the full position if this persists more than 10 seconds"));
+        for (String symbol : decision.close) {
+            events.notify(symbol, "ERROR: Missing stop-loss coverage for more than 10 seconds; closing FULL position");
+            JsonObject action = message("native_job"); action.addProperty("symbol", symbol); action.addProperty("keyCode", "SafetyClosePosition");
+            dispatch(action);
+        }
     }
     private void logNativeOrders(JsonArray orders, String date) {
         List<String> lines = NativeAccountDiagnostics.rawOrders(orders, date);

@@ -96,6 +96,20 @@ public final class Handler {
                 state.symbol, "MARKET", remaining, 0, state.netQuantity < 0)));
         return plan;
     }
+    public static Plan closeUnprotectedPosition(Snapshot state) {
+        Models.require(Double.isFinite(state.netQuantity) && state.netQuantity != 0, "missing position for safety close");
+        Plan plan = new Plan("stop_loss_safety_close"); plan.clearPending = true;
+        double remaining = Math.abs(state.netQuantity);
+        for (ExitPair pair : state.pairs) {
+            Models.require(pair.marketLeg().isBuy == (state.netQuantity < 0), "exit side disagrees with position");
+            remaining -= pair.quantity();
+        }
+        Models.require(remaining >= 0, "exit quantity exceeds position");
+        for (ExitPair pair : state.pairs) Broker.instantOutOneExitPair(plan, pair);
+        if (remaining > 0) plan.requests.add(new Request("POST", null, OrderFactory.createSingleOrder(
+                state.symbol, "MARKET", remaining, 0, state.netQuantity < 0)));
+        return plan;
+    }
     private static boolean isStopLeg(Snapshot state, double price) {
         return state.netQuantity > 0 ? price < state.currentPrice : price > state.currentPrice;
     }

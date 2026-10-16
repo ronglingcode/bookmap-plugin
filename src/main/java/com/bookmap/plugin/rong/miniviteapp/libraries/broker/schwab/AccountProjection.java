@@ -120,6 +120,14 @@ public final class AccountProjection {
                 }
                 if (number(model, "quantity") > 0) add(entries, symbol, model);
             }
+            if (type.equals("SINGLE") && WORKING.contains(string(order, "status")) && !string(order, "status").equals("AWAITING_PARENT_ORDER")
+                    && leg != null && string(leg, "positionEffect").equals("CLOSING") && Set.of("STOP", "LIMIT").contains(string(order, "orderType"))) {
+                JsonObject model = orderModel(order, currentPrice);
+                if (number(model, "quantity") > 0) {
+                    JsonObject pair = new JsonObject(); pair.addProperty("symbol", symbol); pair.addProperty("source", "SINGLE"); pair.addProperty("parentOrderID", "");
+                    pair.add(string(order, "orderType"), model); add(pairs, symbol, pair);
+                }
+            }
             if (type.equals("OCO")) { JsonObject pair = exitPair(order, order, "OCO", currentPrice); if (pair != null) add(pairs, symbol, pair); }
             else if (type.equals("TRIGGER") && (string(order, "status").equals("FILLED") || number(order, "filledQuantity") > 0)) {
                 for (JsonElement childValue : array(order, "childOrderStrategies")) {

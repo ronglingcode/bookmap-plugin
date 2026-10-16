@@ -175,10 +175,13 @@ class TradingRuntimeTest {
             now.addAndGet(1800000); runtime.refreshToken(); assertEquals(2, refreshes.get());
             assertTrue(tasks.stream().noneMatch(task -> task.delay == 15000 && !task.canceled));
             List<Task> periodicRefreshes = tasks.stream().filter(task -> task.delay == 30000 && !task.canceled).collect(java.util.stream.Collectors.toList());
-            assertEquals(2, periodicRefreshes.size(), "token and account refreshes run every thirty seconds");
+            assertEquals(1, periodicRefreshes.size(), "token refresh runs every thirty seconds");
+            Task accountPoll = tasks.stream().filter(task -> task.delay == 3000 && !task.canceled).findFirst().orElseThrow();
+            accountPoll.canceled = true; accountPoll.run.run();
             periodicRefreshes.forEach(task -> { task.canceled = true; task.run.run(); });
             assertEquals(2, accountReads.get(), "periodic account refresh reads the broker without a manual action");
-            assertEquals(2, tasks.stream().filter(task -> task.delay == 30000 && !task.canceled).count(), "both refresh timers schedule their next tick");
+            assertEquals(1, tasks.stream().filter(task -> task.delay == 30000 && !task.canceled).count(), "token timer schedules its next tick");
+            assertEquals(1, tasks.stream().filter(task -> task.delay == 3000 && !task.canceled).count(), "safety account poll schedules its next tick");
             // A real native decision and fake broker acceptance initialize state locally, without a ViteApp ACK.
             JsonObject action = json("{\"symbol\":\"AAPL\",\"tradebook_id\":\"GapGiveAndGoBookmapReversal\",\"entry_method\":\"0.1 R\",\"use_market_order\":true,\"price\":10}"); runtime.dispatch(action);
             long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(2); while (emitted.stream().noneMatch(event -> event.has("outcome")) && System.nanoTime() < deadline) Thread.sleep(5);
@@ -186,9 +189,18 @@ class TradingRuntimeTest {
             runtime.pendingPersistence().get(2, TimeUnit.SECONDS); assertEquals(2, writes.get());
             runtime.dispatch(json("{\"type\":\"manual_inputs\",\"symbol\":\"AAPL\",\"customEntryPrice\":11,\"fixedQuantity\":20}")); assertEquals(20, runtime.manualInputs("AAPL").get("fixedQuantity").getAsInt()); runtime.dispatch(json("{\"symbol\":\"AAPL\",\"keyCode\":\"Space\"}")); assertEquals(json("{\"fixedQuantity\":20}"), runtime.manualInputs("AAPL"));
             for (int i = 0; i < 10; i++) runtime.refreshAccount(); assertEquals(3, accountReads.get());
-            assertEquals(1, tasks.stream().filter(task -> task.delay == 3000 && !task.canceled).count()); Task deferred = tasks.stream().filter(task -> task.delay == 3000 && !task.canceled).findFirst().orElseThrow(); deferred.canceled = true; limited.set(true); now.addAndGet(3000); deferred.run.run(); assertEquals(4, accountReads.get());
+            assertEquals(2, tasks.stream().filter(task -> task.delay == 3000 && !task.canceled).count()); Task deferred = tasks.stream().filter(task -> task.delay == 3000 && !task.canceled).reduce((a, b) -> b).orElseThrow(); deferred.canceled = true; limited.set(true); now.addAndGet(3000); deferred.run.run(); assertEquals(4, accountReads.get());
             runtime.refreshAccount(); assertEquals(4, accountReads.get()); Task retry = tasks.stream().filter(task -> task.delay == 60000 && !task.canceled).reduce((a, b) -> b).orElseThrow(); retry.canceled = true; limited.set(false); now.addAndGet(60000); retry.run.run(); assertEquals(5, accountReads.get());
             positionData.set("[{\"instrument\":{\"symbol\":\"MSFT\",\"assetType\":\"EQUITY\"},\"longQuantity\":10,\"shortQuantity\":0,\"averagePrice\":20}]"); now.addAndGet(3000); runtime.refreshAccount(); assertEquals(10, runtime.view("MSFT", "test").getAsJsonObject("account").getAsJsonObject("positions").getAsJsonObject("MSFT").get("netQuantity").getAsInt());
+            now.addAndGet(9000); runtime.refreshAccount();
+            assertTrue(emitted.stream().noneMatch(event -> event.has("action") && event.get("action").getAsString().equals("stop_loss_safety_close")));
+            now.addAndGet(3000); runtime.refreshAccount();
+            deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(2);
+            while (emitted.stream().noneMatch(event -> event.has("action") && event.get("action").getAsString().equals("stop_loss_safety_close") && event.get("type").getAsString().equals("execution_result")) && System.nanoTime() < deadline) Thread.sleep(5);
+            assertEquals(1, emitted.stream().filter(event -> event.has("action") && event.get("action").getAsString().equals("stop_loss_safety_close") && event.get("type").getAsString().equals("execution_result")).count());
+            assertEquals(2, mutations.get(), "safety close submits the off-watchlist position without a manual command");
+            now.addAndGet(3000); runtime.refreshAccount();
+            assertEquals(2, mutations.get(), "cached unprotected state must not submit duplicate market orders");
             positionData.set("[]"); now.addAndGet(3000); runtime.refreshAccount(); assertTrue(emitted.stream().anyMatch(event -> event.has("symbol") && event.get("symbol").getAsString().equals("MSFT") && event.get("type").getAsString().equals("account_ready") && event.getAsJsonObject("account").getAsJsonObject("positions").size() == 0));
             configData.add("stockSelections", new JsonArray()); runtime.refreshConfig(); assertFalse(runtime.view("AAPL", "test").has("plan")); assertEquals(0, audits.get(), "Logs, notifications, orders and breakout snapshots must never be sent to Firestore");
             // Reporting includes all symbols after watchlist removal and never reads the broker.
