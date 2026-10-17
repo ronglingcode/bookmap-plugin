@@ -46,7 +46,8 @@ class StrictLiquidityEntryTest {
     }
     @Test void strictIsDefaultAndBlocksEvenTheSmallestRequestsWithoutQualifyingLiquidity() {
         var server = server(); JsonObject cap = server.entrySizeCap("TEST");
-        assertEquals(Mode.STRICT, server.entryLiquidityMode("TEST"));
+        assertEquals(Mode.STRICT, BookmapSizeCap.ACTIVE_MODE);
+        assertEquals("STRICT", cap.get("mode").getAsString());
         for (String type : new String[]{"MARKET", "LIMIT"}) for (boolean isLong : new boolean[]{true, false}) {
             Plan plan = entry(isLong, type, isLong ? 104 : 96);
             assertTrue(assertThrows(IllegalArgumentException.class, () -> BookmapSizeCap.apply(new Snapshot(state(cap)), plan))
@@ -89,15 +90,14 @@ class StrictLiquidityEntryTest {
         }
     }
     @Test void proportionalModeRemainsAvailableAndUsesTheSameProspectiveStopRange() {
-        var server = server(); server.setEntryLiquidityMode("TEST", Mode.PROPORTIONAL);
-        JsonObject cap = server.entrySizeCap("TEST");
+        var server = server(); JsonObject cap = server.entrySizeCap("TEST").deepCopy();
+        cap.addProperty("mode", Mode.PROPORTIONAL.name()); // Exercise the retained algorithm without exposing a runtime switch.
         Plan normal = entry(true, "LIMIT", 100);
         BookmapSizeCap.apply(new Snapshot(state(cap)), normal); assertEquals(40, quantity(normal));
         for (boolean isLong : new boolean[]{true, false}) {
             Plan stop = entry(isLong, "STOP", isLong ? 102 : 98);
             BookmapSizeCap.apply(new Snapshot(state(cap)), stop); assertEquals(100, quantity(stop));
         }
-        server.setEntryLiquidityMode("TEST", Mode.STRICT);
         assertThrows(IllegalArgumentException.class, () -> BookmapSizeCap.apply(new Snapshot(state(server.entrySizeCap("TEST"))), entry(true, "LIMIT", 100)));
     }
     @Test void strictCannotBypassUnavailableSessionOrBorrowAnotherStopsWiderRangeAndNeverBlocksExits() {

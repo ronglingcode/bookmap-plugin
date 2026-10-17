@@ -35,7 +35,6 @@ import javax.swing.JButton;
 import javax.swing.JDialog;
 import javax.swing.JFrame;
 import javax.swing.JLabel;
-import javax.swing.JComboBox;
 import javax.swing.JOptionPane;
 import javax.swing.JPanel;
 import javax.swing.SwingConstants;
@@ -568,24 +567,10 @@ public class TradeButtonWindow {
 
         modePanel.add(connectionPanel, BorderLayout.NORTH);
         modePanel.add(wallThresholdLabel, BorderLayout.CENTER);
-        JPanel liquidityMode = new JPanel(new java.awt.FlowLayout(java.awt.FlowLayout.CENTER, 6, 0));
-        liquidityMode.add(new JLabel("Liquidity entry rule:"));
-        liquidityMode.add(createLiquidityModeSelector(symbol, server, this::updateWallThresholdLabel));
-        modePanel.add(liquidityMode, BorderLayout.SOUTH);
         attachShiftMouseRefresh(modePanel);
         attachShiftMouseRefresh(shiftModeLabel);
         attachShiftMouseRefresh(wallThresholdLabel);
         return modePanel;
-    }
-
-    static JComboBox<Mode> createLiquidityModeSelector(String symbol, SignalWebSocketServer server, Runnable refresh) {
-        JComboBox<Mode> selector = new JComboBox<>(Mode.values());
-        selector.setSelectedItem(server.entryLiquidityMode(symbol));
-        selector.setToolTipText("Strict blocks below the required order size; Proportional retains the prior R cap. Applies to buttons, hotkeys and adds for this symbol.");
-        selector.addActionListener(event -> {
-            server.setEntryLiquidityMode(symbol, (Mode) selector.getSelectedItem()); refresh.run();
-        });
-        return selector;
     }
 
     static String liquidityStatusText(JsonObject cap) {

@@ -14,6 +14,8 @@ public final class BookmapSizeCap {
         Mode(String label) { this.label = label; }
         @Override public String toString() { return label; }
     }
+    /** Programmer-only switch: change this constant and rebuild to restore proportional sizing. */
+    public static final Mode ACTIVE_MODE = Mode.STRICT;
 
     public static Mode mode(JsonObject cap) {
         return cap.has("mode") ? Mode.valueOf(Models.string(cap, "mode")) : Mode.STRICT;

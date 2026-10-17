@@ -17,7 +17,7 @@ import org.java_websocket.server.WebSocketServer;
 import com.bookmap.plugin.rong.patterns.Direction;
 import com.bookmap.plugin.rong.patterns.PatternType;
 import com.bookmap.plugin.rong.miniviteapp.models.Candle;
-import com.bookmap.plugin.rong.miniviteapp.core.controllers.BookmapSizeCap.Mode;
+import com.bookmap.plugin.rong.miniviteapp.core.controllers.BookmapSizeCap;
 import com.bookmap.plugin.rong.tradebuttons.TradebookButtonGroup;
 import com.bookmap.plugin.rong.tradebuttons.HotkeyRiskSelection;
 import com.google.gson.JsonArray;
@@ -25,13 +25,6 @@ import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 
 public class SignalWebSocketServer extends WebSocketServer {
-    private final Map<String, Mode> entryLiquidityModes = new ConcurrentHashMap<>();
-    public Mode entryLiquidityMode(String symbol) {
-        return entryLiquidityModes.getOrDefault(SymbolUtils.cleanSymbol(symbol), Mode.STRICT);
-    }
-    public void setEntryLiquidityMode(String symbol, Mode mode) {
-        entryLiquidityModes.put(SymbolUtils.cleanSymbol(symbol), java.util.Objects.requireNonNull(mode));
-    }
     private final HotkeyRiskSelection hotkeyRiskSelection = new HotkeyRiskSelection();
 
     public HotkeyRiskSelection getHotkeyRiskSelection() {
@@ -90,7 +83,7 @@ public class SignalWebSocketServer extends WebSocketServer {
         PremarketSizeThreshold policy = sizeThresholds.get(clean);
         int required = policy == null ? PremarketSizeThreshold.FALLBACK : policy.threshold();
         JsonObject cap = new JsonObject(); cap.addProperty("largestOrderSize", largest);
-        cap.addProperty("mode", entryLiquidityMode(clean).name());
+        cap.addProperty("mode", BookmapSizeCap.ACTIVE_MODE.name());
         cap.addProperty("available", day != null);
         cap.addProperty("requiredOrderSize", required); cap.addProperty("maxRiskMultiple", (double) largest / required);
         if (counted != null) {
@@ -295,7 +288,6 @@ public class SignalWebSocketServer extends WebSocketServer {
         }
         sizeThresholds.remove(symbol);
         sessionOrderSizes.remove(symbol);
-        entryLiquidityModes.remove(symbol);
         symbolToOrderBook.remove(symbol);
         symbolToPips.remove(symbol);
         symbolToRegularSessionHighLow.remove(symbol);
