@@ -35,6 +35,7 @@ import javax.swing.JButton;
 import javax.swing.JDialog;
 import javax.swing.JFrame;
 import javax.swing.JLabel;
+import javax.swing.JComboBox;
 import javax.swing.JOptionPane;
 import javax.swing.JPanel;
 import javax.swing.SwingConstants;
@@ -50,6 +51,8 @@ import com.bookmap.plugin.rong.NativeConnectionStatus;
 import com.bookmap.plugin.rong.PluginLog;
 import com.bookmap.plugin.rong.SignalWebSocketServer;
 import com.bookmap.plugin.rong.WallThresholdConfig;
+import com.bookmap.plugin.rong.miniviteapp.core.controllers.BookmapSizeCap;
+import com.bookmap.plugin.rong.miniviteapp.core.controllers.BookmapSizeCap.Mode;
 import com.google.gson.JsonObject;
 
 /**
@@ -565,10 +568,38 @@ public class TradeButtonWindow {
 
         modePanel.add(connectionPanel, BorderLayout.NORTH);
         modePanel.add(wallThresholdLabel, BorderLayout.CENTER);
+        JPanel liquidityMode = new JPanel(new java.awt.FlowLayout(java.awt.FlowLayout.CENTER, 6, 0));
+        liquidityMode.add(new JLabel("Liquidity entry rule:"));
+        liquidityMode.add(createLiquidityModeSelector(symbol, server, this::updateWallThresholdLabel));
+        modePanel.add(liquidityMode, BorderLayout.SOUTH);
         attachShiftMouseRefresh(modePanel);
         attachShiftMouseRefresh(shiftModeLabel);
         attachShiftMouseRefresh(wallThresholdLabel);
         return modePanel;
+    }
+
+    static JComboBox<Mode> createLiquidityModeSelector(String symbol, SignalWebSocketServer server, Runnable refresh) {
+        JComboBox<Mode> selector = new JComboBox<>(Mode.values());
+        selector.setSelectedItem(server.entryLiquidityMode(symbol));
+        selector.setToolTipText("Strict blocks below the required order size; Proportional retains the prior R cap. Applies to buttons, hotkeys and adds for this symbol.");
+        selector.addActionListener(event -> {
+            server.setEntryLiquidityMode(symbol, (Mode) selector.getSelectedItem()); refresh.run();
+        });
+        return selector;
+    }
+
+    static String liquidityStatusText(JsonObject cap) {
+        int largest = cap.get("largestOrderSize").getAsInt(), required = cap.get("requiredOrderSize").getAsInt();
+        if (BookmapSizeCap.mode(cap) == Mode.STRICT) {
+            boolean qualified = (!cap.has("available") || cap.get("available").getAsBoolean()) && largest >= required;
+            return "Max counted: " + formatShareSize(largest) + " | Required: " + formatShareSize(required)
+                    + "<br><b>STRICT: " + (qualified ? "liquidity threshold met" : "ENTRY BLOCKED in current range")
+                    + "</b><br>Stop entries are checked through their trigger price.";
+        }
+        return "Max counted: " + formatShareSize(largest) + " | Cap: "
+                + String.format(Locale.US, "%.2fR", cap.get("maxRiskMultiple").getAsDouble())
+                + "<br>PROPORTIONAL: size capped by qualifying liquidity"
+                + "<br>Stop entries are checked through their trigger price.";
     }
 
     private void setConnectionStatus(NativeConnectionStatus.Snapshot status) {
@@ -829,10 +860,15 @@ public class TradeButtonWindow {
         int largest = cap.get("largestOrderSize").getAsInt();
         int required = cap.get("requiredOrderSize").getAsInt();
         double cappedR = cap.get("maxRiskMultiple").getAsDouble();
-        String capText = "Max counted: " + formatShareSize(largest)
-                + " | Cap: " + String.format(Locale.US, "%.2fR", cappedR);
+        boolean strict = BookmapSizeCap.mode(cap) == Mode.STRICT;
+        boolean blocked = strict && (!cap.get("available").getAsBoolean() || largest < required);
+        wallThresholdLabel.setBackground(blocked ? new Color(255, 220, 220) : THRESHOLD_BACKGROUND);
+        wallThresholdLabel.setForeground(blocked ? new Color(150, 20, 20) : THRESHOLD_TEXT_COLOR);
+        String capText = liquidityStatusText(cap);
         String capDescription = "Largest bid/offer observed since market open within the session low/high, including cleared orders. "
-                + String.format(Locale.US, "%,d / %,d = %.6fR total risk ceiling; existing position and pending entries consume this budget.", largest, required, cappedR);
+                + (strict ? String.format(Locale.US, "Strict blocks entries below %,d shares; once qualified, existing sizing rules apply. ", required)
+                        : String.format(Locale.US, "%,d / %,d = %.6fR total risk ceiling; existing position and pending entries consume this budget. ", largest, required, cappedR))
+                + "Only a stop entry's own trigger can extend its qualification range; market and limit entries use the actual range.";
         if (cap.has("largestOrderPrice")) {
             String observed = java.time.Instant.ofEpochMilli(cap.get("largestOrderObservedAt").getAsLong())
                     .atZone(java.time.ZoneId.of("America/New_York"))

@@ -341,7 +341,9 @@ public final class TradingRuntime implements AutoCloseable {
         var capProvider = entrySizeCapProvider;
         if (capProvider != null) {
             JsonObject cap = capProvider.apply(symbol).deepCopy();
-            if (!string(cap, "sessionDate").equals(MarketClock.marketTime(now.getAsLong()).date)) cap.addProperty("maxRiskMultiple", 0);
+            if (!string(cap, "sessionDate").equals(MarketClock.marketTime(now.getAsLong()).date)) {
+                cap.addProperty("available", false); cap.addProperty("maxRiskMultiple", 0);
+            }
             input.getAsJsonObject("entryContext").add("bookmapSizeCap", cap);
         }
         JsonObject update = message("execution_state"); JsonArray symbols = new JsonArray(); symbols.add(input); update.add("symbols", symbols); execution.receive(this, update);

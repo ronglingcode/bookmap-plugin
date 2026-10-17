@@ -17,6 +17,7 @@ import org.java_websocket.server.WebSocketServer;
 import com.bookmap.plugin.rong.patterns.Direction;
 import com.bookmap.plugin.rong.patterns.PatternType;
 import com.bookmap.plugin.rong.miniviteapp.models.Candle;
+import com.bookmap.plugin.rong.miniviteapp.core.controllers.BookmapSizeCap.Mode;
 import com.bookmap.plugin.rong.tradebuttons.TradebookButtonGroup;
 import com.bookmap.plugin.rong.tradebuttons.HotkeyRiskSelection;
 import com.google.gson.JsonArray;
@@ -24,6 +25,13 @@ import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 
 public class SignalWebSocketServer extends WebSocketServer {
+    private final Map<String, Mode> entryLiquidityModes = new ConcurrentHashMap<>();
+    public Mode entryLiquidityMode(String symbol) {
+        return entryLiquidityModes.getOrDefault(SymbolUtils.cleanSymbol(symbol), Mode.STRICT);
+    }
+    public void setEntryLiquidityMode(String symbol, Mode mode) {
+        entryLiquidityModes.put(SymbolUtils.cleanSymbol(symbol), java.util.Objects.requireNonNull(mode));
+    }
     private final HotkeyRiskSelection hotkeyRiskSelection = new HotkeyRiskSelection();
 
     public HotkeyRiskSelection getHotkeyRiskSelection() {
@@ -82,13 +90,27 @@ public class SignalWebSocketServer extends WebSocketServer {
         PremarketSizeThreshold policy = sizeThresholds.get(clean);
         int required = policy == null ? PremarketSizeThreshold.FALLBACK : policy.threshold();
         JsonObject cap = new JsonObject(); cap.addProperty("largestOrderSize", largest);
+        cap.addProperty("mode", entryLiquidityMode(clean).name());
+        cap.addProperty("available", day != null);
         cap.addProperty("requiredOrderSize", required); cap.addProperty("maxRiskMultiple", (double) largest / required);
         if (counted != null) {
             cap.addProperty("largestOrderPrice", counted.price);
             cap.addProperty("largestOrderSide", counted.isBid ? "bid" : "offer");
             cap.addProperty("largestOrderObservedAt", counted.timestampNs / 1_000_000L);
         }
-        if (day != null) cap.addProperty("sessionDate", day.getSessionDate());
+        if (day != null) {
+            cap.addProperty("sessionDate", day.getSessionDate());
+            cap.addProperty("rangeLow", low); cap.addProperty("rangeHigh", high);
+            for (boolean upper : new boolean[]{true, false}) {
+                JsonArray candidates = new JsonArray();
+                if (tracker != null) for (SessionOrderSizeTracker.Observation candidate : tracker.stopCandidates(day.getSessionDate(), low, high, upper)) {
+                    JsonObject value = new JsonObject(); value.addProperty("price", candidate.price); value.addProperty("size", candidate.size);
+                    value.addProperty("side", candidate.isBid ? "bid" : "offer"); value.addProperty("observedAt", candidate.timestampNs / 1_000_000L);
+                    candidates.add(value);
+                }
+                cap.add(upper ? "upperStopOrders" : "lowerStopOrders", candidates);
+            }
+        }
         return cap;
     }
     public void registerSizeThreshold(String symbol, PremarketSizeThreshold threshold) { sizeThresholds.put(SymbolUtils.cleanSymbol(symbol), threshold); }
@@ -273,6 +295,7 @@ public class SignalWebSocketServer extends WebSocketServer {
         }
         sizeThresholds.remove(symbol);
         sessionOrderSizes.remove(symbol);
+        entryLiquidityModes.remove(symbol);
         symbolToOrderBook.remove(symbol);
         symbolToPips.remove(symbol);
         symbolToRegularSessionHighLow.remove(symbol);

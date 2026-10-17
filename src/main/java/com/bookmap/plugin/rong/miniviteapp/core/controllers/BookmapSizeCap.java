@@ -8,6 +8,46 @@ import java.util.*;
 /** Final opening-order ceiling, after every entry rule and before any broker effects. */
 public final class BookmapSizeCap {
     private BookmapSizeCap() { }
+    public enum Mode {
+        STRICT("Strict - block below threshold"), PROPORTIONAL("Proportional - cap R");
+        private final String label;
+        Mode(String label) { this.label = label; }
+        @Override public String toString() { return label; }
+    }
+
+    public static Mode mode(JsonObject cap) {
+        return cap.has("mode") ? Mode.valueOf(Models.string(cap, "mode")) : Mode.STRICT;
+    }
+
+    /** Expand only the new entry's qualification range, never the actual observed session range. */
+    public static JsonObject forEntry(JsonObject cap, JsonObject order) {
+        String type = Models.string(order, "orderType");
+        if (!type.equals("STOP") && !type.equals("STOP_LIMIT")) return cap;
+        boolean isLong = instruction(order).equals("BUY");
+        double trigger = Models.number(order, "stopPrice"), low = Models.number(cap, "rangeLow"), high = Models.number(cap, "rangeHigh");
+        if (!Models.positive(trigger) || !Models.positive(low) || !Models.positive(high)
+                || low > high || (isLong ? trigger <= high : trigger >= low)) return cap;
+        String key = isLong ? "upperStopOrders" : "lowerStopOrders";
+        if (!cap.has(key)) return cap;
+        double largest = Models.number(cap, "largestOrderSize"), required = Models.number(cap, "requiredOrderSize");
+        Models.require(Double.isFinite(largest) && largest >= 0 && Models.positive(required), "Bookmap liquidity sizing inputs unavailable");
+        JsonObject result = cap;
+        for (JsonElement item : cap.getAsJsonArray(key)) {
+            JsonObject candidate = item.getAsJsonObject();
+            double price = Models.number(candidate, "price"), size = Models.number(candidate, "size");
+            boolean within = isLong ? price >= low - 1e-8 && price <= trigger + 1e-8 : price >= trigger - 1e-8 && price <= high + 1e-8;
+            if (Models.positive(price) && Models.positive(size) && within && size > largest) {
+                if (result == cap) result = cap.deepCopy();
+                largest = size;
+                result.addProperty("largestOrderSize", size); result.addProperty("maxRiskMultiple", size / required);
+                result.addProperty("largestOrderPrice", price);
+                if (candidate.has("side")) result.add("largestOrderSide", candidate.get("side"));
+                if (candidate.has("observedAt")) result.add("largestOrderObservedAt", candidate.get("observedAt"));
+                result.addProperty("qualificationStopPrice", trigger);
+            }
+        }
+        return result;
+    }
 
     public static boolean hasOpening(Plan plan) {
         return plan.requests.stream().anyMatch(request -> opening(request.body));
@@ -19,6 +59,23 @@ public final class BookmapSizeCap {
         for (Request request : plan.requests) if (opening(request.body)) openings.add(request);
         if (openings.isEmpty()) return; // Exits and stop adjustments are never restricted.
         JsonObject cap = state.entryContext.getAsJsonObject("bookmapSizeCap");
+        Models.require(!cap.has("available") || Models.bool(cap, "available"), "Bookmap liquidity session unavailable");
+        if (mode(cap) == Mode.STRICT) {
+            for (Request request : openings) {
+                JsonObject effective = forEntry(cap, request.body);
+                double largest = Models.number(effective, "largestOrderSize"), required = Models.number(effective, "requiredOrderSize");
+                Models.require(Double.isFinite(largest) && largest >= 0 && Models.positive(required), "Bookmap strict liquidity inputs unavailable");
+                Models.require(largest >= required, "Bookmap STRICT: ENTRY BLOCKED; largest qualifying order=" + largest
+                        + " shares; required=" + required + " shares (stop entries are checked through their trigger)");
+                if (plan.entry != null) plan.entry.add("bookmapSizeCap", effective.deepCopy());
+            }
+            return;
+        }
+        // Multiple entries in one action must each support the action's entire shared risk ceiling.
+        for (Request request : openings) {
+            JsonObject effective = forEntry(state.entryContext.getAsJsonObject("bookmapSizeCap"), request.body);
+            if (request == openings.get(0) || Models.number(effective, "maxRiskMultiple") < Models.number(cap, "maxRiskMultiple")) cap = effective;
+        }
         double multiple = Models.number(cap, "maxRiskMultiple");
         double unitRisk = Models.number(state.entryContext, "riskDollars");
         Models.require(Double.isFinite(multiple) && multiple >= 0 && Models.positive(unitRisk), "Bookmap size cap unavailable");

@@ -3,6 +3,8 @@ package com.bookmap.plugin.rong;
 import java.time.*;
 import java.util.Map;
 import java.util.TreeMap;
+import java.util.List;
+import java.util.ArrayList;
 
 /** Session maxima by price, including liquidity subsequently removed from the book. */
 final class SessionOrderSizeTracker {
@@ -71,6 +73,20 @@ final class SessionOrderSizeTracker {
                 || !Double.isFinite(high) || low > high) return null;
         return maxima.subMap(low - 1e-8, true, high + 1e-8, true).values().stream()
                 .max(java.util.Comparator.comparingInt(value -> value.size)).orElse(null);
+    }
+
+    /** Only record breakers are needed to evaluate any outward stop-entry trigger. */
+    synchronized List<Observation> stopCandidates(String sessionDate, double low, double high, boolean upper) {
+        List<Observation> result = new ArrayList<>();
+        if (date == null || !date.toString().equals(sessionDate) || !Double.isFinite(low)
+                || !Double.isFinite(high) || low > high) return result;
+        Observation inside = largestObservation(sessionDate, low, high);
+        int largest = inside == null ? 0 : inside.size;
+        var outside = upper ? maxima.tailMap(high + 1e-8, false) : maxima.headMap(low - 1e-8, false).descendingMap();
+        for (Observation candidate : outside.values()) if (candidate.size > largest) {
+            result.add(candidate); largest = candidate.size;
+        }
+        return result;
     }
 
     static final class Observation {

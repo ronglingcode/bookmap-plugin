@@ -13,10 +13,34 @@ import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.*;
 
 class NativeExecutionTest {
+    @Test void strictBlocksMarketEntriesButPermitsBuyAndSellStopsAtTheirSubmittedTrigger() throws Exception {
+        for (boolean isLong : new boolean[]{true, false}) for (boolean market : new boolean[]{true, false}) {
+            try (var rig = new Rig()) {
+                JsonObject action = rig.connectEntry();
+                action.addProperty("tradebook_id", isLong ? "RangeBoundBidReversal" : "RangeBoundOfferReversal");
+                action.addProperty("use_market_order", market);
+                JsonObject cap = json("{\"mode\":\"STRICT\",\"available\":true,\"largestOrderSize\":1000,\"requiredOrderSize\":5000,\"maxRiskMultiple\":0.2,\"rangeLow\":9.5,\"rangeHigh\":10,\"upperStopOrders\":[{\"price\":10.01,\"size\":5000}],\"lowerStopOrders\":[{\"price\":9.49,\"size\":5000}]}");
+                rig.state.getAsJsonObject("entryContext").add("bookmapSizeCap", cap);
+                rig.updateState(System.currentTimeMillis()); rig.mutationStatus = 201;
+                rig.engine.route(action);
+                if (market) {
+                    assertEquals(0, rig.mutations.get());
+                    assertTrue(rig.events.stream().anyMatch(event -> event.get("type").getAsString().equals("execution_blocked")
+                            && event.get("reason").getAsString().contains("STRICT: ENTRY BLOCKED")));
+                } else {
+                    JsonObject result = rig.finish(); assertEquals("accepted", result.get("outcome").getAsString());
+                    assertEquals(1, rig.mutations.get());
+                    assertEquals("STOP", rig.bodies.get(0).get("orderType").getAsString());
+                    assertEquals(isLong ? 10.01 : 9.49, result.getAsJsonObject("entry").getAsJsonObject("bookmapSizeCap").get("qualificationStopPrice").getAsDouble());
+                    assertEquals(5000, result.getAsJsonObject("entry").getAsJsonObject("bookmapSizeCap").get("largestOrderSize").getAsInt());
+                }
+            }
+        }
+    }
     @Test void repeatedEntriesWaitForAnAccountReadStartedAfterBrokerCompletion() throws Exception {
         try (var rig = new Rig()) {
             JsonObject action = rig.connectEntry();
-            rig.state.getAsJsonObject("entryContext").add("bookmapSizeCap", json("{\"maxRiskMultiple\":0.4}"));
+            rig.state.getAsJsonObject("entryContext").add("bookmapSizeCap", json("{\"mode\":\"PROPORTIONAL\",\"maxRiskMultiple\":0.4}"));
             rig.state.getAsJsonObject("entryContext").addProperty("bookmapAccountReadStartedAt", 1);
             rig.updateState(System.currentTimeMillis()); rig.mutationStatus = 201;
             rig.engine.route(action); rig.finish();
@@ -33,7 +57,7 @@ class NativeExecutionTest {
     @Test void bookmapCapReachesBrokerAndCapturedTradingState() throws Exception {
         try (var rig = new Rig()) {
             JsonObject action = rig.connectEntry();
-            rig.state.getAsJsonObject("entryContext").add("bookmapSizeCap", json("{\"maxRiskMultiple\":0.3333333333333333}"));
+            rig.state.getAsJsonObject("entryContext").add("bookmapSizeCap", json("{\"mode\":\"PROPORTIONAL\",\"maxRiskMultiple\":0.3333333333333333}"));
             rig.updateState(System.currentTimeMillis()); rig.mutationStatus = 201;
             rig.engine.route(action); JsonObject result = rig.finish();
             assertEquals("accepted", result.get("outcome").getAsString());
@@ -48,7 +72,7 @@ class NativeExecutionTest {
     @Test void zeroBookmapCapBlocksBeforeAnyBrokerRequest() throws Exception {
         try (var rig = new Rig()) {
             JsonObject action = rig.connectEntry();
-            rig.state.getAsJsonObject("entryContext").add("bookmapSizeCap", json("{\"maxRiskMultiple\":0}"));
+            rig.state.getAsJsonObject("entryContext").add("bookmapSizeCap", json("{\"mode\":\"PROPORTIONAL\",\"maxRiskMultiple\":0}"));
             rig.updateState(System.currentTimeMillis()); rig.engine.route(action);
             assertEquals(0, rig.mutations.get());
             assertTrue(rig.events.stream().anyMatch(event -> event.get("type").getAsString().equals("execution_blocked")

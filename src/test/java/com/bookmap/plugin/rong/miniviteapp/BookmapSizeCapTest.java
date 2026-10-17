@@ -13,7 +13,7 @@ class BookmapSizeCapTest {
     private JsonObject state(double cap) {
         JsonObject state = JsonParser.parseReader(new InputStreamReader(getClass().getResourceAsStream("/direct-entry-fixtures.json"), StandardCharsets.UTF_8))
                 .getAsJsonArray().get(0).getAsJsonObject().getAsJsonObject("state").deepCopy();
-        JsonObject limit = new JsonObject(); limit.addProperty("maxRiskMultiple", cap);
+        JsonObject limit = new JsonObject(); limit.addProperty("maxRiskMultiple", cap); limit.addProperty("mode", "PROPORTIONAL");
         state.getAsJsonObject("entryContext").add("bookmapSizeCap", limit);
         state.getAsJsonObject("entryContext").addProperty("riskDollars", 1000);
         state.addProperty("averagePrice", 10);
