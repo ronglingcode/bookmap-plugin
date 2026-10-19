@@ -1,6 +1,7 @@
 package com.bookmap.plugin.rong.miniviteapp.core.controllers;
 
 import com.bookmap.plugin.rong.miniviteapp.core.algorithms.RiskManager;
+import com.bookmap.plugin.rong.miniviteapp.core.algorithms.EntrySizing;
 import com.bookmap.plugin.rong.miniviteapp.core.algorithms.TakeProfit;
 import com.bookmap.plugin.rong.miniviteapp.libraries.broker.schwab.OrderFactory;
 import com.bookmap.plugin.rong.miniviteapp.models.Models;
@@ -12,11 +13,13 @@ public final class OrderFlow {
     private OrderFlow() { }
     public static Plan submitEntry(Snapshot state, JsonObject context, JsonObject definition, JsonObject action,
             boolean isLong, boolean market, double entryPrice, double stopPrice, double multiplier, int requestedCount, String method) {
-        double fixed = Models.number(context, "fixedQuantity"), riskPrice = stopPrice;
+        long requestedShares = EntrySizing.fixedShares(method);
+        double fixed = requestedShares > 0 ? requestedShares : method.isEmpty() ? Models.number(context, "fixedQuantity") : 0;
+        double riskPrice = stopPrice;
         String type = market ? "MARKET" : (isLong ? state.currentPrice > entryPrice : state.currentPrice < entryPrice) ? "LIMIT" : "STOP";
         double orderEntry = isLong ? RiskManager.addCents(entryPrice) : RiskManager.minusCents(entryPrice);
         double orderStop = isLong ? RiskManager.minusCents(stopPrice) : RiskManager.addCents(stopPrice);
-        int count = requestedCount;
+        int count = requestedShares > 0 ? EntrySizing.FIXED_SHARE_PARTIALS : requestedCount;
         double shares = fixed > 0 ? fixed : RiskManager.calculateTotalShares(orderEntry, riskPrice, multiplier, Models.number(context, "riskDollars"));
         double cap = Models.number(context, "maxQuantity");
         if (!(fixed > 0) && cap > 0) shares = Math.min(shares, cap);
@@ -26,8 +29,10 @@ public final class OrderFlow {
         double buyingPower = Models.number(context, "availableBuyingPower");
         Plan plan = new Plan("wall_reversal_entry");
         Models.require(Double.isFinite(buyingPower), "buying-power sizing input missing");
-        JsonObject allocation = Workflows.buyingPowerTargets(targets, orderEntry, buyingPower); targets = allocation.getAsJsonArray("targets"); total = allocation.get("totalQuantity").getAsDouble();
-        if (allocation.get("insufficient").getAsBoolean()) plan.warnings.add("Native warning: estimated buying power insufficient after half sizing; broker will decide");
+        if (requestedShares == 0) {
+            JsonObject allocation = Workflows.buyingPowerTargets(targets, orderEntry, buyingPower); targets = allocation.getAsJsonArray("targets"); total = allocation.get("totalQuantity").getAsDouble();
+            if (allocation.get("insufficient").getAsBoolean()) plan.warnings.add("Native warning: estimated buying power insufficient after half sizing; broker will decide");
+        }
         plan.requests.add(new Request("POST", null, OrderFactory.createOneEntryWithMultipleExits(state.symbol, isLong, type, total, orderEntry, targets, orderStop)));
         JsonObject basePlan = definition.getAsJsonObject("basePlan").deepCopy();
         if (!basePlan.has("planConfigs") || !basePlan.get("planConfigs").isJsonObject()) basePlan.add("planConfigs", new JsonObject());

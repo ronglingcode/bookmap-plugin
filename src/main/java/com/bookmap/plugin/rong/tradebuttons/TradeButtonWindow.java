@@ -21,6 +21,7 @@ import java.awt.event.WindowAdapter;
 import java.awt.event.WindowEvent;
 import java.util.Collections;
 import java.util.List;
+import java.util.ArrayList;
 import java.util.Locale;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
@@ -73,8 +74,6 @@ public class TradeButtonWindow {
     private static final int WINDOW_WIDTH = 570;
     private static final int CONTENT_WIDTH = 540;
     private static final int WALL_THRESHOLD_REFRESH_MS = 1_000;
-    private static final double PRIMARY_ENTRY_BUTTON_WEIGHT = 1.35;
-    private static final double SECONDARY_ENTRY_BUTTON_WEIGHT = 1.0;
     private static final String SHIFT_DOWN_CLIENT_PROPERTY = "rong.shiftDownForClick";
     private static final Object SHIFT_LISTENER_LOCK = new Object();
     private static final Set<TradeButtonWindow> OPEN_WINDOWS =
@@ -442,11 +441,11 @@ public class TradeButtonWindow {
         buttonPanel.setLayout(new BoxLayout(buttonPanel, BoxLayout.Y_AXIS));
         addFullWidth(createModePanel());
         addFullWidth(createHotkeyPanel());
-        hotkeyRiskPanel = new HotkeyRiskPanel(server.getHotkeyRiskSelection());
+        hotkeyRiskPanel = new HotkeyRiskPanel(server.getHotkeyRiskSelection(), symbol);
         addFullWidth(hotkeyRiskPanel);
 
         boolean hasTradebookButtons = false;
-        JPanel tradebookGrid = new JPanel(new GridLayout(0, 2, 6, 6));
+        JPanel tradebookGrid = new JPanel(new GridLayout(0, 1, 6, 6));
         if (tradebooks != null && !tradebooks.isEmpty()) {
             for (TradebookButtonGroup tradebook : tradebooks) {
                 if (!tradebook.getEntryMethods().isEmpty()) {
@@ -493,8 +492,10 @@ public class TradeButtonWindow {
         hotkeyPanel.setBorder(BorderFactory.createEmptyBorder(0, 0, 8, 0));
         hotkeyPanel.add(createHotkeyButton("Cancel Entry", "cancel", "KeyC"));
         hotkeyPanel.add(createHotkeyButton("Flatten", "flatten", "KeyF"));
-        hotkeyPanel.add(createHotkeyButton("Add Partial", "add_partial", "KeyA", true));
+        hotkeyPanel.add(createHotkeyButton("Add Partial 1", "add_partial", "KeyA", true));
+        hotkeyPanel.add(createHotkeyButton("Add Partial 2", "add_2_partials", "KeyA", true));
         hotkeyPanel.add(createHotkeyButton("Market Out 1", "market_out_1_partial", "KeyM"));
+        hotkeyPanel.add(createHotkeyButton("Market Out 2", "market_out_2_partials", "KeyM"));
         hotkeyPanel.add(createHotkeyButton("Market Out Half", "market_out_half", "KeyG", true));
         hotkeyPanel.add(createHotkeyButton("Swap", "swap", "KeyW"));
         JButton inputs = new JButton("Entry Inputs"); applyHotkeyButtonStyle(inputs); inputs.addActionListener(e -> showManualInputs()); hotkeyPanel.add(inputs);
@@ -509,8 +510,6 @@ public class TradeButtonWindow {
         });
         hotkeyPanel.add(refreshAccount);
         hotkeyPanel.add(new JLabel());
-        hotkeyPanel.add(createHotkeyButton("Add Partial 2", "add_2_partials", "KeyA", true));
-        hotkeyPanel.add(createHotkeyButton("Market Out 2", "market_out_2_partials", "KeyM"));
         return hotkeyPanel;
     }
 
@@ -625,19 +624,23 @@ public class TradeButtonWindow {
     }
 
     private JPanel createEntryMethodPanel(TradebookButtonGroup tradebook) {
-        JPanel entryMethodPanel = new JPanel(new GridBagLayout());
-        List<String> entryMethods = tradebook.getEntryMethods();
-        int columns = Math.max(1, (entryMethods.size() + 1) / 2);
-        for (int index = 0; index < entryMethods.size(); index++) {
-            GridBagConstraints gbc = new GridBagConstraints();
-            gbc.gridx = index % columns;
-            gbc.gridy = index / columns;
-            gbc.fill = GridBagConstraints.HORIZONTAL;
-            gbc.weightx = gbc.gridx == 0 ? PRIMARY_ENTRY_BUTTON_WEIGHT : SECONDARY_ENTRY_BUTTON_WEIGHT;
-            gbc.insets = new Insets(gbc.gridy == 0 ? 0 : 6, 0, 0, gbc.gridx == columns - 1 ? 0 : 6);
-            entryMethodPanel.add(createEntryButton(tradebook, entryMethods.get(index)), gbc);
+        List<JButton> risks = new ArrayList<>();
+        List<JButton> shares = new ArrayList<>();
+        for (String method : tradebook.getEntryMethods()) {
+            (method.endsWith(" sh") ? shares : risks).add(createEntryButton(tradebook, method));
         }
-        return entryMethodPanel;
+        JPanel panel = new JPanel(new GridLayout(0, 1, 0, 6));
+        appendEntryRows(panel, risks, Math.max(1, risks.size()));
+        appendEntryRows(panel, shares, Math.max(1, shares.size()));
+        return panel;
+    }
+
+    static void appendEntryRows(JPanel panel, List<JButton> buttons, int columns) {
+        for (int start = 0; start < buttons.size(); start += columns) {
+            JPanel row = new JPanel(new GridLayout(1, 0, 6, 0));
+            for (int index = start; index < Math.min(start + columns, buttons.size()); index++) row.add(buttons.get(index));
+            panel.add(row);
+        }
     }
 
     private JButton createEntryButton(TradebookButtonGroup tradebook, String entryMethod) {

@@ -308,7 +308,7 @@ public class ChartHoverHotkeyHandler implements ScreenSpacePainterFactory {
         json.addProperty("sideIsLong", tradebook.isLong());
         json.addProperty("tradebook_id", tradebook.getTradebookId());
         json.addProperty("tradebook_name", tradebook.getTradebookName());
-        json.addProperty("entry_method", server.getHotkeyRiskSelection().getEntryMethod());
+        json.addProperty("entry_method", server.getHotkeyRiskSelection().getEntryMethod(json.has("symbol") ? SymbolUtils.cleanSymbol(json.get("symbol").getAsString()) : ""));
     }
 
     private void sendPriceIndependentHotkey(

@@ -47,6 +47,7 @@ public final class ExecutionInputs {
         result.addProperty("splitPartials", net != 0 && (!bool(submission, "isSingleOrder") || !largeSingle)); copy(result, active, "hasValue", "entryPrice"); result.add("hasPlan", result.remove("hasValue"));
         copy(result, object(active, "plan"), "coreTarget", "coreCount"); result.addProperty("coreRuleEnabled", bool(policy, "coreTargetEnabled")); result.addProperty("rulesSupported", true); result.add("entries", array(object(account, "entryOrders"), symbol).deepCopy()); result.add("pairs", pairs);
         JsonObject context = new JsonObject(); context.add("definitions", TradingConfig.createTradebookDefinitions(plan)); context.addProperty("attendanceAllowed", true);
+        copy(context, plan, "fixedShares");
         context.add("activeTrade", active.deepCopy()); context.add("candles", array(market, "candles").deepCopy());
         context.add("longTrade", state.direction(symbol, true).deepCopy()); context.add("shortTrade", state.direction(symbol, false).deepCopy());
         List<String> symbols = new ArrayList<>(); double used = 0; for (JsonElement stock : watchlist) { String name = stock.getAsString(); symbols.add(name); used += Math.abs(number(object(object(account, "positions"), name), "netQuantity")) * number(object(markets, name), "currentPrice"); }

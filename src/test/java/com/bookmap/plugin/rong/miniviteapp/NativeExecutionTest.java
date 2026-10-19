@@ -558,6 +558,7 @@ class NativeExecutionTest {
     @Test void fractionalHalfSizedLegsArePassedToBrokerWithoutRounding() throws Exception {
         try (var rig = new Rig()) {
             var entry = rig.connectEntry(); rig.mutationStatus = 400;
+            entry.addProperty("entry_method", "");
             rig.state.getAsJsonObject("entryContext").addProperty("fixedQuantity", 23);
             rig.state.getAsJsonObject("entryContext").addProperty("availableBuyingPower", 200);
             rig.updateState(System.currentTimeMillis()); rig.engine.route(entry);

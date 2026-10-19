@@ -13,6 +13,67 @@ import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.*;
 
 class EntryExecutionPlanTest {
+    @Test void symbolShareOptionsReachExecutionInputs() {
+        var fixtures = JsonParser.parseReader(new InputStreamReader(getClass().getResourceAsStream("/state-fixtures.json"), StandardCharsets.UTF_8)).getAsJsonArray();
+        for (var item : fixtures) {
+            var fixture = item.getAsJsonObject();
+            if (!fixture.get("kind").getAsString().equals("inputs")) continue;
+            var args = fixture.getAsJsonArray("args").deepCopy();
+            args.get(1).getAsJsonObject().add("fixedShares", JsonParser.parseString("[100,50]"));
+            var state = new com.bookmap.plugin.rong.miniviteapp.core.state.TradeState("2026-10-01", 25000, args.get(10).getAsLong() - 1000, args.get(6).isJsonNull() ? null : args.get(6).getAsJsonObject());
+            var snapshot = com.bookmap.plugin.rong.miniviteapp.core.controllers.ExecutionInputs.create(args.get(0).getAsString(), args.get(1).getAsJsonObject(), args.get(2).getAsJsonObject(), args.get(3).getAsJsonObject(), args.get(4).getAsJsonObject(), args.get(5).getAsJsonObject(), state, args.get(7).getAsJsonArray(), args.get(8).getAsJsonObject(), args.get(9).getAsJsonObject(), args.get(10).getAsLong(), args.get(11).getAsLong(), args.get(12).getAsJsonObject());
+            assertEquals(JsonParser.parseString("[100,50]"), snapshot.getAsJsonObject("entryContext").get("fixedShares"));
+            args.get(1).getAsJsonObject().getAsJsonArray("fixedShares").add(200);
+            assertEquals(JsonParser.parseString("[100,50]"), snapshot.getAsJsonObject("entryContext").get("fixedShares"));
+            return;
+        }
+        fail("missing execution-input fixture");
+    }
+
+    @Test void nativePanelUsesConfiguredShareOptionsAndHidesThemForEmptyList() {
+        var view = JsonParser.parseString("{\"type\":\"account_ready\",\"symbol\":\"AAPL\",\"timestamp\":1,\"plan\":{\"fixedShares\":[100,50],\"long\":{\"gapAndGoPlan\":{\"planConfigs\":{},\"support\":{\"low\":9,\"high\":10}}},\"short\":{}}}").getAsJsonObject();
+        for (boolean empty : new boolean[]{false, true}) {
+            if (empty) view.getAsJsonObject("plan").add("fixedShares", new JsonArray());
+            var config = com.bookmap.plugin.rong.miniviteapp.core.controllers.NativeViews.project(view).get(0);
+            var expected = JsonParser.parseString("[\"1 R\",\"0.5 R\",\"0.3 R\",\"0.2 R\",\"0.1 R\"]").getAsJsonArray();
+            if (!empty) { expected.add("100 sh"); expected.add("50 sh"); }
+            assertEquals(expected, config.getAsJsonArray("tradebooks").get(0).getAsJsonObject().getAsJsonArray("entryMethods"));
+        }
+    }
+
+    @Test void configuredSharesUseTenPartialsForBothSidesAndOrderTypes() {
+        for (int quantity : new int[]{50, 100, 75}) for (boolean isLong : new boolean[]{true, false}) for (boolean market : new boolean[]{true, false}) {
+            JsonObject state = entryState();
+            state.addProperty("batchCount", 5);
+            JsonObject context = state.getAsJsonObject("entryContext");
+            context.addProperty("customEntryPrice", 10);
+            context.addProperty("fixedQuantity", 999);
+            context.addProperty("maxQuantity", 20);
+            context.addProperty("liquidityScale", 0.5);
+            context.addProperty("availableBuyingPower", 1);
+            context.add("fixedShares", JsonParser.parseString("[50,100,75]"));
+            JsonObject action = new JsonObject();
+            action.addProperty("tradebook_id", isLong ? "RangeBoundBidReversal" : "RangeBoundOfferReversal");
+            action.addProperty("entry_method", quantity + " sh");
+            action.addProperty("use_market_order", market);
+            var plan = EntryHandler.handleEntry(new Snapshot(state), action, "");
+            JsonObject entry = plan.entry.getAsJsonObject("submitEntryResult");
+            assertEquals(quantity, entry.get("totalQuantity").getAsInt());
+            JsonArray targets = entry.getAsJsonArray("profitTargets");
+            assertEquals(10, targets.size());
+            int total = 0;
+            for (var item : targets) { double size = item.getAsJsonObject().get("quantity").getAsDouble(); assertTrue(size > 0 && size == Math.floor(size)); total += size; }
+            assertEquals(quantity, total);
+            assertEquals(10, plan.entry.getAsJsonObject("basePlan").getAsJsonObject("planConfigs").get("sizingCount").getAsInt());
+        }
+    }
+
+    @Test void unconfiguredSharesCannotEnter() {
+        JsonObject action = JsonParser.parseString("{\"tradebook_id\":\"RangeBoundBidReversal\",\"entry_method\":\"50 sh\"}").getAsJsonObject();
+        assertEquals("unconfigured fixed shares", assertThrows(IllegalArgumentException.class,
+                () -> EntryHandler.handleEntry(new Snapshot(entryState()), action, "")).getMessage());
+    }
+
     private JsonObject entryState() {
         return JsonParser.parseReader(new InputStreamReader(getClass().getResourceAsStream("/direct-entry-fixtures.json"), StandardCharsets.UTF_8))
                 .getAsJsonArray().get(0).getAsJsonObject().getAsJsonObject("state").deepCopy();

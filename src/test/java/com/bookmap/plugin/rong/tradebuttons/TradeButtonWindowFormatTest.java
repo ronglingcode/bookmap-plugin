@@ -12,6 +12,22 @@ import org.junit.jupiter.api.Test;
 import com.bookmap.plugin.rong.SignalWebSocketServer;
 
 class TradeButtonWindowFormatTest {
+    @Test void riskAndShareButtonsEachOccupyOneFullWidthRow() {
+        var panel = new javax.swing.JPanel(new java.awt.GridLayout(0, 1, 0, 6));
+        TradeButtonWindow.appendEntryRows(panel, Arrays.asList(new JButton("1 R"), new JButton("0.5 R"), new JButton("0.3 R"), new JButton("0.2 R"), new JButton("0.1 R")), 5);
+        TradeButtonWindow.appendEntryRows(panel, Arrays.asList(new JButton("50 sh"), new JButton("100 sh")), 2);
+        panel.setSize(540, 120); panel.doLayout();
+        assertEquals(2, panel.getComponentCount());
+        assertEquals(5, ((javax.swing.JPanel) panel.getComponent(0)).getComponentCount());
+        assertEquals(2, ((javax.swing.JPanel) panel.getComponent(1)).getComponentCount());
+        for (var component : panel.getComponents()) {
+            var row = (javax.swing.JPanel) component; row.doLayout();
+            assertEquals(panel.getWidth(), row.getWidth());
+            var last = row.getComponent(row.getComponentCount() - 1);
+            org.junit.jupiter.api.Assertions.assertTrue(Math.abs(row.getWidth() - last.getX() - last.getWidth()) <= 2);
+        }
+    }
+
 
     @Test
     void formatsLargestSizesCompactlyForThresholdLabel() {

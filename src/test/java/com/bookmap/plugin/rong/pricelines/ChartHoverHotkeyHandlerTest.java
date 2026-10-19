@@ -26,6 +26,30 @@ import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 
 class ChartHoverHotkeyHandlerTest {
+    @Test void bothEntryHotkeysUseTheSelectedFixedSharesWithTenPartials() {
+        SignalWebSocketServer server = new SignalWebSocketServer(0, 90);
+        server.getHotkeyRiskSelection().setFixedShareMethods("AAPL", List.of("50 sh", "100 sh"));
+        JsonObject fixture = JsonParser.parseReader(new InputStreamReader(getClass().getResourceAsStream("/direct-entry-fixtures.json"), StandardCharsets.UTF_8))
+                .getAsJsonArray().get(0).getAsJsonObject();
+        for (boolean isLong : new boolean[]{true, false}) for (String method : List.of("50 sh", "100 sh")) {
+            String id = isLong ? "RangeBoundBidReversal" : "RangeBoundOfferReversal";
+            TradebookButtonGroup tradebook = new TradebookButtonGroup(id, "reversal", isLong, id, "reversal", List.of("1 R", "50 sh", "100 sh"));
+            server.getHotkeyRiskSelection().setEntryMethod("AAPL", method);
+            var state = fixture.getAsJsonObject("state").deepCopy();
+            state.getAsJsonObject("entryContext").add("fixedShares", JsonParser.parseString("[50,100]"));
+            state.addProperty("batchCount", 5);
+            var action = fixture.getAsJsonObject("action").deepCopy();
+            action.addProperty("symbol", "AAPL@DXFEED");
+            action.addProperty("source", "bookmap_chart_hotkey");
+            action.addProperty("price", 10);
+            ChartHoverHotkeyHandler.addWallReversalEntryFields(action, tradebook, isLong, server);
+            assertEquals(method, action.get("entry_method").getAsString());
+            var plan = EntryHandler.handleEntry(new Snapshot(state), action, isLong ? "KeyB" : "KeyS");
+            assertEquals(Integer.parseInt(method.split(" ")[0]), plan.entry.getAsJsonObject("submitEntryResult").get("totalQuantity").getAsInt());
+            assertEquals(10, plan.entry.getAsJsonObject("submitEntryResult").getAsJsonArray("profitTargets").size());
+        }
+    }
+
 
     @Test
     void bothEntryDirectionsUseSelectedRiskInNativePlansInsteadOfFirstButtonSize() {

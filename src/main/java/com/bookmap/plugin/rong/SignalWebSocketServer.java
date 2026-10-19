@@ -816,6 +816,9 @@ public class SignalWebSocketServer extends WebSocketServer {
 
         List<TradebookButtonGroup> immutableTradebooks = Collections.unmodifiableList(tradebooks);
         symbolToTradebooks.put(symbol, immutableTradebooks);
+        List<String> methods = new ArrayList<>();
+        for (TradebookButtonGroup tradebook : immutableTradebooks) methods.addAll(tradebook.getEntryMethods());
+        hotkeyRiskSelection.setFixedShareMethods(symbol, methods);
         notifyTradeButtonListeners(symbol, immutableTradebooks);
     }
 

@@ -1,6 +1,9 @@
 package com.bookmap.plugin.rong.miniviteapp.core.controllers;
 
 import com.bookmap.plugin.rong.miniviteapp.core.algorithms.TakeProfit;
+import com.bookmap.plugin.rong.miniviteapp.core.algorithms.EntrySizing;
+import com.google.gson.JsonPrimitive;
+import static com.bookmap.plugin.rong.miniviteapp.models.DomainJson.array;
 import com.bookmap.plugin.rong.miniviteapp.models.Models;
 import com.bookmap.plugin.rong.miniviteapp.models.Models.*;
 import com.bookmap.plugin.rong.miniviteapp.core.tradebooks.BookmapWallReversal;
@@ -60,6 +63,12 @@ public final class EntryHandler {
         Models.require(Models.positive(entry) && Models.positive(stop), "invalid entry or protective stop");
         BookmapWallReversal.checkEntryPrice(definition, entry, isLong);
         String method = field(action, "entry_method", "entryMethod");
+        long requestedShares = EntrySizing.fixedShares(method);
+        if (requestedShares > 0) {
+            var methods = EntrySizing.entryMethods(
+                    array(context, "fixedShares"));
+            Models.require(methods.contains(new JsonPrimitive(requestedShares + " sh")), "unconfigured fixed shares");
+        }
         double methodMultiplier = 1;
         var match = RISK_METHOD.matcher(method.trim());
         if (match.find()) {

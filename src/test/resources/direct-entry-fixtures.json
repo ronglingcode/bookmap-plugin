@@ -2504,7 +2504,7 @@
     }
   },
   {
-    "name": "half risk fixed quantity keeps ten pairs",
+    "name": "half risk button ignores manual fixed quantity",
     "state": {
       "symbol": "AAPL",
       "revision": 1,
@@ -2594,7 +2594,7 @@
     "error": false,
     "multiplier": 0.5,
     "count": 10,
-    "shares": 23,
+    "shares": 980,
     "requests": [
       {
         "method": "POST",
@@ -2610,7 +2610,7 @@
                 "symbol": "AAPL"
               },
               "instruction": "BUY",
-              "quantity": 23
+              "quantity": 980
             }
           ],
           "orderType": "STOP",
@@ -2631,7 +2631,7 @@
                         "symbol": "AAPL"
                       },
                       "instruction": "SELL",
-                      "quantity": 2
+                      "quantity": 98
                     }
                   ],
                   "orderType": "STOP",
@@ -2649,12 +2649,12 @@
                         "symbol": "AAPL"
                       },
                       "instruction": "SELL",
-                      "quantity": 2
+                      "quantity": 98
                     }
                   ],
                   "orderType": "LIMIT",
                   "orderStrategyType": "SINGLE",
-                  "price": 11.05
+                  "price": 11.03
                 }
               ]
             },
@@ -2672,7 +2672,7 @@
                         "symbol": "AAPL"
                       },
                       "instruction": "SELL",
-                      "quantity": 3
+                      "quantity": 98
                     }
                   ],
                   "orderType": "STOP",
@@ -2690,12 +2690,12 @@
                         "symbol": "AAPL"
                       },
                       "instruction": "SELL",
-                      "quantity": 3
+                      "quantity": 98
                     }
                   ],
                   "orderType": "LIMIT",
                   "orderStrategyType": "SINGLE",
-                  "price": 11.57
+                  "price": 11.54
                 }
               ]
             },
@@ -2713,7 +2713,7 @@
                         "symbol": "AAPL"
                       },
                       "instruction": "SELL",
-                      "quantity": 3
+                      "quantity": 98
                     }
                   ],
                   "orderType": "STOP",
@@ -2731,12 +2731,12 @@
                         "symbol": "AAPL"
                       },
                       "instruction": "SELL",
-                      "quantity": 3
+                      "quantity": 98
                     }
                   ],
                   "orderType": "LIMIT",
                   "orderStrategyType": "SINGLE",
-                  "price": 11.57
+                  "price": 11.54
                 }
               ]
             },
@@ -2754,7 +2754,7 @@
                         "symbol": "AAPL"
                       },
                       "instruction": "SELL",
-                      "quantity": 3
+                      "quantity": 98
                     }
                   ],
                   "orderType": "STOP",
@@ -2772,12 +2772,12 @@
                         "symbol": "AAPL"
                       },
                       "instruction": "SELL",
-                      "quantity": 3
+                      "quantity": 98
                     }
                   ],
                   "orderType": "LIMIT",
                   "orderStrategyType": "SINGLE",
-                  "price": 11.57
+                  "price": 11.54
                 }
               ]
             },
@@ -2795,7 +2795,7 @@
                         "symbol": "AAPL"
                       },
                       "instruction": "SELL",
-                      "quantity": 2
+                      "quantity": 98
                     }
                   ],
                   "orderType": "STOP",
@@ -2813,12 +2813,12 @@
                         "symbol": "AAPL"
                       },
                       "instruction": "SELL",
-                      "quantity": 2
+                      "quantity": 98
                     }
                   ],
                   "orderType": "LIMIT",
                   "orderStrategyType": "SINGLE",
-                  "price": 11.57
+                  "price": 11.54
                 }
               ]
             },
@@ -2836,7 +2836,7 @@
                         "symbol": "AAPL"
                       },
                       "instruction": "SELL",
-                      "quantity": 2
+                      "quantity": 98
                     }
                   ],
                   "orderType": "STOP",
@@ -2854,12 +2854,12 @@
                         "symbol": "AAPL"
                       },
                       "instruction": "SELL",
-                      "quantity": 2
+                      "quantity": 98
                     }
                   ],
                   "orderType": "LIMIT",
                   "orderStrategyType": "SINGLE",
-                  "price": 11.57
+                  "price": 11.54
                 }
               ]
             },
@@ -2877,7 +2877,7 @@
                         "symbol": "AAPL"
                       },
                       "instruction": "SELL",
-                      "quantity": 2
+                      "quantity": 98
                     }
                   ],
                   "orderType": "STOP",
@@ -2895,12 +2895,12 @@
                         "symbol": "AAPL"
                       },
                       "instruction": "SELL",
-                      "quantity": 2
+                      "quantity": 98
                     }
                   ],
                   "orderType": "LIMIT",
                   "orderStrategyType": "SINGLE",
-                  "price": 11.57
+                  "price": 11.54
                 }
               ]
             },
@@ -2918,7 +2918,7 @@
                         "symbol": "AAPL"
                       },
                       "instruction": "SELL",
-                      "quantity": 2
+                      "quantity": 98
                     }
                   ],
                   "orderType": "STOP",
@@ -2936,12 +2936,12 @@
                         "symbol": "AAPL"
                       },
                       "instruction": "SELL",
-                      "quantity": 2
+                      "quantity": 98
                     }
                   ],
                   "orderType": "LIMIT",
                   "orderStrategyType": "SINGLE",
-                  "price": 11.57
+                  "price": 11.54
                 }
               ]
             },
@@ -2959,7 +2959,7 @@
                         "symbol": "AAPL"
                       },
                       "instruction": "SELL",
-                      "quantity": 2
+                      "quantity": 98
                     }
                   ],
                   "orderType": "STOP",
@@ -2977,12 +2977,12 @@
                         "symbol": "AAPL"
                       },
                       "instruction": "SELL",
-                      "quantity": 2
+                      "quantity": 98
                     }
                   ],
                   "orderType": "LIMIT",
                   "orderStrategyType": "SINGLE",
-                  "price": 11.57
+                  "price": 11.54
                 }
               ]
             },
@@ -3000,7 +3000,7 @@
                         "symbol": "AAPL"
                       },
                       "instruction": "SELL",
-                      "quantity": 2
+                      "quantity": 98
                     }
                   ],
                   "orderType": "STOP",
@@ -3018,12 +3018,12 @@
                         "symbol": "AAPL"
                       },
                       "instruction": "SELL",
-                      "quantity": 2
+                      "quantity": 98
                     }
                   ],
                   "orderType": "LIMIT",
                   "orderStrategyType": "SINGLE",
-                  "price": 11.57
+                  "price": 11.54
                 }
               ]
             }
@@ -3038,47 +3038,47 @@
       "stopOutPrice": 9.5,
       "multiplier": 0.5,
       "submitEntryResult": {
-        "totalQuantity": 23,
+        "totalQuantity": 980,
         "profitTargets": [
           {
-            "target": 11.05,
-            "quantity": 2
+            "target": 11.03,
+            "quantity": 98
           },
           {
-            "target": 11.57,
-            "quantity": 3
+            "target": 11.54,
+            "quantity": 98
           },
           {
-            "target": 11.57,
-            "quantity": 3
+            "target": 11.54,
+            "quantity": 98
           },
           {
-            "target": 11.57,
-            "quantity": 3
+            "target": 11.54,
+            "quantity": 98
           },
           {
-            "target": 11.57,
-            "quantity": 2
+            "target": 11.54,
+            "quantity": 98
           },
           {
-            "target": 11.57,
-            "quantity": 2
+            "target": 11.54,
+            "quantity": 98
           },
           {
-            "target": 11.57,
-            "quantity": 2
+            "target": 11.54,
+            "quantity": 98
           },
           {
-            "target": 11.57,
-            "quantity": 2
+            "target": 11.54,
+            "quantity": 98
           },
           {
-            "target": 11.57,
-            "quantity": 2
+            "target": 11.54,
+            "quantity": 98
           },
           {
-            "target": 11.57,
-            "quantity": 2
+            "target": 11.54,
+            "quantity": 98
           }
         ],
         "isSingleOrder": false,
@@ -12486,7 +12486,7 @@
     },
     "action": {
       "tradebook_id": "RangeBoundBidReversal",
-      "entry_method": "1 R",
+      "entry_method": "",
       "symbol": "AAPL",
       "priceUnit": "real"
     },
@@ -14231,7 +14231,7 @@
     },
     "action": {
       "tradebook_id": "RangeBoundBidReversal",
-      "entry_method": "1 R",
+      "entry_method": "",
       "symbol": "AAPL",
       "priceUnit": "real"
     },
