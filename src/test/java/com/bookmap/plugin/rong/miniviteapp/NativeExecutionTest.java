@@ -13,7 +13,7 @@ import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.*;
 
 class NativeExecutionTest {
-    @Test void strictBlocksMarketEntriesButPermitsBuyAndSellStopsAtTheirSubmittedTrigger() throws Exception {
+    @Test void strictBlocksMarketAndStopEntriesWhenOnlyUnfilledOutsideWallsAreAvailable() throws Exception {
         for (boolean isLong : new boolean[]{true, false}) for (boolean market : new boolean[]{true, false}) {
             try (var rig = new Rig()) {
                 JsonObject action = rig.connectEntry();
@@ -23,17 +23,9 @@ class NativeExecutionTest {
                 rig.state.getAsJsonObject("entryContext").add("bookmapSizeCap", cap);
                 rig.updateState(System.currentTimeMillis()); rig.mutationStatus = 201;
                 rig.engine.route(action);
-                if (market) {
-                    assertEquals(0, rig.mutations.get());
-                    assertTrue(rig.events.stream().anyMatch(event -> event.get("type").getAsString().equals("execution_blocked")
-                            && event.get("reason").getAsString().contains("STRICT: ENTRY BLOCKED")));
-                } else {
-                    JsonObject result = rig.finish(); assertEquals("accepted", result.get("outcome").getAsString());
-                    assertEquals(1, rig.mutations.get());
-                    assertEquals("STOP", rig.bodies.get(0).get("orderType").getAsString());
-                    assertEquals(isLong ? 10.01 : 9.49, result.getAsJsonObject("entry").getAsJsonObject("bookmapSizeCap").get("qualificationStopPrice").getAsDouble());
-                    assertEquals(5000, result.getAsJsonObject("entry").getAsJsonObject("bookmapSizeCap").get("largestOrderSize").getAsInt());
-                }
+                assertEquals(0, rig.mutations.get());
+                assertTrue(rig.events.stream().anyMatch(event -> event.get("type").getAsString().equals("execution_blocked")
+                        && event.get("reason").getAsString().contains("STRICT: ENTRY BLOCKED")));
             }
         }
     }

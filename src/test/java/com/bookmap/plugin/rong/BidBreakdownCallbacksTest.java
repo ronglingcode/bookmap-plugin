@@ -30,7 +30,7 @@ class BidBreakdownCallbacksTest {
             } finally { painter.shutdown(); }
         });
     }
-    @Test void sharedEntryGateUnlocksOnRangeExpansionThenCallbacksConfirmAndReclaim() throws Exception {
+    @Test void sharedEntryGateRejectsCanceledWallsAndUnlocksOnlyOnAccumulatedExecutions() throws Exception {
         withIsolatedActivation(() -> {
             RongPlugin plugin = SignalComposerCallbacksTest.callbackPlugin();
             SignalWebSocketServer server = new SignalWebSocketServer(0, 90);
@@ -48,8 +48,13 @@ class BidBreakdownCallbacksTest {
                 plugin.onTimestamp(time); plugin.onSnapshotEnd(); plugin.onBbo(110, 1, 111, 1);
                 plugin.onDepth(true, 110, 4000); plugin.onDepth(false, 112, 5000);
                 plugin.onTrade(110, 1, null); assertNull(monitor.snapshot().nextBidTick);
-                // The required 5K order lies outside the traded range until this print.
-                plugin.onTrade(112, 1, null); assertTrue(monitor.snapshot().liquid);
+                plugin.onDepth(false, 112, 0); plugin.onTrade(113, 10000, null);
+                assertFalse(monitor.snapshot().liquid); // Crossing a canceled wall cannot unlock.
+                plugin.onDepth(false, 112, 10000); plugin.onBbo(111, 1, 112, 1);
+                plugin.onTrade(112, 2000, null); assertFalse(monitor.snapshot().liquid);
+                plugin.onTrade(112, 3000, null); assertTrue(monitor.snapshot().liquid);
+                assertEquals(5000, server.entrySizeCap("TEST").get("largestOrderSize").getAsInt());
+                plugin.onBbo(110, 1, 111, 1);
                 assertNull(monitor.snapshot().nextBidTick); // A 4K bid is too small even with entries unlocked.
                 plugin.onDepth(true, 110, 4500); assertNull(monitor.snapshot().nextBidTick);
                 plugin.onTimestamp(time + 1_000_000_000L); assertNull(monitor.snapshot().nextBidTick);
@@ -63,7 +68,9 @@ class BidBreakdownCallbacksTest {
                 plugin.onTimestamp(time + 1); assertTrue(monitor.snapshot().entries.isEmpty());
                 assertFalse(field("patternMonitorSnapshotComplete").getBoolean(plugin));
                 plugin.onDepth(true, 110, 5000); plugin.onTrade(110, 1, null);
-                plugin.onSnapshotEnd(); plugin.onBbo(110, 1, 111, 1); assertNull(monitor.snapshot().nextBidTick);
+                plugin.onSnapshotEnd(); plugin.onBbo(110, 1, 111, 1);
+                assertFalse(monitor.snapshot().liquid);
+                plugin.onTrade(110, 5000, null); assertNull(monitor.snapshot().nextBidTick);
                 plugin.onTimestamp(time + 1_000_000_002L); assertEquals(110, monitor.snapshot().nextBidTick);
             } finally { painter.shutdown(); server.shutdown(); field("sharedServer").set(null, previousServer); }
         });

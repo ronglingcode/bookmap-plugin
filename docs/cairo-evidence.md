@@ -46,7 +46,7 @@ Optional capture writes `%USERPROFILE%\bmtrader\patterns\patterns-*.jsonl`, rota
 
 ## Verify and run
 
-1. `gradlew.bat build` produces `build/libs/lingrong1988_bmtrader_1.34.jar`; select that JAR in Bookmap and reattach charts.
+1. `gradlew.bat build` produces `build/libs/lingrong1988_bmtrader_1.35.jar`; select that JAR in Bookmap and reattach charts.
 2. Rebuild/restart Cairo with `npm run build`. Keep `sourceMode: replay` for replay tests; restore the intended mode/native-trading preference before live use.
 3. `CairoPatternSnapshotTest` generates `build/fixtures/cairo-patterns.jsonl` from actual callback-driven detection/composition. From Cairo, `node --experimental-strip-types scripts/verify-bookmap-bridge.mjs` verifies Java output through a loopback WebSocket, Cairo tools and annotation validation without model/broker calls.
 4. `node scripts/replay-bookmap-evidence.mjs --file <patterns-SESSION-0.jsonl> --speed 1` replays aggregates on `127.0.0.1:8765`; `--port` chooses another port. Captured modes are overridden to replay.

@@ -5,103 +5,91 @@ import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.*;
 
 class SessionOrderSizeTrackerTest {
+    static final long OPEN = time("2026-10-16T09:30:00");
     private static long time(String value) {
-        return LocalDateTime.parse(value).atZone(ZoneId.of("America/New_York")).toInstant().toEpochMilli() * 1_000_000;
+        return LocalDateTime.parse(value).atZone(ZoneId.of("America/New_York")).toInstant().toEpochMilli() * 1_000_000L;
     }
-    @Test void futureRuntimeRangeCannotQualifyAnOrderOutsideFiveSecondChartRange() {
-        SignalWebSocketServer server = new SignalWebSocketServer(0, 0);
-        OrderBookState book = new OrderBookState(); server.registerSymbol("TEST", book, .01);
-        server.setSessionLevelsProvider(symbol -> com.google.gson.JsonParser.parseString(
-                "{\"sessionDate\":\"2026-10-16\",\"highOfDay\":370.58,\"lowOfDay\":356.33,\"openPrice\":369.15}").getAsJsonObject());
-        long open = time("2026-10-16T09:30:00");
-        server.observeSessionTime("TEST", open);
-        server.updateRegularSessionHighLow("TEST", 369.15, open);
-        server.observeSessionDepth("TEST", false, 37050, 7600, open);
-        server.observeSessionDepth("TEST", true, 36800, 5000, open);
-        server.observeSessionDepth("TEST", false, 36930, 2000, open);
-        server.observeSessionTime("TEST", open + 5_000_000_000L);
-        server.updateRegularSessionHighLow("TEST", 369.30, open + 5_000_000_000L);
-        assertEquals(2000, server.entrySizeCap("TEST").get("largestOrderSize").getAsInt());
-        assertEquals(369.15, server.getRegularSessionHighLow("TEST").getLowOfDay());
-        assertEquals(369.30, server.getRegularSessionHighLow("TEST").getHighOfDay());
-        assertEquals(369.30, server.entrySizeCap("TEST").get("largestOrderPrice").getAsDouble());
-        assertEquals("offer", server.entrySizeCap("TEST").get("largestOrderSide").getAsString());
-        assertEquals(open / 1_000_000L, server.entrySizeCap("TEST").get("largestOrderObservedAt").getAsLong());
-        server.updateRegularSessionHighLow("TEST", 370.50, open + 5_000_000_000L);
-        assertEquals(7600, server.entrySizeCap("TEST").get("largestOrderSize").getAsInt());
-    }
-
-    @Test void replayRewindDropsFutureMaximaAndDoesNotSeedFromStaleSharedDepth() {
-        OrderBookState book = new OrderBookState(); SessionOrderSizeTracker tracker = new SessionOrderSizeTracker();
-        long open = time("2026-10-16T09:30:00");
-        tracker.onDepth(false, 369.30, 7600, open + 60_000_000_000L, book, .01);
-        book.update(false, 36930, 7600);
-        tracker.advance(open + 5_000_000_000L, book, .01);
-        assertEquals(0, tracker.largest("2026-10-16", 369, 370));
-        tracker.onDepth(true, 369.15, 2000, open + 5_000_000_000L, book, .01);
-        assertEquals(2000, tracker.largest("2026-10-16", 369, 370));
-        // A seek back into premarket must still count fresh resting liquidity at the next open.
-        tracker.advance(open - 1_000_000_000L, book, .01);
-        tracker.onDepth(false, 369.30, 3000, open - 1_000_000_000L, book, .01);
-        tracker.advance(open, book, .01);
-        assertEquals(3000, tracker.largest("2026-10-16", 369, 370));
-    }
-    @Test void invalidReplayDepthPricesCannotCrashCallbacksOrOpeningSnapshot() {
-        SignalWebSocketServer server = new SignalWebSocketServer(0, 0);
-        OrderBookState book = new OrderBookState(); server.registerSymbol("TEST", book, .01);
-        long open = time("2026-10-16T09:30:00");
-        for (long timestamp : new long[]{open - 1, open}) {
-            for (int price : new int[]{0, -1, Integer.MIN_VALUE}) {
-                assertDoesNotThrow(() -> server.observeSessionDepth("TEST", true, price, 100000, timestamp));
-                assertDoesNotThrow(() -> server.observeSessionDepth("TEST", true, price, 0, timestamp));
-            }
+    static class Rig {
+        final SignalWebSocketServer server = new SignalWebSocketServer(0, 0);
+        final OrderBookState book = new OrderBookState();
+        Rig() { server.registerSymbol("TEST", book, .01); }
+        void depth(boolean bid, int price, int size, long time) {
+            server.observeSessionDepth("TEST", bid, price, size, time); book.update(bid, price, size);
         }
-        // Replay book state may already contain invalid levels before the first regular-session event.
-        book.update(true, 0, 100000); book.update(false, -1, 200000);
-        book.update(true, 10000, 2000);
-        assertDoesNotThrow(() -> server.observeSessionTime("TEST", open));
-        server.updateRegularSessionHighLow("TEST", 100, open);
-        assertEquals(2000, server.entrySizeCap("TEST").get("largestOrderSize").getAsInt());
-        assertDoesNotThrow(() -> server.observeSessionDepth("TEST", true, 10000, 5000, open + 1));
-        assertEquals(5000, server.entrySizeCap("TEST").get("largestOrderSize").getAsInt());
+        void trade(int price, int size, Boolean buy, long time) { server.observeSessionTrade("TEST", price, size, buy, time, true); }
+        long largest() { return server.entrySizeCap("TEST").get("largestOrderSize").getAsLong(); }
     }
-    @Test void removedOrdersBecomeEligibleWhenRangeExpandsIncludingBothBoundaries() {
-        OrderBookState book = new OrderBookState(); SessionOrderSizeTracker tracker = new SessionOrderSizeTracker();
-        long open = time("2026-10-16T09:30:00");
-        tracker.onDepth(true, 99, 10000, open, book, .01);
-        tracker.onDepth(true, 99, 0, open + 1, book, .01);
-        tracker.onDepth(true, 101, 5000, open + 2, book, .01);
-        tracker.onDepth(true, 103, 15000, open + 3, book, .01);
-        assertEquals(5000, tracker.largest("2026-10-16", 100, 102));
-        assertEquals(10000, tracker.largest("2026-10-16", 99, 102));
-        assertEquals(15000, tracker.largest("2026-10-16", 99, 103));
-        tracker.onDepth(true, 103, 100, open + 4, book, .01);
-        assertEquals(15000, tracker.largest("2026-10-16", 99, 103));
+    @Test void canceledLargeWallAndLaterCrossingNeverCountAsFills() {
+        Rig rig = new Rig(); rig.depth(true, 10000, 20000, OPEN);
+        assertEquals(0, rig.largest());
+        rig.depth(true, 10000, 0, OPEN + 1);
+        rig.server.updateRegularSessionHighLow("TEST", 99, OPEN + 2);
+        rig.trade(9900, 30000, false, OPEN + 2);
+        rig.server.updateRegularSessionHighLow("TEST", 101, OPEN + 3);
+        rig.trade(10100, 30000, true, OPEN + 3);
+        assertEquals(0, rig.largest());
     }
-    @Test void premarketClearedOrdersAndAfterHoursDoNotCountAndNextDayResets() {
-        OrderBookState book = new OrderBookState(); SessionOrderSizeTracker tracker = new SessionOrderSizeTracker();
-        tracker.onDepth(true, 100, 50000, time("2026-10-16T09:29:59"), book, .01);
-        book.update(true, 10000, 2000);
-        tracker.advance(time("2026-10-16T09:30:00"), book, .01);
-        assertEquals(2000, tracker.largest("2026-10-16", 100, 100));
-        tracker.onDepth(true, 100, 100000, time("2026-10-16T16:00:00"), book, .01);
-        assertEquals(2000, tracker.largest("2026-10-16", 100, 100));
-        tracker.advance(time("2026-10-19T09:00:00"), book, .01);
-        assertEquals(0, tracker.largest("2026-10-16", 100, 100));
-        assertEquals(0, tracker.largest("2026-10-19", 100, 100));
+    @Test void partialExecutionsAccumulateAtOneWallAndEqualityQualifies() {
+        Rig rig = new Rig(); rig.depth(false, 10000, 10000, OPEN);
+        rig.trade(10000, 2000, true, OPEN + 1); assertEquals(2000, rig.largest());
+        rig.depth(false, 10000, 8000, OPEN + 2);
+        rig.trade(10000, 3000, true, OPEN + 3); assertEquals(5000, rig.largest());
+        assertEquals(1, rig.server.entrySizeCap("TEST").get("maxRiskMultiple").getAsDouble());
+        assertEquals("offer", rig.server.entrySizeCap("TEST").get("largestOrderSide").getAsString());
+        rig.depth(false, 10000, 0, OPEN + 4); assertEquals(5000, rig.largest());
+        assertEquals((OPEN + 3) / 1_000_000L, rig.server.entrySizeCap("TEST").get("largestOrderObservedAt").getAsLong());
     }
-    @Test void serverUsesUnfilteredDepthAndLiveRangeRatherThanOnlyTargetWalls() {
-        SignalWebSocketServer server = new SignalWebSocketServer(0, 0);
-        OrderBookState book = new OrderBookState(); server.registerSymbol("TEST", book, .01);
-        long open = time("2026-10-16T09:30:00");
-        server.observeSessionDepth("TEST", true, 9900, 10000, open);
-        server.observeSessionDepth("TEST", true, 9900, 0, open + 1);
-        server.observeSessionDepth("TEST", true, 10000, 2000, open + 2);
-        server.updateRegularSessionHighLow("TEST", 100, open + 3);
-        assertEquals(.4, server.entrySizeCap("TEST").get("maxRiskMultiple").getAsDouble());
-        server.updateRegularSessionHighLow("TEST", 99, open + 4);
-        assertEquals(2, server.entrySizeCap("TEST").get("maxRiskMultiple").getAsDouble());
-        server.unregisterSymbol("TEST");
-        assertEquals(0, server.entrySizeCap("TEST").get("maxRiskMultiple").getAsDouble());
+    @Test void cancelAndRefillStartsANewEpisodeWithoutCombiningUnrelatedFills() {
+        Rig rig = new Rig(); rig.depth(true, 10000, 10000, OPEN);
+        rig.trade(10000, 2000, false, OPEN + 1); rig.depth(true, 10000, 0, OPEN + 2);
+        rig.depth(true, 10000, 5000, OPEN + 3); rig.trade(10000, 3000, false, OPEN + 4);
+        assertEquals(3000, rig.largest()); // 2K + 3K from separate episodes cannot unlock the 5K gate.
+        rig.trade(10000, 2000, false, OPEN + 5); assertEquals(5000, rig.largest());
+    }
+    @Test void differentSidesAndPricesCannotBeAddedTogether() {
+        Rig rig = new Rig(); rig.depth(true, 10000, 6000, OPEN); rig.depth(false, 10000, 6000, OPEN);
+        rig.depth(false, 10100, 6000, OPEN);
+        rig.trade(10000, 3000, false, OPEN + 1); rig.trade(10000, 3000, true, OPEN + 2);
+        rig.trade(10100, 3000, true, OPEN + 3); assertEquals(3000, rig.largest());
+    }
+    @Test void wrongSideAndUnattributedTradesDoNotCountButValidLevelOneCanAttribute() {
+        Rig rig = new Rig(); rig.depth(false, 10100, 10000, OPEN);
+        rig.trade(10100, 6000, false, OPEN + 1); rig.trade(10100, 6000, null, OPEN + 2); assertEquals(0, rig.largest());
+        rig.server.observeSessionBbo("TEST", 10000, 10100, OPEN + 3);
+        rig.trade(10100, 5000, null, OPEN + 4); assertEquals(5000, rig.largest());
+        rig.server.observeSessionBbo("TEST", 10100, 10100, OPEN + 5);
+        rig.trade(10100, 10000, null, OPEN + 6); assertEquals(5000, rig.largest());
+    }
+    @Test void depthBeforeTradeIsAcceptedBrieflyButLatePrintCannotReviveACanceledWall() {
+        Rig rig = new Rig(); rig.depth(true, 10000, 10000, OPEN); rig.depth(true, 10000, 0, OPEN + 1);
+        rig.trade(10000, 3000, false, OPEN + 2); assertEquals(3000, rig.largest());
+        rig.trade(10000, 4000, false, OPEN + 300_000_002L); assertEquals(3000, rig.largest());
+    }
+    @Test void onlyRegularSessionExecutionsCountAndNewDateResets() {
+        Rig rig = new Rig(); rig.depth(true, 10000, 10000, OPEN - 1);
+        rig.trade(10000, 9000, false, OPEN - 1); assertEquals(0, rig.largest());
+        rig.trade(10000, 2000, false, OPEN); assertEquals(2000, rig.largest());
+        rig.trade(10000, 9000, false, time("2026-10-16T16:00:00")); assertEquals(2000, rig.largest());
+        rig.trade(10000, 9000, false, time("2026-10-17T09:30:00")); assertEquals(0, rig.largest());
+        assertFalse(rig.server.entrySizeCap("TEST").get("available").getAsBoolean());
+        rig.server.observeSessionTime("TEST", time("2026-10-19T09:30:00")); assertEquals(0, rig.largest());
+    }
+    @Test void replaySeekClearsFutureExecutionsAndNeverSeedsStaleBook() {
+        Rig rig = new Rig(); rig.depth(true, 10000, 10000, OPEN + 60_000_000_000L);
+        rig.trade(10000, 5000, false, OPEN + 60_000_000_001L); assertEquals(5000, rig.largest());
+        rig.server.observeSessionTime("TEST", OPEN);
+        rig.trade(10000, 10000, false, OPEN + 1); assertEquals(0, rig.largest());
+        rig.depth(true, 10000, 4000, OPEN + 2); rig.trade(10000, 3000, false, OPEN + 3); assertEquals(3000, rig.largest());
+        rig.server.observeSessionTime("TEST", OPEN - 2);
+        rig.depth(true, 10000, 5000, OPEN - 1); rig.trade(10000, 5000, false, OPEN); assertEquals(5000, rig.largest());
+    }
+    @Test void preSnapshotAndInvalidTradesCannotUnlockAndSizesDoNotOverflowInt() {
+        Rig rig = new Rig(); rig.depth(true, 10000, 10000, OPEN);
+        rig.server.observeSessionTrade("TEST", 10000, 10000, false, OPEN, false); assertEquals(0, rig.largest());
+        for (int price : new int[]{0, -1}) rig.trade(price, 10000, false, OPEN);
+        rig.trade(10000, 0, false, OPEN); rig.trade(10000, -1, false, OPEN); assertEquals(0, rig.largest());
+        rig.trade(10000, Integer.MAX_VALUE, false, OPEN + 1); rig.trade(10000, Integer.MAX_VALUE, false, OPEN + 2);
+        assertEquals(2L * Integer.MAX_VALUE, rig.largest());
+        rig.server.unregisterSymbol("TEST"); assertEquals(0, rig.largest());
     }
 }

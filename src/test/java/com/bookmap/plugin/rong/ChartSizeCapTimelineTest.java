@@ -43,6 +43,7 @@ class ChartSizeCapTimelineTest {
                 chart.set(open + 5000); wall.set(chart.get() + delay);
                 server.observeSessionTime("TEST", chart.get() * 1_000_000L);
                 server.updateRegularSessionHighLow("TEST", 369.30, chart.get() * 1_000_000L);
+                server.observeSessionTrade("TEST", 36930, 5000, true, chart.get() * 1_000_000L, true);
                 JsonObject cap = server.entrySizeCap("TEST");
                 assertEquals(5000, cap.get("largestOrderSize").getAsInt());
                 assertEquals(1.0 / 3, cap.get("maxRiskMultiple").getAsDouble());
@@ -51,7 +52,7 @@ class ChartSizeCapTimelineTest {
                 chart.set(open + 6000); wall.set(chart.get() + delay);
                 server.observeSessionTime("TEST", chart.get() * 1_000_000L);
                 server.updateRegularSessionHighLow("TEST", 368, chart.get() * 1_000_000L);
-                assertEquals(2.0 / 3, server.entrySizeCap("TEST").get("maxRiskMultiple").getAsDouble());
+                assertEquals(1.0 / 3, server.entrySizeCap("TEST").get("maxRiskMultiple").getAsDouble()); // Canceled bid never filled.
                 assertEquals(368, server.getRegularSessionHighLow("TEST").getLowOfDay());
             }
         }

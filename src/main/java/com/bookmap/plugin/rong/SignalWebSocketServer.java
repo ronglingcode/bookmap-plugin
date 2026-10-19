@@ -67,44 +67,48 @@ public class SignalWebSocketServer extends WebSocketServer {
         if (book == null || pips == null || !Double.isFinite(pips) || pips <= 0) return;
         sessionOrderSizes.computeIfAbsent(clean, ignored -> new SessionOrderSizeTracker()).advance(timestampNs, book, pips);
     }
+    public void observeSessionTrade(String symbol, int price, int size, Boolean buyAggressor, long timestampNs, boolean ready) {
+        if (price <= 0 || size <= 0) return;
+        String clean = SymbolUtils.cleanSymbol(symbol);
+        OrderBookState book = symbolToOrderBook.get(clean); Double pips = symbolToPips.get(clean);
+        if (book == null || pips == null || !Double.isFinite(pips) || pips <= 0) return;
+        sessionOrderSizes.computeIfAbsent(clean, ignored -> new SessionOrderSizeTracker()).onTrade(
+                BookmapPriceNormalizer.toWirePrice(price, pips), size, buyAggressor, timestampNs, ready, book, pips);
+    }
+    public void observeSessionBbo(String symbol, int bid, int ask, long timestampNs) {
+        String clean = SymbolUtils.cleanSymbol(symbol);
+        OrderBookState book = symbolToOrderBook.get(clean); Double pips = symbolToPips.get(clean);
+        if (book == null || pips == null || !Double.isFinite(pips) || pips <= 0) return;
+        sessionOrderSizes.computeIfAbsent(clean, ignored -> new SessionOrderSizeTracker()).onBbo(
+                bid > 0 ? BookmapPriceNormalizer.toWirePrice(bid, pips) : Double.NaN,
+                ask > 0 ? BookmapPriceNormalizer.toWirePrice(ask, pips) : Double.NaN, timestampNs, book, pips);
+    }
     public JsonObject entrySizeCap(String symbol) {
         String clean = SymbolUtils.cleanSymbol(symbol);
         SessionOrderSizeTracker tracker = sessionOrderSizes.get(clean);
-        RegularSessionHighLowTracker.Snapshot day = getRegularSessionHighLow(clean);
-        RegularSessionHighLowTracker localTracker = symbolToRegularSessionHighLow.get(clean);
-        RegularSessionHighLowTracker.Snapshot localDay = localTracker == null ? null : localTracker.snapshot();
-        double low = day == null ? Double.NaN : day.getLowOfDay(), high = day == null ? Double.NaN : day.getHighOfDay();
-        if (day != null && localDay != null && day.getSessionDate().equals(localDay.getSessionDate())) {
-            low = Math.min(low, localDay.getLowOfDay()); high = Math.max(high, localDay.getHighOfDay());
-        }
-        SessionOrderSizeTracker.Observation counted = tracker == null || day == null ? null
-                : tracker.largestObservation(day.getSessionDate(), low, high);
-        int largest = counted == null ? 0 : counted.size;
         PremarketSizeThreshold policy = sizeThresholds.get(clean);
         int required = policy == null ? PremarketSizeThreshold.FALLBACK : policy.threshold();
-        JsonObject cap = new JsonObject(); cap.addProperty("largestOrderSize", largest);
-        cap.addProperty("mode", BookmapSizeCap.ACTIVE_MODE.name());
-        cap.addProperty("available", day != null);
-        cap.addProperty("requiredOrderSize", required); cap.addProperty("maxRiskMultiple", (double) largest / required);
+        JsonObject cap = new JsonObject();
+        // One coherent tracker snapshot serves entries, the Trade window, and Bid Breakdown.
+        if (tracker == null) { fillSizeCap(cap, null, false, "", required); }
+        else synchronized (tracker) {
+            fillSizeCap(cap, tracker.largestObservation(), tracker.available(), tracker.sessionDate(), required);
+        }
+        return cap;
+    }
+    private static void fillSizeCap(JsonObject cap, SessionOrderSizeTracker.Observation counted,
+            boolean available, String sessionDate, int required) {
+        long largest = counted == null ? 0 : counted.size;
+        cap.addProperty("largestOrderSize", largest); cap.addProperty("requiredOrderSize", required);
+        cap.addProperty("mode", BookmapSizeCap.ACTIVE_MODE.name()); cap.addProperty("available", available);
+        cap.addProperty("maxRiskMultiple", (double) largest / required);
+        cap.addProperty("sessionDate", sessionDate);
+        cap.addProperty("evidenceBasis", "wallExecutions");
         if (counted != null) {
             cap.addProperty("largestOrderPrice", counted.price);
             cap.addProperty("largestOrderSide", counted.isBid ? "bid" : "offer");
             cap.addProperty("largestOrderObservedAt", counted.timestampNs / 1_000_000L);
         }
-        if (day != null) {
-            cap.addProperty("sessionDate", day.getSessionDate());
-            cap.addProperty("rangeLow", low); cap.addProperty("rangeHigh", high);
-            for (boolean upper : new boolean[]{true, false}) {
-                JsonArray candidates = new JsonArray();
-                if (tracker != null) for (SessionOrderSizeTracker.Observation candidate : tracker.stopCandidates(day.getSessionDate(), low, high, upper)) {
-                    JsonObject value = new JsonObject(); value.addProperty("price", candidate.price); value.addProperty("size", candidate.size);
-                    value.addProperty("side", candidate.isBid ? "bid" : "offer"); value.addProperty("observedAt", candidate.timestampNs / 1_000_000L);
-                    candidates.add(value);
-                }
-                cap.add(upper ? "upperStopOrders" : "lowerStopOrders", candidates);
-            }
-        }
-        return cap;
     }
     public void registerSizeThreshold(String symbol, PremarketSizeThreshold threshold) { sizeThresholds.put(SymbolUtils.cleanSymbol(symbol), threshold); }
     public String premarketVolumeUnavailableReason(String symbol) {

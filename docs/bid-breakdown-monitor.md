@@ -6,12 +6,12 @@ It never submits an entry or stop order.
 
 The monitor waits for snapshot readiness, regular US equity hours
 (09:30 inclusive–16:00 exclusive, America/New_York, weekdays), and the existing
-strict entry liquidity condition: the largest qualifying session depth observation
-inside the actual traded session range must meet the symbol's premarket size
-threshold. It uses the same entry-size snapshot, including the existing premarket
-tiers, fallback, and equality rule. It does not use a hypothetical stop-entry range.
-The shared gate counts observed displayed liquidity, including levels subsequently
-removed; it does not establish that a particular exchange order was filled.
+strict entry liquidity condition: accumulated executions at one bid/offer wall
+since market open must meet the symbol's premarket size threshold. It uses the
+same filled-wall ledger as the entry rules, including premarket tiers, fallback,
+and equality. Canceled displayed size and later price crossings cannot qualify.
+Different wall episodes, prices, or sides are never added together. No prospective
+stop-trigger or session-range exception applies.
 See [the entry liquidity rule](premarket-size-threshold.md#entry-liquidity-rule).
 
 `bidBreakdown` and `falseBreakout` use the same `BidBreakdownMonitor` bid engine

@@ -721,6 +721,8 @@ public class RongPlugin implements CustomModuleAdapter,
         }
         if (sharedServer != null) {
             sharedServer.observeSessionTime(alias, lastTimestampNs);
+            sharedServer.observeSessionTrade(alias, priceTick, size, tradeInfo == null ? null : tradeInfo.isBidAggressor,
+                    lastTimestampNs, patternMonitorSnapshotComplete);
             sharedServer.updateRegularSessionHighLow(alias, realPrice, eventTimeNs);
         }
         if (bidBreakdownMonitor != null) {
@@ -782,6 +784,7 @@ public class RongPlugin implements CustomModuleAdapter,
     @Override
     public void onBbo(int bidPrice, int bidSize, int askPrice, int askSize) {
         if (!initialized) return;
+        if (sharedServer != null) sharedServer.observeSessionBbo(alias, bidPrice, askPrice, lastTimestampNs);
         if (falseBreakoutMonitor != null) {
             falseBreakoutMonitor.onBbo(bidPrice, askPrice, lastTimestampNs, patternMonitorSnapshotComplete);
             falseBreakoutPainter.refresh();

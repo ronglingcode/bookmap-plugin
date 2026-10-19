@@ -25,6 +25,7 @@ class StrictLiquidityEntryTest {
         server.observeSessionDepth("TEST", false, 10400, 10000, OPEN);
         server.observeSessionDepth("TEST", true, 9800, 7000, OPEN);
         server.observeSessionDepth("TEST", true, 9600, 12000, OPEN);
+        server.observeSessionTrade("TEST", 10000, 1000, false, OPEN, true);
         return server;
     }
     private JsonObject state(JsonObject cap) {
@@ -56,31 +57,28 @@ class StrictLiquidityEntryTest {
         assertThrows(IllegalArgumentException.class, () -> BookmapSizeCap.apply(new Snapshot(state(cap)), entry(true, "STOP", 101.99)));
         assertThrows(IllegalArgumentException.class, () -> BookmapSizeCap.apply(new Snapshot(state(cap)), entry(false, "STOP", 98.01)));
     }
-    @Test void buyAndSellStopsQualifyOnlyThroughTheirOwnTriggerIncludingEquality() {
-        var server = server(); JsonObject cap = server.entrySizeCap("TEST");
-        for (boolean isLong : new boolean[]{true, false}) {
-            double trigger = isLong ? 102 : 98;
-            Plan plan = entry(isLong, "STOP", trigger); JsonObject original = plan.requests.get(0).body.deepCopy();
-            BookmapSizeCap.apply(new Snapshot(state(cap)), plan);
-            assertEquals(original, plan.requests.get(0).body);
-            assertEquals(isLong ? 6000 : 7000, BookmapSizeCap.forEntry(cap, plan.requests.get(0).body).get("largestOrderSize").getAsInt());
-        }
-        assertEquals(1000, cap.get("largestOrderSize").getAsInt()); // Hypothetical ranges never unlock other entries.
-        assertEquals(101, server.getRegularSessionHighLow("TEST").getHighOfDay());
-        assertEquals(99, server.getRegularSessionHighLow("TEST").getLowOfDay());
-        assertThrows(IllegalArgumentException.class, () -> BookmapSizeCap.apply(new Snapshot(state(cap)), entry(true, "STOP", 98)));
-        assertThrows(IllegalArgumentException.class, () -> BookmapSizeCap.apply(new Snapshot(state(cap)), entry(false, "STOP", 102)));
+    @Test void unfilledOutsideWallsCannotQualifyAnyOrderEvenWithOutwardStopTriggers() {
+        var server = server();
+        server.observeSessionDepth("TEST", false, 10200, 0, OPEN + 1);
+        server.updateRegularSessionHighLow("TEST", 104, OPEN + 2);
+        for (boolean isLong : new boolean[]{true, false}) for (String type : new String[]{"MARKET", "LIMIT", "STOP", "STOP_LIMIT"})
+            assertThrows(IllegalArgumentException.class, () -> BookmapSizeCap.apply(
+                    new Snapshot(state(server.entrySizeCap("TEST"))), entry(isLong, type, isLong ? 104 : 96)));
     }
-    @Test void cancelledOutsideOrdersStillQualifyStopsButReplayedFutureOrdersDoNot() {
-        var server = server(); server.observeSessionDepth("TEST", false, 10200, 0, OPEN + 1);
-        BookmapSizeCap.apply(new Snapshot(state(server.entrySizeCap("TEST"))), entry(true, "STOP", 102));
-        server.observeSessionTime("TEST", OPEN - 1);
+    @Test void qualifyingExecutionsUnlockEveryEntryTypeWithoutProspectiveRangeExceptions() {
+        var server = server();
+        server.observeSessionTrade("TEST", 10000, 4000, false, OPEN + 1, true);
+        for (boolean isLong : new boolean[]{true, false}) for (String type : new String[]{"MARKET", "LIMIT", "STOP", "STOP_LIMIT"}) {
+            Plan plan = entry(isLong, type, isLong ? 104 : 96);
+            JsonObject original = plan.requests.get(0).body.deepCopy();
+            BookmapSizeCap.apply(new Snapshot(state(server.entrySizeCap("TEST"))), plan);
+            assertEquals(original, plan.requests.get(0).body);
+        }
         server.observeSessionTime("TEST", OPEN);
-        server.updateRegularSessionHighLow("TEST", 100, OPEN);
-        assertThrows(IllegalArgumentException.class, () -> BookmapSizeCap.apply(new Snapshot(state(server.entrySizeCap("TEST"))), entry(true, "STOP", 102)));
+        assertThrows(IllegalArgumentException.class, () -> BookmapSizeCap.apply(new Snapshot(state(server.entrySizeCap("TEST"))), entry(true, "STOP", 104)));
     }
     @Test void strictThresholdEqualityUnlocksNormalSizeAndAddsWithoutProportionalReduction() {
-        var server = server(); server.observeSessionDepth("TEST", true, 10000, 5000, OPEN);
+        var server = server(); server.observeSessionTrade("TEST", 10000, 4000, false, OPEN, true);
         JsonObject json = state(server.entrySizeCap("TEST")); json.addProperty("netQuantity", 500);
         json.getAsJsonObject("entryContext").addProperty("lowOfDay", 99);
         for (String action : new String[]{"wall_reversal_entry", "reload_partial", "swap", "refresh_pending_entry"}) {
@@ -89,15 +87,13 @@ class StrictLiquidityEntryTest {
             BookmapSizeCap.apply(new Snapshot(json), named); assertEquals(100, quantity(named));
         }
     }
-    @Test void proportionalModeRemainsAvailableAndUsesTheSameProspectiveStopRange() {
+    @Test void proportionalModeUsesExecutedSizeForEveryEntryType() {
         var server = server(); JsonObject cap = server.entrySizeCap("TEST").deepCopy();
         cap.addProperty("mode", Mode.PROPORTIONAL.name()); // Exercise the retained algorithm without exposing a runtime switch.
         Plan normal = entry(true, "LIMIT", 100);
         BookmapSizeCap.apply(new Snapshot(state(cap)), normal); assertEquals(40, quantity(normal));
-        for (boolean isLong : new boolean[]{true, false}) {
-            Plan stop = entry(isLong, "STOP", isLong ? 102 : 98);
-            BookmapSizeCap.apply(new Snapshot(state(cap)), stop); assertEquals(100, quantity(stop));
-        }
+        Plan stop = entry(true, "STOP", 102);
+        BookmapSizeCap.apply(new Snapshot(state(cap)), stop); assertEquals(28, quantity(stop)); // 0.2R / $7 per share.
         assertThrows(IllegalArgumentException.class, () -> BookmapSizeCap.apply(new Snapshot(state(server.entrySizeCap("TEST"))), entry(true, "LIMIT", 100)));
     }
     @Test void strictCannotBypassUnavailableSessionOrBorrowAnotherStopsWiderRangeAndNeverBlocksExits() {

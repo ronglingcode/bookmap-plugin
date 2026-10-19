@@ -17,6 +17,7 @@ class StrictLiquidityModeTest {
         qualified.addProperty("available", true); qualified.addProperty("largestOrderSize", 5000);
         assertTrue(TradeButtonWindow.liquidityStatusText(qualified).contains("threshold met"));
         assertFalse(TradeButtonWindow.liquidityStatusText(qualified).contains("ENTRY BLOCKED"));
-        assertTrue(TradeButtonWindow.liquidityStatusText(qualified).contains("trigger price"));
+        assertTrue(TradeButtonWindow.liquidityStatusText(qualified).contains("executions at one wall"));
+        assertFalse(TradeButtonWindow.liquidityStatusText(qualified).contains("trigger price"));
     }
 }

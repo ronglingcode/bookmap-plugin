@@ -573,17 +573,18 @@ public class TradeButtonWindow {
     }
 
     static String liquidityStatusText(JsonObject cap) {
-        int largest = cap.get("largestOrderSize").getAsInt(), required = cap.get("requiredOrderSize").getAsInt();
+        long largest = cap.get("largestOrderSize").getAsLong();
+        int required = cap.get("requiredOrderSize").getAsInt();
         if (BookmapSizeCap.mode(cap) == Mode.STRICT) {
             boolean qualified = (!cap.has("available") || cap.get("available").getAsBoolean()) && largest >= required;
-            return "Max counted: " + formatShareSize(largest) + " | Required: " + formatShareSize(required)
-                    + "<br><b>STRICT: " + (qualified ? "liquidity threshold met" : "ENTRY BLOCKED in current range")
-                    + "</b><br>Stop entries are checked through their trigger price.";
+            return "Max filled: " + formatShareSize(largest) + " | Required: " + formatShareSize(required)
+                    + "<br><b>STRICT: " + (qualified ? "liquidity threshold met" : "ENTRY BLOCKED until qualifying fills")
+                    + "</b><br>Requires executions at one wall since market open.";
         }
-        return "Max counted: " + formatShareSize(largest) + " | Cap: "
+        return "Max filled: " + formatShareSize(largest) + " | Cap: "
                 + String.format(Locale.US, "%.2fR", cap.get("maxRiskMultiple").getAsDouble())
                 + "<br>PROPORTIONAL: size capped by qualifying liquidity"
-                + "<br>Stop entries are checked through their trigger price.";
+                + "<br>Requires executions at one wall since market open.";
     }
 
     private void setConnectionStatus(NativeConnectionStatus.Snapshot status) {
@@ -845,7 +846,7 @@ public class TradeButtonWindow {
         SignalWebSocketServer.OrderbookWallThreshold threshold =
                 server.getOrderbookWallThreshold(symbol, thresholdFloor);
         JsonObject cap = server.entrySizeCap(symbol);
-        int largest = cap.get("largestOrderSize").getAsInt();
+        long largest = cap.get("largestOrderSize").getAsLong();
         int required = cap.get("requiredOrderSize").getAsInt();
         double cappedR = cap.get("maxRiskMultiple").getAsDouble();
         boolean strict = BookmapSizeCap.mode(cap) == Mode.STRICT;
@@ -853,15 +854,14 @@ public class TradeButtonWindow {
         wallThresholdLabel.setBackground(blocked ? new Color(255, 220, 220) : THRESHOLD_BACKGROUND);
         wallThresholdLabel.setForeground(blocked ? new Color(150, 20, 20) : THRESHOLD_TEXT_COLOR);
         String capText = liquidityStatusText(cap);
-        String capDescription = "Largest bid/offer observed since market open within the session low/high, including cleared orders. "
-                + (strict ? String.format(Locale.US, "Strict blocks entries below %,d shares; once qualified, existing sizing rules apply. ", required)
-                        : String.format(Locale.US, "%,d / %,d = %.6fR total risk ceiling; existing position and pending entries consume this budget. ", largest, required, cappedR))
-                + "Only a stop entry's own trigger can extend its qualification range; market and limit entries use the actual range.";
+        String capDescription = "Largest accumulated executions at one bid/offer wall since market open. Canceled size does not count. "
+                + (strict ? String.format(Locale.US, "Strict blocks all opening orders until a wall has filled at least %,d shares. ", required)
+                        : String.format(Locale.US, "%,d / %,d = %.6fR total risk ceiling; existing position and pending entries consume this budget. ", largest, required, cappedR));
         if (cap.has("largestOrderPrice")) {
             String observed = java.time.Instant.ofEpochMilli(cap.get("largestOrderObservedAt").getAsLong())
                     .atZone(java.time.ZoneId.of("America/New_York"))
                     .format(java.time.format.DateTimeFormatter.ofPattern("HH:mm:ss.SSS z", Locale.US));
-            capDescription += String.format(Locale.US, " Counted %s: %,d shares at %.4f, observed %s.",
+            capDescription += String.format(Locale.US, " Counted %s: %,d executed shares at %.4f, filled through %s.",
                     cap.get("largestOrderSide").getAsString(), largest, cap.get("largestOrderPrice").getAsDouble(), observed);
         }
         wallThresholdLabel.setToolTipText(capDescription);
@@ -1008,17 +1008,17 @@ public class TradeButtonWindow {
         return String.format(Locale.US, "%.2f", quantity);
     }
 
-    private static String formatShareSize(int size) {
+    private static String formatShareSize(long size) {
         if (size >= 1_000_000) {
             return formatCompactSize(size, 1_000_000, "M");
         }
         if (size >= 1_000) {
             return formatCompactSize(size, 1_000, "K");
         }
-        return Integer.toString(size);
+        return Long.toString(size);
     }
 
-    private static String formatCompactSize(int size, int unit, String suffix) {
+    private static String formatCompactSize(long size, int unit, String suffix) {
         if (size % unit == 0) {
             return (size / unit) + suffix;
         }
