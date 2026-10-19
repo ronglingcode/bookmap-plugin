@@ -6,13 +6,13 @@ import java.util.*;
 /** Tracks the two most recently filled bid levels and the next qualifying bid. */
 public final class ReclaimSecondBidMonitor {
     public static final String PATTERN = "reclaim2ndBid";
-    public static final int SIZE_THRESHOLD = WallPatternMonitor.SIZE_THRESHOLD;
+    public static final int SIZE_THRESHOLD = 5000;
     private final java.util.function.IntSupplier sizeThreshold;
     public ReclaimSecondBidMonitor() { this(() -> SIZE_THRESHOLD); }
     public ReclaimSecondBidMonitor(java.util.function.IntSupplier threshold) { sizeThreshold = threshold; }
     private int minimumSize() { return sizeThreshold.getAsInt(); }
     private int lastMinimumSize;
-    public static final long BID_MIN_DURATION_NS = WallPatternMonitor.BID_MIN_DURATION_NS;
+    public static final long BID_MIN_DURATION_NS = 1_000_000_000L;
     private static final long FILL_CALLBACK_GRACE_NS = 250_000_000L;
     private static final ZoneId NEW_YORK = ZoneId.of("America/New_York");
 

@@ -1,8 +1,7 @@
 package com.bookmap.plugin.rong.patterns;
 
-public final class FalseBreakoutPainter extends WallPatternPainter {
+/** Uses the same next-bid, entry, and reclaim rendering as Bid Breakdown. */
+public final class FalseBreakoutPainter extends BidBreakdownPainter {
     public static final String NAME_PREFIX = "falseBreakout_";
-    public FalseBreakoutPainter(FalseBreakoutMonitor monitor) {
-        super(monitor, "False breakout", FalseBreakoutMonitor.MAX_ENTRIES, 90, false);
-    }
+    public FalseBreakoutPainter(FalseBreakoutMonitor monitor) { super(monitor, "False breakout", 90); }
 }

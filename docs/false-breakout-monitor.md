@@ -1,43 +1,37 @@
 # False breakout monitor
 
-Enable it per symbol in the trading plan:
-
-```json
-"bookmapPatternsToMonitor": ["falseBreakout"]
-```
-
-The field is required in trading plans; use an empty list to disable the monitor.
-Older saved plans without it are treated as having an empty list. Both the Vite socket and
-the native plan loader forward the list. This monitor runs independently of the
-Signal Composer setting and never submits orders.
+Enable it per symbol with `"bookmapPatternsToMonitor": ["falseBreakout"]`.
+An empty or omitted list disables it. Both the Vite socket and native plan loader
+forward the list. It runs independently of SignalComposer and never submits orders.
 
 The monitor uses Bookmap market timestamps and regular US equity hours
-(09:30â€“16:00 America/New_York, weekdays). Premarket depth is available at the
-open; signals require the initial snapshot to be complete. The threshold is
-strictly greater than 5,000 in Bookmap's raw depth/trade size units.
+(09:30 inclusive–16:00 exclusive, America/New_York, weekdays), after initial
+snapshot readiness. Premarket depth still present at the open remains available.
 
-1. Highlight the closest qualifying offer strictly above the last traded price.
-   Recompute the highlight as depth and price change. Buying executions at the
-   tracked offer accumulate until its captured size is filled; an execution
-   above it after executions at it also completes the breakout. A cancellation
-   alone does not advance the phase. Once execution starts at the offer, allow
-   its fill to finish even if its remaining size drops below the threshold.
-2. A bid qualifies only after staying strictly above 5,000 continuously for
-   more than one second of market time. Size updates above 5,000 preserve the
-   timer; dropping to or below 5,000 restarts it. Highlight the closest qualified
-   bid at or below the last traded price.
-   A trade strictly below the tracked bid produces a compact **bid 1** through
-   **bid 5** marker pointing at that trade's time and price. These mark bid
-   breakdowns; they do not mean the trader must enter a position. Partial fills
-   below the size threshold briefly retain a mature bid while selling continues.
-   Removal allows 250ms for depth/trade callback ordering; selling at the tracked
-   bid allows one second for continued partial fills. Canceled bids then expire
-   instead of creating entries on unrelated later price crossings.
-   A depth removal alone does not signal.
-   Each bid price can signal only once during the session, even if it refills.
-   After five distinct bid breakdowns the highlight disappears and no more markers are added.
+Its starting condition is buying through a qualifying offer:
 
-Markers remain on the chart for that session. A new market date resets the
-pattern and count; a backwards replay timestamp also discards the old depth.
-Repeated plan updates do not restart the monitor. Disabling it hides its display;
-reenabling it on the same date preserves the phase and five-bid limit.
+1. Highlight the nearest qualifying offer strictly above the last traded price.
+   Offer size must be strictly greater than the existing per-symbol premarket
+   threshold (5K fallback). This offer-stage rule is separate from the shared
+   4.5K bid cutoff.
+2. Buying executions at the offer accumulate until its captured size is filled.
+   A buying execution above it after executions at it also completes the breakout.
+   Cancellation alone cannot arm bid monitoring. Once buying starts, remaining
+   size may drop below the threshold while the captured fill completes.
+3. After that breakout, use the exact same bid detection and rendering as
+   `bidBreakdown`: **at least 4,500 displayed shares for more than one second**,
+   **Level 1 ask strictly below the bid for one second** for an entry label,
+   and **Level 1 bid at or above the old bid** for a reclaim/stop-out label.
+   A trade print below the bid is not required. Label the next qualifying bid
+   and stop entry scanning after **five distinct bid prices**. Reclaim tracking
+   continues for all five levels.
+
+See [shared bid rules](bid-breakdown-monitor.md) for boundary comparisons, timer
+resets, callback ordering, and marker placement. The entry-liquidity gate used by
+`bidBreakdown` does not also gate False Breakout; only the offer-breakout start differs.
+
+Entry/reclaim markers remain for the session. A new market date resets the pattern
+and count; a backward replay timestamp also discards depth and quotes and requires
+fresh snapshot readiness. Repeated plan updates preserve progress. Disabling hides
+the display and discards pending bid confirmation; reenabling preserves the offer
+breakout state, completed entries, and the five-bid limit for the same date.

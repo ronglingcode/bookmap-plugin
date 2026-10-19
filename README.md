@@ -147,6 +147,7 @@ and the private mapping remain under `build/intermediates` and
 
 ## Documentation
 
+- [Bid breakdown entry/reclaim monitor](docs/bid-breakdown-monitor.md)
 - [Cairo aggregate patterns, capture and replay testing](docs/cairo-evidence.md)
 - [Standalone setup, data sources and operations](docs/direct-broker-execution.md)
 - [Detailed design and source audit](docs/standalone-native-trading-plan.md)

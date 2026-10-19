@@ -131,9 +131,9 @@ class PremarketSizeThresholdTest {
         long open = time("13:30:00") * 1000000;
         AtomicInteger threshold = new AtomicInteger(2000);
         FalseBreakoutMonitor breakout = new FalseBreakoutMonitor(threshold::get); breakout.setEnabled(true);
-        breakout.onTrade(100, 1, true, open, true); breakout.onDepth(false, 110, 3000, open);
-        assertEquals(110, breakout.snapshot().highlightedTick);
-        threshold.set(20000); breakout.onTimestamp(open + 2000000000); assertNull(breakout.snapshot().highlightedTick);
+        breakout.onTrade(100, 1, true, open, true); breakout.onDepth(false, 110, 3000, open, true);
+        assertEquals(110, breakout.snapshot().offerTick);
+        threshold.set(20000); breakout.onTimestamp(open + 2000000000, true); assertNull(breakout.snapshot().offerTick);
         ReclaimSecondBidMonitor reclaim = new ReclaimSecondBidMonitor(threshold::get); reclaim.setEnabled(true);
         reclaim.onDepth(true, 100, 15000, open, true); reclaim.onDepth(false, 110, 100, open, true);
         reclaim.onTimestamp(open + 2000000000); assertNull(reclaim.snapshot().nextBidTick);

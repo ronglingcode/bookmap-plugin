@@ -116,6 +116,8 @@ public class RongPlugin implements CustomModuleAdapter,
     private com.bookmap.plugin.rong.patterns.FalseBreakoutPainter falseBreakoutPainter;
     private com.bookmap.plugin.rong.patterns.ReclaimSecondBidMonitor reclaimSecondBidMonitor;
     private com.bookmap.plugin.rong.patterns.ReclaimSecondBidPainter reclaimSecondBidPainter;
+    private com.bookmap.plugin.rong.patterns.BidBreakdownMonitor bidBreakdownMonitor;
+    private com.bookmap.plugin.rong.patterns.BidBreakdownPainter bidBreakdownPainter;
     private SignalWebSocketServer.PatternMonitorConfigListener patternMonitorConfigListener;
     private SignalComposerConfig compositionRules;
     private SignalCompositionLog compositionLog;
@@ -235,12 +237,16 @@ public class RongPlugin implements CustomModuleAdapter,
         falseBreakoutPainter = new com.bookmap.plugin.rong.patterns.FalseBreakoutPainter(falseBreakoutMonitor);
         reclaimSecondBidMonitor = new com.bookmap.plugin.rong.patterns.ReclaimSecondBidMonitor(this::getEffectiveWallThreshold);
         reclaimSecondBidPainter = new com.bookmap.plugin.rong.patterns.ReclaimSecondBidPainter(reclaimSecondBidMonitor);
+        bidBreakdownMonitor = new com.bookmap.plugin.rong.patterns.BidBreakdownMonitor(this::isEntryLiquidityReady);
+        bidBreakdownPainter = new com.bookmap.plugin.rong.patterns.BidBreakdownPainter(bidBreakdownMonitor);
         patternMonitorConfigListener = (symbol, patterns) -> {
             if (!cleanAlias.equals(symbol)) return;
             falseBreakoutMonitor.setEnabled(patterns.contains(com.bookmap.plugin.rong.patterns.FalseBreakoutMonitor.PATTERN));
             falseBreakoutPainter.refresh();
             reclaimSecondBidMonitor.setEnabled((patterns.contains(com.bookmap.plugin.rong.patterns.ReclaimSecondBidMonitor.PATTERN) || patterns.contains("falseBreakdown")));
             reclaimSecondBidPainter.refresh();
+            bidBreakdownMonitor.setEnabled(patterns.contains(com.bookmap.plugin.rong.patterns.BidBreakdownMonitor.PATTERN));
+            bidBreakdownPainter.refresh();
         };
         sharedServer.registerPatternMonitorConfigListener(patternMonitorConfigListener);
         api.sendUserMessage(Layer1ApiUserMessageModifyScreenSpacePainter.builder(RongPlugin.class,
@@ -249,6 +255,9 @@ public class RongPlugin implements CustomModuleAdapter,
         api.sendUserMessage(Layer1ApiUserMessageModifyScreenSpacePainter.builder(RongPlugin.class,
                 com.bookmap.plugin.rong.patterns.ReclaimSecondBidPainter.NAME_PREFIX + cleanAlias)
                 .setScreenSpacePainterFactory(reclaimSecondBidPainter).setAliasFilter(exactAliasFilter(rawAlias)).setIsAdd(true).build());
+        api.sendUserMessage(Layer1ApiUserMessageModifyScreenSpacePainter.builder(RongPlugin.class,
+                com.bookmap.plugin.rong.patterns.BidBreakdownPainter.NAME_PREFIX + cleanAlias)
+                .setScreenSpacePainterFactory(bidBreakdownPainter).setAliasFilter(exactAliasFilter(rawAlias)).setIsAdd(true).build());
         synchronized (RongPlugin.class) {
             if (tradingSignalPainter == null) tradingSignalPainter = new TradingSignalPainter(tradingSignalStore, indicatorConfig);
         }
@@ -418,6 +427,12 @@ public class RongPlugin implements CustomModuleAdapter,
 
     private void stopAttachment() {
         if (sharedServer != null && patternMonitorConfigListener != null) sharedServer.unregisterPatternMonitorConfigListener(patternMonitorConfigListener);
+        if (bidBreakdownPainter != null) {
+            cleanup("remove chart painter", () -> api.sendUserMessage(Layer1ApiUserMessageModifyScreenSpacePainter.builder(RongPlugin.class,
+                    com.bookmap.plugin.rong.patterns.BidBreakdownPainter.NAME_PREFIX + alias)
+                    .setScreenSpacePainterFactory(bidBreakdownPainter).setIsAdd(false).build()));
+            bidBreakdownPainter.shutdown();
+        }
         if (falseBreakoutPainter != null) {
             cleanup("remove chart painter", () -> api.sendUserMessage(Layer1ApiUserMessageModifyScreenSpacePainter.builder(RongPlugin.class,
                     com.bookmap.plugin.rong.patterns.FalseBreakoutPainter.NAME_PREFIX + alias)
@@ -665,8 +680,12 @@ public class RongPlugin implements CustomModuleAdapter,
         }
         if (sharedServer != null) sharedServer.observeSessionDepth(alias, isBid, price, size, lastTimestampNs);
         orderBook.update(isBid, price, size);
+        if (bidBreakdownMonitor != null) {
+            bidBreakdownMonitor.onDepth(isBid, price, size, lastTimestampNs, patternMonitorSnapshotComplete);
+            bidBreakdownPainter.refresh();
+        }
         if (falseBreakoutMonitor != null) {
-            falseBreakoutMonitor.onDepth(isBid, price, size, lastTimestampNs);
+            falseBreakoutMonitor.onDepth(isBid, price, size, lastTimestampNs, patternMonitorSnapshotComplete);
             falseBreakoutPainter.refresh();
         }
         if (reclaimSecondBidMonitor != null) {
@@ -692,7 +711,7 @@ public class RongPlugin implements CustomModuleAdapter,
         int priceTick = (int) Math.round(price);
         if (falseBreakoutMonitor != null) {
             falseBreakoutMonitor.onTrade(priceTick, size, tradeInfo == null ? null : tradeInfo.isBidAggressor,
-                    lastTimestampNs, compositionSnapshotComplete);
+                    lastTimestampNs, patternMonitorSnapshotComplete);
             falseBreakoutPainter.refresh();
         }
         if (reclaimSecondBidMonitor != null) {
@@ -703,6 +722,10 @@ public class RongPlugin implements CustomModuleAdapter,
         if (sharedServer != null) {
             sharedServer.observeSessionTime(alias, lastTimestampNs);
             sharedServer.updateRegularSessionHighLow(alias, realPrice, eventTimeNs);
+        }
+        if (bidBreakdownMonitor != null) {
+            bidBreakdownMonitor.onTrade(priceTick, size, lastTimestampNs, patternMonitorSnapshotComplete);
+            bidBreakdownPainter.refresh();
         }
         NativeTradingAdapter trading = nativeTrading;
         if (trading != null) trading.observeBookmapTrade(alias, realPrice, eventTimeNs);
@@ -727,14 +750,19 @@ public class RongPlugin implements CustomModuleAdapter,
         if (!initialized) return;
         if (timestampNs > 0 && lastTimestampNs > 0 && timestampNs < lastTimestampNs) {
             compositionSnapshotComplete = false;
+            patternMonitorSnapshotComplete = false;
             // Legacy book state can retain pre-seek levels. Only fresh callbacks may seed the observer now.
             compositionSeedFromSharedBook = false;
         }
         this.lastTimestampNs = timestampNs;
         if (premarketSizeThreshold != null) premarketSizeThreshold.onMarketTime();
         if (sharedServer != null) sharedServer.observeSessionTime(alias, timestampNs);
+        if (bidBreakdownMonitor != null) {
+            bidBreakdownMonitor.onTimestamp(timestampNs, patternMonitorSnapshotComplete);
+            bidBreakdownPainter.refresh();
+        }
         if (falseBreakoutMonitor != null) {
-            falseBreakoutMonitor.onTimestamp(timestampNs);
+            falseBreakoutMonitor.onTimestamp(timestampNs, patternMonitorSnapshotComplete);
             falseBreakoutPainter.refresh();
         }
         if (reclaimSecondBidMonitor != null) {
@@ -754,6 +782,14 @@ public class RongPlugin implements CustomModuleAdapter,
     @Override
     public void onBbo(int bidPrice, int bidSize, int askPrice, int askSize) {
         if (!initialized) return;
+        if (falseBreakoutMonitor != null) {
+            falseBreakoutMonitor.onBbo(bidPrice, askPrice, lastTimestampNs, patternMonitorSnapshotComplete);
+            falseBreakoutPainter.refresh();
+        }
+        if (bidBreakdownMonitor != null) {
+            bidBreakdownMonitor.onBbo(bidPrice, askPrice, lastTimestampNs, patternMonitorSnapshotComplete);
+            bidBreakdownPainter.refresh();
+        }
         if (reclaimSecondBidMonitor != null) {
             reclaimSecondBidMonitor.onBbo(bidPrice, askPrice, lastTimestampNs, patternMonitorSnapshotComplete);
             reclaimSecondBidPainter.refresh();
@@ -915,6 +951,13 @@ public class RongPlugin implements CustomModuleAdapter,
             signalComposition.markReady();
             if (lastTimestampNs > 0) signalComposition.onTimestamp(lastTimestampNs, PatternEvent.TimestampProvenance.MARKET);
         }
+    }
+
+    private boolean isEntryLiquidityReady() {
+        if (sharedServer == null) return false;
+        com.google.gson.JsonObject cap = sharedServer.entrySizeCap(alias);
+        return cap.get("available").getAsBoolean()
+                && cap.get("largestOrderSize").getAsDouble() >= cap.get("requiredOrderSize").getAsDouble();
     }
 
     private int getEffectiveWallThreshold() {

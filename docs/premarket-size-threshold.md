@@ -1,6 +1,6 @@
 # Premarket size threshold
 
-Wall labels and exported liquidity summaries always use a fixed minimum of 5,000 shares. Attached charts use the per-symbol premarket threshold below for entry wall snapshots/profit targets, wall-change alerts/retest evidence, the False Breakout offer stage, and the Reclaim Second Bid monitor. False Breakout bid qualification always uses a fixed 5,000-share threshold. The trade-window threshold display shows the premarket-based value.
+Wall labels and exported liquidity summaries always use a fixed minimum of 5,000 shares. Attached charts use the per-symbol premarket threshold below for entry wall snapshots/profit targets, wall-change alerts/retest evidence, the False Breakout offer stage, and the Reclaim Second Bid monitor. False Breakout and Bid Breakdown share a fixed bid minimum of 4,500 shares (inclusive), sustained for more than one second; their entry labels require Level 1 ask below the bid for one second. The trade-window threshold display shows the premarket-based value.
 
 | Premarket shares | Threshold |
 | --- | --- |
@@ -21,7 +21,7 @@ Schwab's observed CRWV response on October 14, 2026 began at 07:00 Eastern despi
 
 Live and replay charts both use the date and market time supplied by Bookmap. Historical replay fetches premarket history for its own Eastern session date; explicit replay mode no longer forces a 5K threshold. Requests end at the last completed chart minute, capped at 09:30 Eastern and wall time, so later premarket volume cannot leak into a replay. Rewinding reprojects cached candles through the earlier chart time, even after the full session was fetched. Changing dates immediately hides the old session's total until matching history loads. Unknown chart time, missing authorization, or failed/unavailable history uses 5K. Fetch failures are logged without credentials; the UI identifies the Schwab + Massive backfill policy or shows the unavailable reason.
 
-The UI shows the threshold and premarket shares or the fallback reason. Percentile, top-five size, manual floor, and the former 10K alert cap do not affect attached charts. Size remains in the existing Bookmap depth/share units; no round-lot conversion is performed. Existing strict-greater-than size comparisons in the specialized monitors remain; labels and entry liquidity use greater-than-or-equal. Material alerts still qualify by crossing the threshold or an absolute delta strictly exceeding it.
+The UI shows the threshold and premarket shares or the fallback reason. Percentile, top-five size, manual floor, and the former 10K alert cap do not affect attached charts. Size remains in the existing Bookmap depth/share units; no round-lot conversion is performed. The False Breakout offer stage and Reclaim Second Bid retain strict-greater-than size comparisons. Shared False Breakout/Bid Breakdown bid qualification accepts equality at 4,500 shares; labels and entry liquidity also use greater-than-or-equal. Material alerts still qualify by crossing the threshold or an absolute delta strictly exceeding it.
 
 Canonical observation (1K) and Composer trigger/confirmation policies are unchanged.
 

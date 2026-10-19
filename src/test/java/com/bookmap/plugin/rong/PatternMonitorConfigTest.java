@@ -9,6 +9,14 @@ import com.google.gson.JsonParser;
 import org.junit.jupiter.api.Test;
 
 class PatternMonitorConfigTest {
+    @Test void bidBreakdownPlanConfigurationReachesSymbolListener() {
+        SignalWebSocketServer server = new SignalWebSocketServer(0, 90);
+        AtomicReference<List<String>> patterns = new AtomicReference<>();
+        server.registerPatternMonitorConfigListener((symbol, values) -> { if (symbol.equals("TEST")) patterns.set(values); });
+        JsonObject view = JsonParser.parseString("{\"type\":\"market_ready\",\"symbol\":\"TEST\",\"plan\":{\"bookmapPatternsToMonitor\":[\"bidBreakdown\",\"reclaim2ndBid\"]}}").getAsJsonObject();
+        NativeViews.project(view).forEach(server::acceptLocalMessage);
+        assertEquals(List.of("bidBreakdown", "reclaim2ndBid"), patterns.get());
+    }
     @Test void nativePlanProjectionEnablesMonitorAndLateSubscribersReceiveConfiguration() {
         SignalWebSocketServer server = new SignalWebSocketServer(0, 90);
         JsonObject view = JsonParser.parseString("{\"type\":\"market_ready\",\"symbol\":\"TEST\",\"plan\":{\"bookmapPatternsToMonitor\":[\"falseBreakout\"]}}").getAsJsonObject();
