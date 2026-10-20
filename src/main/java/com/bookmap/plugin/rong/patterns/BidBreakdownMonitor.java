@@ -13,7 +13,7 @@ public class BidBreakdownMonitor {
     public static final int MIN_BID_SIZE = 4500, MAX_ENTRIES = 5;
     public static final long BID_MIN_DURATION_NS = 1_000_000_000L;
     public static final long CONFIRMATION_NS = 1_000_000_000L;
-    private static final long REMOVAL_GRACE_NS = 250_000_000L;
+    public static final long BREAKDOWN_WINDOW_NS = 15_000_000_000L;
     private static final ZoneId NEW_YORK = ZoneId.of("America/New_York");
     private final BooleanSupplier entryLiquidityReady;
     private final TreeMap<Integer, Integer> bids = new TreeMap<>();
@@ -21,7 +21,7 @@ public class BidBreakdownMonitor {
     private final List<Entry> entries = new ArrayList<>();
     private boolean enabled, regularSession, ready, liquid;
     private LocalDate date;
-    private long lastTimeNs, askBelowSince, removedAt;
+    private long lastTimeNs, askBelowSince, brokenAt;
     private Integer marketPrice, bestBid, bestAsk, nextBid;
 
     public static final class Entry {
@@ -56,7 +56,13 @@ public class BidBreakdownMonitor {
     protected void resetStart(boolean clearBook) { }
     protected void observeDepth(boolean bid, int price, int size) { }
     protected void observeTrade(int price, int size, Boolean buyAggressor, boolean canObserve) { }
-    private void clearPending() { nextBid = null; askBelowSince = removedAt = 0; }
+    private void clearPending() { nextBid = null; askBelowSince = brokenAt = 0; }
+    private void expireBreakdown() {
+        if (nextBid == null || brokenAt == 0 || lastTimeNs - brokenAt <= BREAKDOWN_WINDOW_NS) return;
+        // A later attempt needs fresh persistence; do not immediately recycle an expired setup.
+        if (bids.getOrDefault(nextBid, 0) >= MIN_BID_SIZE) largeSince.put(nextBid, lastTimeNs);
+        clearPending();
+    }
     private void clearSession(boolean clearBook) {
         resetStart(clearBook); largeSince.clear();
         entries.clear(); clearPending(); marketPrice = bestBid = bestAsk = null;
@@ -75,6 +81,7 @@ public class BidBreakdownMonitor {
         regularSession = time.getDayOfWeek().getValue() <= 5 && !local.isBefore(LocalTime.of(9, 30)) && local.isBefore(LocalTime.of(16, 0));
         ready = !seek && snapshotReady;
         refreshStart();
+        expireBreakdown();
     }
     private void refreshStart() {
         liquid = enabled && regularSession && ready && startConditionMet();
@@ -85,13 +92,16 @@ public class BidBreakdownMonitor {
     private void select() {
         if (!active() || entries.size() >= MAX_ENTRIES) { clearPending(); return; }
         if (nextBid != null) {
-            // Retain a broken level while confirmation runs, even after its depth disappears.
-            if (askBelowSince != 0) return;
-            if (bids.getOrDefault(nextBid, 0) >= MIN_BID_SIZE) {
+            // Clearing the bid reserves this level for the fixed 15-second window.
+            if (brokenAt != 0) return;
+            int remaining = bids.getOrDefault(nextBid, 0);
+            // A qualified bid can fill in partials; neither shrinking nor quote movement clears it.
+            if (remaining > 0 && (remaining < MIN_BID_SIZE || bestBid != null && bestBid < nextBid
+                    || lastTimeNs - largeSince.getOrDefault(nextBid, lastTimeNs) <= BID_MIN_DURATION_NS)) return;
+            if (remaining >= MIN_BID_SIZE) {
                 // Still locate a newly closer qualifying bid before a breakdown starts.
                 clearPending();
-            } else if (removedAt != 0 && lastTimeNs - removedAt <= REMOVAL_GRACE_NS) return;
-            else clearPending();
+            } else clearPending();
         }
         Integer ceiling = bestBid != null ? bestBid : marketPrice;
         if (ceiling == null) return;
@@ -109,7 +119,7 @@ public class BidBreakdownMonitor {
             if (entry.reclaimTimeNs == 0 && bestBid >= entry.bidTick)
                 entries.set(i, new Entry(entry.number, entry.bidTick, entry.entryTimeNs, lastTimeNs));
         }
-        if (nextBid != null && askBelowSince != 0 && bestAsk != null && bestAsk < nextBid
+        if (nextBid != null && brokenAt != 0 && askBelowSince != 0 && bestAsk != null && bestAsk < nextBid
                 && lastTimeNs - askBelowSince >= CONFIRMATION_NS) {
             entries.add(new Entry(entries.size() + 1, nextBid, lastTimeNs, 0));
             clearPending();
@@ -121,11 +131,17 @@ public class BidBreakdownMonitor {
     }
     public final synchronized void onDepth(boolean bid, int price, int size, long timeNs, boolean snapshotReady) {
         advance(timeNs, snapshotReady);
+        select(); // Qualify against the prior depth before processing its clear callback.
         observeDepth(bid, price, size);
         if (bid && price > 0) {
+            if (active() && Integer.valueOf(price).equals(nextBid) && size == 0
+                    && bids.getOrDefault(price, 0) > 0 && brokenAt == 0) {
+                brokenAt = timeNs;
+                // An earlier ask crossing cannot contribute pre-clear confirmation time.
+                askBelowSince = bestAsk != null && bestAsk < price ? timeNs : 0;
+            }
             if (size >= MIN_BID_SIZE) largeSince.putIfAbsent(price, timeNs); else largeSince.remove(price);
             if (size > 0) bids.put(price, size); else bids.remove(price);
-            if (Integer.valueOf(price).equals(nextBid) && size < MIN_BID_SIZE && removedAt == 0) removedAt = timeNs;
         }
         refreshStart(); evaluate();
     }
@@ -142,9 +158,8 @@ public class BidBreakdownMonitor {
     public final synchronized void onBbo(int bid, int ask, long timeNs, boolean snapshotReady) {
         advance(timeNs, snapshotReady);
         if (bid <= 0 || ask <= bid) { bestBid = bestAsk = null; askBelowSince = 0; return; }
-        select(); // A bid may have matured since the last callback, before this quote crosses it.
-        // Preserve the highlighted level across a quote crossing.
-        if (active() && nextBid != null) {
+        select(); // Quote movement alone cannot clear a displayed bid or start its window.
+        if (active() && nextBid != null && brokenAt != 0) {
             if (ask < nextBid) { if (askBelowSince == 0) askBelowSince = timeNs; }
             else askBelowSince = 0;
         }

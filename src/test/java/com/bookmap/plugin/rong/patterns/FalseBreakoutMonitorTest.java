@@ -27,6 +27,7 @@ class FalseBreakoutMonitorTest {
             monitor.onTrade(130, threshold + 1, true, BidBreakdownMonitorTest.MATURE, true);
             assertEquals(105, monitor.snapshot().nextBidTick);
             offerThreshold.set(50000);
+            monitor.onDepth(true, 105, 0, BidBreakdownMonitorTest.MATURE + 1, true);
             monitor.onBbo(103, 104, BidBreakdownMonitorTest.MATURE + 1, true);
             monitor.onTimestamp(BidBreakdownMonitorTest.MATURE + 1_000_000_001L, true);
             assertEquals(1, monitor.snapshot().entries.size());

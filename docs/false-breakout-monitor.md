@@ -21,6 +21,7 @@ Its starting condition is buying through a qualifying offer:
 3. After that breakout, use the exact same bid detection and rendering as
    `bidBreakdown`: **at least 4,500 displayed shares for more than one second**,
    **Level 1 ask strictly below the bid for one second** for an entry label,
+   completed within **15 seconds of the tracked bid depth clearing to zero**,
    and **Level 1 bid at or above the old bid** for a reclaim/stop-out label.
    A trade print below the bid is not required. Label the next qualifying bid
    and stop entry scanning after **five distinct bid prices**. Reclaim tracking

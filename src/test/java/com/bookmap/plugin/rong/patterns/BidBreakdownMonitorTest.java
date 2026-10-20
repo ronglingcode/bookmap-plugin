@@ -55,16 +55,13 @@ class BidBreakdownMonitorTest {
         monitor.onTimestamp(MATURE, true); assertNull(monitor.snapshot().nextBidTick);
     }
     @ParameterizedTest @ValueSource(booleans = {false, true})
-    void sizeDipRestartsPersistenceButQualifiedSizeUpdatesPreserveIt(boolean falseBreakout) {
+    void sizeDipRestartsPersistenceBeforeQualification(boolean falseBreakout) {
         BidBreakdownMonitor monitor = fresh(falseBreakout);
         monitor.onDepth(true, 110, 5000, BASE, true);
-        monitor.onDepth(true, 110, 4500, BASE + 500_000_000L, true);
-        monitor.onTimestamp(MATURE, true); assertEquals(110, monitor.snapshot().nextBidTick);
-        monitor.onDepth(true, 110, 4499, MATURE + 1, true);
-        monitor.onTimestamp(MATURE + 300_000_000L, true); assertNull(monitor.snapshot().nextBidTick);
-        monitor.onDepth(true, 110, 4500, MATURE + 400_000_000L, true);
-        monitor.onTimestamp(MATURE + 1_400_000_000L, true); assertNull(monitor.snapshot().nextBidTick);
-        monitor.onTimestamp(MATURE + 1_400_000_001L, true); assertEquals(110, monitor.snapshot().nextBidTick);
+        monitor.onDepth(true, 110, 4499, BASE + 500_000_000L, true);
+        monitor.onDepth(true, 110, 4500, BASE + 600_000_000L, true);
+        monitor.onTimestamp(BASE + 1_600_000_000L, true); assertNull(monitor.snapshot().nextBidTick);
+        monitor.onTimestamp(BASE + 1_600_000_001L, true); assertEquals(110, monitor.snapshot().nextBidTick);
     }
     @ParameterizedTest @ValueSource(booleans = {false, true})
     void quoteOnlyEntryAtOneSecondThenReclaimAtEqualityAndContinue(boolean falseBreakout) {
@@ -93,13 +90,75 @@ class BidBreakdownMonitorTest {
         }
     }
     @ParameterizedTest @ValueSource(booleans = {false, true})
-    void depthRemovalOrTradeAloneCannotSignalAndCanceledWallExpires(boolean falseBreakout) {
+    void clearingStartsWindowButEntryStillRequiresAskConfirmation(boolean falseBreakout) {
         BidBreakdownMonitor monitor = monitor(falseBreakout);
         monitor.onDepth(true, 110, 0, MATURE, true);
         monitor.onTrade(109, 1, MATURE + 1, true);
         monitor.onTimestamp(MATURE + 2_000_000_000L, true); assertTrue(monitor.snapshot().entries.isEmpty());
         monitor.onBbo(108, 109, MATURE + 2_000_000_001L, true);
-        monitor.onTimestamp(MATURE + 4_000_000_000L, true); assertTrue(monitor.snapshot().entries.isEmpty());
+        monitor.onTimestamp(MATURE + 4_000_000_000L, true); assertEquals(1, monitor.snapshot().entries.size());
+    }
+    @ParameterizedTest @ValueSource(booleans = {false, true})
+    void quoteCrossingAndPartialDepthDoNotStartWindowOrAllowEntry(boolean falseBreakout) {
+        BidBreakdownMonitor monitor = monitor(falseBreakout);
+        monitor.onBbo(108, 109, MATURE, true); // Both quotes below the old bid, but its depth is not cleared.
+        monitor.onDepth(true, 110, 1000, MATURE + 1, true);
+        monitor.onTimestamp(MATURE + 20_000_000_000L, true);
+        assertEquals(110, monitor.snapshot().nextBidTick);
+        assertTrue(monitor.snapshot().entries.isEmpty());
+        monitor.onDepth(true, 110, 0, MATURE + 20_000_000_001L, true);
+        monitor.onTimestamp(MATURE + 21_000_000_000L, true); assertTrue(monitor.snapshot().entries.isEmpty());
+        monitor.onTimestamp(MATURE + 21_000_000_001L, true);
+        assertEquals(110, monitor.snapshot().entries.get(0).bidTick);
+    }
+    @ParameterizedTest @ValueSource(booleans = {false, true})
+    void fifteenSecondWindowStartsAtBreakdownRatherThanInitialSelection(boolean falseBreakout) {
+        BidBreakdownMonitor monitor = monitor(falseBreakout);
+        monitor.onTimestamp(MATURE + 30_000_000_000L, true);
+        assertEquals(110, monitor.snapshot().nextBidTick);
+        monitor.onDepth(true, 110, 0, MATURE + 30_000_000_000L, true);
+        monitor.onBbo(108, 109, MATURE + 43_000_000_000L, true);
+        monitor.onTimestamp(MATURE + 44_000_000_000L, true);
+        assertEquals(110, monitor.snapshot().entries.get(0).bidTick);
+    }
+    @ParameterizedTest @ValueSource(booleans = {false, true})
+    void brokenBidSurvivesStraddlingQuotesAndRemovalUntilAskConfirms(boolean falseBreakout) {
+        BidBreakdownMonitor monitor = monitor(falseBreakout);
+        monitor.onBbo(109, 111, MATURE, true); // Bid crosses first; ask is still above the old 110 bid.
+        monitor.onDepth(true, 110, 0, MATURE + 1, true);
+        monitor.onDepth(true, 109, 6000, MATURE + 2, true);
+        monitor.onTimestamp(MATURE + 10_000_000_000L, true);
+        assertEquals(110, monitor.snapshot().nextBidTick); // Keep this level instead of switching to 109.
+        monitor.onBbo(108, 109, MATURE + 13_000_000_000L, true);
+        monitor.onTimestamp(MATURE + 14_000_000_000L, true);
+        assertEquals(110, monitor.snapshot().entries.get(0).bidTick);
+    }
+    @ParameterizedTest @ValueSource(booleans = {false, true})
+    void askMustFinishConfirmationByTheOriginalFifteenSecondDeadline(boolean falseBreakout) {
+        for (long confirmationEnd : new long[]{15_000_000_000L, 15_000_000_001L}) {
+            BidBreakdownMonitor monitor = monitor(falseBreakout);
+            monitor.onBbo(109, 111, MATURE, true);
+            monitor.onDepth(true, 110, 0, MATURE, true);
+            monitor.onBbo(108, 109, MATURE + confirmationEnd - BidBreakdownMonitor.CONFIRMATION_NS, true);
+            monitor.onTimestamp(MATURE + confirmationEnd, true);
+            assertEquals(confirmationEnd == 15_000_000_000L ? 1 : 0, monitor.snapshot().entries.size());
+            if (confirmationEnd > 15_000_000_000L) assertFalse(Integer.valueOf(110).equals(monitor.snapshot().nextBidTick));
+        }
+    }
+    @ParameterizedTest @ValueSource(booleans = {false, true})
+    void recoveryAndRepeatedBreakDoNotExtendTheFifteenSecondDeadline(boolean falseBreakout) {
+        BidBreakdownMonitor monitor = monitor(falseBreakout);
+        monitor.onDepth(true, 110, 0, MATURE, true);
+        monitor.onBbo(110, 111, MATURE + 8_000_000_000L, true);
+        monitor.onDepth(true, 110, 4500, MATURE + 8_000_000_001L, true);
+        monitor.onDepth(true, 110, 0, MATURE + 8_000_000_002L, true);
+        monitor.onBbo(109, 110, MATURE + 14_000_000_000L, true);
+        monitor.onTimestamp(MATURE + 15_000_000_001L, true);
+        assertTrue(monitor.snapshot().entries.isEmpty());
+        assertFalse(Integer.valueOf(110).equals(monitor.snapshot().nextBidTick));
+        monitor.onBbo(108, 109, MATURE + 16_000_000_000L, true);
+        monitor.onTimestamp(MATURE + 17_000_000_000L, true);
+        assertTrue(monitor.snapshot().entries.stream().noneMatch(entry -> entry.bidTick == 110));
     }
     @ParameterizedTest @ValueSource(booleans = {false, true})
     void fiveDistinctEntriesStopScanningButAllReclaimsContinue(boolean falseBreakout) {

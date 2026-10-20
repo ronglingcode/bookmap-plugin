@@ -24,14 +24,26 @@ Once eligible, both patterns follow these rules:
    Level 1 quote is available, use the latest trade as the selection ceiling.
    Displayed size must stay **at least 4,500 shares continuously for more than
    one second** of Bookmap market time. Exactly 4,500 and exactly 5,000 qualify.
-   Updates at or above 4,500 preserve persistence; a drop below 4,500 resets it.
-2. A valid Level 1 ask must stay **strictly below the highlighted bid for at
-   least one second** of Bookmap market time. No trade print below the bid is
-   required. An ask at the level or above, or an invalid quote, resets this
-   confirmation timer. Depth removal or a trade alone cannot signal.
-   The highlighted level survives removal for 250 ms to accommodate depth-before-
-   quote callback ordering. Once the ask-below test begins, the level remains
-   pending through confirmation even if its displayed wall disappears.
+   Before qualification, updates at or above 4,500 preserve persistence and a drop
+   below 4,500 resets it. Once selected, a bid can shrink through partial fills
+   without being treated as cleared.
+2. The tracked bid's **depth clearing to zero** starts a fixed **15-second
+   breakdown window**, measured in Bookmap market time. Quote movement and
+   partial size reductions do not start this timer or permit an entry. Keep
+   tracking that original level even if the ask is still at/above it, its wall
+   disappears, or a closer bid appears. A recovery above the level and another
+   breakdown do not restart or extend this window.
+   Within that window, a valid Level 1 ask must stay **strictly below the old
+   bid for one continuous second**. Confirmation at exactly the 15-second
+   deadline qualifies; confirmation after it does not. An ask at/above the
+   level or an invalid quote resets the one-second confirmation, while the
+   original 15-second deadline remains fixed. If the ask was already below
+   before the clear, confirmation starts at the clear time; earlier time does
+   not count. No trade print is required. Duplicate clear callbacks, refills,
+   and subsequent clears cannot extend an already-running window.
+   An unconfirmed attempt expires after 15 seconds and selection resumes.
+   If the old wall is still present, it must establish fresh persistence before
+   it can be selected for a new attempt. Expiry does not consume an entry slot.
 3. At confirmation, place **entry 1** through **entry 5** at the old bid price
    and confirmation time. Immediately begin locating the next unused bid.
 4. For each signaled level, the first valid Level 1 bid at or above it adds
