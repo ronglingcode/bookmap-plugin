@@ -6,6 +6,7 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Set;
+import java.util.HashSet;
 import java.util.function.ToDoubleFunction;
 
 /** Explicit JSON models mirror TS projectAccount and survive obfuscation. */
@@ -69,9 +70,12 @@ public final class AccountProjection {
     private static void add(JsonObject map, String symbol, JsonObject value) {
         if (!map.has(symbol)) map.add(symbol, new JsonArray()); map.getAsJsonArray(symbol).add(value);
     }
-    private static void visitFills(JsonObject order, String date, JsonObject executions) {
+    private static void visitFills(JsonObject order, String date, JsonObject executions, Set<String> seenFillOrders) {
         JsonObject leg = leg(order); String symbol = orderSymbol(order);
-        if (leg != null && (string(leg, "orderLegType").equals("EQUITY") || leg.has("instrument") && string(leg.getAsJsonObject("instrument"), "assetType").equals("EQUITY"))) {
+        String id = string(order, "orderId");
+        // A child can also appear independently on another page.
+        if (leg != null && (id.isEmpty() || !seenFillOrders.contains(id)) && (string(leg, "orderLegType").equals("EQUITY") || leg.has("instrument") && string(leg.getAsJsonObject("instrument"), "assetType").equals("EQUITY"))) {
+            if (!id.isEmpty() && !array(order, "orderActivityCollection").isEmpty()) seenFillOrders.add(id);
             for (JsonElement value : array(order, "orderActivityCollection")) {
                 JsonObject activity = value.getAsJsonObject();
                 if (!string(activity, "activityType").equals("EXECUTION") || !string(activity, "executionType").equals("FILL")) continue;
@@ -90,7 +94,7 @@ public final class AccountProjection {
                 fill.addProperty("isBuy", Set.of("BUY", "BUY_TO_COVER").contains(string(leg, "instruction"))); fill.addProperty("positionEffectIsOpen", string(leg, "positionEffect").equals("OPENING")); add(executions, symbol, fill);
             }
         }
-        for (JsonElement child : array(order, "childOrderStrategies")) visitFills(child.getAsJsonObject(), date, executions);
+        for (JsonElement child : array(order, "childOrderStrategies")) visitFills(child.getAsJsonObject(), date, executions, seenFillOrders);
     }
     public static JsonObject projectAccount(JsonObject account, JsonArray orders, String date, ToDoubleFunction<String> currentPrice) {
         JsonObject positions = new JsonObject(), entries = new JsonObject(), pairs = new JsonObject(), executions = new JsonObject();
@@ -105,8 +109,9 @@ public final class AccountProjection {
         }
         JsonArray equityOrders = new JsonArray();
         for (JsonElement value : orders) if (isEquityOrder(value.getAsJsonObject())) equityOrders.add(value.deepCopy());
+        Set<String> seenFillOrders = new HashSet<>();
         for (JsonElement value : equityOrders) {
-            JsonObject order = value.getAsJsonObject(); visitFills(order, date, executions); String symbol = orderSymbol(order);
+            JsonObject order = value.getAsJsonObject(); visitFills(order, date, executions, seenFillOrders); String symbol = orderSymbol(order);
             if (symbol.isEmpty()) continue;
             String type = string(order, "orderStrategyType"); JsonObject leg = leg(order);
             if (type.equals("SINGLE") && !TERMINAL.contains(string(order, "status")) && leg != null && string(leg, "positionEffect").equals("OPENING")

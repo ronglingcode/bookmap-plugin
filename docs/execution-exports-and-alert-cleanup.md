@@ -58,6 +58,18 @@ a refresh or retrieve earlier trading days. Browser exports still print to the
 console through the existing controls; Bookmap copies to the clipboard and logs
 **Copied [format] to clipboard** without a confirmation popup or file dialog.
 
+Both apps automatically split capped Schwab order-history responses into smaller
+time ranges, including bursts within one minute, and deduplicate shared boundary
+orders by ID. The cap check conservatively includes nested order records rather
+than just top-level orders, while excluding older working trees outside each
+requested range. Fills from children returned both separately and in a bracket
+are counted once per order, preserving that order's individual partial fills.
+Account reads include the preceding 59 days so older orders filled
+today contribute to today's export. If a one-millisecond range still reaches the
+500-order request limit, or a later request fails, the refresh fails rather than
+replacing the cache with incomplete history; exports continue to use the last
+completed refresh.
+
 ## Verification and resume notes
 
 - `npm run build`: passed (existing Vite asset/chunk warnings).
