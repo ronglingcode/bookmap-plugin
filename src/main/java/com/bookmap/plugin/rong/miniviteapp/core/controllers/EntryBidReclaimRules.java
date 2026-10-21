@@ -8,9 +8,14 @@ import static com.bookmap.plugin.rong.miniviteapp.models.DomainJson.*;
 public final class EntryBidReclaimRules {
     private EntryBidReclaimRules() { }
 
+    public static boolean hasMarkedBid(Snapshot state) {
+        return state.netQuantity < 0
+                && Models.positive(number(object(state.entryContext, "activeTrade"), "entryBidToReclaim"));
+    }
+
     public static void check(Snapshot state, int partial) {
         if (state.netQuantity >= 0 || partial <= 3) return;
-        Models.require(Models.positive(number(object(state.entryContext, "activeTrade"), "entryBidToReclaim")),
+        Models.require(hasMarkedBid(state),
                 "Mark entry bid to reclaim first: hover the broken bid and press I before adjusting partials #4 onward");
     }
 }

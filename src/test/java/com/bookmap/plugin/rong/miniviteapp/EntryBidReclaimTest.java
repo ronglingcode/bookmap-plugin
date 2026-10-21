@@ -56,6 +56,30 @@ class EntryBidReclaimTest {
                 () -> KeyboardHandler.handleKeyPressed(new Snapshot(state), "Digit1", false, 9.5));
     }
 
+    @Test void markingBidUnlocksAllShortTargetsEvenWithCoreProtectionOrMissingPlan() {
+        JsonObject state = shortState();
+        state.addProperty("coreRuleEnabled", true);
+        state.addProperty("entryPrice", 10);
+        state.addProperty("coreTarget", 8);
+        state.addProperty("coreCount", 7);
+        state.getAsJsonObject("entryContext").getAsJsonObject("activeTrade").addProperty("entryBidToReclaim", 10.1);
+        for (boolean hasPlan : new boolean[]{false, true}) {
+            state.addProperty("hasPlan", hasPlan);
+            for (int partial = 0; partial <= 9; partial++)
+                assertEquals(1, KeyboardHandler.handleKeyPressed(new Snapshot(state), "Digit" + partial, false, 9.5).requests.size());
+            assertEquals(10, KeyboardHandler.handleKeyPressed(new Snapshot(state), "KeyT", false, 9.5).requests.size());
+            assertEquals(5, KeyboardHandler.handleKeyPressed(new Snapshot(state), "KeyG", false, 9.5).requests.size());
+        }
+        // Target permission stays unlocked when Level 1 bid crosses the marked level.
+        state.addProperty("currentPrice", 10.2);
+        state.addProperty("bid", 10.2);
+        state.addProperty("ask", 10.21);
+        assertEquals(10, KeyboardHandler.handleKeyPressed(new Snapshot(state), "KeyT", false, 9.5).requests.size());
+        assertThrows(IllegalArgumentException.class,
+                () -> KeyboardHandler.handleKeyPressed(new Snapshot(state), "Digit0", false, 10.5),
+                "Existing stop protection is unchanged");
+    }
+
     @Test void resetTargetsCannotBypassTheMarkerAndLongTargetsAreUnchanged() {
         JsonObject state = shortState();
         state.getAsJsonObject("entryContext").addProperty("lowOfDay", 9);

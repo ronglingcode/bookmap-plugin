@@ -21,7 +21,13 @@ even before any fills. This also applies to batch target adjustments and Reset
 Targets when they include later partials. A remaining original partial #4 still
 requires the marker when it becomes the first remaining exit pair. Existing
 partial numbering is inferred from the captured sizing count and remaining exit
-pairs, as with the other exit rules. Other exit restrictions still apply.
+pairs, as with the other exit rules.
+
+Once the entry bid is marked, all short profit targets can be adjusted
+immediately, including targets #4 onward and batch moves. You do not need to
+wait for a reclaim. The older core-target buffer and missing-core-plan checks
+do not block these marked-short profit-target moves. Normal order validation
+still applies. A reclaim warning does not lock the targets again.
 
 Stop adjustments, market partial exits and flatten remain available. Long
 positions are unaffected.
