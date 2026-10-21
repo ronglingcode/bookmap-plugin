@@ -40,6 +40,8 @@ public final class WorkflowHandler {
                         number(state.entryContext, "lowOfDay"), number(state.entryContext, "highOfDay"), state.batchCount);
                 targets = array(reset, "targets"); stop = number(reset, "stopLoss");
             } else targets = Workflows.profitResetTargets(captured, Math.abs(state.netQuantity));
+            EntryBidReclaimRules.check(state, targets.size());
+            for (ExitPair pair : state.pairs) EntryBidReclaimRules.check(state, pair.originalPartial);
             Plan plan = new Plan("reset_profit_targets");
             if (fallback) plan.warnings.add("Reset Targets using day stop and 2R from current price");
             for (ExitPair pair : state.pairs) { Models.require(pair.marketLeg().isBuy == (state.netQuantity < 0), "exit side disagrees with position"); if (pair.limit != null) Broker.cancelOrders(plan, pair.limit); if (pair.stop != null) Broker.cancelOrders(plan, pair.stop); }

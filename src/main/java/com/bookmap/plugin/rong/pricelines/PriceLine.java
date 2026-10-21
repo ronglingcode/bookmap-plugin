@@ -16,6 +16,7 @@ public class PriceLine {
         KEY_LEVEL("Key Level", new Color(255, 215, 0)),
         EXIT_ORDER("Exit", new Color(120, 120, 120)),
         ENTRY_ORDER("Entry", new Color(70, 170, 255)),
+        ENTRY_BID_RECLAIM("entry bid to reclaim", new Color(255, 220, 0)),
 
         // Camarilla Pivot levels - resistance (warm colors)
         CAM_R1("R1", new Color(255, 200, 200)),

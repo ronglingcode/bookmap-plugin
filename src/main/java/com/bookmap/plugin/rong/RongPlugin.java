@@ -175,6 +175,7 @@ public class RongPlugin implements CustomModuleAdapter,
             }
             if (priceLineStore == null) {
                 priceLineStore = new PriceLineStore();
+                sharedServer.setEntryBidReclaimStore(priceLineStore);
                 priceLinePainter = new PriceLinePainter(priceLineStore);
                 priceZoneStore = new PriceZoneStore();
                 priceZonePainter = new PriceZonePainter(priceZoneStore);

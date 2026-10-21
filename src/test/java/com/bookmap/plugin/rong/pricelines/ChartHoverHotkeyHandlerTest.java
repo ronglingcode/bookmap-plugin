@@ -26,6 +26,12 @@ import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 
 class ChartHoverHotkeyHandlerTest {
+    @Test void entryBidUsesTheHoveredPriceWithoutAnEntryTimeCutoff() {
+        assertTrue(ChartHoverHotkeyHandler.isChartHotkey("i"));
+        assertFalse(ChartHoverHotkeyHandler.isPriceIndependentHotkey("i"));
+        assertEquals("KeyI", ChartHoverHotkeyHandler.toViteKeyCode("i"));
+        assertFalse(ChartHoverHotkeyHandler.isEntryHotkeyDisabledAt("i", Instant.parse("2026-10-20T19:00:00Z")));
+    }
     @Test void bothEntryHotkeysUseTheSelectedFixedSharesWithTenPartials() {
         SignalWebSocketServer server = new SignalWebSocketServer(0, 90);
         server.getHotkeyRiskSelection().setFixedShareMethods("AAPL", List.of("50 sh", "100 sh"));

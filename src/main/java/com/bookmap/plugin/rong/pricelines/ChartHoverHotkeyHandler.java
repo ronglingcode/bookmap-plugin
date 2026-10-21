@@ -81,7 +81,7 @@ public class ChartHoverHotkeyHandler implements ScreenSpacePainterFactory {
     /** Chart hotkeys dispatched from the currently hovered Bookmap chart. */
     private static final Set<String> CHART_HOTKEYS =
             Set.of(
-                    "a", "b", "c", "f", "g", "h", "m", "s", "t", "w", "p", "z", "space",
+                    "a", "b", "c", "f", "g", "h", "i", "m", "s", "t", "w", "p", "z", "space",
                     "1", "2", "3", "4", "5", "6", "7", "8", "9", "0",
                     "numpad1", "numpad2", "numpad3", "numpad4", "numpad5",
                     "numpad6", "numpad7", "numpad8", "numpad9", "numpad0");
@@ -227,6 +227,8 @@ public class ChartHoverHotkeyHandler implements ScreenSpacePainterFactory {
         if (!isChartHotkey(normalizedKey)) {
             return;
         }
+        if ("i".equals(normalizedKey)
+                && (event.isShiftDown() || event.isControlDown() || event.isAltDown() || event.isMetaDown())) return;
         if (config == null || !config.isEnabled(IndicatorConfig.FIRE_KEYBOARD_EVENT)) {
             return;
         }
@@ -237,7 +239,7 @@ public class ChartHoverHotkeyHandler implements ScreenSpacePainterFactory {
         }
 
         boolean priceRequired = !(isPriceIndependentHotkey(normalizedKey)
-                || event.isShiftDown() && ("g".equals(normalizedKey) || "h".equals(normalizedKey)));
+                || event.isShiftDown() && Set.of("g", "h").contains(normalizedKey));
         HoverContext hover = resolveCurrentHoverContext(priceRequired);
         if (hover == null) {
             logIgnoredHotkey(event, normalizedKey, priceRequired
@@ -324,7 +326,7 @@ public class ChartHoverHotkeyHandler implements ScreenSpacePainterFactory {
         } else if ("w".equals(normalizedKey)) {
             buttonId = "swap";
             buttonName = "Swap";
-        } else if (isPriceIndependentHotkey(normalizedKey) || shift && ("g".equals(normalizedKey) || "h".equals(normalizedKey))) {
+        } else if (isPriceIndependentHotkey(normalizedKey) || shift && Set.of("g", "h").contains(normalizedKey)) {
             buttonId = normalizedKey; buttonName = "Native " + normalizedKey.toUpperCase();
         } else {
             return;

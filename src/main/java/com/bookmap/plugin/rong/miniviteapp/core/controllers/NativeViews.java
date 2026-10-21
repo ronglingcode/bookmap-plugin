@@ -66,7 +66,13 @@ public final class NativeViews {
         if (has) { JsonObject submit = object(active, "submitTime"); long submitMs = (long) (number(submit, "seconds") * 1000 + number(submit, "nanoseconds") / 1000000); double count = number(object(captured, "planConfigs"), "sizingCount"); if (count <= 0) count = number(policy, "batchCount") > 0 ? number(policy, "batchCount") : 10; double exited = 0;
             for (JsonElement item : fills) if (!bool(item.getAsJsonObject(), "positionEffectIsOpen") && number(item.getAsJsonObject(), "timestamp") >= submitMs) exited += number(item.getAsJsonObject(), "quantity");
             core.addProperty("isLong", net > 0); core.addProperty("entryPrice", number(active, "entryPrice")); core.addProperty("coreTarget", number(captured, "coreTarget")); core.addProperty("coreCount", number(captured, "coreCount")); core.addProperty("runnerCondition", string(captured, "runnerTriggerCondition")); core.addProperty("runnerCount", number(captured, "runnerCount")); core.addProperty("corePlan", string(plan, "corePlan")); core.addProperty("bufferedTarget", number(active, "entryPrice") + .9 * (number(captured, "coreTarget") - number(active, "entryPrice"))); core.addProperty("partialsTaken", Workflows.completedPartials(number(active, "initialQuantity"), exited, pairs.size(), count)); core.addProperty("tradeId", symbol + ":" + (net > 0 ? "long" : "short") + ":" + submitMs); }
-        result.add(core); result.addAll(vwapPoints(view)); return result;
+        result.add(core);
+        JsonObject entryBid = msg(view, "entry_bid_reclaim_config");
+        entryBid.addProperty("isShort", net < 0);
+        entryBid.addProperty("entryBidToReclaim", net < 0 ? number(active, "entryBidToReclaim") : 0);
+        entryBid.addProperty("averagePrice", number(position, "averagePrice"));
+        result.add(entryBid);
+        result.addAll(vwapPoints(view)); return result;
     }
     private static JsonObject marketLevels(JsonObject view) {
         JsonObject market = object(view, "market"), keys = msg(view, "key_levels_config");

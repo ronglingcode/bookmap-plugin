@@ -312,6 +312,16 @@ public final class TradingRuntime implements AutoCloseable {
         });
     }
     private void publishAccount() { List<String> symbols; synchronized (lock) { if (stopped || config == null) return; accountSymbols.addAll(config.symbols); for (String field : new String[]{"positions", "entryOrders", "exitPairs", "executions"}) accountSymbols.addAll(object(account, field).keySet()); symbols = new ArrayList<>(accountSymbols); }
+        boolean clearedEntryBid = false;
+        synchronized (lock) {
+            for (String symbol : symbols) {
+                if (number(object(object(account, "positions"), symbol), "netQuantity") >= 0
+                        && number(state.direction(symbol, false), "entryBidToReclaim") > 0) {
+                    state.direction(symbol, false).remove("entryBidToReclaim"); clearedEntryBid = true;
+                }
+            }
+        }
+        if (clearedEntryBid) persistState();
         symbols.forEach(symbol -> { publishInputs(symbol); events.message(view(symbol, "account_ready")); }); }
     private void publishDirty() { List<String> symbols; synchronized (lock) { if (stopped) return; symbols = new ArrayList<>(dirty); dirty.clear(); } symbols.forEach(symbol -> { events.message(view(symbol, "market_update")); priceNotifications(symbol); }); }
     public JsonObject view(String symbol, String type) {
@@ -369,6 +379,21 @@ public final class TradingRuntime implements AutoCloseable {
             if (type.equals("account_refresh")) {
                 events.log(symbol, "Manual account refresh requested");
                 refreshAccountWithFollowups(); return true;
+            }
+            if (key.equals("KeyI")) {
+                if (bool(action, "shiftKey") || bool(action, "shift_key")) return true;
+                synchronized (lock) {
+                    if (state == null || number(object(object(account, "positions"), symbol), "netQuantity") >= 0)
+                        throw new IllegalArgumentException("Entry bid to reclaim requires an active short position");
+                    double price = number(action, "price");
+                    if (!(Double.isFinite(price) && price > 0))
+                        throw new IllegalArgumentException("Hover the broken bid price and press I");
+                    JsonObject active = state.direction(symbol, false);
+                    active.addProperty("entryBidToReclaim", Math.round(price * 100) / 100.0);
+                }
+                persistState(); publishInputs(symbol); events.message(view(symbol, "command_state"));
+                events.log(symbol, "Entry bid to reclaim marked; watch Level 1 bid for reclaim");
+                return true;
             }
             if (type.equals("core_plan_update")) { for (String field : new String[]{"coreTarget", "coreCount"}) if (!action.has(field) || !action.get(field).isJsonPrimitive() || !action.getAsJsonPrimitive(field).isNumber() || !Double.isFinite(action.get(field).getAsDouble())) throw new IllegalArgumentException("Invalid core plan input: " + field); synchronized (lock) { if (!bool(policy, "coreTargetEnabled") || state == null || number(object(object(account, "positions"), symbol), "netQuantity") == 0) throw new IllegalArgumentException("No active core plan"); boolean isLong = number(object(object(account, "positions"), symbol), "netQuantity") > 0; state.updateCorePlan(symbol, isLong, Math.round(number(action, "coreTarget") * 100) / 100.0, number(action, "coreCount")); }
                 persistState(); JsonObject view = view(symbol, "command_state"); view.addProperty("requestId", string(action, "requestId")); view.addProperty("updateStatus", "success"); events.message(view); return true; }

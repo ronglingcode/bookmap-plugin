@@ -221,6 +221,32 @@ class TradingRuntimeTest {
             int callsBeforeExport = httpCalls.get(); JsonObject beforeExport = runtime.view("MSFT", "test");
             for (Format format : Format.values()) { String report = runtime.exportExecutions(format); assertTrue(report.contains("AAPL")); assertTrue(report.contains("MSFT")); }
             assertEquals(callsBeforeExport, httpCalls.get()); assertEquals(beforeExport, runtime.view("MSFT", "test"));
+            // Entry-bid marking is persisted and displayed without creating a broker order.
+            positionData.set("[{\"instrument\":{\"symbol\":\"MSFT\",\"assetType\":\"EQUITY\"},\"shortQuantity\":10,\"averagePrice\":20}]");
+            now.addAndGet(3000); runtime.refreshAccount();
+            int mutationsBeforeMarker = mutations.get();
+            runtime.dispatch(json("{\"symbol\":\"MSFT\",\"keyCode\":\"KeyI\",\"price\":19.95}"));
+            JsonObject shortTrade = runtime.view("MSFT", "test").getAsJsonObject("state")
+                    .getAsJsonObject("stateBySymbol").getAsJsonObject("MSFT").getAsJsonObject("breakoutTradeStateForShort");
+            assertEquals(19.95, shortTrade.get("entryBidToReclaim").getAsDouble());
+            assertEquals(19.95, com.bookmap.plugin.rong.miniviteapp.core.controllers.NativeViews
+                    .project(runtime.view("MSFT", "command_state")).stream()
+                    .filter(message -> message.get("type").getAsString().equals("entry_bid_reclaim_config"))
+                    .findFirst().orElseThrow().get("entryBidToReclaim").getAsDouble());
+            runtime.dispatch(json("{\"symbol\":\"MSFT\",\"keyCode\":\"KeyI\",\"shiftKey\":true}"));
+            assertEquals(19.95, runtime.view("MSFT", "test").getAsJsonObject("state").getAsJsonObject("stateBySymbol")
+                    .getAsJsonObject("MSFT").getAsJsonObject("breakoutTradeStateForShort").get("entryBidToReclaim").getAsDouble());
+            runtime.dispatch(json("{\"symbol\":\"MSFT\",\"keyCode\":\"KeyI\",\"shift_key\":true,\"price\":20.2}"));
+            assertEquals(19.95, runtime.view("MSFT", "test").getAsJsonObject("state").getAsJsonObject("stateBySymbol")
+                    .getAsJsonObject("MSFT").getAsJsonObject("breakoutTradeStateForShort").get("entryBidToReclaim").getAsDouble());
+            runtime.dispatch(json("{\"symbol\":\"MSFT\",\"keyCode\":\"KeyI\",\"price\":20.1}"));
+            positionData.set("[]"); now.addAndGet(3000); runtime.refreshAccount();
+            assertFalse(runtime.view("MSFT", "test").getAsJsonObject("state").getAsJsonObject("stateBySymbol")
+                    .getAsJsonObject("MSFT").getAsJsonObject("breakoutTradeStateForShort").has("entryBidToReclaim"));
+            runtime.dispatch(json("{\"symbol\":\"MSFT\",\"keyCode\":\"KeyI\",\"price\":20.1}"));
+            assertTrue(logs.stream().anyMatch(line -> line.contains("requires an active short position")));
+            assertEquals(mutationsBeforeMarker, mutations.get());
+            runtime.pendingPersistence().get(2, TimeUnit.SECONDS);
             long sameDay = now.get(); now.addAndGet(86400000);
             assertThrows(IllegalStateException.class, () -> runtime.exportExecutions(Format.SUMMARY), "Yesterday's cached fills must not be exported as today"); now.set(sameDay);
             runtime.pendingPersistence().get(2, TimeUnit.SECONDS);

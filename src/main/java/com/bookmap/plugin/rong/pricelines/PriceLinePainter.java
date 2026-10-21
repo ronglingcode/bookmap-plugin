@@ -177,9 +177,10 @@ public class PriceLinePainter implements ScreenSpacePainterFactory {
             g.setColor(color);
             if (line.getType() == PriceLine.LineType.KEY_LEVEL
                     || line.getType() == PriceLine.LineType.EXIT_ORDER
-                    || line.getType() == PriceLine.LineType.ENTRY_ORDER) {
+                    || line.getType() == PriceLine.LineType.ENTRY_ORDER
+                    || line.getType() == PriceLine.LineType.ENTRY_BID_RECLAIM) {
                 // Solid line for key levels and broker-managed orders
-                g.setStroke(new BasicStroke(LINE_THICKNESS));
+                g.setStroke(new BasicStroke(line.getType() == PriceLine.LineType.ENTRY_BID_RECLAIM ? 4 : LINE_THICKNESS));
             } else {
                 // Dashed for auto-drawn indicators
                 g.setStroke(new BasicStroke(LINE_THICKNESS, BasicStroke.CAP_BUTT, BasicStroke.JOIN_MITER,
@@ -191,7 +192,8 @@ public class PriceLinePainter implements ScreenSpacePainterFactory {
             // Use custom label if set (KEY_LEVEL lines have user-defined text), else use LineType.label
             String labelText = line.getCustomLabel() != null ? line.getCustomLabel() : line.getType().label;
             String label = labelText + " " + String.format("%.2f", line.getRealPrice());
-            g.setFont(LABEL_FONT);
+            boolean entryBid = line.getType() == PriceLine.LineType.ENTRY_BID_RECLAIM;
+            g.setFont(entryBid ? LABEL_FONT.deriveFont(13f) : LABEL_FONT);
             FontMetrics fm = g.getFontMetrics();
             int textWidth = fm.stringWidth(label);
             int textHeight = fm.getHeight();
@@ -201,11 +203,11 @@ public class PriceLinePainter implements ScreenSpacePainterFactory {
             int labelY = lineY - textHeight / 2 - 1;
 
             // Background rectangle
-            g.setColor(new Color(color.getRed(), color.getGreen(), color.getBlue(), 180));
+            g.setColor(new Color(color.getRed(), color.getGreen(), color.getBlue(), entryBid ? 255 : 180));
             g.fillRect(labelX - padding, labelY, textWidth + padding * 2, textHeight + 2);
 
             // Label text
-            g.setColor(Color.WHITE);
+            g.setColor(entryBid ? Color.BLACK : Color.WHITE);
             g.drawString(label, labelX, lineY + fm.getAscent() / 2 - 1);
 
             g.dispose();

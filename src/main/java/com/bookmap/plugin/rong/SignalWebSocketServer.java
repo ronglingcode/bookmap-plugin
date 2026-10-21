@@ -25,6 +25,10 @@ import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 
 public class SignalWebSocketServer extends WebSocketServer {
+    private com.bookmap.plugin.rong.pricelines.EntryBidReclaimManager entryBidReclaimManager;
+    public void setEntryBidReclaimStore(com.bookmap.plugin.rong.pricelines.PriceLineStore store) {
+        entryBidReclaimManager = new com.bookmap.plugin.rong.pricelines.EntryBidReclaimManager(store);
+    }
     private final HotkeyRiskSelection hotkeyRiskSelection = new HotkeyRiskSelection();
 
     public HotkeyRiskSelection getHotkeyRiskSelection() {
@@ -79,6 +83,8 @@ public class SignalWebSocketServer extends WebSocketServer {
         String clean = SymbolUtils.cleanSymbol(symbol);
         OrderBookState book = symbolToOrderBook.get(clean); Double pips = symbolToPips.get(clean);
         if (book == null || pips == null || !Double.isFinite(pips) || pips <= 0) return;
+        if (entryBidReclaimManager != null) entryBidReclaimManager.onBid(clean,
+                bid > 0 ? BookmapPriceNormalizer.toWirePrice(bid, pips) : Double.NaN);
         sessionOrderSizes.computeIfAbsent(clean, ignored -> new SessionOrderSizeTracker()).onBbo(
                 bid > 0 ? BookmapPriceNormalizer.toWirePrice(bid, pips) : Double.NaN,
                 ask > 0 ? BookmapPriceNormalizer.toWirePrice(ask, pips) : Double.NaN, timestampNs, book, pips);
@@ -282,10 +288,12 @@ public class SignalWebSocketServer extends WebSocketServer {
     public void registerSymbol(String symbol, OrderBookState orderBook, double pips) {
         symbolToOrderBook.put(symbol, orderBook);
         symbolToPips.put(symbol, pips);
+        if (entryBidReclaimManager != null) entryBidReclaimManager.register(symbol, pips);
     }
 
     /** Unregister a symbol when its plugin instance stops. */
     public void unregisterSymbol(String symbol) {
+        if (entryBidReclaimManager != null) entryBidReclaimManager.unregister(symbol);
         com.bookmap.plugin.rong.signal.CairoPatternFeed feed = patternFeeds.remove(symbol);
         if (feed != null) {
             feed.close(); observationWorker.execute(() -> { JsonObject terminal = feed.terminal(); if (terminal != null) broadcast(terminal.toString()); });
@@ -698,6 +706,11 @@ public class SignalWebSocketServer extends WebSocketServer {
             }
             if ("core_plan_config".equals(type)) {
                 handleCorePlanConfig(json);
+                return;
+            }
+            if ("entry_bid_reclaim_config".equals(type) && entryBidReclaimManager != null) {
+                entryBidReclaimManager.update(getString(json, "symbol"), getBoolean(json, "isShort"),
+                        getWirePrice(json, "entryBidToReclaim"), getWirePrice(json, "averagePrice"));
                 return;
             }
         }
@@ -1449,7 +1462,8 @@ public class SignalWebSocketServer extends WebSocketServer {
                 || "exit_order_pair_config".equals(type)
                 || "account_state".equals(type)
                 || "vwap_update".equals(type)
-                || "core_plan_config".equals(type);
+                || "core_plan_config".equals(type)
+                || "entry_bid_reclaim_config".equals(type);
     }
 
     private String getString(JsonObject json, String field) {

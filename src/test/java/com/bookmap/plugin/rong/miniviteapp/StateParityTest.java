@@ -32,7 +32,10 @@ class StateParityTest {
                     }
                     result = state.snapshot(); JsonObject detached = state.snapshot(); detached.addProperty("date", "mutated"); assertNotEquals("mutated", state.snapshot().get("date").getAsString());
                 } else switch (kind + ":" + fixture.get("method").getAsString()) {
-                    case "views:nativeViews": { JsonArray messages = new JsonArray(); NativeViews.project(args.get(0).getAsJsonObject()).forEach(messages::add); result = messages; break; }
+                    // The entry-bid reminder extends the legacy display protocol; covered separately.
+                    case "views:nativeViews": { JsonArray messages = new JsonArray(); NativeViews.project(args.get(0).getAsJsonObject()).stream()
+                            .filter(message -> !message.get("type").getAsString().equals("entry_bid_reclaim_config"))
+                            .forEach(messages::add); result = messages; break; }
                     case "views:positionRisk": result = new JsonPrimitive(NativeViews.positionRisk(args.get(0).getAsDouble(), args.get(1).getAsDouble(), args.get(2).getAsJsonArray(), args.get(3).getAsDouble(), args.get(4).getAsDouble())); break;
                     case "workflow:buyingPowerTargets": result = Workflows.buyingPowerTargets(args.get(0).getAsJsonArray(), args.get(1).getAsDouble(), args.get(2).getAsDouble()); break;
                     case "workflow:firstVwapTouch": result = Workflows.firstVwapTouch(args.get(0).getAsJsonObject(), args.get(1).isJsonNull() ? null : args.get(1).getAsJsonObject(), args.get(2).getAsDouble(), args.get(3).getAsDouble()); break;

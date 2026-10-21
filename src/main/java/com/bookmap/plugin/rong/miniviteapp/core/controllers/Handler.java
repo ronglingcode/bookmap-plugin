@@ -68,6 +68,7 @@ public final class Handler {
         }
     }
     private static void checkAdjustment(Snapshot state, ExitPair pair, double price, boolean stop) {
+        if (!stop) EntryBidReclaimRules.check(state, pair.originalPartial);
         Order leg = stop ? pair.stop : pair.limit;
         Models.require(leg != null && Models.positive(leg.price), "missing exit leg price");
         boolean earlier = stop ? (state.netQuantity > 0 ? price > leg.price : price < leg.price)

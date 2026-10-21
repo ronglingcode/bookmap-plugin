@@ -15,6 +15,7 @@ class WorkflowExecutionTest {
             JsonObject state = ExtendedExecutionPlanTest.longState(); state.addProperty("netQuantity", isLong ? 53 : -53);
             state.addProperty("currentPrice", 10); state.addProperty("entryPrice", 20); state.addProperty("batchCount", 10);
             JsonObject context = state.getAsJsonObject("entryContext"); context.add("activeTrade", new JsonObject());
+            if (!isLong) context.getAsJsonObject("activeTrade").addProperty("entryBidToReclaim", 11);
             context.addProperty("lowOfDay", 9); context.addProperty("highOfDay", 11);
             for (JsonElement item : state.getAsJsonArray("pairs")) for (String leg : new String[]{"LIMIT", "STOP"}) {
                 JsonObject pair = item.getAsJsonObject(); if (pair.has(leg)) pair.getAsJsonObject(leg).addProperty("isBuy", !isLong);
