@@ -141,7 +141,12 @@ class TradingRuntimeTest {
             String account = "{\"positions\":" + positionData.get() + ",\"currentBalances\":{\"liquidationValue\":25000}}";
             if (path.endsWith("/accounts")) { accountReads.incrementAndGet(); if (limited.get()) return new HttpPort.Response(429, "", Map.of("Retry-After", "60")); return new HttpPort.Response(200, "[{\"securitiesAccount\":" + account + "}]"); }
             if (path.endsWith("/accounts/fake-account")) return new HttpPort.Response(200, "{\"securitiesAccount\":" + account + "}");
-            if (path.endsWith("/orders")) { if (method.equals("POST")) { mutations.incrementAndGet(); return new HttpPort.Response(201, "", Map.of("Location", "https://fake.invalid/orders/123")); } return new HttpPort.Response(200, orderData.get()); }
+            if (path.endsWith("/orders")) {
+                if (method.equals("POST")) { mutations.incrementAndGet(); return new HttpPort.Response(201, "", Map.of("Location", "https://fake.invalid/orders/123")); }
+                assertEquals("fromEnteredTime=2026-10-01T00:00:00.000Z&toEnteredTime=2026-10-02T00:00:00.000Z&maxResults=500", uri.getQuery(),
+                        "Startup, account refresh and cancellation reads must request only today's orders");
+                return new HttpPort.Response(200, orderData.get());
+            }
             if (path.endsWith("/userPreference")) return new HttpPort.Response(200, "{\"streamerInfo\":[{\"streamerSocketUrl\":\"wss://fake.invalid\",\"schwabClientCustomerId\":\"customer\",\"schwabClientCorrelId\":\"correl\",\"schwabClientChannel\":\"channel\",\"schwabClientFunctionId\":\"function\"}]}");
             if (path.contains("/reference/")) return new HttpPort.Response(200, "{\"results\":{\"weighted_shares_outstanding\":1000000000}}");
             if (path.contains("/v3/trades/")) return new HttpPort.Response(200, "{\"results\":[]}");

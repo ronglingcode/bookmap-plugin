@@ -101,7 +101,7 @@ public final class TradingRuntime implements AutoCloseable {
                 String token = oauth.accessToken(false), date = MarketClock.marketTime(now.getAsLong()).date;
                 long readStartedAt = now.getAsLong();
                 JsonObject raw = reads.getAccount(token);
-                JsonArray orders = reads.getOrders(accountHash(), token, date, false, 59);
+                JsonArray orders = reads.getOrders(accountHash(), token, date, false);
                 logNativeOrders(orders, date);
                 JsonObject projected = AccountProjection.projectAccount(raw, orders, date, this::price);
                 logNativeFills(projected, date);
@@ -248,7 +248,7 @@ public final class TradingRuntime implements AutoCloseable {
             try {
                 String token = oauth.accessToken(false), date = MarketClock.marketTime(now.getAsLong()).date;
                 long readStartedAt = now.getAsLong();
-                JsonObject raw = reads.getAccount(token); JsonArray orders = reads.getOrders(accountHash(), token, date, false, 59);
+                JsonObject raw = reads.getAccount(token); JsonArray orders = reads.getOrders(accountHash(), token, date, false);
                 logNativeOrders(orders, date);
                 JsonObject projected = AccountProjection.projectAccount(raw, orders, date, this::price);
                 logNativeFills(projected, date);
@@ -418,7 +418,7 @@ public final class TradingRuntime implements AutoCloseable {
         try {
             events.detail(symbol, "Cancel requested; refreshing broker orders before selecting entries; no cancellation attempted yet");
             String token = oauth.accessToken(false), date = MarketClock.marketTime(now.getAsLong()).date;
-            JsonArray orders = reads.getOrders(accountHash(), token, date, false, 59);
+            JsonArray orders = reads.getOrders(accountHash(), token, date, false);
             logNativeOrders(orders, date);
             // Project only order state; do not overwrite the cached positions or trade ledger.
             JsonObject raw = new JsonObject(), balances = new JsonObject();

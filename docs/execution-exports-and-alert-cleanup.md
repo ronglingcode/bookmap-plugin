@@ -64,8 +64,10 @@ orders by ID. The cap check conservatively includes nested order records rather
 than just top-level orders, while excluding older working trees outside each
 requested range. Fills from children returned both separately and in a bracket
 are counted once per order, preserving that order's individual partial fills.
-Account reads include the preceding 59 days so older orders filled
-today contribute to today's export. If a one-millisecond range still reaches the
+Bookmap startup, account refreshes and entry-cancellation reads request only
+today's order history for the day-trading workflow. Orders entered on prior days
+are not explicitly retrieved. ViteApp currently retains its 59-day lookback.
+If a one-millisecond range still reaches the
 500-order request limit, or a later request fails, the refresh fails rather than
 replacing the cache with incomplete history; exports continue to use the last
 completed refresh.
