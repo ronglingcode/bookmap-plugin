@@ -50,6 +50,22 @@ class StrictLiquidityEntryTest {
     private double quantity(Plan plan) {
         return plan.requests.get(0).body.getAsJsonArray("orderLegCollection").get(0).getAsJsonObject().get("quantity").getAsDouble();
     }
+    @Test void historicalFillQualifiesLateAttachmentOnceHistoryCatchesUp() {
+        SignalWebSocketServer server = new SignalWebSocketServer(0, 0);
+        server.registerSymbol("TEST", new OrderBookState(), .01);
+        server.beginSessionHistory("TEST");
+        server.observeSessionHistoricalTrade("TEST", 10000, 5000, true, OPEN);
+        assertThrows(IllegalArgumentException.class, () -> BookmapSizeCap.apply(
+                new Snapshot(state(server.entrySizeCap("TEST"))), entry(true, "LIMIT", 100)));
+        server.finishSessionHistory("TEST");
+        for (boolean isLong : new boolean[]{true, false})
+            for (String type : new String[]{"MARKET", "LIMIT", "STOP", "STOP_LIMIT"}) {
+                Plan plan = entry(isLong, type, 100);
+                JsonObject original = plan.requests.get(0).body.deepCopy();
+                BookmapSizeCap.apply(new Snapshot(state(server.entrySizeCap("TEST"))), plan);
+                assertEquals(original, plan.requests.get(0).body);
+            }
+    }
     @Test void strictIsDefaultAndBlocksEvenTheSmallestRequestsWithoutQualifyingLiquidity() {
         var server = server(); JsonObject cap = server.entrySizeCap("TEST");
         assertEquals(Mode.STRICT, BookmapSizeCap.ACTIVE_MODE);

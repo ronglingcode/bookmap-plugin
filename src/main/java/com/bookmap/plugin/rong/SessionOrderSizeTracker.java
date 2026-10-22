@@ -3,7 +3,7 @@ package com.bookmap.plugin.rong;
 import java.time.*;
 import java.util.*;
 
-/** Largest executed volume in a single side/price wall episode since the regular-session open. */
+/** Largest executed wall episode or individual historical print since regular-session open. */
 final class SessionOrderSizeTracker {
     private static final ZoneId NEW_YORK = ZoneId.of("America/New_York");
     private static final long REMOVAL_GRACE_NS = 250_000_000L;
@@ -85,6 +85,16 @@ final class SessionOrderSizeTracker {
         if (largest == null || wall.filled > largest.size)
             largest = new Observation(price, wall.filled, isBid, timestampNs);
     }
+    synchronized void onHistoricalTrade(double price, int size, Boolean buyAggressor, long timestampNs,
+            OrderBookState book, double pips) {
+        // Reconstruct wall episodes when historical depth exists. A single executed
+        // print also proves its own size when cloud history has no matching depth.
+        // Never sum unrelated prints merely because they share a price.
+        onTrade(price, size, buyAggressor, timestampNs, true, book, pips);
+        if (!regular || !Double.isFinite(price) || price <= 0 || size <= 0 || buyAggressor == null) return;
+        if (largest == null || size > largest.size)
+            largest = new Observation(price, size, !buyAggressor, timestampNs, true);
+    }
     synchronized Observation largestObservation() { return largest; }
     synchronized boolean available() { return regular; }
     synchronized String sessionDate() { return date == null ? "" : date.toString(); }
@@ -94,8 +104,13 @@ final class SessionOrderSizeTracker {
         final long size;
         final boolean isBid;
         final long timestampNs;
+        final boolean historicalPrint;
         Observation(double price, long size, boolean isBid, long timestampNs) {
+            this(price, size, isBid, timestampNs, false);
+        }
+        Observation(double price, long size, boolean isBid, long timestampNs, boolean historicalPrint) {
             this.price = price; this.size = size; this.isBid = isBid; this.timestampNs = timestampNs;
+            this.historicalPrint = historicalPrint;
         }
     }
 }

@@ -43,6 +43,7 @@ import velox.api.layer1.messages.indicators.AliasFilter;
 import velox.api.layer1.messages.indicators.Layer1ApiUserMessageModifyIndicator.GraphType;
 import velox.api.layer1.messages.indicators.Layer1ApiUserMessageModifyScreenSpacePainter;
 import velox.api.layer1.simplified.Api;
+import velox.api.layer1.simplified.BackfilledDataListener;
 import velox.api.layer1.simplified.BboListener;
 import velox.api.layer1.simplified.CustomModuleAdapter;
 import velox.api.layer1.simplified.DepthDataListener;
@@ -60,7 +61,7 @@ import velox.gui.StrategyPanel;
 @UnrestrictedData
 public class RongPlugin implements CustomModuleAdapter,
         DepthDataListener, TradeDataListener, TimeListener,
-        SnapshotEndListener, BboListener, HistoricalModeListener,
+        SnapshotEndListener, BboListener, HistoricalModeListener, BackfilledDataListener,
         CustomSettingsPanelProvider, IndicatorConfig.ChangeListener {
 
     private static final int WS_PORT = 8765;
@@ -124,6 +125,9 @@ public class RongPlugin implements CustomModuleAdapter,
     private volatile boolean signalCompositionEnabled;
     private volatile boolean compositionSnapshotComplete;
     private volatile boolean patternMonitorSnapshotComplete;
+    // HistoricalModeListener delivers stored callbacks before onRealtimeStart.
+    // Keep their liquidity evidence separate from live pattern snapshot readiness.
+    private boolean sessionHistoryLoading = true;
     private volatile boolean compositionSeedFromSharedBook = true;
     private final Object compositionLock = new Object();
     private final com.bookmap.plugin.rong.patterns.CairoObservationConfig observationConfig = com.bookmap.plugin.rong.patterns.CairoObservationConfig.load();
@@ -142,6 +146,7 @@ public class RongPlugin implements CustomModuleAdapter,
         if (!LocalCredentials.fileExists() && !observationConfig.observerOnly) return;
         this.rawAlias = alias;
         patternMonitorSnapshotComplete = false;
+        sessionHistoryLoading = true;
         String cleanAlias = SymbolUtils.cleanSymbol(alias);
         this.alias = cleanAlias;
         this.api = api;
@@ -265,6 +270,7 @@ public class RongPlugin implements CustomModuleAdapter,
         tradingSignalPainter.registerInstrument(cleanAlias);
         indicatorConfig.addChangeListener(this);
         sharedServer.registerSymbol(cleanAlias, orderBook, info.pips);
+        sharedServer.beginSessionHistory(cleanAlias);
         if (observationConfig.exportsPatterns(cleanAlias) && signalComposition != null) {
             sharedServer.registerPatterns(cleanAlias, new com.bookmap.plugin.rong.signal.CairoPatternFeed(
                     reconnect -> cairoPatternSnapshot(reconnect), observationConfig.captureEvidence));
@@ -725,8 +731,13 @@ public class RongPlugin implements CustomModuleAdapter,
         }
         if (sharedServer != null) {
             sharedServer.observeSessionTime(alias, lastTimestampNs);
-            sharedServer.observeSessionTrade(alias, priceTick, size, tradeInfo == null ? null : tradeInfo.isBidAggressor,
-                    lastTimestampNs, patternMonitorSnapshotComplete);
+            if (sessionHistoryLoading) {
+                sharedServer.observeSessionHistoricalTrade(alias, priceTick, size,
+                        tradeInfo == null ? null : tradeInfo.isBidAggressor, lastTimestampNs);
+            } else {
+                sharedServer.observeSessionTrade(alias, priceTick, size, tradeInfo == null ? null : tradeInfo.isBidAggressor,
+                        lastTimestampNs, patternMonitorSnapshotComplete);
+            }
             sharedServer.updateRegularSessionHighLow(alias, realPrice, eventTimeNs);
         }
         if (bidBreakdownMonitor != null) {
@@ -822,6 +833,8 @@ public class RongPlugin implements CustomModuleAdapter,
     @Override
     public void onRealtimeStart() {
         if (!initialized) return;
+        sessionHistoryLoading = false;
+        if (sharedServer != null) sharedServer.finishSessionHistory(alias);
         patternMonitorSnapshotComplete = true;
         compositionSnapshotComplete = true;
         // This callback alone does not prove a live provider (replay can catch up).

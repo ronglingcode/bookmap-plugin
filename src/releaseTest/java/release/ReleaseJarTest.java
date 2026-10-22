@@ -26,6 +26,7 @@ import velox.api.layer1.annotations.Layer1SimpleAttachable;
 import velox.api.layer1.annotations.Layer1StrategyName;
 import velox.api.layer1.annotations.UnrestrictedData;
 import velox.api.layer1.simplified.BboListener;
+import velox.api.layer1.simplified.BackfilledDataListener;
 import velox.api.layer1.simplified.CustomModuleAdapter;
 import velox.api.layer1.simplified.CustomSettingsPanelProvider;
 import velox.api.layer1.simplified.DepthDataListener;
@@ -117,7 +118,7 @@ class ReleaseJarTest {
         assertEquals(Layer1ApiVersionValue.VERSION2, type.getAnnotation(Layer1ApiVersion.class).value());
         Object plugin = type.getConstructor().newInstance();
         for (Class<?> contract : List.of(CustomModuleAdapter.class, DepthDataListener.class, TradeDataListener.class,
-                TimeListener.class, SnapshotEndListener.class, BboListener.class, HistoricalModeListener.class,
+                TimeListener.class, SnapshotEndListener.class, BboListener.class, HistoricalModeListener.class, BackfilledDataListener.class,
                 CustomSettingsPanelProvider.class)) {
             assertTrue(contract.isInstance(plugin), contract.getName());
             for (Method callback : contract.getMethods()) {

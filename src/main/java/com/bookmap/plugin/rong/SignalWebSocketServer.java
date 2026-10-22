@@ -55,6 +55,24 @@ public class SignalWebSocketServer extends WebSocketServer {
     public void setTradingDispatch(java.util.function.Consumer<JsonObject> dispatch) { tradingDispatch = dispatch; }
     private final Map<String, PremarketSizeThreshold> sizeThresholds = new ConcurrentHashMap<>();
     private final Map<String, SessionOrderSizeTracker> sessionOrderSizes = new ConcurrentHashMap<>();
+    private final Set<String> sessionHistoryLoading = ConcurrentHashMap.newKeySet();
+    public void beginSessionHistory(String symbol) { sessionHistoryLoading.add(SymbolUtils.cleanSymbol(symbol)); }
+    public void finishSessionHistory(String symbol) {
+        String clean = SymbolUtils.cleanSymbol(symbol);
+        if (sessionHistoryLoading.remove(clean)) {
+            JsonObject cap = entrySizeCap(clean);
+            PluginLog.detail(clean, "Bookmap session fill history checked: largest=" + cap.get("largestOrderSize")
+                    + " shares; required=" + cap.get("requiredOrderSize") + "; session=" + cap.get("sessionDate"));
+        }
+    }
+    public void observeSessionHistoricalTrade(String symbol, int price, int size, Boolean buyAggressor, long timestampNs) {
+        if (price <= 0 || size <= 0) return;
+        String clean = SymbolUtils.cleanSymbol(symbol);
+        OrderBookState book = symbolToOrderBook.get(clean); Double pips = symbolToPips.get(clean);
+        if (book == null || pips == null || !Double.isFinite(pips) || pips <= 0) return;
+        sessionOrderSizes.computeIfAbsent(clean, ignored -> new SessionOrderSizeTracker()).onHistoricalTrade(
+                BookmapPriceNormalizer.toWirePrice(price, pips), size, buyAggressor, timestampNs, book, pips);
+    }
     public void observeSessionDepth(String symbol, boolean isBid, int price, int size, long timestampNs) {
         if (price <= 0) return;
         String clean = SymbolUtils.cleanSymbol(symbol);
@@ -100,6 +118,9 @@ public class SignalWebSocketServer extends WebSocketServer {
         else synchronized (tracker) {
             fillSizeCap(cap, tracker.largestObservation(), tracker.available(), tracker.sessionDate(), required);
         }
+        boolean loading = sessionHistoryLoading.contains(clean);
+        cap.addProperty("historyLoading", loading);
+        if (loading) cap.addProperty("available", false);
         return cap;
     }
     private static void fillSizeCap(JsonObject cap, SessionOrderSizeTracker.Observation counted,
@@ -109,7 +130,7 @@ public class SignalWebSocketServer extends WebSocketServer {
         cap.addProperty("mode", BookmapSizeCap.ACTIVE_MODE.name()); cap.addProperty("available", available);
         cap.addProperty("maxRiskMultiple", (double) largest / required);
         cap.addProperty("sessionDate", sessionDate);
-        cap.addProperty("evidenceBasis", "wallExecutions");
+        cap.addProperty("evidenceBasis", counted != null && counted.historicalPrint ? "historicalTrade" : "wallExecutions");
         if (counted != null) {
             cap.addProperty("largestOrderPrice", counted.price);
             cap.addProperty("largestOrderSide", counted.isBid ? "bid" : "offer");
@@ -300,6 +321,7 @@ public class SignalWebSocketServer extends WebSocketServer {
         }
         sizeThresholds.remove(symbol);
         sessionOrderSizes.remove(symbol);
+        sessionHistoryLoading.remove(symbol);
         symbolToOrderBook.remove(symbol);
         symbolToPips.remove(symbol);
         symbolToRegularSessionHighLow.remove(symbol);

@@ -38,8 +38,8 @@ public final class BookmapSizeCap {
         if (mode == Mode.STRICT) {
             double largest = Models.number(cap, "largestOrderSize"), required = Models.number(cap, "requiredOrderSize");
             Models.require(Double.isFinite(largest) && largest >= 0 && Models.positive(required), "Bookmap strict liquidity inputs unavailable");
-            Models.require(largest >= required, "Bookmap STRICT: ENTRY BLOCKED; largest filled wall=" + largest
-                    + " shares; required=" + required + " shares (executed volume at one wall since market open)");
+            Models.require(largest >= required, "Bookmap STRICT: ENTRY BLOCKED; largest executed size=" + largest
+                    + " shares; required=" + required + " shares (wall executions or historical trade since market open)");
             if (plan.entry != null) plan.entry.add("bookmapSizeCap", cap.deepCopy());
             return;
         }

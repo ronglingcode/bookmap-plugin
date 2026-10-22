@@ -26,5 +26,8 @@ class StrictLiquidityModeTest {
         assertFalse(TradeButtonWindow.liquidityStatusText(qualified).contains("ENTRY BLOCKED"));
         assertTrue(TradeButtonWindow.liquidityStatusText(qualified).contains("executions at one wall"));
         assertFalse(TradeButtonWindow.liquidityStatusText(qualified).contains("trigger price"));
+        qualified.addProperty("historyLoading", true);
+        assertTrue(TradeButtonWindow.liquidityStatusText(qualified).contains("checking fills since market open"));
+        assertFalse(TradeButtonWindow.liquidityStatusText(qualified).contains("threshold met"));
     }
 }

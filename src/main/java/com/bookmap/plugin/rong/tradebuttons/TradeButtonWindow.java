@@ -578,15 +578,18 @@ public class TradeButtonWindow {
         long largest = cap.get("largestOrderSize").getAsLong();
         int required = cap.get("requiredOrderSize").getAsInt();
         if (BookmapSizeCap.mode(cap) == Mode.STRICT) {
+            if (cap.has("historyLoading") && cap.get("historyLoading").getAsBoolean())
+                return "Max filled: " + formatShareSize(largest) + " | Required: " + formatShareSize(required)
+                        + "<br><b>STRICT: checking fills since market open</b>";
             boolean qualified = (!cap.has("available") || cap.get("available").getAsBoolean()) && largest >= required;
             return "Max filled: " + formatShareSize(largest) + " | Required: " + formatShareSize(required)
                     + "<br><b>STRICT: " + (qualified ? "liquidity threshold met" : "ENTRY BLOCKED until qualifying fills")
-                    + "</b><br>Requires executions at one wall since market open.";
+                    + "</b><br>Accepts executions at one wall or a historical trade since market open.";
         }
         return "Max filled: " + formatShareSize(largest) + " | Cap: "
                 + String.format(Locale.US, "%.2fR", cap.get("maxRiskMultiple").getAsDouble())
                 + "<br>PROPORTIONAL: size capped by qualifying liquidity"
-                + "<br>Requires executions at one wall since market open.";
+                + "<br>Accepts executions at one wall or a historical trade since market open.";
     }
 
     private void setConnectionStatus(NativeConnectionStatus.Snapshot status) {
@@ -858,8 +861,8 @@ public class TradeButtonWindow {
         String capText = liquidityStatusText(cap);
         String capDescription = BookmapSizeCap.mode(cap) == Mode.NORMAL_1R
                 ? "Normal mode: 1R total risk ceiling; existing position and pending entries consume this budget. No qualifying wall fills required."
-                : "Largest accumulated executions at one bid/offer wall since market open. Canceled size does not count. "
-                + (strict ? String.format(Locale.US, "Strict blocks all opening orders until a wall has filled at least %,d shares. ", required)
+                : "Largest executed wall episode or single historical trade since market open. Canceled size does not count. "
+                + (strict ? String.format(Locale.US, "Strict requires at least %,d executed shares in one wall episode or historical trade. ", required)
                         : String.format(Locale.US, "%,d / %,d = %.6fR total risk ceiling; existing position and pending entries consume this budget. ", largest, required, cappedR));
         if (cap.has("largestOrderPrice")) {
             String observed = java.time.Instant.ofEpochMilli(cap.get("largestOrderObservedAt").getAsLong())
