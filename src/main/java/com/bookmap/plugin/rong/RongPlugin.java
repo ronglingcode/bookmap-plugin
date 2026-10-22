@@ -674,6 +674,9 @@ public class RongPlugin implements CustomModuleAdapter,
     @Override
     public void onDepth(boolean isBid, int price, int size) {
         if (!initialized) return;
+        // Discard absent/invalid price levels before any tracker or shared book sees them.
+        // A zero size at a positive price is a valid level removal.
+        if (price <= 0) return;
         long eventTimeNs = getEventTimeNs();
         PatternEvent.TimestampProvenance provenance = compositionProvenance();
         if (wallChangeTracker != null) {

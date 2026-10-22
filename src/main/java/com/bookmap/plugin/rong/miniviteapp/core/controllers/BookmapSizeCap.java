@@ -9,16 +9,17 @@ import java.util.*;
 public final class BookmapSizeCap {
     private BookmapSizeCap() { }
     public enum Mode {
-        STRICT("Strict - block below threshold"), PROPORTIONAL("Proportional - cap R");
+        STRICT("Strict - block below threshold"), PROPORTIONAL("Proportional - cap R"),
+        NORMAL_1R("Normal - cap at 1R");
         private final String label;
         Mode(String label) { this.label = label; }
         @Override public String toString() { return label; }
     }
-    /** Programmer-only switch: change this constant and rebuild to restore proportional sizing. */
+    /** Programmer-only switch for the liquidity policy used by this build. */
     public static final Mode ACTIVE_MODE = Mode.STRICT;
 
     public static Mode mode(JsonObject cap) {
-        return cap.has("mode") ? Mode.valueOf(Models.string(cap, "mode")) : Mode.STRICT;
+        return cap.has("mode") ? Mode.valueOf(Models.string(cap, "mode")) : ACTIVE_MODE;
     }
 
     public static boolean hasOpening(Plan plan) {
@@ -31,8 +32,10 @@ public final class BookmapSizeCap {
         for (Request request : plan.requests) if (opening(request.body)) openings.add(request);
         if (openings.isEmpty()) return; // Exits and stop adjustments are never restricted.
         JsonObject cap = state.entryContext.getAsJsonObject("bookmapSizeCap");
-        Models.require(!cap.has("available") || Models.bool(cap, "available"), "Bookmap liquidity session unavailable");
-        if (mode(cap) == Mode.STRICT) {
+        Mode mode = mode(cap);
+        if (mode != Mode.NORMAL_1R)
+            Models.require(!cap.has("available") || Models.bool(cap, "available"), "Bookmap liquidity session unavailable");
+        if (mode == Mode.STRICT) {
             double largest = Models.number(cap, "largestOrderSize"), required = Models.number(cap, "requiredOrderSize");
             Models.require(Double.isFinite(largest) && largest >= 0 && Models.positive(required), "Bookmap strict liquidity inputs unavailable");
             Models.require(largest >= required, "Bookmap STRICT: ENTRY BLOCKED; largest filled wall=" + largest
@@ -40,7 +43,8 @@ public final class BookmapSizeCap {
             if (plan.entry != null) plan.entry.add("bookmapSizeCap", cap.deepCopy());
             return;
         }
-        double multiple = Models.number(cap, "maxRiskMultiple");
+        // Normal mode uses a fixed budget even when fill history is missing or stale.
+        double multiple = mode == Mode.NORMAL_1R ? 1 : Models.number(cap, "maxRiskMultiple");
         double unitRisk = Models.number(state.entryContext, "riskDollars");
         Models.require(Double.isFinite(multiple) && multiple >= 0 && Models.positive(unitRisk), "Bookmap size cap unavailable");
         boolean isLong = instruction(openings.get(0).body).equals("BUY");

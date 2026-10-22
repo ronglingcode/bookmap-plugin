@@ -573,6 +573,8 @@ public class TradeButtonWindow {
     }
 
     static String liquidityStatusText(JsonObject cap) {
+        if (BookmapSizeCap.mode(cap) == Mode.NORMAL_1R)
+            return "NORMAL 1R: risk capped at 1.00R<br>No qualifying wall fills required.";
         long largest = cap.get("largestOrderSize").getAsLong();
         int required = cap.get("requiredOrderSize").getAsInt();
         if (BookmapSizeCap.mode(cap) == Mode.STRICT) {
@@ -854,7 +856,9 @@ public class TradeButtonWindow {
         wallThresholdLabel.setBackground(blocked ? new Color(255, 220, 220) : THRESHOLD_BACKGROUND);
         wallThresholdLabel.setForeground(blocked ? new Color(150, 20, 20) : THRESHOLD_TEXT_COLOR);
         String capText = liquidityStatusText(cap);
-        String capDescription = "Largest accumulated executions at one bid/offer wall since market open. Canceled size does not count. "
+        String capDescription = BookmapSizeCap.mode(cap) == Mode.NORMAL_1R
+                ? "Normal mode: 1R total risk ceiling; existing position and pending entries consume this budget. No qualifying wall fills required."
+                : "Largest accumulated executions at one bid/offer wall since market open. Canceled size does not count. "
                 + (strict ? String.format(Locale.US, "Strict blocks all opening orders until a wall has filled at least %,d shares. ", required)
                         : String.format(Locale.US, "%,d / %,d = %.6fR total risk ceiling; existing position and pending entries consume this budget. ", largest, required, cappedR));
         if (cap.has("largestOrderPrice")) {

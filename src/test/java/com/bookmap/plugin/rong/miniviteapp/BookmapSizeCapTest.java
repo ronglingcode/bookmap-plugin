@@ -27,6 +27,30 @@ class BookmapSizeCapTest {
     private double shares(Plan plan) {
         return plan.requests.stream().mapToDouble(r -> r.body.getAsJsonArray("orderLegCollection").get(0).getAsJsonObject().get("quantity").getAsDouble()).sum();
     }
+    @Test void normalModeCapsAtOneRiskRegardlessOfRecordedLiquidity() {
+        for (boolean isLong : new boolean[]{true, false})
+            for (double observed : new double[]{0, .2, 5}) {
+                JsonObject json = state(observed);
+                JsonObject cap = json.getAsJsonObject("entryContext").getAsJsonObject("bookmapSizeCap");
+                cap.addProperty("mode", "NORMAL_1R"); cap.addProperty("available", false);
+                Plan plan = entry(isLong, 2000, 10, isLong ? 9 : 11);
+                BookmapSizeCap.apply(new Snapshot(json), plan);
+                assertEquals(1000, shares(plan));
+                Plan small = entry(isLong, 100, 10, isLong ? 9 : 11);
+                BookmapSizeCap.apply(new Snapshot(json), small);
+                assertEquals(100, shares(small));
+            }
+    }
+    @Test void normalModeSubtractsExistingAndPendingRiskFromOneRiskBudget() {
+        JsonObject json = state(0);
+        json.getAsJsonObject("entryContext").getAsJsonObject("bookmapSizeCap").addProperty("mode", "NORMAL_1R");
+        json.addProperty("netQuantity", 250);
+        json.getAsJsonObject("entryContext").addProperty("lowOfDay", 9);
+        json.add("entries", JsonParser.parseString("[{\"orderID\":\"pending\",\"isBuy\":true,\"quantity\":50,\"price\":10,\"exitStopPrice\":9}]"));
+        Plan plan = entry(true, 2000, 10, 9);
+        BookmapSizeCap.apply(new Snapshot(json), plan);
+        assertEquals(700, shares(plan));
+    }
     @Test void bothSidesUseAbsoluteRatioAndNeverIncreaseSmallerRequests() {
         for (boolean isLong : new boolean[]{true, false}) {
             Snapshot state = new Snapshot(state(5000.0 / 15000));

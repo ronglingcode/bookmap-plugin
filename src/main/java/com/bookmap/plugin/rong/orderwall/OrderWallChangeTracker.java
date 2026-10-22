@@ -225,7 +225,7 @@ public class OrderWallChangeTracker {
     }
 
     public synchronized void onDepth(boolean isBid, int priceTick, int size, long eventTimeNs) {
-        if (shutdown) {
+        if (shutdown || priceTick <= 0) {
             return;
         }
         long nowMs = System.currentTimeMillis();

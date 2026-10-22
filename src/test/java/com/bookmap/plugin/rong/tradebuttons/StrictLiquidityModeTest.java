@@ -10,10 +10,17 @@ class StrictLiquidityModeTest {
         SignalWebSocketServer server = new SignalWebSocketServer(0, 0);
         assertEquals("STRICT", server.entrySizeCap("TEST").get("mode").getAsString());
         assertTrue(TradeButtonWindow.liquidityStatusText(server.entrySizeCap("TEST")).contains("ENTRY BLOCKED"));
+        JsonObject normal = server.entrySizeCap("TEST").deepCopy();
+        normal.addProperty("mode", "NORMAL_1R");
+        assertTrue(TradeButtonWindow.liquidityStatusText(normal).contains("NORMAL 1R"));
+        assertTrue(TradeButtonWindow.liquidityStatusText(normal).contains("No qualifying wall fills required"));
+        assertFalse(TradeButtonWindow.liquidityStatusText(normal).contains("ENTRY BLOCKED"));
         JsonObject proportional = server.entrySizeCap("TEST").deepCopy();
         proportional.addProperty("mode", "PROPORTIONAL");
         assertTrue(TradeButtonWindow.liquidityStatusText(proportional).contains("Cap: 0.00R"));
         JsonObject qualified = server.entrySizeCap("TEST");
+        qualified.addProperty("mode", "STRICT");
+        assertTrue(TradeButtonWindow.liquidityStatusText(qualified).contains("ENTRY BLOCKED"));
         qualified.addProperty("available", true); qualified.addProperty("largestOrderSize", 5000);
         assertTrue(TradeButtonWindow.liquidityStatusText(qualified).contains("threshold met"));
         assertFalse(TradeButtonWindow.liquidityStatusText(qualified).contains("ENTRY BLOCKED"));

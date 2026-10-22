@@ -36,6 +36,11 @@ class StrictLiquidityEntryTest {
         state.getAsJsonObject("entryContext").addProperty("riskDollars", 1000);
         return state;
     }
+    private JsonObject strictCap(SignalWebSocketServer server) {
+        JsonObject cap = server.entrySizeCap("TEST");
+        cap.addProperty("mode", Mode.STRICT.name());
+        return cap;
+    }
     private Plan entry(boolean isLong, String type, double trigger) {
         Plan plan = new Plan("wall_reversal_entry");
         plan.requests.add(new Request("POST", null, OrderFactory.createOneEntryWithTwoExits("TEST", isLong, type, 100, trigger,
@@ -48,6 +53,7 @@ class StrictLiquidityEntryTest {
     @Test void strictIsDefaultAndBlocksEvenTheSmallestRequestsWithoutQualifyingLiquidity() {
         var server = server(); JsonObject cap = server.entrySizeCap("TEST");
         assertEquals(Mode.STRICT, BookmapSizeCap.ACTIVE_MODE);
+        assertEquals(Mode.STRICT, BookmapSizeCap.mode(new JsonObject()));
         assertEquals("STRICT", cap.get("mode").getAsString());
         for (String type : new String[]{"MARKET", "LIMIT"}) for (boolean isLong : new boolean[]{true, false}) {
             Plan plan = entry(isLong, type, isLong ? 104 : 96);
@@ -63,7 +69,7 @@ class StrictLiquidityEntryTest {
         server.updateRegularSessionHighLow("TEST", 104, OPEN + 2);
         for (boolean isLong : new boolean[]{true, false}) for (String type : new String[]{"MARKET", "LIMIT", "STOP", "STOP_LIMIT"})
             assertThrows(IllegalArgumentException.class, () -> BookmapSizeCap.apply(
-                    new Snapshot(state(server.entrySizeCap("TEST"))), entry(isLong, type, isLong ? 104 : 96)));
+                    new Snapshot(state(strictCap(server))), entry(isLong, type, isLong ? 104 : 96)));
     }
     @Test void qualifyingExecutionsUnlockEveryEntryTypeWithoutProspectiveRangeExceptions() {
         var server = server();
@@ -71,15 +77,15 @@ class StrictLiquidityEntryTest {
         for (boolean isLong : new boolean[]{true, false}) for (String type : new String[]{"MARKET", "LIMIT", "STOP", "STOP_LIMIT"}) {
             Plan plan = entry(isLong, type, isLong ? 104 : 96);
             JsonObject original = plan.requests.get(0).body.deepCopy();
-            BookmapSizeCap.apply(new Snapshot(state(server.entrySizeCap("TEST"))), plan);
+            BookmapSizeCap.apply(new Snapshot(state(strictCap(server))), plan);
             assertEquals(original, plan.requests.get(0).body);
         }
         server.observeSessionTime("TEST", OPEN);
-        assertThrows(IllegalArgumentException.class, () -> BookmapSizeCap.apply(new Snapshot(state(server.entrySizeCap("TEST"))), entry(true, "STOP", 104)));
+        assertThrows(IllegalArgumentException.class, () -> BookmapSizeCap.apply(new Snapshot(state(strictCap(server))), entry(true, "STOP", 104)));
     }
     @Test void strictThresholdEqualityUnlocksNormalSizeAndAddsWithoutProportionalReduction() {
         var server = server(); server.observeSessionTrade("TEST", 10000, 4000, false, OPEN, true);
-        JsonObject json = state(server.entrySizeCap("TEST")); json.addProperty("netQuantity", 500);
+        JsonObject json = state(strictCap(server)); json.addProperty("netQuantity", 500);
         json.getAsJsonObject("entryContext").addProperty("lowOfDay", 99);
         for (String action : new String[]{"wall_reversal_entry", "reload_partial", "swap", "refresh_pending_entry"}) {
             Plan plan = entry(true, "LIMIT", 100);
@@ -87,17 +93,37 @@ class StrictLiquidityEntryTest {
             BookmapSizeCap.apply(new Snapshot(json), named); assertEquals(100, quantity(named));
         }
     }
-    @Test void proportionalModeUsesExecutedSizeForEveryEntryType() {
+    @Test void proportionalAllowsEntriesBelowStrictThreshold() {
         var server = server(); JsonObject cap = server.entrySizeCap("TEST").deepCopy();
-        cap.addProperty("mode", Mode.PROPORTIONAL.name()); // Exercise the retained algorithm without exposing a runtime switch.
+        cap.addProperty("mode", Mode.PROPORTIONAL.name());
+        assertEquals(Mode.PROPORTIONAL, BookmapSizeCap.mode(cap));
         Plan normal = entry(true, "LIMIT", 100);
         BookmapSizeCap.apply(new Snapshot(state(cap)), normal); assertEquals(40, quantity(normal));
         Plan stop = entry(true, "STOP", 102);
         BookmapSizeCap.apply(new Snapshot(state(cap)), stop); assertEquals(28, quantity(stop)); // 0.2R / $7 per share.
-        assertThrows(IllegalArgumentException.class, () -> BookmapSizeCap.apply(new Snapshot(state(server.entrySizeCap("TEST"))), entry(true, "LIMIT", 100)));
+        assertThrows(IllegalArgumentException.class, () -> BookmapSizeCap.apply(new Snapshot(state(strictCap(server))), entry(true, "LIMIT", 100)));
+    }
+    @Test void normalOneRiskIgnoresMissingFillHistoryWhenSelected() {
+        SignalWebSocketServer server = new SignalWebSocketServer(0, 0);
+        JsonObject cap = server.entrySizeCap("TEST");
+        cap.addProperty("mode", Mode.NORMAL_1R.name());
+        assertEquals(Mode.NORMAL_1R, BookmapSizeCap.mode(cap));
+        assertFalse(cap.get("available").getAsBoolean());
+        assertEquals(0, cap.get("largestOrderSize").getAsInt());
+        JsonObject json = state(cap);
+        json.addProperty("currentPrice", 100);
+        json.addProperty("bid", 99.99);
+        json.addProperty("ask", 100.01);
+        for (boolean isLong : new boolean[]{true, false})
+            for (String type : new String[]{"MARKET", "LIMIT", "STOP", "STOP_LIMIT"}) {
+                Plan plan = entry(isLong, type, 100);
+                JsonObject original = plan.requests.get(0).body.deepCopy();
+                BookmapSizeCap.apply(new Snapshot(json), plan);
+                assertEquals(original, plan.requests.get(0).body);
+            }
     }
     @Test void strictCannotBypassUnavailableSessionOrBorrowAnotherStopsWiderRangeAndNeverBlocksExits() {
-        var server = server(); JsonObject cap = server.entrySizeCap("TEST");
+        var server = server(); JsonObject cap = strictCap(server);
         Plan plan = entry(true, "STOP", 102); plan.requests.addAll(entry(true, "STOP", 101.99).requests);
         assertThrows(IllegalArgumentException.class, () -> BookmapSizeCap.apply(new Snapshot(state(cap)), plan));
         cap.addProperty("available", false);

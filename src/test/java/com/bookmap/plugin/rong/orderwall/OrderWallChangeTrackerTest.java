@@ -20,6 +20,30 @@ class OrderWallChangeTrackerTest {
     private static final long TEST_SURVIVAL_MS = 60;
 
     @Test
+    void invalidDepthPricesCannotBreakCallbacksOrEmitAlerts() throws Exception {
+        List<OrderWallChangeEvent> events = new CopyOnWriteArrayList<>();
+        CountDownLatch seen = new CountDownLatch(1);
+        OrderWallChangeTracker tracker = rangeTracker(events, seen,
+                () -> 110, () -> 90, () -> 100);
+        try {
+            for (boolean bid : new boolean[]{true, false})
+                for (int price : new int[]{0, -1, Integer.MIN_VALUE})
+                    tracker.onDepth(bid, price, 8_000, 1L);
+            tracker.markReady();
+            for (boolean bid : new boolean[]{true, false})
+                for (int price : new int[]{0, -1, Integer.MIN_VALUE}) {
+                    tracker.onDepth(bid, price, 0, 2L);
+                    tracker.onDepth(bid, price, 16_000, 3L);
+                }
+            tracker.onDepth(true, 10_000, 8_000, 4L);
+            assertTrue(seen.await(1, TimeUnit.SECONDS));
+            assertEquals(1, events.size());
+            assertEquals(10_000, events.get(0).getPriceTick());
+            assertEquals(OrderWallChangeEvent.Type.ADDED, events.get(0).getType());
+        } finally { tracker.shutdown(); }
+    }
+
+    @Test
     void cancellationRangeScalesWithStockPriceAndIncludesBothBoundaries() throws Exception {
         for (double stockPrice : new double[] {10, 500}) {
             double high = stockPrice * 1.1, low = stockPrice * .9;
