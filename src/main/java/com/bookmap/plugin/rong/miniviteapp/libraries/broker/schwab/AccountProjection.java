@@ -70,6 +70,24 @@ public final class AccountProjection {
     private static void add(JsonObject map, String symbol, JsonObject value) {
         if (!map.has(symbol)) map.add(symbol, new JsonArray()); map.getAsJsonArray(symbol).add(value);
     }
+    private static void deduplicateExitPairs(JsonObject pairs) {
+        for (String symbol : new ArrayList<>(pairs.keySet())) {
+            JsonArray candidates = pairs.getAsJsonArray(symbol), unique = new JsonArray();
+            Set<String> seen = new HashSet<>();
+            // Keep bracket membership when a leg also appears as a standalone root.
+            for (boolean standalone : new boolean[]{false, true}) for (JsonElement value : candidates) {
+                JsonObject pair = value.getAsJsonObject();
+                if (string(pair, "source").equals("SINGLE") != standalone) continue;
+                JsonObject kept = pair.deepCopy();
+                for (String role : new String[]{"STOP", "LIMIT"}) if (kept.has(role)) {
+                    String id = string(kept.getAsJsonObject(role), "orderID");
+                    if (!id.isEmpty() && !seen.add(id)) kept.remove(role);
+                }
+                if (kept.has("STOP") || kept.has("LIMIT")) unique.add(kept);
+            }
+            pairs.add(symbol, unique);
+        }
+    }
     private static void visitFills(JsonObject order, String date, JsonObject executions, Set<String> seenFillOrders) {
         JsonObject leg = leg(order); String symbol = orderSymbol(order);
         String id = string(order, "orderId");
@@ -140,6 +158,7 @@ public final class AccountProjection {
                 }
             }
         }
+        deduplicateExitPairs(pairs);
         for (String symbol : new ArrayList<>(executions.keySet())) {
             List<JsonObject> list = new ArrayList<>(); executions.getAsJsonArray(symbol).forEach(value -> list.add(value.getAsJsonObject()));
             list.sort(Comparator.comparingLong(fill -> fill.get("timestamp").getAsLong())); JsonArray sorted = new JsonArray(); list.forEach(sorted::add); executions.add(symbol, sorted);
