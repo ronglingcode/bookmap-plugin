@@ -51,8 +51,8 @@ public final class NativeViews {
         for (JsonElement item : array(object(plan, "keyLevels"), "otherLevels")) { JsonObject level = item.getAsJsonObject(); double price = number(level, "price"); if (price > 0 && seen.add(price)) levels.add(level.deepCopy()); }
         for (JsonElement item : array(object(plan, "keyLevels"), "zones")) zone(zones, zoneKeys, item.getAsJsonObject(), "", "");
         zone(zones, zoneKeys, object(object(plan, "rangeBoundReversalPlan"), "support"), "support", "green"); zone(zones, zoneKeys, object(object(plan, "rangeBoundReversalPlan"), "resistance"), "resistance", "red");
-        zone(zones, zoneKeys, object(object(object(plan, "long"), "gapAndGoPlan"), "support"), "gap & go support", "green"); zone(zones, zoneKeys, object(object(object(plan, "long"), "gapDownAndGoUpPlan"), "support"), "gap down & go up support", "green");
-        zone(zones, zoneKeys, object(object(object(plan, "short"), "gapAndCrapPlan"), "resistance"), "gap & crap resistance", "red"); zone(zones, zoneKeys, object(object(object(plan, "short"), "gapDownAndGoDownPlan"), "resistance"), "gap down & go down resistance", "red");
+        zone(zones, zoneKeys, object(object(object(plan, "long"), "gapAndGoPlan"), "support"), "support", "green"); zone(zones, zoneKeys, object(object(object(plan, "long"), "gapDownAndGoUpPlan"), "support"), "support", "green");
+        zone(zones, zoneKeys, object(object(object(plan, "short"), "gapAndCrapPlan"), "resistance"), "resistance", "red"); zone(zones, zoneKeys, object(object(object(plan, "short"), "gapDownAndGoDownPlan"), "resistance"), "resistance", "red");
         keys.add("levels", levels); keys.add("zones", zones); keys.addProperty("waitForBidRetest", mode(object(plan, "analysis"), "waitForBidRetest")); keys.addProperty("waitForOfferRetest", mode(object(plan, "analysis"), "waitForOfferRetest"));
         keys.add("bookmapPatternsToMonitor", array(plan, "bookmapPatternsToMonitor").deepCopy());
         result.add(keys);
