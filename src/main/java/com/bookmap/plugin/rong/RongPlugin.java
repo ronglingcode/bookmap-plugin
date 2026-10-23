@@ -148,6 +148,10 @@ public class RongPlugin implements CustomModuleAdapter,
         patternMonitorSnapshotComplete = false;
         sessionHistoryLoading = true;
         String cleanAlias = SymbolUtils.cleanSymbol(alias);
+        // Bookmap may not have complete instrument metadata during attachment.
+        // Do not register indicators or start shared services for an unusable chart.
+        if (cleanAlias.isEmpty() || api == null || info == null
+                || !Double.isFinite(info.pips) || info.pips <= 0) return;
         this.alias = cleanAlias;
         this.api = api;
         this.instrumentInfo = info;
@@ -682,7 +686,7 @@ public class RongPlugin implements CustomModuleAdapter,
         if (!initialized) return;
         // Discard absent/invalid price levels before any tracker or shared book sees them.
         // A zero size at a positive price is a valid level removal.
-        if (price <= 0) return;
+        if (price <= 0 || size < 0) return;
         long eventTimeNs = getEventTimeNs();
         PatternEvent.TimestampProvenance provenance = compositionProvenance();
         if (wallChangeTracker != null) {
@@ -714,6 +718,8 @@ public class RongPlugin implements CustomModuleAdapter,
     @Override
     public void onTrade(double price, int size, TradeInfo tradeInfo) {
         if (!initialized) return;
+        if (!Double.isFinite(price) || price < 0.5 || price > Integer.MAX_VALUE
+                || size <= 0) return;
         long eventTimeNs = getEventTimeNs();
         PatternEvent.TimestampProvenance provenance = compositionProvenance();
         double realPrice = BookmapPriceNormalizer.toWirePrice(price, instrumentInfo.pips);

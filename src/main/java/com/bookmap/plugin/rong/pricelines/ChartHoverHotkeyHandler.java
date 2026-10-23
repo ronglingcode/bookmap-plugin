@@ -519,10 +519,14 @@ public class ChartHoverHotkeyHandler implements ScreenSpacePainterFactory {
     }
 
     private static String onlyInstrument(Set<String> instruments) {
-        if (instruments == null || instruments.size() != 1) {
+        if (instruments == null) {
             return null;
         }
-        return instruments.iterator().next();
+        // Inspect one iterator so concurrent chart removal cannot invalidate a size check.
+        java.util.Iterator<String> iterator = instruments.iterator();
+        if (!iterator.hasNext()) return null;
+        String instrument = iterator.next();
+        return iterator.hasNext() ? null : instrument;
     }
 
     static boolean isTextEntryEvent(KeyEvent event) {

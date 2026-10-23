@@ -52,29 +52,29 @@ public class OrderBookState {
     }
 
     /** Best bid price tick, or null if no bids. */
-    public Integer getBestBid() {
+    public synchronized Integer getBestBid() {
         return bids.isEmpty() ? null : bids.firstKey();
     }
 
     /** Best ask price tick, or null if no asks. */
-    public Integer getBestAsk() {
+    public synchronized Integer getBestAsk() {
         return asks.isEmpty() ? null : asks.firstKey();
     }
 
     /** Best bid size, or 0 if no bids. */
-    public int getBestBidSize() {
+    public synchronized int getBestBidSize() {
         if (bids.isEmpty()) return 0;
         return bids.firstEntry().getValue();
     }
 
     /** Best ask size, or 0 if no asks. */
-    public int getBestAskSize() {
+    public synchronized int getBestAskSize() {
         if (asks.isEmpty()) return 0;
         return asks.firstEntry().getValue();
     }
 
     /** Size at a specific price level, or 0 if not present. */
-    public int getSizeAt(boolean isBid, int price) {
+    public synchronized int getSizeAt(boolean isBid, int price) {
         TreeMap<Integer, Integer> book = isBid ? bids : asks;
         return book.getOrDefault(price, 0);
     }
@@ -83,7 +83,7 @@ public class OrderBookState {
      * Top N bid levels (best first). Returns a snapshot.
      * If fewer than N levels exist, returns all available.
      */
-    public NavigableMap<Integer, Integer> getBidDepth(int levels) {
+    public synchronized NavigableMap<Integer, Integer> getBidDepth(int levels) {
         return getTopLevels(bids, levels);
     }
 
@@ -91,38 +91,38 @@ public class OrderBookState {
      * Top N ask levels (best first). Returns a snapshot.
      * If fewer than N levels exist, returns all available.
      */
-    public NavigableMap<Integer, Integer> getAskDepth(int levels) {
+    public synchronized NavigableMap<Integer, Integer> getAskDepth(int levels) {
         return getTopLevels(asks, levels);
     }
 
     /** Total shares across all bid levels. */
-    public long getTotalBidSize() {
+    public synchronized long getTotalBidSize() {
         return bids.values().stream().mapToLong(Integer::longValue).sum();
     }
 
     /** Total shares across all ask levels. */
-    public long getTotalAskSize() {
+    public synchronized long getTotalAskSize() {
         return asks.values().stream().mapToLong(Integer::longValue).sum();
     }
 
     /** Number of bid price levels. */
-    public int getBidLevelCount() {
+    public synchronized int getBidLevelCount() {
         return bids.size();
     }
 
     /** Number of ask price levels. */
-    public int getAskLevelCount() {
+    public synchronized int getAskLevelCount() {
         return asks.size();
     }
 
-    /** Unmodifiable view of all bids (descending by price). */
-    public NavigableMap<Integer, Integer> getBids() {
-        return Collections.unmodifiableNavigableMap(bids);
+    /** Immutable snapshot of all bids (descending by price). */
+    public synchronized NavigableMap<Integer, Integer> getBids() {
+        return getLevelsSnapshot(true);
     }
 
-    /** Unmodifiable view of all asks (ascending by price). */
-    public NavigableMap<Integer, Integer> getAsks() {
-        return Collections.unmodifiableNavigableMap(asks);
+    /** Immutable snapshot of all asks (ascending by price). */
+    public synchronized NavigableMap<Integer, Integer> getAsks() {
+        return getLevelsSnapshot(false);
     }
 
     /** Thread-safe copy of every level on one side of the book. */
@@ -138,7 +138,7 @@ public class OrderBookState {
      * @param percentile 0-100 (e.g., 90 means only top 10% of sizes pass)
      * @return the size value at that percentile, or 0 if book is empty
      */
-    public int getPercentileThreshold(double percentile) {
+    public synchronized int getPercentileThreshold(double percentile) {
         if (totalLevels == 0) return 0;
 
         int index = (int) Math.ceil(percentile / 100.0 * totalLevels) - 1;
