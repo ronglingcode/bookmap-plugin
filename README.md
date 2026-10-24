@@ -32,7 +32,9 @@ If the local secrets file is missing when attaching the addon, it silently stays
 inactive: no windows, indicators, connections or trading services start. After
 creating the file, disable and re-enable the addon to activate it.
 The native runtime supports the active `schwab` and `momentumSimple` equity
-profiles and the existing single-stock watchlist policy.
+profiles and up to two selected stocks trading at the same time. Each selected
+stock requires its own valid trading plan; a watchlist with more than two stocks
+is blocked at startup and during entry validation.
 
 ## Features
 

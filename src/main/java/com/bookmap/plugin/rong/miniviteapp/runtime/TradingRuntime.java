@@ -96,7 +96,7 @@ public final class TradingRuntime implements AutoCloseable {
         return CompletableFuture.runAsync(() -> {
             try {
                 if (massiveKey.isBlank()) throw new IllegalArgumentException("Massive API key missing from local secrets");
-                TradingConfig.Result loaded = TradingConfig.readTradingConfig(firestore.fetchConfigData(), 1);
+                TradingConfig.Result loaded = TradingConfig.readTradingConfig(firestore.fetchConfigData());
                 validateProfile(loaded.profile);
                 String token = oauth.accessToken(false), date = MarketClock.marketTime(now.getAsLong()).date;
                 long readStartedAt = now.getAsLong();
@@ -291,7 +291,7 @@ public final class TradingRuntime implements AutoCloseable {
         if (stopped || !configReading.compareAndSet(false, true)) return;
         executor.execute(() -> {
             try {
-                TradingConfig.Result loaded = TradingConfig.readTradingConfig(firestore.fetchConfigData(), 1); validateProfile(loaded.profile);
+                TradingConfig.Result loaded = TradingConfig.readTradingConfig(firestore.fetchConfigData()); validateProfile(loaded.profile);
                 String date = MarketClock.marketTime(now.getAsLong()).date; boolean rollover;
                 synchronized (lock) { rollover = !string(state.snapshot(), "date").equals(TradeState.dateLabel(date)) && !string(state.snapshot(), "date").equals(date); }
                 JsonObject restored = rollover ? firestore.getTradingState(loaded.profile) : null;

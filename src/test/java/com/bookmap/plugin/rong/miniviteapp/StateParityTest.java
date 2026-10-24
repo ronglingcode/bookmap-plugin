@@ -50,7 +50,7 @@ class StateParityTest {
                     case "state:acceptedBreakout": result = TradeState.acceptedBreakout(args.get(0).getAsJsonObject(), args.get(1).getAsLong()); break;
                     case "config:validateTradingPlan": result = new JsonPrimitive(TradingConfig.validateTradingPlan(args.get(0).getAsJsonObject())); break;
                     case "config:createTradebookDefinitions": result = TradingConfig.createTradebookDefinitions(args.get(0).getAsJsonObject()); break;
-                    case "config:readTradingConfig": result = TradingConfig.readTradingConfig(args.get(0).isJsonNull() ? null : args.get(0).getAsJsonObject(), args.size() > 1 ? args.get(1).getAsInt() : 1).toJson(); break;
+                    case "config:readTradingConfig": result = (args.size() > 1 ? TradingConfig.readTradingConfig(args.get(0).isJsonNull() ? null : args.get(0).getAsJsonObject(), args.get(1).getAsInt()) : TradingConfig.readTradingConfig(args.get(0).isJsonNull() ? null : args.get(0).getAsJsonObject())).toJson(); break;
                     default: fail(name);
                 }
             } catch (Exception failure) { error = failure.getMessage(); }

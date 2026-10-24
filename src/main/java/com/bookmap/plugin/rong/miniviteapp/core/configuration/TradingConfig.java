@@ -6,6 +6,8 @@ import java.util.List;
 
 /** Mirrors TS definitions and selected-plan validation; all input is local Firestore data. */
 public final class TradingConfig {
+    public static final int MAX_TRADABLE_STOCKS_COUNT = 2;
+
     private TradingConfig() { }
     private static JsonObject object(JsonObject value, String key) { return value.has(key) && value.get(key).isJsonObject() ? value.getAsJsonObject(key) : new JsonObject(); }
     private static String string(JsonObject value, String key) { return value.has(key) && !value.get(key).isJsonNull() ? value.get(key).getAsString() : ""; }
@@ -96,6 +98,9 @@ public final class TradingConfig {
         }
         public JsonObject plan(String symbol) { for (JsonElement value : plans) if (string(value.getAsJsonObject(), "symbol").equals(symbol)) return value.getAsJsonObject(); return null; }
         public JsonObject toJson() { JsonObject result = new JsonObject(); result.add("plans", plans.deepCopy()); JsonArray stocks = new JsonArray(); symbols.forEach(stocks::add); result.add("symbols", stocks); result.addProperty("profile", profile); result.add("tradingSettings", tradingSettings.deepCopy()); return result; }
+    }
+    public static Result readTradingConfig(JsonObject raw) {
+        return readTradingConfig(raw, MAX_TRADABLE_STOCKS_COUNT);
     }
     public static Result readTradingConfig(JsonObject raw, int maxStocks) {
         if (raw == null || !raw.has("plans") || !raw.get("plans").isJsonArray() || !raw.has("stockSelections") || !raw.get("stockSelections").isJsonArray()) throw new IllegalArgumentException("Trading configuration missing plans/stockSelections");

@@ -85,8 +85,8 @@ class EntryExecutionPlanTest {
         assertEquals("checkRule: startup eligibility: " + breakout, assertThrows(IllegalArgumentException.class,
                 () -> EntryRulesChecker.checkBasicGlobalEntryRules(context, true, 10)).getMessage());
         context.addProperty("startupBlockReason", "");
-        context.addProperty("watchlistBlockReason", "more than 1 stocks in watchlist: AMD, AAPL");
-        assertEquals("checkRule: more than 1 stocks in watchlist: AMD, AAPL", assertThrows(IllegalArgumentException.class,
+        context.addProperty("watchlistBlockReason", "more than 2 stocks in watchlist: AMD, AAPL, TSLA");
+        assertEquals("checkRule: more than 2 stocks in watchlist: AMD, AAPL, TSLA", assertThrows(IllegalArgumentException.class,
                 () -> EntryRulesChecker.checkBasicGlobalEntryRules(context, true, 10)).getMessage());
         context.addProperty("watchlistBlockReason", "");
         context.addProperty("realizedPnl", -4000);
