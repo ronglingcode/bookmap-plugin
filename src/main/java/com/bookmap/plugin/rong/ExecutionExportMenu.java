@@ -13,7 +13,7 @@ final class ExecutionExportMenu {
     private ExecutionExportMenu() {}
     static JButton create(Component parent, Function<Format, String> export) {
         JButton button = new JButton("Export");
-        button.setToolTipText("Copy today's cached account executions to the clipboard");
+        button.setToolTipText("Fetch today's complete execution history and copy it to the clipboard");
         JPopupMenu menu = new JPopupMenu();
         for (Format format : Format.values()) {
             JMenuItem item = new JMenuItem(format.label);

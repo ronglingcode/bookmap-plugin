@@ -64,7 +64,7 @@ class StopLossMonitorTest {
     }
     @Test void standaloneClosingStopCoversRemainingQuantity() {
         JsonObject order = json("{\"orderId\":1,\"status\":\"WORKING\",\"orderStrategyType\":\"SINGLE\",\"orderType\":\"STOP\",\"quantity\":100,\"filledQuantity\":25,\"stopPrice\":10,\"orderLegCollection\":[{\"instruction\":\"SELL\",\"positionEffect\":\"CLOSING\",\"instrument\":{\"symbol\":\"A\",\"assetType\":\"EQUITY\"}}]}");
-        JsonArray orders = new JsonArray(); orders.add(order); JsonObject canceled = order.deepCopy(); canceled.addProperty("status", "CANCELED"); orders.add(canceled);
+        JsonArray orders = new JsonArray(); orders.add(order); JsonObject canceled = order.deepCopy(); canceled.addProperty("orderId", 2); canceled.addProperty("status", "CANCELED"); orders.add(canceled);
         JsonObject account = AccountProjection.projectAccount(json("{\"positions\":[{\"instrument\":{\"symbol\":\"A\"},\"longQuantity\":75}],\"currentBalances\":{\"liquidationValue\":25000}}"), orders, "2026-10-16", symbol -> 10);
         assertEquals(1, account.getAsJsonObject("exitPairs").getAsJsonArray("A").size());
         assertTrue(new StopLossMonitor().observe(account, 0).warnings.isEmpty());

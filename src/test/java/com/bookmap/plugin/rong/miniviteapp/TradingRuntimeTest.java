@@ -143,7 +143,8 @@ class TradingRuntimeTest {
             if (path.endsWith("/accounts/fake-account")) return new HttpPort.Response(200, "{\"securitiesAccount\":" + account + "}");
             if (path.endsWith("/orders")) {
                 if (method.equals("POST")) { mutations.incrementAndGet(); return new HttpPort.Response(201, "", Map.of("Location", "https://fake.invalid/orders/123")); }
-                assertEquals("fromEnteredTime=2026-10-01T00:00:00.000Z&toEnteredTime=2026-10-02T00:00:00.000Z&maxResults=500", uri.getQuery(),
+                String date = com.bookmap.plugin.rong.miniviteapp.core.marketdata.MarketClock.marketTime(now.get()).date;
+                assertEquals("fromEnteredTime=" + date + "T00:00:00.000Z&toEnteredTime=" + java.time.LocalDate.parse(date).plusDays(1) + "T00:00:00.000Z&maxResults=500", uri.getQuery(),
                         "Startup, account refresh and cancellation reads must request only today's orders");
                 return new HttpPort.Response(200, orderData.get());
             }
@@ -225,7 +226,8 @@ class TradingRuntimeTest {
                     || value.contains("returned HTTP") || value.contains("Native entry POST")), screen.toString());
             int callsBeforeExport = httpCalls.get(); JsonObject beforeExport = runtime.view("MSFT", "test");
             for (Format format : Format.values()) { String report = runtime.exportExecutions(format); assertTrue(report.contains("AAPL")); assertTrue(report.contains("MSFT")); }
-            assertEquals(callsBeforeExport, httpCalls.get()); assertEquals(beforeExport, runtime.view("MSFT", "test"));
+            assertEquals(callsBeforeExport + Format.values().length, httpCalls.get(), "Each export fetches fresh broker history");
+            assertEquals(beforeExport, runtime.view("MSFT", "test"), "Journaling must not replace the live account cache");
             // Entry-bid marking is persisted and displayed without creating a broker order.
             positionData.set("[{\"instrument\":{\"symbol\":\"MSFT\",\"assetType\":\"EQUITY\"},\"shortQuantity\":10,\"averagePrice\":20}]");
             now.addAndGet(3000); runtime.refreshAccount();

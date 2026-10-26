@@ -21,7 +21,7 @@ exposes these settings without credentials or native trading.
    `node scripts/importSecrets.mjs ..\secrets\storeSecrets.js`.
    See [credential setup](config/README.md).
 3. In Bookmap, open API Plugins Configuration, add
-   `build/libs/lingrong1988_bmtrader_1.35.jar`, and attach bmtrader to a chart.
+   `build/libs/lingrong1988_bmtrader_1.38.jar`, and attach bmtrader to a chart.
 4. The first attachment starts the trading runtime; the final detachment stops it.
    Check the bmtrader Logs window for startup errors. Settings offer
    **Restart Native Trading / Reload Secrets**, **Open Schwab Authorization**,
@@ -51,8 +51,9 @@ is blocked at startup and during entry validation.
   and trade-consumption alerts keep their existing behavior.
 - Local account/orders/fills and position-risk display, entry-input dialog,
   core-plan editor, trading notifications and optional sound.
-- One **Export** menu in Logs copies summary/detailed ThinkScript bubbles or trade
-  CSV from cached account fills to the clipboard. [Formats and usage](docs/execution-exports-and-alert-cleanup.md).
+- One **Export** menu in Logs fetches complete session order history on demand
+  and copies summary/detailed ThinkScript bubbles or trade CSV to the clipboard.
+  Live account/order reads use one order request per refresh. [Formats and usage](docs/execution-exports-and-alert-cleanup.md).
 - Automatic history/live overlap handling, account refresh, token renewal,
   reconnecting streams, Firestore trading-state persistence and local action logs.
 
@@ -143,7 +144,7 @@ TypeScript fixtures check Java parity; fake services cover standalone startup,
 renewal, requests, persistence and teardown. No live orders or real Firestore writes
 are sent by these checks.
 
-Share only `build/libs/lingrong1988_bmtrader_1.35.jar`. Unobfuscated intermediates
+Share only `build/libs/lingrong1988_bmtrader_1.38.jar`. Unobfuscated intermediates
 and the private mapping remain under `build/intermediates` and
 `build/private/obfuscation`. Obfuscation does not prevent reverse engineering.
 

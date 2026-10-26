@@ -7,6 +7,9 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.Set;
 import java.util.HashSet;
+import java.util.Map;
+import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.function.ToDoubleFunction;
 
 /** Explicit JSON models mirror TS projectAccount and survive obfuscation. */
@@ -114,6 +117,55 @@ public final class AccountProjection {
         }
         for (JsonElement child : array(order, "childOrderStrategies")) visitFills(child.getAsJsonObject(), date, executions, seenFillOrders);
     }
+    // The same ID can appear in a filled entry's tree, an OCO root and a standalone
+    // root, with different states even in one REST read. Reconcile before choosing
+    // bracket membership; deduplicating after filtering working legs resurrects
+    // stale WORKING copies of orders already observed FILLED/CANCELED/REPLACED.
+    private static void indexOrders(JsonObject order, Map<String, JsonObject> latest) {
+        String id = string(order, order.has("orderId") ? "orderId" : "orderID");
+        JsonObject previous = latest.get(id);
+        if (!id.isEmpty()) latest.put(id, previous == null ? order : mergeOrderCopies(previous, order));
+        for (JsonElement child : array(order, "childOrderStrategies")) indexOrders(child.getAsJsonObject(), latest);
+    }
+    private static int stateRank(JsonObject order) {
+        String status = string(order, "status");
+        return status.equals("FILLED") ? 4 : TERMINAL.contains(status) ? 3
+                : status.equals("AWAITING_PARENT_ORDER") ? 0 : status.equals("PARTIALLY_FILLED") ? 2 : 1;
+    }
+    static JsonObject mergeOrderCopies(JsonObject first, JsonObject second) {
+        boolean secondWins = stateRank(second) > stateRank(first) || stateRank(second) == stateRank(first)
+                && number(second, "filledQuantity") >= number(first, "filledQuantity");
+        JsonObject result = (secondWins ? first : second).deepCopy(), preferred = secondWins ? second : first;
+        for (var field : preferred.entrySet()) {
+            // A sparse copy must not erase execution evidence from another copy.
+            if (field.getKey().equals("orderActivityCollection") && array(preferred, field.getKey()).isEmpty()) continue;
+            result.add(field.getKey(), field.getValue().deepCopy());
+        }
+        if (first.has("childOrderStrategies") || second.has("childOrderStrategies")) {
+            Map<String, JsonObject> children = new LinkedHashMap<>();
+            for (JsonObject parent : new JsonObject[]{first, second}) for (JsonElement item : array(parent, "childOrderStrategies")) {
+                JsonObject child = item.getAsJsonObject(); String id = string(child, child.has("orderId") ? "orderId" : "orderID");
+                if (id.isEmpty()) id = "missing-id:" + children.size();
+                JsonObject old = children.get(id); children.put(id, old == null ? child : mergeOrderCopies(old, child));
+            }
+            JsonArray merged = new JsonArray(); children.values().forEach(child -> merged.add(child.deepCopy()));
+            result.add("childOrderStrategies", merged);
+        }
+        return result;
+    }
+    private static JsonObject reconcileOrder(JsonObject order, Map<String, JsonObject> latest) {
+        JsonObject result = order.deepCopy();
+        String id = string(order, order.has("orderId") ? "orderId" : "orderID");
+        JsonObject preferred = latest.get(id);
+        if (preferred != null) for (var field : preferred.entrySet())
+            if (!field.getKey().equals("childOrderStrategies")) result.add(field.getKey(), field.getValue().deepCopy());
+        if (order.has("childOrderStrategies")) {
+            JsonArray children = new JsonArray();
+            for (JsonElement child : array(order, "childOrderStrategies")) children.add(reconcileOrder(child.getAsJsonObject(), latest));
+            result.add("childOrderStrategies", children);
+        }
+        return result;
+    }
     public static JsonObject projectAccount(JsonObject account, JsonArray orders, String date, ToDoubleFunction<String> currentPrice) {
         JsonObject positions = new JsonObject(), entries = new JsonObject(), pairs = new JsonObject(), executions = new JsonObject();
         for (JsonElement value : array(account, "positions")) {
@@ -126,7 +178,9 @@ public final class AccountProjection {
             position.addProperty("symbol", symbol); position.addProperty("netQuantity", number(position, "longQuantity") - number(position, "shortQuantity")); positions.add(symbol, position);
         }
         JsonArray equityOrders = new JsonArray();
-        for (JsonElement value : orders) if (isEquityOrder(value.getAsJsonObject())) equityOrders.add(value.deepCopy());
+        Map<String, JsonObject> latest = new HashMap<>();
+        for (JsonElement value : orders) indexOrders(value.getAsJsonObject(), latest);
+        for (JsonElement value : orders) if (isEquityOrder(value.getAsJsonObject())) equityOrders.add(reconcileOrder(value.getAsJsonObject(), latest));
         Set<String> seenFillOrders = new HashSet<>();
         for (JsonElement value : equityOrders) {
             JsonObject order = value.getAsJsonObject(); visitFills(order, date, executions, seenFillOrders); String symbol = orderSymbol(order);

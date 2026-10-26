@@ -83,7 +83,7 @@ public final class TradingRuntime implements AutoCloseable {
             }
             return response;
         };
-        reads = new ReadApi(authenticatedReads);
+        reads = new ReadApi(authenticatedReads, value -> events.detail("", value));
         priceHistory = new PriceHistoryApi(authenticatedReads);
         JsonObject firebase = object(sections, "firebaseConfig");
         firestore = new com.bookmap.plugin.rong.miniviteapp.libraries.firestore.Api(http, string(firebase, "projectId"), () -> string(firebase, "apiKey"), () -> "", now);
@@ -101,7 +101,7 @@ public final class TradingRuntime implements AutoCloseable {
                 String token = oauth.accessToken(false), date = MarketClock.marketTime(now.getAsLong()).date;
                 long readStartedAt = now.getAsLong();
                 JsonObject raw = reads.getAccount(token);
-                JsonArray orders = reads.getOrders(accountHash(), token, date, false);
+                JsonArray orders = reads.getOrders(accountHash(), token, date);
                 logNativeOrders(orders, date);
                 JsonObject projected = AccountProjection.projectAccount(raw, orders, date, this::price);
                 logNativeFills(projected, date);
@@ -182,7 +182,7 @@ public final class TradingRuntime implements AutoCloseable {
                     if (market.acceptTrade(trade)) synchronized (lock) { dirty.add(trade.symbol); }
                 }
                 public void quote(JsonObject quote) { String symbol = string(quote, "symbol"); synchronized (lock) { JsonObject value = quotes.computeIfAbsent(symbol, key -> new JsonObject()); quote.entrySet().forEach(entry -> value.add(entry.getKey(), entry.getValue())); dirty.add(symbol); } }
-                public void activity(JsonArray values) { publishAccountActivity(values); refreshAccount(); }
+                public void activity(JsonArray values) { publishAccountActivity(values); refreshAccount(true); }
                 public void ready(String source) { if (source.equals("massive")) { massiveTradeReceived.set(false); events.status("massiveStream", "connected; waiting for trades"); if (massiveReady.getAndSet(true)) symbols.forEach(TradingRuntime.this::loadMarket); } else { publishAccountActivity(new JsonArray()); refreshAccount(); } }
                 public void status(String source, String status) {
                     if (!stopped) {
@@ -245,17 +245,21 @@ public final class TradingRuntime implements AutoCloseable {
         if (!accountReading.compareAndSet(false, true)) { if (afterMutation) accountUrgentAgain.set(true); accountAgain.set(true); return; }
         synchronized (lock) { nextAccountRead = now.getAsLong() + 3000; }
         executor.execute(() -> {
+            long started = now.getAsLong();
             try {
                 String token = oauth.accessToken(false), date = MarketClock.marketTime(now.getAsLong()).date;
                 long readStartedAt = now.getAsLong();
-                JsonObject raw = reads.getAccount(token); JsonArray orders = reads.getOrders(accountHash(), token, date, false);
+                JsonObject raw = reads.getAccount(token); JsonArray orders = reads.getOrders(accountHash(), token, date);
                 logNativeOrders(orders, date);
                 JsonObject projected = AccountProjection.projectAccount(raw, orders, date, this::price);
                 logNativeFills(projected, date);
                 synchronized (lock) { if (stopped) return; account = projected; accountReadStartedAt = readStartedAt; ledger = TradeLedger.projectTradeLedger(object(projected, "executions"), number(policy, "dailyMaxLoss")); }
                 publishToken(); publishAccount(); checkStopLossProtection(); disciplineJobs(); accountNotifications();
             } catch (Exception error) { failure("", "Account refresh", error); accountAgain.set(true); }
-            finally { accountReading.set(false); boolean urgent = accountUrgentAgain.getAndSet(false); if (accountAgain.getAndSet(false) || urgent) refreshAccount(urgent); }
+            finally {
+                events.detail("", "Native account refresh: durationMs=" + Math.max(0, now.getAsLong() - started) + "; urgent=" + afterMutation);
+                accountReading.set(false); boolean urgent = accountUrgentAgain.getAndSet(false); if (accountAgain.getAndSet(false) || urgent) refreshAccount(urgent);
+            }
         });
     }
     private void checkStopLossProtection() {
@@ -418,7 +422,7 @@ public final class TradingRuntime implements AutoCloseable {
         try {
             events.detail(symbol, "Cancel requested; refreshing broker orders before selecting entries; no cancellation attempted yet");
             String token = oauth.accessToken(false), date = MarketClock.marketTime(now.getAsLong()).date;
-            JsonArray orders = reads.getOrders(accountHash(), token, date, false);
+            JsonArray orders = reads.getOrders(accountHash(), token, date);
             logNativeOrders(orders, date);
             // Project only order state; do not overwrite the cached positions or trade ledger.
             JsonObject raw = new JsonObject(), balances = new JsonObject();
@@ -446,19 +450,29 @@ public final class TradingRuntime implements AutoCloseable {
         }
     }
     public JsonObject manualInputs(String symbol) { synchronized (lock) { return manual.getOrDefault(symbol, new JsonObject()).deepCopy(); } }
-    /** Snapshot the whole cached account, including symbols with no attached chart. No vendor reads. */
+    /** On-demand journaling read; never replace or lock the live account cache during I/O. */
     public String exportExecutions(ExecutionExports.Format format) {
-        JsonObject executions;
         synchronized (lock) {
             if (stopped || account == null) throw new IllegalStateException("Native account is not ready");
-            executions = object(account, "executions").deepCopy();
         }
         long timestamp = now.getAsLong(); String date = MarketClock.marketTime(timestamp).date;
-        JsonArray fills = new JsonArray();
-        for (JsonElement values : executions.asMap().values()) for (JsonElement fill : values.getAsJsonArray())
-            if (MarketClock.marketTime(fill.getAsJsonObject().get("timestamp").getAsLong()).date.equals(date)) fills.add(fill);
-        if (fills.isEmpty()) throw new IllegalStateException("No cached executions for today's market session");
-        return ExecutionExports.export(fills, format, timestamp, java.time.ZoneId.systemDefault());
+        String token = "", hash = "";
+        try {
+            token = oauth.accessToken(false); hash = accountHash();
+            JsonArray orders = reads.getOrderHistory(hash, token, date);
+            if (stopped) throw new IllegalStateException("Native runtime stopped during export");
+            if (!date.equals(MarketClock.marketTime(now.getAsLong()).date))
+                throw new IllegalStateException("Market session changed during export; request the export again");
+            JsonObject raw = new JsonObject(), balances = new JsonObject();
+            balances.addProperty("liquidationValue", 0); raw.add("currentBalances", balances);
+            JsonObject executions = object(AccountProjection.projectAccount(raw, orders, date, symbol -> 0), "executions");
+            JsonArray fills = new JsonArray();
+            for (JsonElement values : executions.asMap().values()) for (JsonElement fill : values.getAsJsonArray()) fills.add(fill);
+            if (fills.isEmpty()) throw new IllegalStateException("No executions for today's market session");
+            return ExecutionExports.export(fills, format, timestamp, java.time.ZoneId.systemDefault());
+        } catch (Exception error) {
+            throw new IllegalStateException("Execution export failed: " + ExecutionDiagnostics.describe(error, token, hash, massiveKey), error);
+        }
     }
     public void resetAfterBrokerReview() { execution.resetAfterBrokerReview(); }
     private void executionEvent(JsonObject result) {

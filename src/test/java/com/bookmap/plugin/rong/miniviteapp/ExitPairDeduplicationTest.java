@@ -51,4 +51,36 @@ class ExitPairDeduplicationTest {
             assertEquals("independent-stop", pairs.get(1).getAsJsonObject().getAsJsonObject("STOP").get("orderID").getAsString());
         }
     }
+    @Test void terminalStandaloneObservationOverridesStaleBracketInEitherRootOrder() {
+        for (String status : new String[]{"REPLACED", "CANCELED", "FILLED", "REJECTED", "EXPIRED"})
+            for (boolean terminalFirst : new boolean[]{true, false}) {
+                JsonObject oco = bracket(1), terminal = closing("limit-1", "LIMIT");
+                terminal.addProperty("status", status);
+                JsonArray orders = new JsonArray();
+                if (terminalFirst) orders.add(terminal);
+                orders.add(oco);
+                if (!terminalFirst) orders.add(terminal);
+                String original = orders.toString();
+                JsonArray pairs = project(orders);
+                assertEquals(1, pairs.size());
+                assertTrue(pairs.get(0).getAsJsonObject().has("STOP"));
+                assertFalse(pairs.get(0).getAsJsonObject().has("LIMIT"), status);
+                assertEquals(original, orders.toString(), "Projection must not mutate the broker diagnostics");
+            }
+    }
+    @Test void filledAndCanceledCopiesCannotResurrectAnEntireStaleBracket() {
+        JsonObject stale = bracket(1), current = stale.deepCopy();
+        current.getAsJsonArray("childOrderStrategies").get(0).getAsJsonObject().addProperty("status", "CANCELED");
+        current.getAsJsonArray("childOrderStrategies").get(1).getAsJsonObject().addProperty("status", "FILLED");
+        JsonArray orders = new JsonArray(); orders.add(current); orders.add(stale);
+        assertNull(project(orders), "No active pair should survive terminal observations of both IDs");
+    }
+    @Test void mostFilledLiveCopyControlsRemainingQuantity() {
+        JsonObject oco = bracket(1), partial = closing("limit-1", "LIMIT");
+        partial.addProperty("status", "PARTIALLY_FILLED"); partial.addProperty("filledQuantity", 5);
+        JsonArray orders = new JsonArray(); orders.add(partial); orders.add(oco);
+        JsonObject pair = project(orders).get(0).getAsJsonObject();
+        assertEquals(3, pair.getAsJsonObject("LIMIT").get("quantity").getAsInt());
+        assertEquals(3, pair.getAsJsonObject("STOP").get("quantity").getAsInt());
+    }
 }

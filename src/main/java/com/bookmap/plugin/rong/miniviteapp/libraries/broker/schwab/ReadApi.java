@@ -13,6 +13,7 @@ import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeFormatterBuilder;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.function.Consumer;
 
 /** Mirrors TS SchwabReadApi: no mutations, no proxy dependency. */
 public final class ReadApi {
@@ -21,8 +22,13 @@ public final class ReadApi {
             .append(DateTimeFormatter.ISO_LOCAL_DATE_TIME).appendPattern("[XXX][XX]").toFormatter();
     private final HttpPort http;
     private final String base;
+    private final Consumer<String> diagnostics;
     public ReadApi(HttpPort http) { this(http, "https://api.schwabapi.com/trader/v1"); }
-    public ReadApi(HttpPort http, String base) { this.http = http; this.base = base.replaceAll("/$", ""); }
+    public ReadApi(HttpPort http, String base) { this(http, base, value -> { }); }
+    public ReadApi(HttpPort http, Consumer<String> diagnostics) { this(http, "https://api.schwabapi.com/trader/v1", diagnostics); }
+    private ReadApi(HttpPort http, String base, Consumer<String> diagnostics) {
+        this.http = http; this.base = base.replaceAll("/$", ""); this.diagnostics = diagnostics;
+    }
     private JsonElement read(String path, String token) throws Exception {
         HttpPort.Response response = http.request(URI.create(base + "/" + path), "GET", Map.of("Authorization", "Bearer " + token, "Accept", "application/json"), null);
         if (response.status != 200) throw new IOException("Schwab read HTTP " + response.status);
@@ -47,33 +53,50 @@ public final class ReadApi {
         }
         return result;
     }
-    public JsonArray getOrders(String account, String token, String date, boolean useTimeWindows) throws Exception {
-        return getOrders(account, token, date, useTimeWindows, 0);
+    /** Live trading: exactly one order query, regardless of root/nested record count. */
+    public JsonArray getOrders(String account, String token, String date) throws Exception {
+        long start = Instant.parse(date + "T00:00:00Z").toEpochMilli();
+        long end = Instant.parse(LocalDate.parse(date).plusDays(1) + "T00:00:00Z").toEpochMilli();
+        long started = System.nanoTime();
+        try {
+            return readOrderWindow(account, token, start, end);
+        } finally {
+            diagnostics.accept("Schwab orders read: mode=live; requests=1; durationMs=" + (System.nanoTime() - started) / 1000000);
+        }
     }
-    /** Include older working orders that can receive fills during today's session. */
-    public JsonArray getOrders(String account, String token, String date, boolean useTimeWindows, int lookbackDays) throws Exception {
+    /** Journaling only: retrieve the complete session history for CSV/ThinkScript exports. */
+    public JsonArray getOrderHistory(String account, String token, String date) throws Exception {
+        return getOrderHistory(account, token, date, false, 0);
+    }
+    public JsonArray getOrderHistory(String account, String token, String date, boolean useTimeWindows, int lookbackDays) throws Exception {
         if (lookbackDays < 0 || lookbackDays > 59) throw new IllegalArgumentException("Order lookback must be 0-59 days");
         long start = Instant.parse(LocalDate.parse(date).minusDays(lookbackDays) + "T00:00:00Z").toEpochMilli(), end = Instant.parse(LocalDate.parse(date).plusDays(1) + "T00:00:00Z").toEpochMilli();
         Map<String, JsonObject> orders = new LinkedHashMap<>();
-        if (!useTimeWindows) {
-            window(account, token, start, end, orders);
-        }
-        else {
-            long today = Instant.parse(date + "T00:00:00Z").toEpochMilli();
-            // Only pre-split today; older history subdivides on demand.
-            if (start < today) window(account, token, start, today, orders);
-            for (long from = today; from < end; from += 3600000L) {
-                long to = from + 3600000L;
-                if (MarketClock.marketTime(from + 1800000L).minutesSinceMarketOpen != 0) window(account, token, from, to, orders);
-                else {
-                    window(account, token, from, from + 1800000, orders);
-                    for (long cursor = from + 1800000; cursor < to; cursor += 300000) window(account, token, cursor, cursor + 300000, orders);
+        int[] requests = {0}; long started = System.nanoTime(); boolean complete = false;
+        try {
+            if (!useTimeWindows) window(account, token, start, end, orders, requests);
+            else {
+                long today = Instant.parse(date + "T00:00:00Z").toEpochMilli();
+                // Only pre-split today; older history subdivides on demand.
+                if (start < today) window(account, token, start, today, orders, requests);
+                for (long from = today; from < end; from += 3600000L) {
+                    long to = from + 3600000L;
+                    if (MarketClock.marketTime(from + 1800000L).minutesSinceMarketOpen != 0) window(account, token, from, to, orders, requests);
+                    else {
+                        window(account, token, from, from + 1800000, orders, requests);
+                        for (long cursor = from + 1800000; cursor < to; cursor += 300000) window(account, token, cursor, cursor + 300000, orders, requests);
+                    }
                 }
             }
+            JsonArray result = new JsonArray(); orders.values().forEach(result::add); complete = true; return result;
+        } finally {
+            diagnostics.accept("Schwab orders read: mode=journal; requests=" + requests[0] + "; durationMs=" + (System.nanoTime() - started) / 1000000
+                    + "; roots=" + orders.size() + "; complete=" + complete);
         }
-        JsonArray result = new JsonArray(); orders.values().forEach(result::add); return result;
     }
-    private void window(String account, String token, long from, long to, Map<String, JsonObject> orders) throws Exception {
+    private void window(String account, String token, long from, long to, Map<String, JsonObject> orders,
+            int[] requests) throws Exception {
+        requests[0]++;
         JsonArray array = readOrderWindow(account, token, from, to);
         // Brackets may be truncated below 500 roots. Count nested records
         // conservatively, including child orders, legs and execution activities.
@@ -81,8 +104,8 @@ public final class ReadApi {
             // Inclusive endpoints avoid gaps; collectOrders removes boundary duplicates.
             if (to - from <= 1) throw new IOException("Schwab orders reached 500 in a one-millisecond window; read may be incomplete");
             long middle = from + (to - from) / 2;
-            window(account, token, from, middle, orders);
-            window(account, token, middle, to, orders);
+            window(account, token, from, middle, orders, requests);
+            window(account, token, middle, to, orders, requests);
             return;
         }
         collectOrders(array, orders);
@@ -98,7 +121,8 @@ public final class ReadApi {
         for (JsonElement element : array) {
             JsonObject order = element.getAsJsonObject(); JsonElement id = order.has("orderId") ? order.get("orderId") : order.get("orderID");
             if (id == null || id.isJsonNull()) throw new IOException("Schwab order missing orderId");
-            orders.put(id.getAsString(), order);
+            JsonObject previous = orders.get(id.getAsString());
+            orders.put(id.getAsString(), previous == null ? order : AccountProjection.mergeOrderCopies(previous, order));
         }
     }
     private static int recordCount(JsonElement value, long from, long to, boolean inWindow) {

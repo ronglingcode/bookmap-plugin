@@ -34,7 +34,7 @@ class FilledExecutionPipelineTest {
                     : "[{\"orderId\":" + request + "}]");
         };
 
-        JsonArray orders = new ReadApi(http).getOrders("account", "token", "2026-10-02", false, 59);
+        JsonArray orders = new ReadApi(http).getOrderHistory("account", "token", "2026-10-02", false, 59);
 
         assertEquals(3, requests.get());
         assertEquals(2, orders.size());
@@ -59,7 +59,7 @@ class FilledExecutionPipelineTest {
             }
             return new HttpPort.Response(200, "[" + order + "]");
         };
-        JsonArray orders = new ReadApi(http).getOrders("account", "token", "2026-10-02", false, 59);
+        JsonArray orders = new ReadApi(http).getOrderHistory("account", "token", "2026-10-02", false, 59);
         assertEquals("2026-08-04T00:00:00.000Z", fromEnteredTime.get());
 
         JsonObject account = JsonParser.parseString("{\"currentBalances\":{\"liquidationValue\":25000}}").getAsJsonObject();

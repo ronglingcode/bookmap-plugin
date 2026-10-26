@@ -12,6 +12,7 @@ import java.time.Instant;
 import java.time.ZoneId;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicBoolean;
 import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -46,7 +47,7 @@ class OrderPaginationTest {
                 matching.subList(Math.max(0, matching.size() - 500), matching.size()).forEach(page::add);
                 return new HttpPort.Response(200, page.toString());
             };
-            JsonArray orders = new ReadApi(http).getOrders("account", "token", DATE, useTimeWindows, 1);
+            JsonArray orders = new ReadApi(http).getOrderHistory("account", "token", DATE, useTimeWindows, 1);
             assertTrue(requests.get() > 3 && capped.get() > 1);
             assertEquals(source.size(), orders.size());
             Set<Integer> ids = new HashSet<>();
@@ -69,7 +70,7 @@ class OrderPaginationTest {
             return new HttpPort.Response(request == 3 ? 503 : 200,
                     request == 1 ? cappedPage() : "[{\"orderId\":1}]");
         };
-        IOException error = assertThrows(IOException.class, () -> new ReadApi(http).getOrders("account", "token", DATE, false));
+        IOException error = assertThrows(IOException.class, () -> new ReadApi(http).getOrderHistory("account", "token", DATE));
         assertEquals("Schwab read HTTP 503", error.getMessage());
         assertEquals(3, requests.get());
     }
@@ -100,7 +101,7 @@ class OrderPaginationTest {
             JsonArray page = new JsonArray(); matching.subList(Math.max(0, matching.size() - 20), matching.size()).forEach(page::add);
             return new HttpPort.Response(200, page.toString());
         };
-        JsonArray orders = new ReadApi(http).getOrders("account", "token", DATE, false);
+        JsonArray orders = new ReadApi(http).getOrderHistory("account", "token", DATE);
         assertTrue(requests.get() > 1); assertEquals(roots.size(), orders.size());
         Set<Integer> ids = new HashSet<>();
         orders.forEach(order -> ids.add(order.getAsJsonObject().get("orderId").getAsInt()));
@@ -110,7 +111,7 @@ class OrderPaginationTest {
     @Test void unsplittableFullPageFailsExplicitly() {
         AtomicInteger requests = new AtomicInteger(); String page = cappedPage();
         HttpPort http = (uri, method, headers, body) -> { requests.incrementAndGet(); return new HttpPort.Response(200, page); };
-        IOException error = assertThrows(IOException.class, () -> new ReadApi(http).getOrders("account", "token", DATE, false));
+        IOException error = assertThrows(IOException.class, () -> new ReadApi(http).getOrderHistory("account", "token", DATE));
         assertTrue(error.getMessage().contains("one-millisecond window; read may be incomplete"));
         assertTrue(requests.get() < 30);
     }
@@ -128,8 +129,89 @@ class OrderPaginationTest {
         JsonArray page = new JsonArray(); page.add(old); page.add(current);
         AtomicInteger requests = new AtomicInteger();
         HttpPort http = (uri, method, headers, body) -> { requests.incrementAndGet(); return new HttpPort.Response(200, page.toString()); };
-        JsonArray orders = new ReadApi(http).getOrders("account", "token", DATE, false);
+        JsonArray orders = new ReadApi(http).getOrderHistory("account", "token", DATE);
         assertEquals(1, requests.get()); assertEquals(2, orders.size());
+    }
+
+    @Test void journalingReadsStayFreshAcrossExportsAndFailures() throws Exception {
+        JsonArray source = new JsonArray();
+        for (int id = 0; id < 501; id++) source.add(filledOrder(id, BURST + id));
+        AtomicInteger requests = new AtomicInteger(); AtomicBoolean fail = new AtomicBoolean();
+        List<String> diagnostics = new ArrayList<>();
+        ReadApi api = new ReadApi((uri, method, headers, body) -> {
+            requests.incrementAndGet();
+            if (fail.get()) return new HttpPort.Response(503, "");
+            Map<String, String> query = new HashMap<>();
+            for (String item : uri.getRawQuery().split("&")) {
+                String[] pair = item.split("=", 2); query.put(pair[0], URLDecoder.decode(pair[1], StandardCharsets.UTF_8));
+            }
+            long from = Instant.parse(query.get("fromEnteredTime")).toEpochMilli(), to = Instant.parse(query.get("toEnteredTime")).toEpochMilli();
+            List<JsonElement> matching = new ArrayList<>();
+            for (JsonElement item : source) {
+                long entered = item.getAsJsonObject().get("enteredTime").getAsLong();
+                if (entered >= from && entered <= to) matching.add(item);
+            }
+            JsonArray page = new JsonArray(); matching.subList(Math.max(0, matching.size() - 500), matching.size()).forEach(page::add);
+            return new HttpPort.Response(200, page.toString());
+        }, diagnostics::add);
+        assertEquals(501, api.getOrderHistory("account", "token", DATE).size());
+        assertTrue(requests.getAndSet(0) > 1);
+        source.get(0).getAsJsonObject().addProperty("status", "CANCELED");
+        JsonArray fresh = api.getOrderHistory("account", "token", DATE);
+        assertTrue(requests.getAndSet(0) > 1);
+        assertEquals(501, fresh.size());
+        assertTrue(fresh.asList().stream().anyMatch(item -> item.getAsJsonObject().get("orderId").getAsInt() == 0
+                && item.getAsJsonObject().get("status").getAsString().equals("CANCELED")));
+        assertTrue(diagnostics.get(1).contains("mode=journal"));
+        assertFalse(diagnostics.get(1).contains("token")); assertFalse(diagnostics.get(1).contains("account"));
+        for (int id = 501; id < 1001; id++) source.add(filledOrder(id, BURST + id));
+        assertEquals(1001, api.getOrderHistory("account", "token", DATE).size(), "Newly capped leaves subdivide again");
+        fail.set(true);
+        assertThrows(IOException.class, () -> api.getOrderHistory("account", "token", DATE));
+        assertTrue(diagnostics.get(diagnostics.size() - 1).contains("complete=false"));
+        fail.set(false);
+        assertEquals(1001, api.getOrderHistory("account", "token", DATE).size());
+    }
+
+    @Test void liveOrdersAlwaysUseOneRequestEvenAtTheCapOrWithLargeNestedTrees() throws Exception {
+        for (boolean nested : new boolean[]{false, true}) {
+            JsonArray page = JsonParser.parseString(cappedPage()).getAsJsonArray();
+            if (nested) {
+                JsonObject root = new JsonObject(); root.addProperty("orderId", 999);
+                root.add("childOrderStrategies", page); page = new JsonArray(); page.add(root);
+            }
+            final JsonArray response = page;
+            AtomicInteger requests = new AtomicInteger(); List<String> diagnostics = new ArrayList<>();
+            ReadApi api = new ReadApi((uri, method, headers, body) -> {
+                requests.incrementAndGet(); assertEquals("GET", method);
+                assertEquals("fromEnteredTime=2026-10-01T00:00:00.000Z&toEnteredTime=2026-10-02T00:00:00.000Z&maxResults=500", uri.getQuery());
+                return new HttpPort.Response(200, response.toString());
+            }, diagnostics::add);
+            assertEquals(response, api.getOrders("account", "token", DATE));
+            assertEquals(1, requests.get(), "Live reads must never subdivide a large response");
+            assertTrue(diagnostics.get(0).contains("mode=live; requests=1"));
+            api.getOrders("account", "token", DATE); assertEquals(2, requests.get());
+        }
+    }
+
+    @Test void overlappingPagesPreserveTerminalChildrenAndReplacementChildren() throws Exception {
+        AtomicInteger requests = new AtomicInteger();
+        ReadApi api = new ReadApi((uri, method, headers, body) -> {
+            int request = requests.incrementAndGet();
+            if (request == 1) return new HttpPort.Response(200, cappedPage());
+            // A later window can return an older copy of a root already seen in
+            // an earlier window. Its live child must not overwrite terminal evidence.
+            String children = request == 2
+                    ? "[{\"orderId\":2,\"status\":\"REPLACED\"}]"
+                    : "[{\"orderId\":2,\"status\":\"WORKING\"},{\"orderId\":3,\"status\":\"WORKING\"}]";
+            return new HttpPort.Response(200, "[{\"orderId\":1,\"childOrderStrategies\":" + children + "}]");
+        });
+        JsonArray orders = api.getOrderHistory("account", "token", DATE);
+        assertEquals(1, orders.size());
+        JsonArray children = orders.get(0).getAsJsonObject().getAsJsonArray("childOrderStrategies");
+        assertEquals(2, children.size());
+        assertEquals("REPLACED", children.get(0).getAsJsonObject().get("status").getAsString());
+        assertEquals(3, children.get(1).getAsJsonObject().get("orderId").getAsInt());
     }
 
     private static String cappedPage() {

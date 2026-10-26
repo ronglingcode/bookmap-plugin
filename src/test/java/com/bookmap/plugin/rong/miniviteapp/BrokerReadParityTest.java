@@ -34,7 +34,7 @@ class BrokerReadParityTest {
                     switch (fixture.get("method").getAsString()) {
                         case "getAccount": result = api.getAccount(args.get(0).getAsString()); break;
                         case "getStreamerInfo": result = api.getStreamerInfo(args.get(0).getAsString()); break;
-                        case "getOrders": result = api.getOrders(args.get(0).getAsString(), args.get(1).getAsString(), args.get(2).getAsString(), args.size() > 3 && args.get(3).getAsBoolean(), args.size() > 4 ? args.get(4).getAsInt() : 0); break;
+                        case "getOrders": result = api.getOrderHistory(args.get(0).getAsString(), args.get(1).getAsString(), args.get(2).getAsString(), args.size() > 3 && args.get(3).getAsBoolean(), args.size() > 4 ? args.get(4).getAsInt() : 0); break;
                         default: fail(name);
                     }
                 }

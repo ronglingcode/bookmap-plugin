@@ -19,11 +19,11 @@ cleanup, tests and these documents.
   `src/trading/core/account/executionExports.ts`; existing browser buttons and
   exported broker helper names delegate to that module.
 - Added matching Java `miniviteapp/core/account/ExecutionExports.java`.
-  Runtime takes a detached snapshot of the cached account's executions and formats
-  it outside the state lock. No broker/API reads, trading-state changes or order
-  submissions are performed by export. All cached symbols are included, even
-  without chart/watchlist membership. Only today's Eastern market session is
-  exported; absent runtime/account/fills produce a clear error.
+  Runtime fetches complete paginated order history on demand for journaling,
+  then projects and formats the executions outside the live state lock. Export
+  never replaces the live account cache or submits orders. All returned symbols
+  are included, even without chart/watchlist membership. Only today's Eastern
+  market session is exported; absent runtime/account/fills produce a clear error.
 - Added one **Export** button beside the existing account status in **bmtrader
   Logs**. No additional toolbar row or persistent panel. A three-item menu copies
   the selected format directly to the system clipboard. Generation and copying
@@ -53,24 +53,30 @@ escape CSV fields. Legacy CSV section layout and `ETF`/`MKT` placeholders are
 preserved for compatibility: this remains a fills export/template, not a complete
 broker statement with original order types, commissions or balances.
 
-Exports reflect the latest completed native account refresh. They do not request
-a refresh or retrieve earlier trading days. Browser exports still print to the
-console through the existing controls; Bookmap copies to the clipboard and logs
-**Copied [format] to clipboard** without a confirmation popup or file dialog.
+Each Bookmap export fetches fresh, complete order history for today's session.
+The export worker runs outside the Swing event thread and live account state lock;
+it never installs history results into the live account cache. Browser exports
+still print through their existing controls. Bookmap copies to the clipboard and
+logs **Copied [format] to clipboard** after completion. A failed history read
+produces an export error without falling back to a partial live snapshot.
 
-Both apps automatically split capped Schwab order-history responses into smaller
-time ranges, including bursts within one minute, and deduplicate shared boundary
-orders by ID. The cap check conservatively includes nested order records rather
-than just top-level orders, while excluding older working trees outside each
-requested range. Fills from children returned both separately and in a bracket
-are counted once per order, preserving that order's individual partial fills.
-Bookmap startup, account refreshes and entry-cancellation reads request only
-today's order history for the day-trading workflow. Orders entered on prior days
-are not explicitly retrieved. ViteApp currently retains its 59-day lookback.
-If a one-millisecond range still reaches the
-500-order request limit, or a later request fails, the refresh fails rather than
-replacing the cache with incomplete history; exports continue to use the last
-completed refresh.
+The October 21 change `929d40e` added conservative nested-record cap detection
+and recursive subdivision. In version 1.38, that paginated path is named
+`getOrderHistory` and is used only by CSV and ThinkScript exports. It splits
+capped responses into smaller time ranges, including bursts within one minute,
+and deduplicates shared boundary orders by ID. The cap check includes nested
+order records while excluding older working trees outside each requested range.
+Fills from children returned separately and in a bracket are counted once per
+order, preserving individual partial fills. If a one-millisecond range still
+reaches the cap or any page fails, the export fails without returning partial
+history. The export remains scoped to today's date range; it does not request
+earlier trading days explicitly.
+
+Live startup, periodic/manual/post-mutation account refreshes, stream-activity
+refreshes and entry cancellation use `getOrders`: one order-list request with
+`maxResults=500` for today's range. Large or capped responses do not cause
+additional history requests. The journaling path does not share a refresh gate
+or cached response with live trading.
 
 ## Verification and resume notes
 
@@ -80,8 +86,12 @@ completed refresh.
   premarket/DST, CSV timestamps, signed quantities, effects and escaping.
 - `npm run test:state`: 85 shared cases; `test:core-target-exits`: six passed.
 - Java `ExecutionExportsTest`: exact string parity against those 15 TS cases.
-- Java `TradingRuntimeTest`: verifies all-symbol cached export after watchlist
-  removal, no HTTP calls/state changes, absent data and stale-session rejection.
+- Java `TradingRuntimeTest`: verifies fresh all-symbol exports after watchlist
+  removal, no live state changes, absent data and stale-session rejection.
+- Java `JournalExportRuntimeTest`: verifies pagination for all three formats,
+  fills absent from the live page, error handling without partial output, and
+  live refresh during a slow export. `OrderPaginationTest` verifies live reads
+  make exactly one request for capped and large nested responses.
 - Full Gradle build passed: 211 normal tests, native-only compilation and nine
   release JAR tests. Both repositories passed `git diff --check`.
   No live broker/Firestore calls were used. Clipboard use inside Bookmap and

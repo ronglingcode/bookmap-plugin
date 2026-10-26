@@ -116,6 +116,20 @@ speech and DOM blinking stay in the browser.
 
 The trade window **Refresh Account** button requests the same immediate and delayed reads for positions, orders and fills across the account. It bypasses the ordinary polling throttle while respecting broker backoff.
 
+Broker account-activity messages also bypass the ordinary three-second polling
+throttle. Hints received during a read coalesce into an urgent follow-up; HTTP 429
+backoff still applies. Startup, periodic/manual/post-mutation refreshes and entry
+cancellation each make one order-list request for today's range, with
+`maxResults=500`. They never subdivide a response. Only CSV and ThinkScript
+exports request complete paginated order history on demand, outside the live
+account cache and state lock. Export results do not replace live positions,
+orders, fills, ledger or trading state.
+Duplicate observations of the same order ID are reconciled before projecting
+active orders: terminal observations override stale working copies, including
+copies nested under earlier entry orders. File diagnostics distinguish `mode=live`
+from `mode=journal` and report order-query counts and elapsed read/refresh time.
+See the [October 26 investigation](execution-lag-2026-10-26.md).
+
 ## Architecture and development
 
 TS `src/trading` mirrors Java `com.bookmap.plugin.rong.miniviteapp`:
