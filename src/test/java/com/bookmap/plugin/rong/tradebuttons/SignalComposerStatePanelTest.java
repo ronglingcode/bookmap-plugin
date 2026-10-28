@@ -42,13 +42,14 @@ class SignalComposerStatePanelTest {
         });
     }
 
-    @Test void directionsHaveSeparateEventLinesWithFullNamesAndExpiredStyling() throws Exception {
+    @Test void directionsCombineBidAndOfferEventsWithFullNamesAndExpiredStyling() throws Exception {
         SwingUtilities.invokeAndWait(() -> {
             long time = java.time.Instant.parse("2026-10-06T13:31:52Z").getEpochSecond() * 1_000_000_000L;
             PatternEvent bid = PatternEvent.builder("AMD", 1, PatternEventType.BIDS_CANCELLED, "bid")
                     .size(1465, PatternEvent.SizeBasis.DISPLAYED_WALL).price(648, 1).times(time, time).build();
             PatternEvent offer = PatternEvent.builder("AMD", 1, PatternEventType.OFFER_BREAKOUT, "offer")
-                    .size(60000, PatternEvent.SizeBasis.DISPLAYED_WALL).price(64825, .01).times(time, time).build();
+                    .size(60000, PatternEvent.SizeBasis.DISPLAYED_WALL).price(64825, .01)
+                    .times(time + 1_000_000_000L, time + 1_000_000_000L).build();
             SignalComposerInspection snapshot = new SignalComposerInspection("", "Scanning", List.of(
                     new SignalComposerInspection.Section(Direction.LONG, List.of(),
                             List.of(new SignalComposerInspection.Event(bid, "Expired")),
@@ -58,16 +59,21 @@ class SignalComposerStatePanelTest {
             List<JTextArea> lines = descendants(panel, JTextArea.class).stream()
                     .filter(area -> "patternEvent".equals(area.getName())).collect(java.util.stream.Collectors.toList());
             assertEquals(8, lines.size());
-            assertEquals("09:31:52: 1.4K @ 648, Bids cancelled", lines.get(0).getText());
-            assertNotEquals(java.awt.Color.WHITE, lines.get(0).getForeground());
-            assertEquals("09:31:52: 60K @ 648.25, Offer breakout", lines.get(2).getText());
-            assertTrue(lines.get(2).getToolTipText().contains("Out of range"));
-            assertTrue(lines.get(0).getToolTipText().contains("1465 lots"));
+            assertEquals("09:31:53: 60K @ 648.25, Offer breakout", lines.get(0).getText());
+            assertTrue(lines.get(0).getToolTipText().contains("Out of range"));
+            assertEquals("09:31:52: 1.4K @ 648, Bids cancelled", lines.get(1).getText());
+            assertNotEquals(java.awt.Color.WHITE, lines.get(1).getForeground());
+            assertTrue(lines.get(1).getToolTipText().contains("1465 lots"));
             assertEquals(2, lines.stream().filter(Component::isVisible).count());
+            assertEquals(2, descendants(panel, JLabel.class).stream()
+                    .filter(label -> "Bid & offer patterns".equals(label.getText())).count());
+            assertEquals(1, descendants(panel, JLabel.class).stream()
+                    .filter(label -> "No recent events".equals(label.getText())).filter(Component::isVisible).count());
+            assertEquals(220, ((JScrollPane)panel.getComponent(0)).getPreferredSize().height);
             assertTrue(descendants(panel, JTable.class).isEmpty());
             assertTrue(descendants(panel, javax.swing.table.JTableHeader.class).isEmpty());
-            lines.get(0).select(0, 8);
-            panel.refresh(); assertEquals("09:31:52", lines.get(0).getSelectedText());
+            lines.get(1).select(0, 8);
+            panel.refresh(); assertEquals("09:31:52", lines.get(1).getSelectedText());
         });
     }
     @Test void quantitiesUseCompactLotsWithoutRoundingUp() {

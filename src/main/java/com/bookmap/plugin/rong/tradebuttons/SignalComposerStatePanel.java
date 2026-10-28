@@ -8,15 +8,19 @@ import java.awt.Point;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
+import java.util.Comparator;
 import java.util.EnumMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.function.Supplier;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 import javax.swing.*;
 import javax.swing.text.DefaultCaret;
 import com.bookmap.plugin.rong.patterns.Direction;
 import com.bookmap.plugin.rong.signal.SignalComposerInspection;
+import com.bookmap.plugin.rong.VerticalWindowLayout;
 
 /** Per-symbol advisory summary with bounded event groups and optional copyable diagnostics. */
 final class SignalComposerStatePanel extends JPanel {
@@ -29,6 +33,7 @@ final class SignalComposerStatePanel extends JPanel {
     private final JTextArea diagnostics = textArea();
     private final Map<Direction, DirectionPanel> directions = new EnumMap<>(Direction.class);
     private final JScrollPane scroll;
+    private String noticeText = "";
 
     SignalComposerStatePanel(Supplier<SignalComposerInspection> supplier) {
         super(new BorderLayout());
@@ -40,7 +45,7 @@ final class SignalComposerStatePanel extends JPanel {
         content.setBackground(BACKGROUND);
         notice.setFont(new Font("SansSerif", Font.BOLD, 14));
         notice.setForeground(new Color(255, 205, 120));
-        notice.setBorder(BorderFactory.createEmptyBorder(6, 8, 6, 8));
+        notice.setBorder(BorderFactory.createEmptyBorder(4, 8, 4, 8));
         notice.setAlignmentX(LEFT_ALIGNMENT);
         content.add(notice);
         for (Direction direction : Direction.values()) {
@@ -65,7 +70,7 @@ final class SignalComposerStatePanel extends JPanel {
         });
         scroll = new JScrollPane(content);
         scroll.setHorizontalScrollBarPolicy(ScrollPaneConstants.HORIZONTAL_SCROLLBAR_NEVER);
-        scroll.setPreferredSize(new Dimension(500, 440));
+        scroll.setPreferredSize(new Dimension(500, 220));
         scroll.getVerticalScrollBar().setUnitIncrement(20);
         scroll.getViewport().addComponentListener(new java.awt.event.ComponentAdapter() {
             @Override public void componentResized(java.awt.event.ComponentEvent event) {
@@ -80,7 +85,7 @@ final class SignalComposerStatePanel extends JPanel {
     void refresh() {
         SignalComposerInspection snapshot = supplier.get();
         Point position = scroll.getViewport().getViewPosition();
-        notice.setText(snapshot.notice);
+        noticeText = snapshot.notice;
         notice.setVisible(!snapshot.notice.isEmpty());
         for (Direction direction : Direction.values()) {
             SignalComposerInspection.Section section = snapshot.sections.stream()
@@ -93,10 +98,12 @@ final class SignalComposerStatePanel extends JPanel {
     }
 
     private void updateEventLineHeights() {
+        int noticeWidth = scroll.getViewport().getWidth();
+        notice.setText(VerticalWindowLayout.wrapText(noticeText,
+                noticeWidth > 0 ? Math.max(80, noticeWidth - 16) : VerticalWindowLayout.CONTENT_WIDTH - 32));
         int width = Math.max(80, scroll.getViewport().getWidth() - 16);
         for (DirectionPanel direction : directions.values()) {
-            direction.bids.updateLineHeights(width);
-            direction.offers.updateLineHeights(width);
+            direction.patterns.updateLineHeights(width);
         }
     }
 
@@ -109,7 +116,7 @@ final class SignalComposerStatePanel extends JPanel {
         text.setFont(new Font("SansSerif", Font.PLAIN, 14));
         text.setBackground(BACKGROUND);
         text.setForeground(Color.WHITE);
-        text.setBorder(BorderFactory.createEmptyBorder(6, 8, 6, 8));
+        text.setBorder(BorderFactory.createEmptyBorder(2, 8, 2, 8));
         return text;
     }
 
@@ -151,13 +158,13 @@ final class SignalComposerStatePanel extends JPanel {
 
     private static final class DirectionPanel extends JPanel {
         private final JTextArea requirements = textArea();
-        private final EventGroup bids = new EventGroup("Bid patterns"), offers = new EventGroup("Offer patterns");
+        private final EventGroup patterns = new EventGroup("Bid & offer patterns");
 
         DirectionPanel(Direction direction) {
             setLayout(new BoxLayout(this, BoxLayout.Y_AXIS));
             setBackground(BACKGROUND);
             setAlignmentX(LEFT_ALIGNMENT);
-            setBorder(BorderFactory.createEmptyBorder(8, 8, 8, 8));
+            setBorder(BorderFactory.createEmptyBorder(4, 8, 4, 8));
             JLabel heading = new JLabel(direction.name());
             heading.setFont(new Font("SansSerif", Font.BOLD, 16));
             heading.setForeground(direction == Direction.LONG ? new Color(130, 220, 180) : new Color(255, 165, 165));
@@ -165,16 +172,18 @@ final class SignalComposerStatePanel extends JPanel {
             add(heading);
             requirements.setAlignmentX(LEFT_ALIGNMENT);
             add(requirements);
-            add(bids);
-            add(offers);
+            add(patterns);
         }
 
         void refresh(SignalComposerInspection.Section section) {
             String value = section == null ? "" : String.join("\n", section.requirements);
             updateText(requirements, value);
             requirements.setVisible(!value.isEmpty());
-            bids.refresh(section == null ? List.of() : section.bids);
-            offers.refresh(section == null ? List.of() : section.offers);
+            patterns.refresh(section == null ? List.of() : Stream.concat(
+                    section.bids.stream().limit(2), section.offers.stream().limit(2))
+                    .sorted(Comparator.comparingLong((SignalComposerInspection.Event event) -> event.pattern.eventTimeNs)
+                            .reversed())
+                    .collect(Collectors.toList()));
         }
 
         @Override public Dimension getMaximumSize() { return new Dimension(Integer.MAX_VALUE, getPreferredSize().height); }
@@ -190,14 +199,14 @@ final class SignalComposerStatePanel extends JPanel {
     }
 
     private static final class EventGroup extends JPanel {
-        private final JTextArea[] lines = new JTextArea[2];
+        private final JTextArea[] lines = new JTextArea[4];
         private final JLabel empty = new JLabel("No recent events");
 
         EventGroup(String title) {
             setLayout(new BoxLayout(this, BoxLayout.Y_AXIS));
             setBackground(BACKGROUND);
             setAlignmentX(LEFT_ALIGNMENT);
-            setBorder(BorderFactory.createEmptyBorder(8, 0, 4, 0));
+            setBorder(BorderFactory.createEmptyBorder(4, 0, 2, 0));
             JLabel label = new JLabel(title);
             label.setFont(new Font("SansSerif", Font.BOLD, 14));
             label.setForeground(Color.WHITE);
@@ -217,7 +226,7 @@ final class SignalComposerStatePanel extends JPanel {
                 line.setFont(new Font("SansSerif", Font.PLAIN, 14));
                 line.setBackground(BACKGROUND);
                 line.setForeground(Color.WHITE);
-                line.setBorder(BorderFactory.createEmptyBorder(4, 6, 4, 0));
+                line.setBorder(BorderFactory.createEmptyBorder(2, 6, 2, 0));
                 line.setAlignmentX(LEFT_ALIGNMENT);
                 line.setVisible(false);
                 lines[index] = line;
@@ -230,7 +239,7 @@ final class SignalComposerStatePanel extends JPanel {
         }
 
         void refresh(List<SignalComposerInspection.Event> events) {
-            int count = Math.min(2, events.size());
+            int count = Math.min(lines.length, events.size());
             for (int index = 0; index < lines.length; index++) {
                 JTextArea line = lines[index];
                 line.setVisible(index < count);
@@ -260,7 +269,7 @@ final class SignalComposerStatePanel extends JPanel {
                         used = size;
                     } else used += gap + size;
                 }
-                Dimension preferred = new Dimension(1, rows * metrics.getHeight() + 8);
+                Dimension preferred = new Dimension(1, rows * metrics.getHeight() + 4);
                 if (!preferred.equals(line.getPreferredSize())) {
                     line.setPreferredSize(preferred);
                     line.setMinimumSize(preferred);

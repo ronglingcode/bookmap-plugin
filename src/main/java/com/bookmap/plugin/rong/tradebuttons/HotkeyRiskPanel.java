@@ -1,7 +1,9 @@
 package com.bookmap.plugin.rong.tradebuttons;
 
-import java.awt.FlowLayout;
 import java.awt.Font;
+import java.awt.GridBagConstraints;
+import java.awt.GridBagLayout;
+import java.awt.Insets;
 import java.beans.PropertyChangeListener;
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -26,7 +28,7 @@ final class HotkeyRiskPanel extends JPanel {
     }
 
     HotkeyRiskPanel(HotkeyRiskSelection selection, String symbol) {
-        super(new FlowLayout(FlowLayout.LEFT, 8, 0));
+        super(new GridBagLayout());
         this.selection = selection;
         this.symbol = symbol;
         setBorder(BorderFactory.createEmptyBorder(6, 0, 6, 0));
@@ -38,8 +40,18 @@ final class HotkeyRiskPanel extends JPanel {
     private void rebuildButtons() {
         removeAll();
         buttons.clear();
-        add(label);
+        GridBagConstraints cell = new GridBagConstraints();
+        cell.gridx = 0;
+        cell.gridy = 0;
+        cell.gridwidth = 2;
+        cell.weightx = 1;
+        cell.anchor = GridBagConstraints.WEST;
+        cell.fill = GridBagConstraints.HORIZONTAL;
+        cell.insets = new Insets(2, 4, 2, 4);
+        add(label, cell);
+        cell.gridwidth = 1;
         ButtonGroup group = new ButtonGroup();
+        int index = 0;
         for (String method : selection.getEntryMethods(symbol)) {
             JRadioButton button = new JRadioButton(method);
             button.setFocusable(false);
@@ -47,7 +59,10 @@ final class HotkeyRiskPanel extends JPanel {
             button.addActionListener(event -> selection.setEntryMethod(symbol, method));
             group.add(button);
             buttons.put(method, button);
-            add(button);
+            cell.gridx = index % 2;
+            cell.gridy = 1 + index / 2;
+            add(button, cell);
+            index++;
         }
         revalidate();
         repaint();

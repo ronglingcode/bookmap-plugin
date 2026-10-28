@@ -32,8 +32,7 @@ import javax.swing.table.DefaultTableModel;
 public class ActionLogWindow {
 
     private static final int MAX_LINES = 20;
-    private static final int WINDOW_WIDTH = 570;
-    private static final int CONTENT_WIDTH = 540;
+    private static final int CONTENT_WIDTH = VerticalWindowLayout.CONTENT_WIDTH;
     private static final DateTimeFormatter TIME_FMT = DateTimeFormatter.ofPattern("HH:mm:ss");
     private static final ScreenLogBuffer lines = new ScreenLogBuffer(MAX_LINES);
     private static final Map<String, AccountStateDefinition> accountStates = new LinkedHashMap<>();
@@ -88,7 +87,7 @@ public class ActionLogWindow {
     public static void updatePersistenceStatus(String status) {
         invokeWhenActive(() -> {
             persistenceStatus = status;
-            if (persistenceStatusLabel != null) persistenceStatusLabel.setText(status);
+            if (persistenceStatusLabel != null) persistenceStatusLabel.setText(VerticalWindowLayout.wrapText(status, CONTENT_WIDTH));
         });
     }
 
@@ -139,6 +138,14 @@ public class ActionLogWindow {
         frame = new JFrame(PluginVersion.NAME + " Logs");
         frame.setAlwaysOnTop(true);
         frame.setDefaultCloseOperation(JFrame.DO_NOTHING_ON_CLOSE);
+        frame.setContentPane(createContent());
+        VerticalWindowLayout.sizeToScreen(frame);
+        frame.setVisible(true);
+        renderHighlightedSymbol();
+        renderAccountState();
+    }
+
+    private static JPanel createContent() {
         textArea = new JTextArea(20, 41);
         textArea.setEditable(false);
         textArea.setFont(new Font(Font.MONOSPACED, Font.PLAIN, 12));
@@ -148,7 +155,7 @@ public class ActionLogWindow {
         highlightedSymbolLabel = new JLabel();
         highlightedSymbolLabel.setFont(
                 highlightedSymbolLabel.getFont().deriveFont(Font.BOLD));
-        accountStatusLabel = new JLabel("Account: waiting for ViteApp");
+        accountStatusLabel = new JLabel(VerticalWindowLayout.wrapText("Account: waiting for ViteApp", CONTENT_WIDTH));
         positionStatusLabel = new JLabel("Positions (0)");
         orderStatusLabel = new JLabel("0 exit pair(s)");
         positionTableModel = createTableModel(POSITION_COLUMNS);
@@ -158,12 +165,12 @@ public class ActionLogWindow {
 
         JPanel accountPanel = new JPanel(new BorderLayout(0, 6));
         accountPanel.setBorder(BorderFactory.createEmptyBorder(8, 8, 4, 8));
-        JPanel statusPanel = new JPanel(new GridLayout(2, 1, 0, 2));
-        statusPanel.add(highlightedSymbolLabel);
-        statusPanel.add(accountStatusLabel);
-        JPanel headerPanel = new JPanel(new BorderLayout(8, 0));
+        JPanel statusPanel = new JPanel(new BorderLayout(0, 4));
+        statusPanel.add(highlightedSymbolLabel, BorderLayout.NORTH);
+        statusPanel.add(accountStatusLabel, BorderLayout.CENTER);
+        JPanel headerPanel = new JPanel(new BorderLayout(0, 6));
         headerPanel.add(statusPanel, BorderLayout.CENTER);
-        headerPanel.add(ExecutionExportMenu.create(frame, RongPlugin::exportNativeExecutions), BorderLayout.EAST);
+        headerPanel.add(ExecutionExportMenu.create(frame, RongPlugin::exportNativeExecutions), BorderLayout.SOUTH);
         accountPanel.add(headerPanel, BorderLayout.NORTH);
 
         JPanel tablesPanel = new JPanel(new GridLayout(2, 1, 0, 6));
@@ -172,10 +179,11 @@ public class ActionLogWindow {
         accountPanel.add(tablesPanel, BorderLayout.CENTER);
 
         JPanel logPanel = new JPanel(new BorderLayout());
-        logPanel.setBorder(BorderFactory.createTitledBorder("Important events (full details in log files)"));
+        logPanel.setBorder(BorderFactory.createTitledBorder("Important events"));
+        logPanel.setToolTipText("Full details in local log files");
         logPanel.add(new JScrollPane(textArea), BorderLayout.CENTER);
         JPanel persistencePanel = new JPanel(new BorderLayout(0, 4));
-        persistenceStatusLabel = new JLabel(persistenceStatus);
+        persistenceStatusLabel = new JLabel(VerticalWindowLayout.wrapText(persistenceStatus, CONTENT_WIDTH));
         persistencePanel.add(persistenceStatusLabel, BorderLayout.CENTER);
         JButton openLogs = new JButton("Open Logs Folder");
         openLogs.addActionListener(event -> {
@@ -188,14 +196,10 @@ public class ActionLogWindow {
         persistencePanel.add(openLogs, BorderLayout.SOUTH);
         logPanel.add(persistencePanel, BorderLayout.SOUTH);
 
-        frame.getContentPane().setLayout(new BorderLayout());
-        frame.getContentPane().add(accountPanel, BorderLayout.NORTH);
-        frame.getContentPane().add(logPanel, BorderLayout.CENTER);
-        frame.setPreferredSize(new Dimension(WINDOW_WIDTH, 620));
-        frame.pack();
-        frame.setVisible(true);
-        renderHighlightedSymbol();
-        renderAccountState();
+        JPanel content = new JPanel(new BorderLayout());
+        content.add(accountPanel, BorderLayout.NORTH);
+        content.add(logPanel, BorderLayout.CENTER);
+        return content;
     }
 
     private static void renderHighlightedSymbol() {
@@ -220,6 +224,10 @@ public class ActionLogWindow {
         table.setFont(new Font(Font.MONOSPACED, Font.PLAIN, 12));
         table.setRowHeight(20);
         table.setFillsViewportHeight(true);
+        table.setAutoResizeMode(model.getColumnCount() > 4 ? JTable.AUTO_RESIZE_OFF : JTable.AUTO_RESIZE_SUBSEQUENT_COLUMNS);
+        for (int column = 0; column < table.getColumnCount(); column++) {
+            table.getColumnModel().getColumn(column).setPreferredWidth(column == 0 ? 65 : 80);
+        }
         return table;
     }
 
@@ -245,7 +253,7 @@ public class ActionLogWindow {
         states.sort(Comparator.comparing(AccountStateDefinition::getSymbol));
 
         if (states.isEmpty()) {
-            accountStatusLabel.setText("Account: waiting for ViteApp");
+            accountStatusLabel.setText(VerticalWindowLayout.wrapText("Account: waiting for ViteApp", CONTENT_WIDTH));
             positionStatusLabel.setText("Positions (0)");
             orderStatusLabel.setText("0 exit pair(s)");
             return;
@@ -285,8 +293,8 @@ public class ActionLogWindow {
         }
 
         int orderPairCount = orderPairKeys.size();
-        accountStatusLabel.setText("Account: " + activeSummary(positionCount, orderPairCount)
-                + " | updated " + LocalTime.now().format(TIME_FMT));
+        accountStatusLabel.setText(VerticalWindowLayout.wrapText("Account: " + activeSummary(positionCount, orderPairCount)
+                + " | updated " + LocalTime.now().format(TIME_FMT), CONTENT_WIDTH));
         positionStatusLabel.setText("Positions (" + positionCount + ")");
         orderStatusLabel.setText(orderPairCount + " exit pair(s)");
     }

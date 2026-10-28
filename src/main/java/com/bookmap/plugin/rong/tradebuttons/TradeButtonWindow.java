@@ -51,6 +51,7 @@ import com.bookmap.plugin.rong.NativeConnectionStatus;
 import com.bookmap.plugin.rong.PluginLog;
 import com.bookmap.plugin.rong.SignalWebSocketServer;
 import com.bookmap.plugin.rong.WallThresholdConfig;
+import com.bookmap.plugin.rong.VerticalWindowLayout;
 import com.bookmap.plugin.rong.miniviteapp.core.controllers.BookmapSizeCap;
 import com.bookmap.plugin.rong.miniviteapp.core.controllers.BookmapSizeCap.Mode;
 import com.google.gson.JsonObject;
@@ -71,8 +72,8 @@ public class TradeButtonWindow {
     private static final Color MODE_TEXT_COLOR = Color.WHITE;
     private static final Color THRESHOLD_BACKGROUND = new Color(232, 238, 246);
     private static final Color THRESHOLD_TEXT_COLOR = new Color(24, 35, 46);
-    private static final int WINDOW_WIDTH = 570;
-    private static final int CONTENT_WIDTH = 540;
+    private static final int CONTENT_WIDTH = VerticalWindowLayout.CONTENT_WIDTH;
+    private static final int ENTRY_COLUMNS = 2;
     private static final int WALL_THRESHOLD_REFRESH_MS = 1_000;
     private static final String SHIFT_DOWN_CLIENT_PROPERTY = "rong.shiftDownForClick";
     private static final Object SHIFT_LISTENER_LOCK = new Object();
@@ -162,9 +163,13 @@ public class TradeButtonWindow {
             }
         });
 
-        buttonPanel = new JPanel();
+        buttonPanel = new VerticalWindowLayout.Content();
         buttonPanel.setBorder(new EmptyBorder(8, 8, 8, 8));
-        frame.setContentPane(buttonPanel);
+        javax.swing.JScrollPane contentScroll = new javax.swing.JScrollPane(buttonPanel);
+        contentScroll.setBorder(BorderFactory.createEmptyBorder());
+        contentScroll.setHorizontalScrollBarPolicy(javax.swing.ScrollPaneConstants.HORIZONTAL_SCROLLBAR_NEVER);
+        contentScroll.getVerticalScrollBar().setUnitIncrement(24);
+        frame.setContentPane(contentScroll);
         registerShiftTracker(this);
         renderButtons(Collections.emptyList());
         startWallThresholdTimer();
@@ -463,19 +468,22 @@ public class TradeButtonWindow {
             buttonPanel.add(waitingLabel);
         }
         if (composerInspectionSupplier != null) addFullWidth(createComposerInspectionPanel());
-        buttonPanel.setPreferredSize(new Dimension(CONTENT_WIDTH, buttonPanel.getPreferredSize().height));
         buttonPanel.revalidate();
         buttonPanel.repaint();
         if (frame != null) {
-            frame.pack();
-            frame.setSize(WINDOW_WIDTH, frame.getHeight());
+            VerticalWindowLayout.sizeToScreen(frame);
         }
     }
 
     private void addFullWidth(JPanel panel) {
-        panel.setAlignmentX(Component.LEFT_ALIGNMENT);
-        panel.setMaximumSize(new Dimension(Integer.MAX_VALUE, panel.getPreferredSize().height));
-        buttonPanel.add(panel);
+        JPanel row = new JPanel(new BorderLayout()) {
+            @Override public Dimension getMaximumSize() {
+                return new Dimension(Integer.MAX_VALUE, getPreferredSize().height);
+            }
+        };
+        row.setAlignmentX(Component.LEFT_ALIGNMENT);
+        row.add(panel, BorderLayout.CENTER);
+        buttonPanel.add(row);
     }
 
     private JPanel createComposerInspectionPanel() {
@@ -488,7 +496,7 @@ public class TradeButtonWindow {
     }
 
     private JPanel createHotkeyPanel() {
-        JPanel hotkeyPanel = new JPanel(new GridLayout(0, 4, 6, 6));
+        JPanel hotkeyPanel = new JPanel(new GridLayout(0, 2, 6, 6));
         hotkeyPanel.setBorder(BorderFactory.createEmptyBorder(0, 0, 8, 0));
         hotkeyPanel.add(createHotkeyButton("Cancel Entry", "cancel", "KeyC"));
         hotkeyPanel.add(createHotkeyButton("Flatten", "flatten", "KeyF"));
@@ -530,7 +538,9 @@ public class TradeButtonWindow {
     }
 
     private JButton createHotkeyButton(String label, String id, String keyCode, boolean shiftKey) {
-        JButton button = new JButton(label);
+        JButton button = new JButton("Market Out Half".equals(label)
+                ? "<html><center>Market Out<br>Half</center></html>" : label);
+        button.getAccessibleContext().setAccessibleName(label);
         applyHotkeyButtonStyle(button);
         button.addActionListener(e -> sendHotkeyButtonMessage(id, label, keyCode, shiftKey));
         return button;
@@ -554,7 +564,7 @@ public class TradeButtonWindow {
         wallThresholdLabel.setBorder(BorderFactory.createEmptyBorder(4, 8, 4, 8));
         updateWallThresholdLabel();
 
-        JPanel connectionPanel = new JPanel(new GridLayout(1, 4, 4, 0));
+        JPanel connectionPanel = new JPanel(new GridLayout(2, 2, 4, 4));
         schwabStatusLabel = createConnectionLabel();
         massiveHistoryStatusLabel = createConnectionLabel();
         massiveStreamStatusLabel = createConnectionLabel();
@@ -636,15 +646,16 @@ public class TradeButtonWindow {
             (method.endsWith(" sh") ? shares : risks).add(createEntryButton(tradebook, method));
         }
         JPanel panel = new JPanel(new GridLayout(0, 1, 0, 6));
-        appendEntryRows(panel, risks, Math.max(1, risks.size()));
-        appendEntryRows(panel, shares, Math.max(1, shares.size()));
+        appendEntryRows(panel, risks, ENTRY_COLUMNS);
+        appendEntryRows(panel, shares, ENTRY_COLUMNS);
         return panel;
     }
 
     static void appendEntryRows(JPanel panel, List<JButton> buttons, int columns) {
         for (int start = 0; start < buttons.size(); start += columns) {
-            JPanel row = new JPanel(new GridLayout(1, 0, 6, 0));
+            JPanel row = new JPanel(new GridLayout(1, columns, 6, 0));
             for (int index = start; index < Math.min(start + columns, buttons.size()); index++) row.add(buttons.get(index));
+            while (row.getComponentCount() < columns) row.add(new JLabel());
             panel.add(row);
         }
     }
@@ -692,6 +703,7 @@ public class TradeButtonWindow {
     }
 
     private void applyTradebookButtonStyle(JButton button, boolean sideIsLong) {
+        button.setMargin(new Insets(6, 4, 6, 4));
         Color color = getTradebookButtonColor(sideIsLong);
         button.setBackground(color);
         button.setForeground(TRADEBOOK_BUTTON_TEXT_COLOR);
@@ -727,6 +739,7 @@ public class TradeButtonWindow {
     }
 
     private void applyHotkeyButtonStyle(JButton button) {
+        button.setMargin(new Insets(6, 4, 6, 4));
         applyButtonHoverStyle(button, button.getBackground(), HOTKEY_BUTTON_HOVER_COLOR);
     }
 
@@ -874,16 +887,16 @@ public class TradeButtonWindow {
         wallThresholdLabel.setToolTipText(capDescription);
         wallThresholdLabel.getAccessibleContext().setAccessibleDescription(capDescription);
         if (!threshold.isAvailable()) {
-            wallThresholdLabel.setText("<html><center>Wall: waiting<br>"
-                    + capText + "<br>" + getRegularSessionHighLowText() + "</center></html>");
+            wallThresholdLabel.setText(VerticalWindowLayout.wrapHtml("Wall: waiting<br>"
+                    + capText + "<br>" + getRegularSessionHighLowText(), CONTENT_WIDTH - 32));
             return;
         }
 
         double volume = server.premarketShareVolume(symbol);
         String source = Double.isFinite(volume) ? "Schwab + Massive premarket: " + String.format(java.util.Locale.US, "%,.0f", volume) + " shares"
                 : "Premarket: " + server.premarketVolumeUnavailableReason(symbol) + "; default 5K";
-        wallThresholdLabel.setText("<html><center>Wall: " + formatShareSize(threshold.getEffectiveMinSize())
-                + " (" + source + ")<br>" + capText + "<br>" + getRegularSessionHighLowText() + "</center></html>");
+        wallThresholdLabel.setText(VerticalWindowLayout.wrapHtml("Wall: " + formatShareSize(threshold.getEffectiveMinSize())
+                + "<br>" + source + "<br>" + capText + "<br>" + getRegularSessionHighLowText(), CONTENT_WIDTH - 32));
     }
 
     private String getRegularSessionHighLowText() {

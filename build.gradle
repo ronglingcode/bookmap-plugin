@@ -13,7 +13,7 @@ plugins {
 }
 
 group = 'com.bookmap.plugin'
-version = '1.38'
+version = '1.39'
 
 def bookmapApiVersion = '7.8.0.13'
 
