@@ -30,12 +30,20 @@ class PremarketSizeThresholdTest {
         assertEquals(20000, PremarketSizeThreshold.forVolume(4000000));
         assertEquals(20000, PremarketSizeThreshold.forVolume(4000001));
         assertEquals(25000, PremarketSizeThreshold.forVolume(5000000));
-        assertEquals(45000, PremarketSizeThreshold.forVolume(9999999));
-        assertEquals(50000, PremarketSizeThreshold.forVolume(10000000));
-        assertEquals(50000, PremarketSizeThreshold.forVolume(10709318));
-        assertEquals(55000, PremarketSizeThreshold.forVolume(11000000));
-        assertEquals(500000, PremarketSizeThreshold.forVolume(100000000));
-        assertEquals(Integer.MAX_VALUE, PremarketSizeThreshold.forVolume(Double.MAX_VALUE));
+        assertEquals(25000, PremarketSizeThreshold.forVolume(5999999));
+        assertEquals(30000, PremarketSizeThreshold.forVolume(6000000));
+        assertEquals(30000, PremarketSizeThreshold.forVolume(6000001));
+        assertEquals(30000, PremarketSizeThreshold.forVolume(6999999));
+        assertEquals(35000, PremarketSizeThreshold.forVolume(7000000));
+        assertEquals(35000, PremarketSizeThreshold.forVolume(7999999));
+        assertEquals(40000, PremarketSizeThreshold.forVolume(8000000));
+        assertEquals(40000, PremarketSizeThreshold.forVolume(8000001));
+        assertEquals(40000, PremarketSizeThreshold.forVolume(9999999));
+        assertEquals(40000, PremarketSizeThreshold.forVolume(10000000));
+        assertEquals(40000, PremarketSizeThreshold.forVolume(10709318));
+        assertEquals(40000, PremarketSizeThreshold.forVolume(11000000));
+        assertEquals(40000, PremarketSizeThreshold.forVolume(100000000));
+        assertEquals(40000, PremarketSizeThreshold.forVolume(Double.MAX_VALUE));
     }
     @Test void aggregatesPremarketAndFinalizesAtOpenWithoutRegularVolume() {
         AtomicLong now = new AtomicLong(time("13:00:00"));

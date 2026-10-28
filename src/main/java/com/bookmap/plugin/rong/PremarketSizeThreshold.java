@@ -124,8 +124,8 @@ public final class PremarketSizeThreshold implements AutoCloseable {
     public static int forVolume(double shares) {
         if (!Double.isFinite(shares) || shares < 0) return FALLBACK;
         if (shares < 1000000) return 2000;
-        // Each completed million requires another 5K; saturate only at the API's int limit.
-        return (int) Math.min(Integer.MAX_VALUE, Math.floor(shares / 1000000) * 5000);
+        // Each completed million requires another 5K, capped at 40K from eight million onward.
+        return (int) (Math.min(8, Math.floor(shares / 1000000)) * 5000);
     }
     @Override public void close() { closed = true; worker.shutdownNow(); }
 }

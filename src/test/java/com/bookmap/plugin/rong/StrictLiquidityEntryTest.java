@@ -3,11 +3,13 @@ package com.bookmap.plugin.rong;
 import com.bookmap.plugin.rong.miniviteapp.core.controllers.BookmapSizeCap;
 import com.bookmap.plugin.rong.miniviteapp.core.controllers.BookmapSizeCap.Mode;
 import com.bookmap.plugin.rong.miniviteapp.libraries.broker.schwab.OrderFactory;
+import com.bookmap.plugin.rong.miniviteapp.models.Candle;
 import com.bookmap.plugin.rong.miniviteapp.models.Models.*;
 import com.google.gson.*;
 import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
 import java.time.*;
+import java.util.List;
 import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -49,6 +51,34 @@ class StrictLiquidityEntryTest {
     }
     private double quantity(Plan plan) {
         return plan.requests.get(0).body.getAsJsonArray("orderLegCollection").get(0).getAsJsonObject().get("quantity").getAsDouble();
+    }
+    @Test void eightMillionAndHigherPremarketVolumesRequireExactlyFortyThousandFilledShares() {
+        for (double volume : new double[]{8000000, 10709318, 100000000}) {
+            long chartTime = OPEN / 1_000_000L;
+            try (PremarketSizeThreshold policy = new PremarketSizeThreshold("TEST", () -> chartTime, () -> chartTime,
+                    (symbol, start, end) -> List.of(new Candle(symbol, start, 100, 100, 100, 100, volume, 100)))) {
+                policy.refresh();
+                SignalWebSocketServer server = server();
+                try {
+                    server.registerSizeThreshold("TEST", policy);
+                    assertEquals(40000, server.entrySizeCap("TEST").get("requiredOrderSize").getAsInt());
+                    server.observeSessionDepth("TEST", false, 10200, 40000, OPEN);
+                    server.observeSessionTrade("TEST", 10200, 39999, true, OPEN + 1, true);
+                    for (boolean isLong : new boolean[]{true, false})
+                        for (String type : new String[]{"MARKET", "LIMIT", "STOP", "STOP_LIMIT"})
+                            assertThrows(IllegalArgumentException.class, () -> BookmapSizeCap.apply(
+                                    new Snapshot(state(strictCap(server))), entry(isLong, type, 100)));
+                    server.observeSessionTrade("TEST", 10200, 1, true, OPEN + 2, true);
+                    for (boolean isLong : new boolean[]{true, false})
+                        for (String type : new String[]{"MARKET", "LIMIT", "STOP", "STOP_LIMIT"}) {
+                            Plan plan = entry(isLong, type, 100);
+                            JsonObject original = plan.requests.get(0).body.deepCopy();
+                            BookmapSizeCap.apply(new Snapshot(state(strictCap(server))), plan);
+                            assertEquals(original, plan.requests.get(0).body);
+                        }
+                } finally { server.shutdown(); }
+            }
+        }
     }
     @Test void historicalFillQualifiesLateAttachmentOnceHistoryCatchesUp() {
         SignalWebSocketServer server = new SignalWebSocketServer(0, 0);
