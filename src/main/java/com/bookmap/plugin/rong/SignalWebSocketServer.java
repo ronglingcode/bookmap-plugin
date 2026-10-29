@@ -18,6 +18,7 @@ import com.bookmap.plugin.rong.patterns.Direction;
 import com.bookmap.plugin.rong.patterns.PatternType;
 import com.bookmap.plugin.rong.miniviteapp.models.Candle;
 import com.bookmap.plugin.rong.miniviteapp.core.controllers.BookmapSizeCap;
+import com.bookmap.plugin.rong.miniviteapp.core.controllers.WallOut;
 import com.bookmap.plugin.rong.tradebuttons.TradebookButtonGroup;
 import com.bookmap.plugin.rong.tradebuttons.HotkeyRiskSelection;
 import com.google.gson.JsonArray;
@@ -165,9 +166,17 @@ public class SignalWebSocketServer extends WebSocketServer {
         if (key.equals("KeyB") || key.equals("KeyS") || key.equals("KeyW")
                 || key.isEmpty() && !getString(local, "tradebook_id").isEmpty())
             local.add("orderbook", entryWallSnapshot(getString(local, "symbol")));
+        if (WallOut.count(local) > 0)
+            local.add("orderbook", wallOutSnapshot(getString(local, "symbol")));
         tradingDispatch.accept(local);
     }
     JsonObject entryWallSnapshot(String symbol) {
+        return wallSnapshot(symbol, false);
+    }
+    JsonObject wallOutSnapshot(String symbol) {
+        return wallSnapshot(symbol, true);
+    }
+    private JsonObject wallSnapshot(String symbol, boolean wallOut) {
         JsonObject result = new JsonObject();
         BookmapPriceNormalizer.addWirePriceUnit(result);
         String cleanSymbol = SymbolUtils.cleanSymbol(symbol);
@@ -175,12 +184,14 @@ public class SignalWebSocketServer extends WebSocketServer {
         Double pips = symbolToPips.get(cleanSymbol);
         if (book == null || pips == null || !Double.isFinite(pips) || pips <= 0) return result;
         synchronized (book) {
-            WallThreshold threshold = effectiveThreshold(cleanSymbol, book, wallThresholdFloor.getAsInt());
-            result.addProperty("effectiveWallThreshold", threshold.effectiveMinSize);
+            int minimum = wallOut ? WallOut.MINIMUM_SIZE
+                    : effectiveThreshold(cleanSymbol, book, wallThresholdFloor.getAsInt()).effectiveMinSize;
+            result.addProperty("effectiveWallThreshold", minimum);
+            result.addProperty("tickSize", pips);
             for (boolean bid : new boolean[]{true, false}) {
                 JsonArray levels = new JsonArray();
                 for (Map.Entry<Integer, Integer> level : book.getLevelsSnapshot(bid).entrySet()) {
-                    if (level.getValue() < threshold.effectiveMinSize) continue;
+                    if (level.getKey() <= 0 || level.getValue() < minimum) continue;
                     JsonArray value = new JsonArray();
                     value.add(BookmapPriceNormalizer.toWirePrice(level.getKey(), pips));
                     value.add(level.getValue()); levels.add(value);
@@ -679,7 +690,18 @@ public class SignalWebSocketServer extends WebSocketServer {
 
     @Override
     public void onMessage(WebSocket conn, String message) {
-        // External clients cannot supply tokens, trading inputs or overwrite local views.
+        // External clients may read current depth; execution and local views remain native.
+        try {
+            JsonObject request = com.google.gson.JsonParser.parseString(message).getAsJsonObject();
+            if (!getString(request, "type").equals("wall_out_snapshot_request") || conn == null) return;
+            String symbol = SymbolUtils.cleanSymbol(getString(request, "symbol"));
+            JsonObject response = new JsonObject();
+            response.addProperty("type", "wall_out_snapshot");
+            response.addProperty("requestId", getString(request, "requestId"));
+            response.addProperty("symbol", symbol);
+            response.add("orderbook", wallOutSnapshot(symbol));
+            conn.send(response.toString());
+        } catch (RuntimeException ignored) { }
     }
 
     /** Broker hints bypass the lossy market-observation queue. */

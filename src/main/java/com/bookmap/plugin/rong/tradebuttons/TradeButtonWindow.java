@@ -505,6 +505,8 @@ public class TradeButtonWindow {
         hotkeyPanel.add(createHotkeyButton("Add Partial 2", "add_2_partials", "KeyA", true));
         hotkeyPanel.add(createHotkeyButton("Market Out 1", "market_out_1_partial", "KeyM"));
         hotkeyPanel.add(createHotkeyButton("Market Out 2", "market_out_2_partials", "KeyM"));
+        hotkeyPanel.add(createWallOutButton(1));
+        hotkeyPanel.add(createWallOutButton(2));
         hotkeyPanel.add(createHotkeyButton("Market Out Half", "market_out_half", "KeyG", true));
         hotkeyPanel.add(createHotkeyButton("Swap", "swap", "KeyW"));
         JButton inputs = new JButton("Entry Inputs"); applyHotkeyButtonStyle(inputs); inputs.addActionListener(e -> showManualInputs()); hotkeyPanel.add(inputs);
@@ -546,6 +548,12 @@ public class TradeButtonWindow {
 
     private JButton createHotkeyButton(String label, String id, String keyCode) {
         return createHotkeyButton(label, id, keyCode, false);
+    }
+
+    private JButton createWallOutButton(int count) {
+        JButton button = createHotkeyButton("Wall Out " + count, "wall_out_" + count, "");
+        button.setToolTipText("Move the next " + count + " exit pair(s) two cents ahead of the nearest wall with at least 5,000 lots");
+        return button;
     }
 
     private JButton createHotkeyButton(String label, String id, String keyCode, boolean shiftKey) {

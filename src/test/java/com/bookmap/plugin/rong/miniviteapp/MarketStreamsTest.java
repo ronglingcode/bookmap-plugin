@@ -30,7 +30,7 @@ class MarketStreamsTest {
                     public void ready(String source) { events.add("ready:" + source); }
                     public void status(String source, String status) { events.add(source + ":" + status); }
                 });
-        streams.start(); assertEquals(2, sockets.size()); Socket massive = sockets.get(0), schwab = sockets.get(1);
+        streams.start(); streams.start(); assertEquals(2, sockets.size()); Socket massive = sockets.get(0), schwab = sockets.get(1);
         massive.handlers.opened(massive); schwab.handlers.opened(schwab);
         assertEquals("token-1", schwab.sent.get(0).getAsJsonObject().getAsJsonObject("parameters").get("Authorization").getAsString());
         massive.receive("[{\"ev\":\"status\",\"status\":\"auth_success\"}]"); assertEquals("T.AAPL,T.TSLA", massive.sent.get(1).getAsJsonObject().get("params").getAsString());
@@ -39,6 +39,7 @@ class MarketStreamsTest {
         tasks.get(0).run.run(); Socket replacement = sockets.get(2); replacement.handlers.opened(replacement);
         assertEquals("token-2", replacement.sent.get(0).getAsJsonObject().getAsJsonObject("parameters").get("Authorization").getAsString());
         replacement.receive("{\"response\":[{\"service\":\"ADMIN\",\"command\":\"LOGIN\",\"content\":{\"code\":0}}]}"); assertEquals(3, replacement.sent.size());
+        assertEquals("AAPL,TSLA", replacement.sent.get(1).getAsJsonObject().getAsJsonObject("parameters").get("keys").getAsString());
         replacement.receive("{\"data\":[{\"service\":\"LEVELONE_EQUITIES\",\"content\":[{\"key\":\"AAPL\",\"4\":0}]},{\"service\":\"ACCT_ACTIVITY\",\"content\":[{\"2\":\"OrderAccepted\"}]}]}");
         assertTrue(events.contains("quote:0")); assertTrue(events.contains("activity"));
         massive.receive("[{\"ev\":\"T\",\"sym\":\"AAPL\",\"p\":10,\"s\":100,\"t\":1790861400000,\"q\":1},{\"ev\":\"T\",\"sym\":\"AAPL\",\"p\":99,\"s\":100,\"t\":1790861400000,\"q\":2,\"c\":[37]}]");

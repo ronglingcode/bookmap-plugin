@@ -38,7 +38,8 @@ public final class NativeTradingAdapter implements AutoCloseable {
     }
     public void attach(String symbol, Api api) { apis.put(symbol, api); }
     public void detach(String symbol) { apis.remove(symbol); }
-    public void start() {
+    public synchronized void start() {
+        if (closed || runtime != null) return;
         connectionStatus.setStarting();
         try { runtime = new NativeRuntime(new TradingRuntime.Events() {
             public void message(JsonObject value) { NativeTradingAdapter.this.accept(value); }
@@ -93,5 +94,5 @@ public final class NativeTradingAdapter implements AutoCloseable {
         if (api != null) try { api.sendUserMessage(new Layer1ApiSoundAlertMessage(sound, symbol + " " + text, 1, Duration.ZERO, null, RongPlugin.class, "native:" + symbol + ":" + System.nanoTime())); }
         catch (RuntimeException error) { PluginLog.action(symbol, "Trading sound unavailable: " + error.getClass().getSimpleName()); }
     }
-    @Override public void close() { closed = true; connectionStatus.setUnavailable("stopped"); if (runtime != null) runtime.close(); apis.clear(); }
+    @Override public synchronized void close() { closed = true; connectionStatus.setUnavailable("stopped"); if (runtime != null) runtime.close(); apis.clear(); }
 }

@@ -13,6 +13,26 @@ import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.*;
 
 class NativeExecutionTest {
+    @Test void wallOutButtonsRouteDirectlyAndReplaceOnlyOneOrTwoLimits() throws Exception {
+        for (int count : new int[]{1, 2}) try (var rig = new Rig()) {
+            rig.connect();
+            JsonObject action = new JsonObject();
+            action.addProperty("type", "custom_button_click"); action.addProperty("symbol", "AAPL");
+            action.addProperty("button_id", "hotkey:wall_out_" + count);
+            action.add("orderbook", json("{\"priceUnit\":\"real\",\"tickSize\":0.01,\"largeAsks\":[[105.1,5000]]}"));
+            assertTrue(rig.engine.route(action));
+            assertEquals("accepted", rig.finish().get("outcome").getAsString());
+            assertEquals(count, rig.mutations.get());
+            assertEquals(count, new HashSet<>(rig.requests).size());
+            assertTrue(rig.requests.stream().allMatch(request -> request.startsWith("PUT ")));
+            for (JsonObject body : rig.bodies) {
+                assertEquals("LIMIT", body.get("orderType").getAsString());
+                assertEquals(105.08, body.get("price").getAsDouble());
+                assertEquals("SELL", body.getAsJsonArray("orderLegCollection").get(0).getAsJsonObject().get("instruction").getAsString());
+            }
+        }
+    }
+
     @Test void strictBlocksMarketAndStopEntriesWhenOnlyUnfilledOutsideWallsAreAvailable() throws Exception {
         for (boolean isLong : new boolean[]{true, false}) for (boolean market : new boolean[]{true, false}) {
             try (var rig = new Rig()) {

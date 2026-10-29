@@ -22,6 +22,7 @@ The earlier flag-based rollout is historical; this document supersedes it.
 | C / Cancel Entry | Refresh broker orders, cancel STOP breakout entries only and clear pending timer. |
 | F / Flatten | Preserve uncovered-share branch, otherwise market out exit pairs and any remainder. Core-target protection does not prevent Flatten. Independent requests dispatch concurrently; all responses are collected before refreshing account status. |
 | M / Numpad1 / Market Out 1 | Market out the first pair tied for smallest share quantity. |
+| Wall Out 1 / Wall Out 2 | Move the next one/two smallest-quantity exit pairs to the same nearest opposing depth wall of at least 5,000 lots (inclusive, independent of adaptive entry thresholds). Sell limits go two cents below an offer wall; buy-to-cover limits go two cents above a bid wall, rounded outward to whole ticks. Only LIMIT legs change; existing exit rules apply. With one pair remaining, Wall Out 2 moves that pair. |
 | Other numpad digits | Market out the indexed partial; 0 means tenth. |
 | Top-row digits | Move the selected stop/limit to hover price; Digit1 uses the first smallest pair, remaining digits are positional. |
 | G / H / T | Move half / half / all exit pairs at hover price; Shift+G/H markets out the first half, rounding pair count up. |

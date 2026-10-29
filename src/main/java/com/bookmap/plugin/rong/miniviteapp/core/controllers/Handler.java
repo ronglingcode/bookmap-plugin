@@ -50,6 +50,25 @@ public final class Handler {
         Plan plan = new Plan("adjust_exit");
         adjust(state, plan, List.of(state.pairs.get(indexForKey(state, key))), price, stop); return plan;
     }
+    public static Plan wallOutPartials(Snapshot state, int count, com.google.gson.JsonObject snapshot) {
+        requireExits(state);
+        Models.require(state.splitPartials, "Wall Out requires split protective orders");
+        Models.require(count == 1 || count == 2, "Invalid wall-out partial count");
+        double price = WallOut.targetPrice(state.netQuantity > 0, snapshot);
+        List<ExitPair> remaining = new java.util.ArrayList<>(state.pairs);
+        List<ExitPair> selected = new java.util.ArrayList<>();
+        while (selected.size() < count && !remaining.isEmpty()) {
+            int index = ExitPairSelection.getFirstSmallestQuantityExitPairIndex(remaining);
+            Models.require(index >= 0, "Missing exit quantity");
+            ExitPair pair = remaining.remove(index);
+            Models.require(pair.limit != null && pair.stop != null, "Both exit legs required for wall out");
+            selected.add(pair);
+        }
+        Plan plan = new Plan("wall_out_" + count);
+        // LIMIT is explicit: a nearby wall's offset must never change a protective stop.
+        adjust(state, plan, selected, price, false);
+        return plan;
+    }
     public static Plan adjustBatchExitsAtPrice(Snapshot state, String key, double price) {
         requireExits(state); boolean stop = isStopLeg(state, price);
         Models.require(state.splitPartials || stop, "target adjustment requires split protective orders");

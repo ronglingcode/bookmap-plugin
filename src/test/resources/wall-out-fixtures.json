@@ -1,0 +1,1684 @@
+[
+  {
+    "name": "long exact 5k nearest unsorted ask",
+    "count": 1,
+    "state": {
+      "symbol": "AAPL",
+      "revision": 1,
+      "observedAt": 1,
+      "quoteObservedAt": 1,
+      "netQuantity": 100,
+      "currentPrice": 105,
+      "bid": 104.99,
+      "ask": 105.01,
+      "batchCount": 10,
+      "splitPartials": true,
+      "hasPlan": true,
+      "entryPrice": 100,
+      "coreTarget": 110,
+      "coreCount": 5,
+      "coreRuleEnabled": false,
+      "rulesSupported": true,
+      "entries": [],
+      "pairs": [
+        {
+          "LIMIT": {
+            "orderID": "200",
+            "orderType": "LIMIT",
+            "quantity": 30,
+            "price": 110,
+            "isBuy": false
+          },
+          "STOP": {
+            "orderID": "201",
+            "orderType": "STOP",
+            "quantity": 30,
+            "price": 95,
+            "isBuy": false
+          },
+          "originalPartial": 1
+        },
+        {
+          "LIMIT": {
+            "orderID": "202",
+            "orderType": "LIMIT",
+            "quantity": 5,
+            "price": 111,
+            "isBuy": false
+          },
+          "STOP": {
+            "orderID": "203",
+            "orderType": "STOP",
+            "quantity": 5,
+            "price": 95,
+            "isBuy": false
+          },
+          "originalPartial": 2
+        },
+        {
+          "LIMIT": {
+            "orderID": "204",
+            "orderType": "LIMIT",
+            "quantity": 5,
+            "price": 112,
+            "isBuy": false
+          },
+          "STOP": {
+            "orderID": "205",
+            "orderType": "STOP",
+            "quantity": 5,
+            "price": 95,
+            "isBuy": false
+          },
+          "originalPartial": 3
+        }
+      ]
+    },
+    "snapshot": {
+      "priceUnit": "real",
+      "tickSize": 0.01,
+      "effectiveWallThreshold": 20000,
+      "largeAsks": [
+        [
+          105.2,
+          9000
+        ],
+        [
+          105.05,
+          4999
+        ],
+        [
+          105.1,
+          5000
+        ]
+      ],
+      "largeBids": [
+        [
+          104.8,
+          9000
+        ],
+        [
+          104.95,
+          4999
+        ],
+        [
+          104.9,
+          5000
+        ]
+      ]
+    },
+    "requests": [
+      {
+        "method": "PUT",
+        "orderId": "202",
+        "body": {
+          "session": "NORMAL",
+          "duration": "DAY",
+          "orderLegCollection": [
+            {
+              "orderLegType": "EQUITY",
+              "instrument": {
+                "assetType": "EQUITY",
+                "symbol": "AAPL"
+              },
+              "instruction": "SELL",
+              "quantity": 5
+            }
+          ],
+          "orderType": "LIMIT",
+          "orderStrategyType": "SINGLE",
+          "price": 105.08
+        }
+      }
+    ],
+    "error": false
+  },
+  {
+    "name": "two distinct smallest pairs share the nearest wall",
+    "count": 2,
+    "state": {
+      "symbol": "AAPL",
+      "revision": 1,
+      "observedAt": 1,
+      "quoteObservedAt": 1,
+      "netQuantity": 100,
+      "currentPrice": 105,
+      "bid": 104.99,
+      "ask": 105.01,
+      "batchCount": 10,
+      "splitPartials": true,
+      "hasPlan": true,
+      "entryPrice": 100,
+      "coreTarget": 110,
+      "coreCount": 5,
+      "coreRuleEnabled": false,
+      "rulesSupported": true,
+      "entries": [],
+      "pairs": [
+        {
+          "LIMIT": {
+            "orderID": "200",
+            "orderType": "LIMIT",
+            "quantity": 30,
+            "price": 110,
+            "isBuy": false
+          },
+          "STOP": {
+            "orderID": "201",
+            "orderType": "STOP",
+            "quantity": 30,
+            "price": 95,
+            "isBuy": false
+          },
+          "originalPartial": 1
+        },
+        {
+          "LIMIT": {
+            "orderID": "202",
+            "orderType": "LIMIT",
+            "quantity": 5,
+            "price": 111,
+            "isBuy": false
+          },
+          "STOP": {
+            "orderID": "203",
+            "orderType": "STOP",
+            "quantity": 5,
+            "price": 95,
+            "isBuy": false
+          },
+          "originalPartial": 2
+        },
+        {
+          "LIMIT": {
+            "orderID": "204",
+            "orderType": "LIMIT",
+            "quantity": 5,
+            "price": 112,
+            "isBuy": false
+          },
+          "STOP": {
+            "orderID": "205",
+            "orderType": "STOP",
+            "quantity": 5,
+            "price": 95,
+            "isBuy": false
+          },
+          "originalPartial": 3
+        }
+      ]
+    },
+    "snapshot": {
+      "priceUnit": "real",
+      "tickSize": 0.01,
+      "effectiveWallThreshold": 20000,
+      "largeAsks": [
+        [
+          105.2,
+          9000
+        ],
+        [
+          105.05,
+          4999
+        ],
+        [
+          105.1,
+          5000
+        ]
+      ],
+      "largeBids": [
+        [
+          104.8,
+          9000
+        ],
+        [
+          104.95,
+          4999
+        ],
+        [
+          104.9,
+          5000
+        ]
+      ]
+    },
+    "requests": [
+      {
+        "method": "PUT",
+        "orderId": "202",
+        "body": {
+          "session": "NORMAL",
+          "duration": "DAY",
+          "orderLegCollection": [
+            {
+              "orderLegType": "EQUITY",
+              "instrument": {
+                "assetType": "EQUITY",
+                "symbol": "AAPL"
+              },
+              "instruction": "SELL",
+              "quantity": 5
+            }
+          ],
+          "orderType": "LIMIT",
+          "orderStrategyType": "SINGLE",
+          "price": 105.08
+        }
+      },
+      {
+        "method": "PUT",
+        "orderId": "204",
+        "body": {
+          "session": "NORMAL",
+          "duration": "DAY",
+          "orderLegCollection": [
+            {
+              "orderLegType": "EQUITY",
+              "instrument": {
+                "assetType": "EQUITY",
+                "symbol": "AAPL"
+              },
+              "instruction": "SELL",
+              "quantity": 5
+            }
+          ],
+          "orderType": "LIMIT",
+          "orderStrategyType": "SINGLE",
+          "price": 105.08
+        }
+      }
+    ],
+    "error": false
+  },
+  {
+    "name": "short exact 5k nearest unsorted bid",
+    "count": 2,
+    "state": {
+      "symbol": "AAPL",
+      "revision": 1,
+      "observedAt": 1,
+      "quoteObservedAt": 1,
+      "netQuantity": -100,
+      "currentPrice": 105,
+      "bid": 104.99,
+      "ask": 105.01,
+      "batchCount": 10,
+      "splitPartials": true,
+      "hasPlan": true,
+      "entryPrice": 100,
+      "coreTarget": 110,
+      "coreCount": 5,
+      "coreRuleEnabled": false,
+      "rulesSupported": true,
+      "entries": [],
+      "pairs": [
+        {
+          "LIMIT": {
+            "orderID": "200",
+            "orderType": "LIMIT",
+            "quantity": 30,
+            "price": 99,
+            "isBuy": true
+          },
+          "STOP": {
+            "orderID": "201",
+            "orderType": "STOP",
+            "quantity": 30,
+            "price": 110,
+            "isBuy": true
+          },
+          "originalPartial": 1
+        },
+        {
+          "LIMIT": {
+            "orderID": "202",
+            "orderType": "LIMIT",
+            "quantity": 5,
+            "price": 99,
+            "isBuy": true
+          },
+          "STOP": {
+            "orderID": "203",
+            "orderType": "STOP",
+            "quantity": 5,
+            "price": 110,
+            "isBuy": true
+          },
+          "originalPartial": 2
+        },
+        {
+          "LIMIT": {
+            "orderID": "204",
+            "orderType": "LIMIT",
+            "quantity": 5,
+            "price": 99,
+            "isBuy": true
+          },
+          "STOP": {
+            "orderID": "205",
+            "orderType": "STOP",
+            "quantity": 5,
+            "price": 110,
+            "isBuy": true
+          },
+          "originalPartial": 3
+        }
+      ]
+    },
+    "snapshot": {
+      "priceUnit": "real",
+      "tickSize": 0.01,
+      "effectiveWallThreshold": 20000,
+      "largeAsks": [
+        [
+          105.2,
+          9000
+        ],
+        [
+          105.05,
+          4999
+        ],
+        [
+          105.1,
+          5000
+        ]
+      ],
+      "largeBids": [
+        [
+          104.8,
+          9000
+        ],
+        [
+          104.95,
+          4999
+        ],
+        [
+          104.9,
+          5000
+        ]
+      ]
+    },
+    "requests": [
+      {
+        "method": "PUT",
+        "orderId": "202",
+        "body": {
+          "session": "NORMAL",
+          "duration": "DAY",
+          "orderLegCollection": [
+            {
+              "orderLegType": "EQUITY",
+              "instrument": {
+                "assetType": "EQUITY",
+                "symbol": "AAPL"
+              },
+              "instruction": "BUY_TO_COVER",
+              "quantity": 5
+            }
+          ],
+          "orderType": "LIMIT",
+          "orderStrategyType": "SINGLE",
+          "price": 104.92
+        }
+      },
+      {
+        "method": "PUT",
+        "orderId": "204",
+        "body": {
+          "session": "NORMAL",
+          "duration": "DAY",
+          "orderLegCollection": [
+            {
+              "orderLegType": "EQUITY",
+              "instrument": {
+                "assetType": "EQUITY",
+                "symbol": "AAPL"
+              },
+              "instruction": "BUY_TO_COVER",
+              "quantity": 5
+            }
+          ],
+          "orderType": "LIMIT",
+          "orderStrategyType": "SINGLE",
+          "price": 104.92
+        }
+      }
+    ],
+    "error": false
+  },
+  {
+    "name": "single pair remaining clamps Wall Out 2",
+    "count": 2,
+    "state": {
+      "symbol": "AAPL",
+      "revision": 1,
+      "observedAt": 1,
+      "quoteObservedAt": 1,
+      "netQuantity": 100,
+      "currentPrice": 105,
+      "bid": 104.99,
+      "ask": 105.01,
+      "batchCount": 10,
+      "splitPartials": true,
+      "hasPlan": true,
+      "entryPrice": 100,
+      "coreTarget": 110,
+      "coreCount": 5,
+      "coreRuleEnabled": false,
+      "rulesSupported": true,
+      "entries": [],
+      "pairs": [
+        {
+          "LIMIT": {
+            "orderID": "202",
+            "orderType": "LIMIT",
+            "quantity": 5,
+            "price": 111,
+            "isBuy": false
+          },
+          "STOP": {
+            "orderID": "203",
+            "orderType": "STOP",
+            "quantity": 5,
+            "price": 95,
+            "isBuy": false
+          },
+          "originalPartial": 2
+        }
+      ]
+    },
+    "snapshot": {
+      "priceUnit": "real",
+      "tickSize": 0.01,
+      "effectiveWallThreshold": 20000,
+      "largeAsks": [
+        [
+          105.2,
+          9000
+        ],
+        [
+          105.05,
+          4999
+        ],
+        [
+          105.1,
+          5000
+        ]
+      ],
+      "largeBids": [
+        [
+          104.8,
+          9000
+        ],
+        [
+          104.95,
+          4999
+        ],
+        [
+          104.9,
+          5000
+        ]
+      ]
+    },
+    "requests": [
+      {
+        "method": "PUT",
+        "orderId": "202",
+        "body": {
+          "session": "NORMAL",
+          "duration": "DAY",
+          "orderLegCollection": [
+            {
+              "orderLegType": "EQUITY",
+              "instrument": {
+                "assetType": "EQUITY",
+                "symbol": "AAPL"
+              },
+              "instruction": "SELL",
+              "quantity": 5
+            }
+          ],
+          "orderType": "LIMIT",
+          "orderStrategyType": "SINGLE",
+          "price": 105.08
+        }
+      }
+    ],
+    "error": false
+  },
+  {
+    "name": "coarse tick offsets by at least two cents",
+    "count": 1,
+    "state": {
+      "symbol": "AAPL",
+      "revision": 1,
+      "observedAt": 1,
+      "quoteObservedAt": 1,
+      "netQuantity": 100,
+      "currentPrice": 105,
+      "bid": 104.99,
+      "ask": 105.01,
+      "batchCount": 10,
+      "splitPartials": true,
+      "hasPlan": true,
+      "entryPrice": 100,
+      "coreTarget": 110,
+      "coreCount": 5,
+      "coreRuleEnabled": false,
+      "rulesSupported": true,
+      "entries": [],
+      "pairs": [
+        {
+          "LIMIT": {
+            "orderID": "200",
+            "orderType": "LIMIT",
+            "quantity": 30,
+            "price": 110,
+            "isBuy": false
+          },
+          "STOP": {
+            "orderID": "201",
+            "orderType": "STOP",
+            "quantity": 30,
+            "price": 95,
+            "isBuy": false
+          },
+          "originalPartial": 1
+        },
+        {
+          "LIMIT": {
+            "orderID": "202",
+            "orderType": "LIMIT",
+            "quantity": 5,
+            "price": 111,
+            "isBuy": false
+          },
+          "STOP": {
+            "orderID": "203",
+            "orderType": "STOP",
+            "quantity": 5,
+            "price": 95,
+            "isBuy": false
+          },
+          "originalPartial": 2
+        },
+        {
+          "LIMIT": {
+            "orderID": "204",
+            "orderType": "LIMIT",
+            "quantity": 5,
+            "price": 112,
+            "isBuy": false
+          },
+          "STOP": {
+            "orderID": "205",
+            "orderType": "STOP",
+            "quantity": 5,
+            "price": 95,
+            "isBuy": false
+          },
+          "originalPartial": 3
+        }
+      ]
+    },
+    "snapshot": {
+      "priceUnit": "real",
+      "tickSize": 0.05,
+      "effectiveWallThreshold": 20000,
+      "largeAsks": [
+        [
+          105.2,
+          9000
+        ],
+        [
+          105.05,
+          4999
+        ],
+        [
+          105.1,
+          5000
+        ]
+      ],
+      "largeBids": [
+        [
+          104.8,
+          9000
+        ],
+        [
+          104.95,
+          4999
+        ],
+        [
+          104.9,
+          5000
+        ]
+      ]
+    },
+    "requests": [
+      {
+        "method": "PUT",
+        "orderId": "202",
+        "body": {
+          "session": "NORMAL",
+          "duration": "DAY",
+          "orderLegCollection": [
+            {
+              "orderLegType": "EQUITY",
+              "instrument": {
+                "assetType": "EQUITY",
+                "symbol": "AAPL"
+              },
+              "instruction": "SELL",
+              "quantity": 5
+            }
+          ],
+          "orderType": "LIMIT",
+          "orderStrategyType": "SINGLE",
+          "price": 105.05
+        }
+      }
+    ],
+    "error": false
+  },
+  {
+    "name": "near wall still changes limit when target crosses current price",
+    "count": 1,
+    "state": {
+      "symbol": "AAPL",
+      "revision": 1,
+      "observedAt": 1,
+      "quoteObservedAt": 1,
+      "netQuantity": 100,
+      "currentPrice": 105,
+      "bid": 104.99,
+      "ask": 105.01,
+      "batchCount": 10,
+      "splitPartials": true,
+      "hasPlan": true,
+      "entryPrice": 100,
+      "coreTarget": 110,
+      "coreCount": 5,
+      "coreRuleEnabled": false,
+      "rulesSupported": true,
+      "entries": [],
+      "pairs": [
+        {
+          "LIMIT": {
+            "orderID": "200",
+            "orderType": "LIMIT",
+            "quantity": 30,
+            "price": 110,
+            "isBuy": false
+          },
+          "STOP": {
+            "orderID": "201",
+            "orderType": "STOP",
+            "quantity": 30,
+            "price": 95,
+            "isBuy": false
+          },
+          "originalPartial": 1
+        },
+        {
+          "LIMIT": {
+            "orderID": "202",
+            "orderType": "LIMIT",
+            "quantity": 5,
+            "price": 111,
+            "isBuy": false
+          },
+          "STOP": {
+            "orderID": "203",
+            "orderType": "STOP",
+            "quantity": 5,
+            "price": 95,
+            "isBuy": false
+          },
+          "originalPartial": 2
+        },
+        {
+          "LIMIT": {
+            "orderID": "204",
+            "orderType": "LIMIT",
+            "quantity": 5,
+            "price": 112,
+            "isBuy": false
+          },
+          "STOP": {
+            "orderID": "205",
+            "orderType": "STOP",
+            "quantity": 5,
+            "price": 95,
+            "isBuy": false
+          },
+          "originalPartial": 3
+        }
+      ]
+    },
+    "snapshot": {
+      "priceUnit": "real",
+      "tickSize": 0.01,
+      "effectiveWallThreshold": 20000,
+      "largeAsks": [
+        [
+          105.01,
+          5000
+        ]
+      ],
+      "largeBids": [
+        [
+          104.8,
+          9000
+        ],
+        [
+          104.95,
+          4999
+        ],
+        [
+          104.9,
+          5000
+        ]
+      ]
+    },
+    "requests": [
+      {
+        "method": "PUT",
+        "orderId": "202",
+        "body": {
+          "session": "NORMAL",
+          "duration": "DAY",
+          "orderLegCollection": [
+            {
+              "orderLegType": "EQUITY",
+              "instrument": {
+                "assetType": "EQUITY",
+                "symbol": "AAPL"
+              },
+              "instruction": "SELL",
+              "quantity": 5
+            }
+          ],
+          "orderType": "LIMIT",
+          "orderStrategyType": "SINGLE",
+          "price": 104.99
+        }
+      }
+    ],
+    "error": false
+  },
+  {
+    "name": "no qualifying wall sends nothing",
+    "count": 2,
+    "state": {
+      "symbol": "AAPL",
+      "revision": 1,
+      "observedAt": 1,
+      "quoteObservedAt": 1,
+      "netQuantity": 100,
+      "currentPrice": 105,
+      "bid": 104.99,
+      "ask": 105.01,
+      "batchCount": 10,
+      "splitPartials": true,
+      "hasPlan": true,
+      "entryPrice": 100,
+      "coreTarget": 110,
+      "coreCount": 5,
+      "coreRuleEnabled": false,
+      "rulesSupported": true,
+      "entries": [],
+      "pairs": [
+        {
+          "LIMIT": {
+            "orderID": "200",
+            "orderType": "LIMIT",
+            "quantity": 30,
+            "price": 110,
+            "isBuy": false
+          },
+          "STOP": {
+            "orderID": "201",
+            "orderType": "STOP",
+            "quantity": 30,
+            "price": 95,
+            "isBuy": false
+          },
+          "originalPartial": 1
+        },
+        {
+          "LIMIT": {
+            "orderID": "202",
+            "orderType": "LIMIT",
+            "quantity": 5,
+            "price": 111,
+            "isBuy": false
+          },
+          "STOP": {
+            "orderID": "203",
+            "orderType": "STOP",
+            "quantity": 5,
+            "price": 95,
+            "isBuy": false
+          },
+          "originalPartial": 2
+        },
+        {
+          "LIMIT": {
+            "orderID": "204",
+            "orderType": "LIMIT",
+            "quantity": 5,
+            "price": 112,
+            "isBuy": false
+          },
+          "STOP": {
+            "orderID": "205",
+            "orderType": "STOP",
+            "quantity": 5,
+            "price": 95,
+            "isBuy": false
+          },
+          "originalPartial": 3
+        }
+      ]
+    },
+    "snapshot": {
+      "priceUnit": "real",
+      "tickSize": 0.01,
+      "effectiveWallThreshold": 20000,
+      "largeAsks": [
+        [
+          106,
+          4999
+        ]
+      ],
+      "largeBids": [
+        [
+          104.8,
+          9000
+        ],
+        [
+          104.95,
+          4999
+        ],
+        [
+          104.9,
+          5000
+        ]
+      ]
+    },
+    "requests": [],
+    "error": true
+  },
+  {
+    "name": "no opposing wall sends nothing",
+    "count": 1,
+    "state": {
+      "symbol": "AAPL",
+      "revision": 1,
+      "observedAt": 1,
+      "quoteObservedAt": 1,
+      "netQuantity": 100,
+      "currentPrice": 105,
+      "bid": 104.99,
+      "ask": 105.01,
+      "batchCount": 10,
+      "splitPartials": true,
+      "hasPlan": true,
+      "entryPrice": 100,
+      "coreTarget": 110,
+      "coreCount": 5,
+      "coreRuleEnabled": false,
+      "rulesSupported": true,
+      "entries": [],
+      "pairs": [
+        {
+          "LIMIT": {
+            "orderID": "200",
+            "orderType": "LIMIT",
+            "quantity": 30,
+            "price": 110,
+            "isBuy": false
+          },
+          "STOP": {
+            "orderID": "201",
+            "orderType": "STOP",
+            "quantity": 30,
+            "price": 95,
+            "isBuy": false
+          },
+          "originalPartial": 1
+        },
+        {
+          "LIMIT": {
+            "orderID": "202",
+            "orderType": "LIMIT",
+            "quantity": 5,
+            "price": 111,
+            "isBuy": false
+          },
+          "STOP": {
+            "orderID": "203",
+            "orderType": "STOP",
+            "quantity": 5,
+            "price": 95,
+            "isBuy": false
+          },
+          "originalPartial": 2
+        },
+        {
+          "LIMIT": {
+            "orderID": "204",
+            "orderType": "LIMIT",
+            "quantity": 5,
+            "price": 112,
+            "isBuy": false
+          },
+          "STOP": {
+            "orderID": "205",
+            "orderType": "STOP",
+            "quantity": 5,
+            "price": 95,
+            "isBuy": false
+          },
+          "originalPartial": 3
+        }
+      ]
+    },
+    "snapshot": {
+      "priceUnit": "real",
+      "tickSize": 0.01,
+      "effectiveWallThreshold": 20000,
+      "largeAsks": [],
+      "largeBids": [
+        [
+          104.8,
+          9000
+        ],
+        [
+          104.95,
+          4999
+        ],
+        [
+          104.9,
+          5000
+        ]
+      ]
+    },
+    "requests": [],
+    "error": true
+  },
+  {
+    "name": "missing tick size sends nothing",
+    "count": 1,
+    "state": {
+      "symbol": "AAPL",
+      "revision": 1,
+      "observedAt": 1,
+      "quoteObservedAt": 1,
+      "netQuantity": 100,
+      "currentPrice": 105,
+      "bid": 104.99,
+      "ask": 105.01,
+      "batchCount": 10,
+      "splitPartials": true,
+      "hasPlan": true,
+      "entryPrice": 100,
+      "coreTarget": 110,
+      "coreCount": 5,
+      "coreRuleEnabled": false,
+      "rulesSupported": true,
+      "entries": [],
+      "pairs": [
+        {
+          "LIMIT": {
+            "orderID": "200",
+            "orderType": "LIMIT",
+            "quantity": 30,
+            "price": 110,
+            "isBuy": false
+          },
+          "STOP": {
+            "orderID": "201",
+            "orderType": "STOP",
+            "quantity": 30,
+            "price": 95,
+            "isBuy": false
+          },
+          "originalPartial": 1
+        },
+        {
+          "LIMIT": {
+            "orderID": "202",
+            "orderType": "LIMIT",
+            "quantity": 5,
+            "price": 111,
+            "isBuy": false
+          },
+          "STOP": {
+            "orderID": "203",
+            "orderType": "STOP",
+            "quantity": 5,
+            "price": 95,
+            "isBuy": false
+          },
+          "originalPartial": 2
+        },
+        {
+          "LIMIT": {
+            "orderID": "204",
+            "orderType": "LIMIT",
+            "quantity": 5,
+            "price": 112,
+            "isBuy": false
+          },
+          "STOP": {
+            "orderID": "205",
+            "orderType": "STOP",
+            "quantity": 5,
+            "price": 95,
+            "isBuy": false
+          },
+          "originalPartial": 3
+        }
+      ]
+    },
+    "snapshot": {
+      "priceUnit": "real",
+      "effectiveWallThreshold": 20000,
+      "largeAsks": [
+        [
+          105.2,
+          9000
+        ],
+        [
+          105.05,
+          4999
+        ],
+        [
+          105.1,
+          5000
+        ]
+      ],
+      "largeBids": [
+        [
+          104.8,
+          9000
+        ],
+        [
+          104.95,
+          4999
+        ],
+        [
+          104.9,
+          5000
+        ]
+      ]
+    },
+    "requests": [],
+    "error": true
+  },
+  {
+    "name": "unsupported price unit sends nothing",
+    "count": 1,
+    "state": {
+      "symbol": "AAPL",
+      "revision": 1,
+      "observedAt": 1,
+      "quoteObservedAt": 1,
+      "netQuantity": 100,
+      "currentPrice": 105,
+      "bid": 104.99,
+      "ask": 105.01,
+      "batchCount": 10,
+      "splitPartials": true,
+      "hasPlan": true,
+      "entryPrice": 100,
+      "coreTarget": 110,
+      "coreCount": 5,
+      "coreRuleEnabled": false,
+      "rulesSupported": true,
+      "entries": [],
+      "pairs": [
+        {
+          "LIMIT": {
+            "orderID": "200",
+            "orderType": "LIMIT",
+            "quantity": 30,
+            "price": 110,
+            "isBuy": false
+          },
+          "STOP": {
+            "orderID": "201",
+            "orderType": "STOP",
+            "quantity": 30,
+            "price": 95,
+            "isBuy": false
+          },
+          "originalPartial": 1
+        },
+        {
+          "LIMIT": {
+            "orderID": "202",
+            "orderType": "LIMIT",
+            "quantity": 5,
+            "price": 111,
+            "isBuy": false
+          },
+          "STOP": {
+            "orderID": "203",
+            "orderType": "STOP",
+            "quantity": 5,
+            "price": 95,
+            "isBuy": false
+          },
+          "originalPartial": 2
+        },
+        {
+          "LIMIT": {
+            "orderID": "204",
+            "orderType": "LIMIT",
+            "quantity": 5,
+            "price": 112,
+            "isBuy": false
+          },
+          "STOP": {
+            "orderID": "205",
+            "orderType": "STOP",
+            "quantity": 5,
+            "price": 95,
+            "isBuy": false
+          },
+          "originalPartial": 3
+        }
+      ]
+    },
+    "snapshot": {
+      "priceUnit": "ticks",
+      "tickSize": 0.01,
+      "effectiveWallThreshold": 20000,
+      "largeAsks": [
+        [
+          105.2,
+          9000
+        ],
+        [
+          105.05,
+          4999
+        ],
+        [
+          105.1,
+          5000
+        ]
+      ],
+      "largeBids": [
+        [
+          104.8,
+          9000
+        ],
+        [
+          104.95,
+          4999
+        ],
+        [
+          104.9,
+          5000
+        ]
+      ]
+    },
+    "requests": [],
+    "error": true
+  },
+  {
+    "name": "no position sends nothing",
+    "count": 1,
+    "state": {
+      "symbol": "AAPL",
+      "revision": 1,
+      "observedAt": 1,
+      "quoteObservedAt": 1,
+      "netQuantity": 0,
+      "currentPrice": 105,
+      "bid": 104.99,
+      "ask": 105.01,
+      "batchCount": 10,
+      "splitPartials": true,
+      "hasPlan": true,
+      "entryPrice": 100,
+      "coreTarget": 110,
+      "coreCount": 5,
+      "coreRuleEnabled": false,
+      "rulesSupported": true,
+      "entries": [],
+      "pairs": [
+        {
+          "LIMIT": {
+            "orderID": "200",
+            "orderType": "LIMIT",
+            "quantity": 30,
+            "price": 110,
+            "isBuy": false
+          },
+          "STOP": {
+            "orderID": "201",
+            "orderType": "STOP",
+            "quantity": 30,
+            "price": 95,
+            "isBuy": false
+          },
+          "originalPartial": 1
+        },
+        {
+          "LIMIT": {
+            "orderID": "202",
+            "orderType": "LIMIT",
+            "quantity": 5,
+            "price": 111,
+            "isBuy": false
+          },
+          "STOP": {
+            "orderID": "203",
+            "orderType": "STOP",
+            "quantity": 5,
+            "price": 95,
+            "isBuy": false
+          },
+          "originalPartial": 2
+        },
+        {
+          "LIMIT": {
+            "orderID": "204",
+            "orderType": "LIMIT",
+            "quantity": 5,
+            "price": 112,
+            "isBuy": false
+          },
+          "STOP": {
+            "orderID": "205",
+            "orderType": "STOP",
+            "quantity": 5,
+            "price": 95,
+            "isBuy": false
+          },
+          "originalPartial": 3
+        }
+      ]
+    },
+    "snapshot": {
+      "priceUnit": "real",
+      "tickSize": 0.01,
+      "effectiveWallThreshold": 20000,
+      "largeAsks": [
+        [
+          105.2,
+          9000
+        ],
+        [
+          105.05,
+          4999
+        ],
+        [
+          105.1,
+          5000
+        ]
+      ],
+      "largeBids": [
+        [
+          104.8,
+          9000
+        ],
+        [
+          104.95,
+          4999
+        ],
+        [
+          104.9,
+          5000
+        ]
+      ]
+    },
+    "requests": [],
+    "error": true
+  },
+  {
+    "name": "unsplit protective orders send nothing",
+    "count": 1,
+    "state": {
+      "symbol": "AAPL",
+      "revision": 1,
+      "observedAt": 1,
+      "quoteObservedAt": 1,
+      "netQuantity": 100,
+      "currentPrice": 105,
+      "bid": 104.99,
+      "ask": 105.01,
+      "batchCount": 10,
+      "splitPartials": false,
+      "hasPlan": true,
+      "entryPrice": 100,
+      "coreTarget": 110,
+      "coreCount": 5,
+      "coreRuleEnabled": false,
+      "rulesSupported": true,
+      "entries": [],
+      "pairs": [
+        {
+          "LIMIT": {
+            "orderID": "200",
+            "orderType": "LIMIT",
+            "quantity": 30,
+            "price": 110,
+            "isBuy": false
+          },
+          "STOP": {
+            "orderID": "201",
+            "orderType": "STOP",
+            "quantity": 30,
+            "price": 95,
+            "isBuy": false
+          },
+          "originalPartial": 1
+        },
+        {
+          "LIMIT": {
+            "orderID": "202",
+            "orderType": "LIMIT",
+            "quantity": 5,
+            "price": 111,
+            "isBuy": false
+          },
+          "STOP": {
+            "orderID": "203",
+            "orderType": "STOP",
+            "quantity": 5,
+            "price": 95,
+            "isBuy": false
+          },
+          "originalPartial": 2
+        },
+        {
+          "LIMIT": {
+            "orderID": "204",
+            "orderType": "LIMIT",
+            "quantity": 5,
+            "price": 112,
+            "isBuy": false
+          },
+          "STOP": {
+            "orderID": "205",
+            "orderType": "STOP",
+            "quantity": 5,
+            "price": 95,
+            "isBuy": false
+          },
+          "originalPartial": 3
+        }
+      ]
+    },
+    "snapshot": {
+      "priceUnit": "real",
+      "tickSize": 0.01,
+      "effectiveWallThreshold": 20000,
+      "largeAsks": [
+        [
+          105.2,
+          9000
+        ],
+        [
+          105.05,
+          4999
+        ],
+        [
+          105.1,
+          5000
+        ]
+      ],
+      "largeBids": [
+        [
+          104.8,
+          9000
+        ],
+        [
+          104.95,
+          4999
+        ],
+        [
+          104.9,
+          5000
+        ]
+      ]
+    },
+    "requests": [],
+    "error": true
+  },
+  {
+    "name": "incomplete second pair blocks both replacements",
+    "count": 2,
+    "state": {
+      "symbol": "AAPL",
+      "revision": 1,
+      "observedAt": 1,
+      "quoteObservedAt": 1,
+      "netQuantity": 100,
+      "currentPrice": 105,
+      "bid": 104.99,
+      "ask": 105.01,
+      "batchCount": 10,
+      "splitPartials": true,
+      "hasPlan": true,
+      "entryPrice": 100,
+      "coreTarget": 110,
+      "coreCount": 5,
+      "coreRuleEnabled": false,
+      "rulesSupported": true,
+      "entries": [],
+      "pairs": [
+        {
+          "LIMIT": {
+            "orderID": "200",
+            "orderType": "LIMIT",
+            "quantity": 30,
+            "price": 110,
+            "isBuy": false
+          },
+          "STOP": {
+            "orderID": "201",
+            "orderType": "STOP",
+            "quantity": 30,
+            "price": 95,
+            "isBuy": false
+          },
+          "originalPartial": 1
+        },
+        {
+          "LIMIT": {
+            "orderID": "202",
+            "orderType": "LIMIT",
+            "quantity": 5,
+            "price": 111,
+            "isBuy": false
+          },
+          "STOP": {
+            "orderID": "203",
+            "orderType": "STOP",
+            "quantity": 5,
+            "price": 95,
+            "isBuy": false
+          },
+          "originalPartial": 2
+        },
+        {
+          "LIMIT": {
+            "orderID": "204",
+            "orderType": "LIMIT",
+            "quantity": 5,
+            "price": 112,
+            "isBuy": false
+          },
+          "originalPartial": 3
+        }
+      ]
+    },
+    "snapshot": {
+      "priceUnit": "real",
+      "tickSize": 0.01,
+      "effectiveWallThreshold": 20000,
+      "largeAsks": [
+        [
+          105.2,
+          9000
+        ],
+        [
+          105.05,
+          4999
+        ],
+        [
+          105.1,
+          5000
+        ]
+      ],
+      "largeBids": [
+        [
+          104.8,
+          9000
+        ],
+        [
+          104.95,
+          4999
+        ],
+        [
+          104.9,
+          5000
+        ]
+      ]
+    },
+    "requests": [],
+    "error": true
+  },
+  {
+    "name": "protected second pair blocks both replacements",
+    "count": 2,
+    "state": {
+      "symbol": "AAPL",
+      "revision": 1,
+      "observedAt": 1,
+      "quoteObservedAt": 1,
+      "netQuantity": 100,
+      "currentPrice": 105,
+      "bid": 104.99,
+      "ask": 105.01,
+      "batchCount": 10,
+      "splitPartials": true,
+      "hasPlan": true,
+      "entryPrice": 100,
+      "coreTarget": 110,
+      "coreCount": 7,
+      "coreRuleEnabled": true,
+      "rulesSupported": true,
+      "entries": [],
+      "pairs": [
+        {
+          "LIMIT": {
+            "orderID": "200",
+            "orderType": "LIMIT",
+            "quantity": 30,
+            "price": 110,
+            "isBuy": false
+          },
+          "STOP": {
+            "orderID": "201",
+            "orderType": "STOP",
+            "quantity": 30,
+            "price": 95,
+            "isBuy": false
+          },
+          "originalPartial": 1
+        },
+        {
+          "LIMIT": {
+            "orderID": "202",
+            "orderType": "LIMIT",
+            "quantity": 5,
+            "price": 111,
+            "isBuy": false
+          },
+          "STOP": {
+            "orderID": "203",
+            "orderType": "STOP",
+            "quantity": 5,
+            "price": 95,
+            "isBuy": false
+          },
+          "originalPartial": 2
+        },
+        {
+          "LIMIT": {
+            "orderID": "204",
+            "orderType": "LIMIT",
+            "quantity": 40,
+            "price": 112,
+            "isBuy": false
+          },
+          "STOP": {
+            "orderID": "205",
+            "orderType": "STOP",
+            "quantity": 40,
+            "price": 95,
+            "isBuy": false
+          },
+          "originalPartial": 3
+        },
+        {
+          "LIMIT": {
+            "orderID": "206",
+            "orderType": "LIMIT",
+            "quantity": 5,
+            "price": 111,
+            "isBuy": false
+          },
+          "STOP": {
+            "orderID": "207",
+            "orderType": "STOP",
+            "quantity": 5,
+            "price": 95,
+            "isBuy": false
+          },
+          "originalPartial": 4
+        }
+      ]
+    },
+    "snapshot": {
+      "priceUnit": "real",
+      "tickSize": 0.01,
+      "effectiveWallThreshold": 20000,
+      "largeAsks": [
+        [
+          105.2,
+          9000
+        ],
+        [
+          105.05,
+          4999
+        ],
+        [
+          105.1,
+          5000
+        ]
+      ],
+      "largeBids": [
+        [
+          104.8,
+          9000
+        ],
+        [
+          104.95,
+          4999
+        ],
+        [
+          104.9,
+          5000
+        ]
+      ]
+    },
+    "requests": [],
+    "error": true
+  }
+]

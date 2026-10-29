@@ -6,6 +6,7 @@ import com.bookmap.plugin.rong.miniviteapp.core.controllers.KeyboardHandler;
 import com.bookmap.plugin.rong.miniviteapp.core.controllers.EntryHandler;
 import com.bookmap.plugin.rong.miniviteapp.core.controllers.ExtendedHandler;
 import com.bookmap.plugin.rong.miniviteapp.core.controllers.Handler;
+import com.bookmap.plugin.rong.miniviteapp.core.controllers.WallOut;
 import com.bookmap.plugin.rong.miniviteapp.core.controllers.BookmapSizeCap;
 import com.bookmap.plugin.rong.miniviteapp.models.Models;
 import com.bookmap.plugin.rong.miniviteapp.models.Models.*;
@@ -115,6 +116,7 @@ public final class MiniViteApp implements AutoCloseable {
         if (key.isEmpty()) key = Models.string(action, "key_code");
         boolean shift = Models.bool(action, "shiftKey") || Models.bool(action, "shift_key");
         boolean entry = EntryHandler.supports(action, key);
+        int wallOutCount = WallOut.count(action);
         String symbol = symbolKey.apply(Models.string(action, "symbol"));
         Snapshot state = snapshots.get(symbol);
         boolean sameDirection = entry && EntryHandler.matchesPositionSide(state, action);
@@ -127,7 +129,7 @@ public final class MiniViteApp implements AutoCloseable {
             Models.require(!closed, "native executor stopped");
             Models.require(!requiresReview, "broker review required: " + reviewReason);
             boolean directionalEntry = (key.equals("KeyB") || key.equals("KeyS")) && !entry;
-            Models.require(entry || directionalEntry || key.equals("KeyA") || key.equals("KeyW") || KeyboardHandler.supports(key, shift), "unsupported native action: "
+            Models.require(wallOutCount > 0 || entry || directionalEntry || key.equals("KeyA") || key.equals("KeyW") || KeyboardHandler.supports(key, shift), "unsupported native action: "
                     + (key.isEmpty() ? Models.string(action, "tradebook_id") : key));
             Models.require(state != null, "execution inputs unavailable");
             if (marketData.containsKey(symbol)) state = new Snapshot(state, marketData.get(symbol));
@@ -144,7 +146,8 @@ public final class MiniViteApp implements AutoCloseable {
                     state = new Snapshot(state, prices);
                 }
             }
-            Plan plan = entry ? EntryHandler.handleEntry(state, action, key, extended || sameDirection)
+            Plan plan = wallOutCount > 0 ? Handler.wallOutPartials(state, wallOutCount, action.has("orderbook") ? action.getAsJsonObject("orderbook") : null)
+                    : entry ? EntryHandler.handleEntry(state, action, key, extended || sameDirection)
                     : directionalEntry ? EntryHandler.handleDirectionalEntry(state, action, key)
                     : key.equals("KeyA") ? ExtendedHandler.reload(state, shift, Models.number(action, "price"),
                             Models.string(action, "button_id").equals("hotkey:add_2_partials") ? 2 : 1)

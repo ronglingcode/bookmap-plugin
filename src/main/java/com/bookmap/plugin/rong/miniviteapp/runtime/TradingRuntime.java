@@ -64,6 +64,7 @@ public final class TradingRuntime implements AutoCloseable {
     private MarketStreams streams;
     private CompletableFuture<Void> persistence = CompletableFuture.completedFuture(null);
     private volatile boolean stopped;
+    private CompletableFuture<Void> startup;
     private long revision, nextAccountRead, accountBackoffUntil, accountReadStartedAt;
     private Runnable accountRetry;
     private String lastNativeOrdersLog, lastNativeFillsLog;
@@ -93,7 +94,13 @@ public final class TradingRuntime implements AutoCloseable {
         execution = new MiniViteApp(new Api(authenticatedReads, this.events::detail), (connection, message) -> executionEvent(message), this.events, String::trim);
     }
     public CompletableFuture<Void> start() {
-        return CompletableFuture.runAsync(() -> {
+        final CompletableFuture<Void> pending;
+        synchronized (lock) {
+            if (stopped) return CompletableFuture.completedFuture(null);
+            if (startup != null) return startup;
+            startup = pending = new CompletableFuture<>();
+        }
+        CompletableFuture.runAsync(() -> {
             try {
                 if (massiveKey.isBlank()) throw new IllegalArgumentException("Massive API key missing from local secrets");
                 TradingConfig.Result loaded = TradingConfig.readTradingConfig(firestore.fetchConfigData());
@@ -121,7 +128,14 @@ public final class TradingRuntime implements AutoCloseable {
                 failure("", "Native startup", error);
                 throw new CompletionException(error);
             }
-        }, executor);
+        }, executor).whenComplete((value, error) -> {
+            if (error == null) pending.complete(null);
+            else {
+                synchronized (lock) { if (startup == pending) startup = null; }
+                pending.completeExceptionally(error);
+            }
+        });
+        return pending;
     }
     private static void validateProfile(String profile) { if (!profile.equals("schwab") && !profile.equals("momentumSimple")) throw new IllegalArgumentException("Native equity runtime requires schwab or momentumSimple profile"); }
     private JsonObject selectedPlan(String symbol) { return config != null && config.symbols.contains(symbol) ? config.plan(symbol) : null; }
