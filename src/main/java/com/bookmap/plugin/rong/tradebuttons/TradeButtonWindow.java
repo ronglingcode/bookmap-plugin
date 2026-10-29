@@ -496,7 +496,8 @@ public class TradeButtonWindow {
     }
 
     private JPanel createHotkeyPanel() {
-        JPanel hotkeyPanel = new JPanel(new GridLayout(0, 2, 6, 6));
+        GridBagLayout layout = new GridBagLayout();
+        JPanel hotkeyPanel = new JPanel(layout);
         hotkeyPanel.setBorder(BorderFactory.createEmptyBorder(0, 0, 8, 0));
         hotkeyPanel.add(createHotkeyButton("Cancel Entry", "cancel", "KeyC"));
         hotkeyPanel.add(createHotkeyButton("Flatten", "flatten", "KeyF"));
@@ -518,6 +519,16 @@ public class TradeButtonWindow {
         });
         hotkeyPanel.add(refreshAccount);
         hotkeyPanel.add(new JLabel());
+        // Size each row independently so the two-line label only enlarges its own row.
+        for (int index = 0; index < hotkeyPanel.getComponentCount(); index++) {
+            GridBagConstraints cell = new GridBagConstraints();
+            cell.gridx = index % 2;
+            cell.gridy = index / 2;
+            cell.weightx = 1;
+            cell.fill = GridBagConstraints.BOTH;
+            cell.insets = new Insets(index < 2 ? 0 : 6, index % 2 == 0 ? 0 : 6, 0, 0);
+            layout.setConstraints(hotkeyPanel.getComponent(index), cell);
+        }
         return hotkeyPanel;
     }
 
@@ -647,7 +658,7 @@ public class TradeButtonWindow {
         }
         JPanel panel = new JPanel(new GridLayout(0, 1, 0, 6));
         appendEntryRows(panel, risks, ENTRY_COLUMNS);
-        appendEntryRows(panel, shares, ENTRY_COLUMNS);
+        appendEntryRows(panel, shares, 2);
         return panel;
     }
 
@@ -739,7 +750,7 @@ public class TradeButtonWindow {
     }
 
     private void applyHotkeyButtonStyle(JButton button) {
-        button.setMargin(new Insets(6, 4, 6, 4));
+        button.setMargin(new Insets(2, 4, 2, 4));
         applyButtonHoverStyle(button, button.getBackground(), HOTKEY_BUTTON_HOVER_COLOR);
     }
 

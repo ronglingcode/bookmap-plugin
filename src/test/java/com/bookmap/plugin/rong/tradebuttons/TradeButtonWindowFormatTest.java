@@ -12,17 +12,18 @@ import org.junit.jupiter.api.Test;
 import com.bookmap.plugin.rong.SignalWebSocketServer;
 
 class TradeButtonWindowFormatTest {
-    @Test void riskAndShareButtonsUseThreeColumnsWithSharesOnTheirOwnRow() {
+    @Test void riskButtonsUseThreeColumnsAndShareButtonsUseTwoColumns() {
         var panel = new javax.swing.JPanel(new java.awt.GridLayout(0, 1, 0, 6));
         TradeButtonWindow.appendEntryRows(panel, Arrays.asList(new JButton("1 R"), new JButton("0.5 R"), new JButton("0.3 R"), new JButton("0.2 R"), new JButton("0.1 R")), 3);
-        TradeButtonWindow.appendEntryRows(panel, Arrays.asList(new JButton("100 sh"), new JButton("200 sh"), new JButton("300 sh")), 3);
+        TradeButtonWindow.appendEntryRows(panel, Arrays.asList(new JButton("100 sh"), new JButton("200 sh"), new JButton("300 sh")), 2);
         panel.setSize(245, 240); panel.doLayout();
-        assertEquals(3, panel.getComponentCount());
+        assertEquals(4, panel.getComponentCount());
         assertEquals("0.1 R", ((JButton)((javax.swing.JPanel)panel.getComponent(1)).getComponent(1)).getText());
         assertEquals("100 sh", ((JButton)((javax.swing.JPanel)panel.getComponent(2)).getComponent(0)).getText());
-        for (var component : panel.getComponents()) {
-            var row = (javax.swing.JPanel) component; row.doLayout();
-            assertEquals(3, row.getComponentCount());
+        assertEquals("300 sh", ((JButton)((javax.swing.JPanel)panel.getComponent(3)).getComponent(0)).getText());
+        for (int index = 0; index < panel.getComponentCount(); index++) {
+            var row = (javax.swing.JPanel) panel.getComponent(index); row.doLayout();
+            assertEquals(index < 2 ? 3 : 2, row.getComponentCount());
             assertEquals(panel.getWidth(), row.getWidth());
             var last = row.getComponent(row.getComponentCount() - 1);
             org.junit.jupiter.api.Assertions.assertTrue(Math.abs(row.getWidth() - last.getX() - last.getWidth()) <= 2);
