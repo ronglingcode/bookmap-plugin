@@ -73,7 +73,7 @@ public class TradeButtonWindow {
     private static final Color THRESHOLD_BACKGROUND = new Color(232, 238, 246);
     private static final Color THRESHOLD_TEXT_COLOR = new Color(24, 35, 46);
     private static final int CONTENT_WIDTH = VerticalWindowLayout.CONTENT_WIDTH;
-    private static final int ENTRY_COLUMNS = 2;
+    private static final int ENTRY_COLUMNS = 3;
     private static final int WALL_THRESHOLD_REFRESH_MS = 1_000;
     private static final String SHIFT_DOWN_CLIENT_PROPERTY = "rong.shiftDownForClick";
     private static final Object SHIFT_LISTENER_LOCK = new Object();
