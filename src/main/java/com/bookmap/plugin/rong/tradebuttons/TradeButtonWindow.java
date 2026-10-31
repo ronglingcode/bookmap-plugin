@@ -606,19 +606,25 @@ public class TradeButtonWindow {
             return "NORMAL 1R: risk capped at 1.00R<br>No qualifying wall fills required.";
         long largest = cap.get("largestOrderSize").getAsLong();
         int required = cap.get("requiredOrderSize").getAsInt();
+        long rolling = (long) BookmapSizeCap.rollingSize(cap);
+        boolean loading = cap.has("historyLoading") && cap.get("historyLoading").getAsBoolean();
+        String rules = "Single wall: " + formatShareSize(largest) + " | "
+                + (loading ? "CHECKING" : largest >= required ? "MET" : "WAITING")
+                + "<br>Best 2s: " + formatShareSize(rolling) + " | "
+                + (loading ? "CHECKING" : rolling >= required ? "MET" : "WAITING")
+                + "<br>Required: " + formatShareSize(required) + " | 2s contributor: &ge;"
+                + formatShareSize((required + 3L) / 4);
         if (BookmapSizeCap.mode(cap) == Mode.STRICT) {
-            if (cap.has("historyLoading") && cap.get("historyLoading").getAsBoolean())
-                return "Max filled: " + formatShareSize(largest) + " | Required: " + formatShareSize(required)
-                        + "<br><b>STRICT: checking fills since market open</b>";
-            boolean qualified = (!cap.has("available") || cap.get("available").getAsBoolean()) && largest >= required;
-            return "Max filled: " + formatShareSize(largest) + " | Required: " + formatShareSize(required)
+            if (loading) return rules + "<br><b>STRICT: checking fills since market open</b>";
+            boolean qualified = BookmapSizeCap.liquidityQualified(cap);
+            return rules
                     + "<br><b>STRICT: " + (qualified ? "liquidity threshold met" : "ENTRY BLOCKED until qualifying fills")
-                    + "</b><br>Accepts executions at one wall or a historical trade since market open.";
+                    + "</b><br>Either rule qualifies for the session.";
         }
-        return "Max filled: " + formatShareSize(largest) + " | Cap: "
+        return rules + "<br>Cap: "
                 + String.format(Locale.US, "%.2fR", cap.get("maxRiskMultiple").getAsDouble())
                 + "<br>PROPORTIONAL: size capped by qualifying liquidity"
-                + "<br>Accepts executions at one wall or a historical trade since market open.";
+                + "<br>Uses the larger result from either rule.";
     }
 
     private void setConnectionStatus(NativeConnectionStatus.Snapshot status) {
@@ -887,21 +893,32 @@ public class TradeButtonWindow {
         int required = cap.get("requiredOrderSize").getAsInt();
         double cappedR = cap.get("maxRiskMultiple").getAsDouble();
         boolean strict = BookmapSizeCap.mode(cap) == Mode.STRICT;
-        boolean blocked = strict && (!cap.get("available").getAsBoolean() || largest < required);
+        boolean blocked = strict && !BookmapSizeCap.liquidityQualified(cap);
         wallThresholdLabel.setBackground(blocked ? new Color(255, 220, 220) : THRESHOLD_BACKGROUND);
         wallThresholdLabel.setForeground(blocked ? new Color(150, 20, 20) : THRESHOLD_TEXT_COLOR);
         String capText = liquidityStatusText(cap);
         String capDescription = BookmapSizeCap.mode(cap) == Mode.NORMAL_1R
                 ? "Normal mode: 1R total risk ceiling; existing position and pending entries consume this budget. No qualifying wall fills required."
-                : "Largest executed wall episode or single historical trade since market open. Canceled size does not count. "
-                + (strict ? String.format(Locale.US, "Strict requires at least %,d executed shares in one wall episode or historical trade. ", required)
-                        : String.format(Locale.US, "%,d / %,d = %.6fR total risk ceiling; existing position and pending entries consume this budget. ", largest, required, cappedR));
+                : "Single wall: executions at one wall episode or a single historical trade since market open. "
+                + "Best 2s: session's largest same-side total across prices in a rolling two-second window; "
+                + String.format(Locale.US, "each wall episode (or historical print without depth) must execute at least %,d shares inside that window. ", (required + 3L) / 4)
+                + "No price-distance limit. Canceled size does not count. "
+                + (strict ? String.format(Locale.US, "Either rule reaching %,d executed shares satisfies liquidity for the session. ", required)
+                        : String.format(Locale.US, "%.0f / %,d = %.6fR total risk ceiling; existing position and pending entries consume this budget. ", BookmapSizeCap.qualifyingSize(cap), required, cappedR));
         if (cap.has("largestOrderPrice")) {
             String observed = java.time.Instant.ofEpochMilli(cap.get("largestOrderObservedAt").getAsLong())
                     .atZone(java.time.ZoneId.of("America/New_York"))
                     .format(java.time.format.DateTimeFormatter.ofPattern("HH:mm:ss.SSS z", Locale.US));
             capDescription += String.format(Locale.US, " Counted %s: %,d executed shares at %.4f, filled through %s.",
                     cap.get("largestOrderSide").getAsString(), largest, cap.get("largestOrderPrice").getAsDouble(), observed);
+        }
+        if (cap.has("rollingOrderObservedAt")) {
+            String observed = java.time.Instant.ofEpochMilli(cap.get("rollingOrderObservedAt").getAsLong())
+                    .atZone(java.time.ZoneId.of("America/New_York"))
+                    .format(java.time.format.DateTimeFormatter.ofPattern("HH:mm:ss.SSS z", Locale.US));
+            capDescription += String.format(Locale.US, " Best 2s %s: %,d shares from %,d contributors, window ending %s.",
+                    cap.get("rollingOrderSide").getAsString(), (long) BookmapSizeCap.rollingSize(cap),
+                    cap.get("rollingContributorCount").getAsInt(), observed);
         }
         wallThresholdLabel.setToolTipText(capDescription);
         wallThresholdLabel.getAccessibleContext().setAccessibleDescription(capDescription);

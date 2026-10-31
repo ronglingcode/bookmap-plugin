@@ -22,6 +22,22 @@ public final class BookmapSizeCap {
         return cap.has("mode") ? Mode.valueOf(Models.string(cap, "mode")) : ACTIVE_MODE;
     }
 
+    public static double rollingSize(JsonObject cap) {
+        return cap.has("rollingOrderSize") ? Models.number(cap, "rollingOrderSize") : 0;
+    }
+
+    public static double qualifyingSize(JsonObject cap) {
+        return Math.max(Models.number(cap, "largestOrderSize"), rollingSize(cap));
+    }
+
+    /** Shared by entry submission, pattern readiness, and the read-only Trade window. */
+    public static boolean liquidityQualified(JsonObject cap) {
+        double size = qualifyingSize(cap), required = Models.number(cap, "requiredOrderSize");
+        return (!cap.has("available") || Models.bool(cap, "available"))
+                && (!cap.has("historyLoading") || !Models.bool(cap, "historyLoading"))
+                && Double.isFinite(size) && Models.positive(required) && size >= required;
+    }
+
     public static boolean hasOpening(Plan plan) {
         return plan.requests.stream().anyMatch(request -> opening(request.body));
     }
@@ -37,9 +53,12 @@ public final class BookmapSizeCap {
             Models.require(!cap.has("available") || Models.bool(cap, "available"), "Bookmap liquidity session unavailable");
         if (mode == Mode.STRICT) {
             double largest = Models.number(cap, "largestOrderSize"), required = Models.number(cap, "requiredOrderSize");
-            Models.require(Double.isFinite(largest) && largest >= 0 && Models.positive(required), "Bookmap strict liquidity inputs unavailable");
-            Models.require(largest >= required, "Bookmap STRICT: ENTRY BLOCKED; largest executed size=" + largest
-                    + " shares; required=" + required + " shares (wall executions or historical trade since market open)");
+            double rolling = rollingSize(cap);
+            Models.require(Double.isFinite(largest) && largest >= 0 && Double.isFinite(rolling) && rolling >= 0
+                    && Models.positive(required), "Bookmap strict liquidity inputs unavailable");
+            Models.require(liquidityQualified(cap), "Bookmap STRICT: ENTRY BLOCKED; largest executed size=" + largest
+                    + " shares; best 2s accumulation=" + rolling + " shares; required=" + required
+                    + " shares (single wall/historical trade OR same-side 2s fills, each contributor >=25% of required)");
             if (plan.entry != null) plan.entry.add("bookmapSizeCap", cap.deepCopy());
             return;
         }

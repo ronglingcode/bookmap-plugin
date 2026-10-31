@@ -8,6 +8,29 @@ import java.time.Instant;
 import org.junit.jupiter.api.Test;
 
 class BidBreakdownCallbacksTest {
+    @Test void sharedPatternGateAlsoAcceptsRollingFillsWithoutASingleQualifyingWall() throws Exception {
+        withIsolatedActivation(() -> {
+            RongPlugin plugin = SignalComposerCallbacksTest.callbackPlugin();
+            SignalWebSocketServer server = new SignalWebSocketServer(0, 0);
+            Object previousServer = field("sharedServer").get(null);
+            field("sharedServer").set(null, server);
+            server.registerSymbol("TEST", (OrderBookState) field("orderBook").get(plugin), .01);
+            Method gate = RongPlugin.class.getDeclaredMethod("isEntryLiquidityReady"); gate.setAccessible(true);
+            long time = SessionOrderSizeTrackerTest.OPEN;
+            try {
+                server.observeSessionDepth("TEST", false, 10000, 3000, time);
+                server.observeSessionDepth("TEST", false, 10500, 2000, time);
+                server.observeSessionTrade("TEST", 10000, 3000, true, time, true);
+                assertFalse((boolean) gate.invoke(plugin));
+                server.observeSessionTrade("TEST", 10500, 2000, true, time + 1, true);
+                assertEquals(3000, server.entrySizeCap("TEST").get("largestOrderSize").getAsLong());
+                assertTrue((boolean) gate.invoke(plugin));
+                server.beginSessionHistory("TEST"); assertFalse((boolean) gate.invoke(plugin));
+                server.finishSessionHistory("TEST"); assertTrue((boolean) gate.invoke(plugin));
+            } finally { server.shutdown(); field("sharedServer").set(null, previousServer); }
+        });
+    }
+
     @Test void falseBreakoutGetsLevelOneQuotesAndUsesSharedEntryReclaimRules() throws Exception {
         withIsolatedActivation(() -> {
             RongPlugin plugin = SignalComposerCallbacksTest.callbackPlugin();

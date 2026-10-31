@@ -982,8 +982,7 @@ public class RongPlugin implements CustomModuleAdapter,
     private boolean isEntryLiquidityReady() {
         if (sharedServer == null) return false;
         com.google.gson.JsonObject cap = sharedServer.entrySizeCap(alias);
-        return cap.get("available").getAsBoolean()
-                && cap.get("largestOrderSize").getAsDouble() >= cap.get("requiredOrderSize").getAsDouble();
+        return com.bookmap.plugin.rong.miniviteapp.core.controllers.BookmapSizeCap.liquidityQualified(cap);
     }
 
     private int getEffectiveWallThreshold() {

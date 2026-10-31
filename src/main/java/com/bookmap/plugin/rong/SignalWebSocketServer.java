@@ -115,9 +115,10 @@ public class SignalWebSocketServer extends WebSocketServer {
         int required = policy == null ? PremarketSizeThreshold.FALLBACK : policy.threshold();
         JsonObject cap = new JsonObject();
         // One coherent tracker snapshot serves entries, the Trade window, and Bid Breakdown.
-        if (tracker == null) { fillSizeCap(cap, null, false, "", required); }
+        if (tracker == null) { fillSizeCap(cap, null, null, false, "", required); }
         else synchronized (tracker) {
-            fillSizeCap(cap, tracker.largestObservation(), tracker.available(), tracker.sessionDate(), required);
+            fillSizeCap(cap, tracker.largestObservation(), tracker.rollingObservation(required),
+                    tracker.available(), tracker.sessionDate(), required);
         }
         boolean loading = sessionHistoryLoading.contains(clean);
         cap.addProperty("historyLoading", loading);
@@ -125,17 +126,27 @@ public class SignalWebSocketServer extends WebSocketServer {
         return cap;
     }
     private static void fillSizeCap(JsonObject cap, SessionOrderSizeTracker.Observation counted,
+            SessionOrderSizeTracker.RollingObservation rolling,
             boolean available, String sessionDate, int required) {
         long largest = counted == null ? 0 : counted.size;
+        long rollingSize = rolling == null ? 0 : rolling.size;
         cap.addProperty("largestOrderSize", largest); cap.addProperty("requiredOrderSize", required);
+        cap.addProperty("rollingOrderSize", rollingSize);
+        cap.addProperty("rollingContributorMinimum", (required + 3L) / 4);
+        cap.addProperty("rollingWindowMillis", SessionOrderSizeTracker.ROLLING_WINDOW_NS / 1_000_000L);
         cap.addProperty("mode", BookmapSizeCap.ACTIVE_MODE.name()); cap.addProperty("available", available);
-        cap.addProperty("maxRiskMultiple", (double) largest / required);
+        cap.addProperty("maxRiskMultiple", (double) Math.max(largest, rollingSize) / required);
         cap.addProperty("sessionDate", sessionDate);
         cap.addProperty("evidenceBasis", counted != null && counted.historicalPrint ? "historicalTrade" : "wallExecutions");
         if (counted != null) {
             cap.addProperty("largestOrderPrice", counted.price);
             cap.addProperty("largestOrderSide", counted.isBid ? "bid" : "offer");
             cap.addProperty("largestOrderObservedAt", counted.timestampNs / 1_000_000L);
+        }
+        if (rolling != null) {
+            cap.addProperty("rollingOrderSide", rolling.isBid ? "bid" : "offer");
+            cap.addProperty("rollingOrderObservedAt", rolling.timestampNs / 1_000_000L);
+            cap.addProperty("rollingContributorCount", rolling.contributors);
         }
     }
     public void registerSizeThreshold(String symbol, PremarketSizeThreshold threshold) { sizeThresholds.put(SymbolUtils.cleanSymbol(symbol), threshold); }

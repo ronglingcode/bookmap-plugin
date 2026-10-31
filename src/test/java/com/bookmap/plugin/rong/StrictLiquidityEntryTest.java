@@ -96,6 +96,31 @@ class StrictLiquidityEntryTest {
                 assertEquals(original, plan.requests.get(0).body);
             }
     }
+    @Test void rollingRuleUnlocksEveryEntryTypeAndActionWhenSingleWallRuleIsUnmet() {
+        var server = server();
+        try {
+            server.observeSessionTrade("TEST", 10200, 3000, true, OPEN + 1, true);
+            server.observeSessionTrade("TEST", 10400, 2000, true, OPEN + 2_000_000_001L, true);
+            JsonObject cap = strictCap(server);
+            assertEquals(3000, cap.get("largestOrderSize").getAsLong());
+            assertEquals(5000, cap.get("rollingOrderSize").getAsLong());
+            for (boolean isLong : new boolean[]{true, false})
+                for (String type : new String[]{"MARKET", "LIMIT", "STOP", "STOP_LIMIT"})
+                    for (String action : new String[]{"wall_reversal_entry", "reload_partial", "swap", "refresh_pending_entry"}) {
+                        Plan original = entry(isLong, type, 100);
+                        Plan plan = new Plan(action); plan.requests.addAll(original.requests);
+                        JsonObject body = plan.requests.get(0).body.deepCopy();
+                        BookmapSizeCap.apply(new Snapshot(state(cap)), plan);
+                        assertEquals(body, plan.requests.get(0).body);
+                    }
+            cap.addProperty("available", false);
+            assertThrows(IllegalArgumentException.class, () -> BookmapSizeCap.apply(
+                    new Snapshot(state(cap)), entry(true, "MARKET", 100)));
+            cap.addProperty("available", true); cap.addProperty("historyLoading", true);
+            assertThrows(IllegalArgumentException.class, () -> BookmapSizeCap.apply(
+                    new Snapshot(state(cap)), entry(true, "MARKET", 100)));
+        } finally { server.shutdown(); }
+    }
     @Test void strictIsDefaultAndBlocksEvenTheSmallestRequestsWithoutQualifyingLiquidity() {
         var server = server(); JsonObject cap = server.entrySizeCap("TEST");
         assertEquals(Mode.STRICT, BookmapSizeCap.ACTIVE_MODE);
