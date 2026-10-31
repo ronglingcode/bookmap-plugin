@@ -52,8 +52,8 @@ class StrictLiquidityEntryTest {
     private double quantity(Plan plan) {
         return plan.requests.get(0).body.getAsJsonArray("orderLegCollection").get(0).getAsJsonObject().get("quantity").getAsDouble();
     }
-    @Test void eightMillionAndHigherPremarketVolumesRequireExactlyFortyThousandFilledShares() {
-        for (double volume : new double[]{8000000, 10709318, 100000000}) {
+    @Test void sixtyFourMillionAndHigherPremarketVolumesRequireExactlyFortyThousandFilledShares() {
+        for (double volume : new double[]{64000000, 100000000, Double.MAX_VALUE}) {
             long chartTime = OPEN / 1_000_000L;
             try (PremarketSizeThreshold policy = new PremarketSizeThreshold("TEST", () -> chartTime, () -> chartTime,
                     (symbol, start, end) -> List.of(new Candle(symbol, start, 100, 100, 100, 100, volume, 100)))) {

@@ -18,10 +18,10 @@ final class SessionOrderSizeTracker {
     private Observation largest;
 
     SessionOrderSizeTracker() {
-        // Retain a separate peak for every premarket tier. History may arrive before
-        // the final premarket requirement; a fallback-tier peak must not qualify 40K.
-        rollingStates.put(2000, new RollingState(2000));
-        for (int required = 5000; required <= 40000; required += 5000)
+        // History can precede the final volume: retain peaks for every rounded
+        // square-root requirement, each using its own 25% contributor minimum.
+        for (int required = PremarketSizeThreshold.MINIMUM; required <= PremarketSizeThreshold.MAXIMUM;
+                required += PremarketSizeThreshold.INCREMENT)
             rollingStates.put(required, new RollingState(required));
     }
 

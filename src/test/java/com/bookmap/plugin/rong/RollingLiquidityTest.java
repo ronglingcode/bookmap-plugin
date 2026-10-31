@@ -16,7 +16,7 @@ class RollingLiquidityTest {
         final OrderBookState book = new OrderBookState();
         final PremarketSizeThreshold policy = new PremarketSizeThreshold("TEST", () -> OPEN / 1_000_000,
                 () -> OPEN / 1_000_000, (symbol, start, end) -> List.of(
-                        new Candle(symbol, start, 100, 100, 100, 100, 8000000, 100)));
+                        new Candle(symbol, start, 100, 100, 100, 100, 64000000, 100)));
         Rig() {
             server.registerSymbol("TEST", book, .01); policy.refresh();
             server.registerSizeThreshold("TEST", policy); server.observeSessionTime("TEST", OPEN);

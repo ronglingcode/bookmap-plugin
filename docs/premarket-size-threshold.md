@@ -4,18 +4,19 @@ Wall labels and exported liquidity summaries always use a fixed minimum of 5,000
 
 | Premarket shares | Threshold |
 | --- | --- |
-| Below 1,000,000 | 2,000 |
-| 1,000,000 to below 2,000,000 | 5,000 |
-| 2,000,000 to below 3,000,000 | 10,000 |
-| 3,000,000 to below 4,000,000 | 15,000 |
-| 4,000,000 to below 5,000,000 | 20,000 |
-| 5,000,000 to below 6,000,000 | 25,000 |
-| 6,000,000 to below 7,000,000 | 30,000 |
-| 7,000,000 to below 8,000,000 | 35,000 |
-| 8,000,000 or more | 40,000 |
+| 0 to 160,000 | 2,000 |
+| 250,000 | 2,500 |
+| 500,000 | 3,500 |
+| 750,000 | 4,500 |
+| 1,000,000 | 5,000 |
+| 2,000,000 | 7,000 |
+| 4,000,000 | 10,000 |
+| 8,000,000 | 14,000 |
+| 16,000,000 | 20,000 |
+| 64,000,000 or more | 40,000 |
 | Unavailable | 5,000 |
 
-At or above one million premarket shares, the threshold is `min(8, floor(premarket shares / 1,000,000)) * 5,000`: each completed million adds 5K, up to a maximum requirement of 40K. Exact million boundaries enter the new tier. At 8,000,000 shares or any higher volume, including 10,709,318 shares, the requirement remains 40K.
+The threshold follows a square-root curve anchored at 5K for one million premarket shares: `500 * round(clamp(5,000 * sqrt(premarket shares / 1,000,000), 2,000, 40,000) / 500)`. It is rounded to the nearest 500 shares (halfway values round up), with a 2K minimum and 40K maximum. The same curve applies below one million, so the requirement rises gradually toward 5K. The unrounded curve reaches the 2K floor at 160,000 shares; rounding keeps the requirement at 2K until 202,500 shares. The table shows examples rather than volume buckets. At 10,709,318 premarket shares the requirement is 16,500; MRVL's Massive-only 3,784,074.65 shares on March 31, 2026 would require 9,500. Invalid, negative, or unavailable volume retains the separate 5K fallback.
 
 The policy first uses Schwab's price-history endpoint with one-minute candles and extended-hours data enabled. It shares the native trading runtime's OAuth token and refresh handling. Requests cover 01:00 Eastern until 09:30 Eastern exclusive, matching the Thinkorswim study's start time. Returned candles are deduplicated by timestamp and filtered to the requested range, because Schwab may return additional session candles.
 
@@ -40,7 +41,7 @@ Strict blocks the entire opening action until **either** of two execution rules 
 1. **Single wall:** accumulated executions in one continuous bid/offer wall episode, or one historical executed print, reach the full requirement. There is no two-second limit on this original rule.
 2. **Best 2s:** actual executions across any prices on the same side reach the requirement within a rolling two-second window. Each contributing wall episode must have at least **25% of the full requirement executed inside that window** (rounded up to whole shares). Smaller contributors are excluded entirely; partial fills of the same episode can reach the minimum together. Bid and offer totals stay separate. There is no price-distance or ATR condition. A window includes executions exactly two seconds apart, but never older executions or a chain extending beyond two seconds.
 
-For a 40K requirement, the contributor minimum is 10K: 30K + 15K qualifies at 45K; 30K + 9K + 8K counts only 30K and does not qualify. Separate canceled/replaced episodes must each meet the 10K floor, even at the same price. One 40K execution can satisfy both rules. One wall accumulating 40K over a longer period may satisfy only the original rule. Each rule retains its best result for the session; qualification does not expire when its rolling window moves on. The tracker retains separate peaks for every possible premarket tier, so a fallback-tier result cannot later import contributors below the final tier's minimum.
+For a 40K requirement, the contributor minimum is 10K: 30K + 15K qualifies at 45K; 30K + 9K + 8K counts only 30K and does not qualify. Separate canceled/replaced episodes must each meet the 10K floor, even at the same price. One 40K execution can satisfy both rules. One wall accumulating 40K over a longer period may satisfy only the original rule. Each rule retains its best result for the session; qualification does not expire when its rolling window moves on. The tracker retains separate peaks for all 77 possible rounded requirements from 2K through 40K, so fallback evidence cannot later import contributors below the final requirement's minimum.
 
 Once either rule qualifies, Strict leaves the requested size and protective brackets unchanged; it does not apply the proportional R ceiling. Smaller R requests, fixed shares, low-risk reload overrides, and favorable VWAP conditions cannot bypass qualification. When blocked, the UI highlights **STRICT: ENTRY BLOCKED until qualifying fills** in red. It shows **Single wall** and **Best 2s** separately, each with a **MET**, **WAITING**, or history-loading **CHECKING** status, plus the full requirement and 25% contributor minimum. Market, limit, STOP, and STOP_LIMIT entries all use the same executed evidence. Once qualified, it shows **liquidity threshold met**, which refers only to liquidity, not all trading eligibility checks.
 
@@ -50,7 +51,7 @@ Proportional uses the larger result from the two rules:
 
 For a 15K threshold and a largest filled wall of 5K shares, Proportional caps total risk at one third of R. This is a ceiling, not a multiplier on the selected button: a smaller request stays smaller. Ratios above 1R are allowed when the existing rules also permit that size. Existing same-direction position risk and pending-entry risk consume this budget. A PUT replacement excludes the pending order it replaces. Entries submitted before old entries are canceled still reserve those old entries' risk. Swap reentries are sized after their preceding position-close stage. Whole-share reductions update all protective brackets and captured trade state consistently.
 
-The denominator in both modes uses the existing tier table above, including boundary rules and the unavailable-volume fallback. The display refreshes every second. Its tooltip identifies the winning single wall's executed size, side, price, and fill time in Eastern, plus the best two-second total's side, contributor count, and window end time. In Proportional mode it also shows the calculation and identifies the cap as a shared total risk ceiling.
+The denominator in both modes uses the square-root calculation above, including rounding, the 2K floor, the 40K cap, and the unavailable-volume fallback. The display refreshes every second. Its tooltip identifies the winning single wall's executed size, side, price, and fill time in Eastern, plus the best two-second total's side, contributor count, and window end time. In Proportional mode it also shows the calculation and identifies the cap as a shared total risk ceiling.
 
 The tracker counts actual Bookmap executions at observed bid/offer walls during weekdays from 09:30 inclusive to 16:00 exclusive Eastern, after snapshot readiness. Buying consumes the offer and selling consumes the bid, at the exact wall price. Unknown-aggressor prints count only when a valid Level 1 bid/ask identifies their side at that price. Raw depth size, size reductions, cancellations, price crossings, and minute history never count as executed volume.
 

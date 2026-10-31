@@ -20,30 +20,43 @@ class PremarketSizeThresholdTest {
         assertEquals(5000, PremarketSizeThreshold.forVolume(Double.NEGATIVE_INFINITY));
         assertEquals(5000, PremarketSizeThreshold.forVolume(-1));
         assertEquals(2000, PremarketSizeThreshold.forVolume(0));
-        assertEquals(2000, PremarketSizeThreshold.forVolume(999999));
+        assertEquals(2000, PremarketSizeThreshold.forVolume(100000));
+        assertEquals(2000, PremarketSizeThreshold.forVolume(160000));
+        assertEquals(2000, PremarketSizeThreshold.forVolume(202499));
+        assertEquals(2500, PremarketSizeThreshold.forVolume(202500));
+        assertEquals(2500, PremarketSizeThreshold.forVolume(250000));
+        assertEquals(3500, PremarketSizeThreshold.forVolume(500000));
+        assertEquals(4500, PremarketSizeThreshold.forVolume(750000));
+        assertEquals(5000, PremarketSizeThreshold.forVolume(999999));
         assertEquals(5000, PremarketSizeThreshold.forVolume(1000000));
-        assertEquals(5000, PremarketSizeThreshold.forVolume(1999999));
-        assertEquals(10000, PremarketSizeThreshold.forVolume(2000000));
-        assertEquals(10000, PremarketSizeThreshold.forVolume(2000001));
-        assertEquals(15000, PremarketSizeThreshold.forVolume(3000000));
-        assertEquals(15000, PremarketSizeThreshold.forVolume(3000001));
-        assertEquals(20000, PremarketSizeThreshold.forVolume(4000000));
-        assertEquals(20000, PremarketSizeThreshold.forVolume(4000001));
-        assertEquals(25000, PremarketSizeThreshold.forVolume(5000000));
-        assertEquals(25000, PremarketSizeThreshold.forVolume(5999999));
-        assertEquals(30000, PremarketSizeThreshold.forVolume(6000000));
-        assertEquals(30000, PremarketSizeThreshold.forVolume(6000001));
-        assertEquals(30000, PremarketSizeThreshold.forVolume(6999999));
-        assertEquals(35000, PremarketSizeThreshold.forVolume(7000000));
-        assertEquals(35000, PremarketSizeThreshold.forVolume(7999999));
-        assertEquals(40000, PremarketSizeThreshold.forVolume(8000000));
-        assertEquals(40000, PremarketSizeThreshold.forVolume(8000001));
-        assertEquals(40000, PremarketSizeThreshold.forVolume(9999999));
-        assertEquals(40000, PremarketSizeThreshold.forVolume(10000000));
-        assertEquals(40000, PremarketSizeThreshold.forVolume(10709318));
-        assertEquals(40000, PremarketSizeThreshold.forVolume(11000000));
+        assertEquals(5000, PremarketSizeThreshold.forVolume(1000001));
+        assertEquals(7000, PremarketSizeThreshold.forVolume(1999999));
+        assertEquals(7000, PremarketSizeThreshold.forVolume(2000000));
+        assertEquals(7000, PremarketSizeThreshold.forVolume(2000001));
+        assertEquals(8500, PremarketSizeThreshold.forVolume(3000000));
+        assertEquals(9500, PremarketSizeThreshold.forVolume(3784074.65031));
+        assertEquals(10000, PremarketSizeThreshold.forVolume(4000000));
+        assertEquals(14000, PremarketSizeThreshold.forVolume(8000000));
+        assertEquals(16500, PremarketSizeThreshold.forVolume(10709318));
+        assertEquals(20000, PremarketSizeThreshold.forVolume(16000000));
+        assertEquals(39500, PremarketSizeThreshold.forVolume(63202499));
+        assertEquals(40000, PremarketSizeThreshold.forVolume(63202500));
+        assertEquals(40000, PremarketSizeThreshold.forVolume(64000000));
         assertEquals(40000, PremarketSizeThreshold.forVolume(100000000));
         assertEquals(40000, PremarketSizeThreshold.forVolume(Double.MAX_VALUE));
+    }
+    @Test void roundedCurveIsMonotoneAndReachesEverySupportedRequirement() {
+        int previous = PremarketSizeThreshold.forVolume(0);
+        for (int volume = 10000; volume <= 100000000; volume += 10000) {
+            int required = PremarketSizeThreshold.forVolume(volume);
+            assertTrue(required >= previous, "volume=" + volume);
+            assertEquals(0, required % 500);
+            previous = required;
+        }
+        for (int required = 2000; required <= 40000; required += 500) {
+            double volume = 1000000 * Math.pow(required / 5000.0, 2);
+            assertEquals(required, PremarketSizeThreshold.forVolume(volume));
+        }
     }
     @Test void aggregatesPremarketAndFinalizesAtOpenWithoutRegularVolume() {
         AtomicLong now = new AtomicLong(time("13:00:00"));
@@ -54,8 +67,8 @@ class PremarketSizeThresholdTest {
             return List.of(candle(start - 1, 9000000), candle(start, 1500000),
                     candle(time("13:00:00"), 1000000), candle(time("13:30:00"), 9000000));
         })) {
-            policy.refresh(); assertEquals(5000, policy.threshold());
-            now.set(time("13:29:00")); policy.refresh(); assertEquals(10000, policy.threshold());
+            policy.refresh(); assertEquals(6000, policy.threshold());
+            now.set(time("13:29:00")); policy.refresh(); assertEquals(8000, policy.threshold());
             now.set(time("13:30:00")); policy.refresh(); assertEquals(2500000, policy.volume());
             now.set(time("15:00:00")); policy.refresh(); assertEquals(3, calls.get());
             now.set(time("15:00:00") + 86400000); assertEquals(5000, policy.threshold());
@@ -70,7 +83,7 @@ class PremarketSizeThresholdTest {
         })) {
             policy.refresh(); assertEquals(0, calls.get()); assertEquals(5000, policy.threshold());
             market.set(now.get()); policy.refresh(); assertEquals(5000, policy.threshold());
-            policy.refresh(); assertEquals(20000, policy.threshold());
+            policy.refresh(); assertEquals(10500, policy.threshold());
             market.set(0); assertEquals(5000, policy.threshold());
         }
     }
@@ -81,11 +94,11 @@ class PremarketSizeThresholdTest {
             calls.incrementAndGet(); assertEquals(time("05:00:00"), start); assertEquals(time("13:30:00") - 1, end);
             return List.of(candle(start, 500000), candle(time("13:29:00"), 3000000));
         })) {
-            policy.refresh(); assertEquals(15000, policy.threshold()); assertEquals(3500000, policy.volume());
+            policy.refresh(); assertEquals(9500, policy.threshold()); assertEquals(3500000, policy.volume());
             market.set(time("13:29:05"));
-            assertEquals(500000, policy.volume()); assertEquals(2000, policy.threshold());
+            assertEquals(500000, policy.volume()); assertEquals(3500, policy.threshold());
             policy.refresh(); assertEquals(1, calls.get());
-            market.set(time("13:30:05")); assertEquals(15000, policy.threshold());
+            market.set(time("13:30:05")); assertEquals(9500, policy.threshold());
             assertEquals(1, calls.get());
         }
     }
@@ -98,7 +111,7 @@ class PremarketSizeThresholdTest {
                         assertEquals(time("13:29:00") - 1, end);
                         return List.of(candle(start, 500000), candle(time("13:29:00"), 3000000));
                     })) {
-                policy.refresh(); assertEquals(500000, policy.volume()); assertEquals(2000, policy.threshold());
+                policy.refresh(); assertEquals(500000, policy.volume()); assertEquals(3500, policy.threshold());
             }
         }
     }
@@ -111,10 +124,10 @@ class PremarketSizeThresholdTest {
             assertTimeoutPreemptively(java.time.Duration.ofSeconds(2), () -> {
                 while (!Double.isFinite(policy.volume())) Thread.sleep(5);
             });
-            assertEquals(2000, policy.threshold());
+            assertEquals(3500, policy.threshold());
             market.set(time("13:30:05")); policy.onMarketTime();
             assertTimeoutPreemptively(java.time.Duration.ofSeconds(2), () -> {
-                while (policy.threshold() != 15000) Thread.sleep(5);
+                while (policy.threshold() != 9500) Thread.sleep(5);
             });
             assertEquals(2, calls.get());
         }
@@ -127,7 +140,7 @@ class PremarketSizeThresholdTest {
                     assertEquals(Instant.parse("2026-11-03T14:30:00Z").toEpochMilli() - 1, end);
                     return List.of(candle(start, 3500000));
                 })) {
-            policy.refresh(); assertEquals(15000, policy.threshold());
+            policy.refresh(); assertEquals(9500, policy.threshold());
         }
     }
     @Test void entryAndDisplayIgnorePercentileAndManualFloor() {
@@ -137,10 +150,10 @@ class PremarketSizeThresholdTest {
             policy.refresh();
             SignalWebSocketServer server = new SignalWebSocketServer(0, 97);
             try {
-                OrderBookState book = new OrderBookState(); book.update(true, 1000, 3000); book.update(false, 1100, 100000);
+                OrderBookState book = new OrderBookState(); book.update(true, 1000, 4000); book.update(false, 1100, 100000);
                 server.registerSymbol("TEST", book, .01); server.registerSizeThreshold("TEST", policy);
-                assertEquals(2000, server.getOrderbookWallThreshold("TEST", 20000).getEffectiveMinSize());
-                assertEquals(2000, server.entryWallSnapshot("TEST").get("effectiveWallThreshold").getAsInt());
+                assertEquals(3500, server.getOrderbookWallThreshold("TEST", 20000).getEffectiveMinSize());
+                assertEquals(3500, server.entryWallSnapshot("TEST").get("effectiveWallThreshold").getAsInt());
                 assertEquals(1, server.entryWallSnapshot("TEST").getAsJsonArray("largeBids").size());
             } finally { server.shutdown(); }
         }
@@ -164,14 +177,14 @@ class PremarketSizeThresholdTest {
                 (symbol, start, end) -> List.of(candle(start, 4360373)))) {
             policy.refresh();
             assertEquals(4360373, policy.volume());
-            assertEquals(20000, policy.threshold());
+            assertEquals(10500, policy.threshold());
         }
     }
     @Test void laggingPremarketChartBoundsSchwabRequest() {
         AtomicLong now = new AtomicLong(time("14:51:00")), market = new AtomicLong(time("13:00:00"));
         try (PremarketSizeThreshold policy = new PremarketSizeThreshold("TEST", market::get, now::get,
                 (symbol, start, end) -> { assertEquals(market.get() - 1, end); return List.of(candle(start, 500000)); })) {
-            policy.refresh(); assertEquals(2000, policy.threshold());
+            policy.refresh(); assertEquals(3500, policy.threshold());
         }
     }
 }

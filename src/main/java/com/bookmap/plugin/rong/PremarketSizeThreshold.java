@@ -11,6 +11,7 @@ import java.util.function.LongSupplier;
 /** Per-chart premarket share policy. Network work never runs on Bookmap callbacks. */
 public final class PremarketSizeThreshold implements AutoCloseable {
     static final ZoneId NEW_YORK = ZoneId.of("America/New_York");
+    static final int MINIMUM = 2000, MAXIMUM = 40000, INCREMENT = 500;
     public static final int FALLBACK = 5000;
     public interface Bars { List<Candle> load(String symbol, long from, long to) throws Exception; }
     private final String symbol;
@@ -123,9 +124,8 @@ public final class PremarketSizeThreshold implements AutoCloseable {
     public int threshold() { return forVolume(volume()); }
     public static int forVolume(double shares) {
         if (!Double.isFinite(shares) || shares < 0) return FALLBACK;
-        if (shares < 1000000) return 2000;
-        // Each completed million requires another 5K, capped at 40K from eight million onward.
-        return (int) (Math.min(8, Math.floor(shares / 1000000)) * 5000);
+        double requirement = Math.max(MINIMUM, Math.min(MAXIMUM, 5000 * Math.sqrt(shares / 1000000)));
+        return (int) Math.round(requirement / INCREMENT) * INCREMENT;
     }
     @Override public void close() { closed = true; worker.shutdownNow(); }
 }

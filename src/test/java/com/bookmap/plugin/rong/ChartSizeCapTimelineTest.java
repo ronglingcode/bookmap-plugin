@@ -30,14 +30,14 @@ class ChartSizeCapTimelineTest {
                 OrderBookState book = new OrderBookState(); server.registerSymbol("TEST", book, .01);
                 server.registerSizeThreshold("TEST", policy);
                 server.observeSessionTime("TEST", chart.get() * 1_000_000L);
-                policy.refresh(); assertEquals(2000, policy.threshold());
+                policy.refresh(); assertEquals(3500, policy.threshold());
                 depth(server, book, true, 36800, 10000, chart.get());
                 depth(server, book, false, 37050, 7600, chart.get());
                 depth(server, book, false, 36930, 5000, chart.get());
                 chart.set(open); wall.set(chart.get() + delay);
                 server.observeSessionTime("TEST", chart.get() * 1_000_000L);
                 server.updateRegularSessionHighLow("TEST", 369.15, chart.get() * 1_000_000L);
-                policy.refresh(); assertEquals(15000, policy.threshold());
+                policy.refresh(); assertEquals(9500, policy.threshold());
                 // The later minute's full range cannot widen either live or replay's first five seconds.
                 server.updateRegularSessionMinuteBars("TEST", "2026-10-16", List.of(bar(open, 370.58, 356.33, 1000000)));
                 chart.set(open + 5000); wall.set(chart.get() + delay);
@@ -46,13 +46,13 @@ class ChartSizeCapTimelineTest {
                 server.observeSessionTrade("TEST", 36930, 5000, true, chart.get() * 1_000_000L, true);
                 JsonObject cap = server.entrySizeCap("TEST");
                 assertEquals(5000, cap.get("largestOrderSize").getAsInt());
-                assertEquals(1.0 / 3, cap.get("maxRiskMultiple").getAsDouble());
+                assertEquals(5000.0 / 9500, cap.get("maxRiskMultiple").getAsDouble());
                 if (baseline == null) baseline = cap; else assertEquals(baseline, cap);
                 depth(server, book, true, 36800, 0, chart.get());
                 chart.set(open + 6000); wall.set(chart.get() + delay);
                 server.observeSessionTime("TEST", chart.get() * 1_000_000L);
                 server.updateRegularSessionHighLow("TEST", 368, chart.get() * 1_000_000L);
-                assertEquals(1.0 / 3, server.entrySizeCap("TEST").get("maxRiskMultiple").getAsDouble()); // Canceled bid never filled.
+                assertEquals(5000.0 / 9500, server.entrySizeCap("TEST").get("maxRiskMultiple").getAsDouble()); // Canceled bid never filled.
                 assertEquals(368, server.getRegularSessionHighLow("TEST").getLowOfDay());
             }
         }
