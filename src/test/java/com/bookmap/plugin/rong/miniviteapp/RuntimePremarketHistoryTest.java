@@ -13,6 +13,12 @@ import static org.junit.jupiter.api.Assertions.*;
 
 class RuntimePremarketHistoryTest {
     @Test void runtimeUsesSchwabFirstThenBoundedMassiveBackfillAndLogsContributions() throws Exception {
+        checkRuntime(false);
+    }
+    @Test void failedTradeLookupCannotPublishUnfilteredPremarketVolume() throws Exception {
+        checkRuntime(true);
+    }
+    private void checkRuntime(boolean failTrades) throws Exception {
         long start = Instant.parse("2026-10-16T05:00:00Z").toEpochMilli();
         long early = start + 3 * 3600000, seven = start + 6 * 3600000;
         long open = Instant.parse("2026-10-16T13:30:00Z").toEpochMilli();
@@ -34,6 +40,14 @@ class RuntimePremarketHistoryTest {
                         + ",\"open\":10,\"high\":10,\"low\":10,\"close\":10,\"volume\":1957823}]}");
             }
             assertEquals("api.massive.com", uri.getHost());
+            if (uri.getPath().equals("/v3/trades/TSLA")) {
+                assertTrue(uri.getQuery().contains("timestamp.gte=" + start + "000000"));
+                assertTrue(uri.getQuery().contains("timestamp.lt=" + open + "000000"));
+                if (failTrades) return new HttpPort.Response(503, "{}");
+                return new HttpPort.Response(200, "{\"status\":\"OK\",\"results\":["
+                        + trade(early, 1000.25, "2,12") + "," + trade(seven, 2000, "2,12")
+                        + "," + trade(seven, 500, "12") + "]}");
+            }
             assertEquals("/v2/aggs/ticker/TSLA/range/1/minute/" + start + "/" + (open - 1), uri.getPath());
             assertTrue(uri.getQuery().contains("apiKey=test-key"));
             return new HttpPort.Response(200, "{\"status\":\"OK\",\"results\":["
@@ -48,13 +62,23 @@ class RuntimePremarketHistoryTest {
                     public void log(String symbol, String message) { logs.add(message); }
                     public void notify(String symbol, String message) { }
                 })) {
+            if (failTrades) {
+                assertThrows(java.io.IOException.class, () -> runtime.premarketMinuteBars("TSLA", start, open - 1));
+                assertTrue(logs.stream().noneMatch(log -> log.startsWith("Premarket history:")));
+                return;
+            }
             var bars = runtime.premarketMinuteBars("TSLA", start, open - 1);
-            assertEquals(List.of("api.schwabapi.com", "api.massive.com"), requests);
+            assertEquals(List.of("api.schwabapi.com", "api.massive.com", "api.massive.com"), requests);
             assertEquals(2, bars.size()); assertEquals(early, bars.get(0).datetime);
-            assertEquals(3245080.25, bars.stream().mapToDouble(candle -> candle.volume).sum());
+            assertEquals(3242080, bars.stream().mapToDouble(candle -> candle.volume).sum());
             assertTrue(logs.stream().anyMatch(log -> log.contains("Schwab shares=1957823.0")
-                    && log.contains("Massive backfill shares=1287257.25") && log.contains("backfilled minutes=1")));
+                    && log.contains("Massive backfill shares=1287257.25") && log.contains("backfilled minutes=1")
+                    && log.contains("excluded average-price shares=3000.25") && log.contains("filtered shares=3242080.0")));
         }
+    }
+    private static String trade(long timestamp, double size, String conditions) {
+        return "{\"sip_timestamp\":" + timestamp + "000000,\"price\":10,\"size\":" + size
+                + ",\"conditions\":[" + conditions + "]}";
     }
     private static String massiveBar(long timestamp, double volume) {
         return "{\"t\":" + timestamp + ",\"o\":10,\"h\":10,\"l\":10,\"c\":10,\"v\":" + volume + "}";

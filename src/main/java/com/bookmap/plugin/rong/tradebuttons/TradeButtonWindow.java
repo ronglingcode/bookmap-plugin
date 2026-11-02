@@ -929,7 +929,7 @@ public class TradeButtonWindow {
         }
 
         double volume = server.premarketShareVolume(symbol);
-        String source = Double.isFinite(volume) ? "Schwab + Massive premarket: " + String.format(java.util.Locale.US, "%,.0f", volume) + " shares"
+        String source = Double.isFinite(volume) ? "Schwab + Massive premarket (excl. avg-price): " + String.format(java.util.Locale.US, "%,.0f", volume) + " shares"
                 : "Premarket: " + server.premarketVolumeUnavailableReason(symbol) + "; default 5K";
         wallThresholdLabel.setText(VerticalWindowLayout.wrapHtml("Wall: " + formatShareSize(threshold.getEffectiveMinSize())
                 + "<br>" + source + "<br>" + capText + "<br>" + getRegularSessionHighLowText(), CONTENT_WIDTH - 32));

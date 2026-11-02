@@ -150,9 +150,14 @@ public final class TradingRuntime implements AutoCloseable {
         PremarketHistory.Result result = PremarketHistory.load(symbol, from, toInclusive,
                 (ticker, start, end) -> priceHistory.getMinuteBars(ticker, start, end, oauth.accessToken(false), true),
                 massive::getMinuteBars);
+        List<Candle> filtered = PremarketHistory.withoutAveragePriceTrades(result.candles,
+                massive.getTrades(symbol, from, Math.addExact(toInclusive, 1)));
+        double filteredShares = filtered.stream().mapToDouble(candle -> candle.volume).sum();
+        double excludedShares = result.schwabShares + result.massiveShares - filteredShares;
         events.detail(symbol, "Premarket history: Schwab shares=" + result.schwabShares
-                + "; Massive backfill shares=" + result.massiveShares + "; backfilled minutes=" + result.backfilledMinutes);
-        return result.candles;
+                + "; Massive backfill shares=" + result.massiveShares + "; backfilled minutes=" + result.backfilledMinutes
+                + "; excluded average-price shares=" + excludedShares + "; filtered shares=" + filteredShares);
+        return filtered;
     }
     public JsonObject sessionLevels(String symbol) {
         var state = market.getState(symbol);

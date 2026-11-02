@@ -1,6 +1,7 @@
 package com.bookmap.plugin.rong.miniviteapp.core.marketdata;
 
 import com.bookmap.plugin.rong.miniviteapp.models.Candle;
+import com.bookmap.plugin.rong.miniviteapp.models.Trade;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
@@ -20,6 +21,24 @@ public final class PremarketHistory {
         }
     }
     private PremarketHistory() { }
+    /** Remove condition-2 reports per minute so chart rewinds retain the same filtering. */
+    public static List<Candle> withoutAveragePriceTrades(List<Candle> candles, List<Trade> trades) throws IOException {
+        TreeMap<Long, Double> excluded = new TreeMap<>();
+        for (Trade trade : trades) {
+            if (!trade.conditions.contains(2)) continue;
+            if (!Double.isFinite(trade.size) || trade.size < 0) throw new IOException("Invalid average-price trade size");
+            excluded.merge(trade.timestamp / MINUTE * MINUTE, trade.size, Double::sum);
+        }
+        List<Candle> filtered = new ArrayList<>();
+        for (Candle candle : candles) {
+            validate(candle);
+            // Providers can differ in eligible volume. Never deduct another minute's shares.
+            double volume = Math.max(0, candle.volume - excluded.getOrDefault(candle.datetime, 0.0));
+            filtered.add(new Candle(candle.symbol, candle.datetime, candle.open, candle.high,
+                    candle.low, candle.close, volume, candle.vwap));
+        }
+        return filtered;
+    }
     public static Result load(String symbol, long from, long toInclusive, Bars schwab, Bars massive) throws Exception {
         if (from > toInclusive) throw new IllegalArgumentException("Invalid premarket range");
         TreeMap<Long, Candle> candles = new TreeMap<>();
