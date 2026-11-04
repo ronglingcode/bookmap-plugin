@@ -6,7 +6,7 @@ import java.util.List;
 
 /** Mirrors TS definitions and selected-plan validation; all input is local Firestore data. */
 public final class TradingConfig {
-    public static final int MAX_TRADABLE_STOCKS_COUNT = 2;
+    public static final int MAX_TRADABLE_STOCKS_COUNT = 4;
 
     private TradingConfig() { }
     private static JsonObject object(JsonObject value, String key) { return value.has(key) && value.get(key).isJsonObject() ? value.getAsJsonObject(key) : new JsonObject(); }

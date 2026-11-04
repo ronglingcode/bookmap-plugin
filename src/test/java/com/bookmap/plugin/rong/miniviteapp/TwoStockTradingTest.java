@@ -92,8 +92,8 @@ class TwoStockTradingTest {
             assertFalse(runtime.view("TSLA", "test").has("plan"));
             configData.getAsJsonArray("stockSelections").add("TSLA"); runtime.refreshConfig();
             assertTrue(runtime.view("TSLA", "test").has("plan"));
-            configData.getAsJsonArray("stockSelections").add("MSFT"); runtime.refreshConfig();
-            assertTrue(logs.stream().anyMatch(value -> value.contains("more than 2 stocks in watchlist: AAPL, TSLA, MSFT")));
+            for (String symbol : List.of("MSFT", "AMD", "NVDA")) configData.getAsJsonArray("stockSelections").add(symbol); runtime.refreshConfig();
+            assertTrue(logs.stream().anyMatch(value -> value.contains("more than 4 stocks in watchlist: AAPL, TSLA, MSFT, AMD, NVDA")));
             assertTrue(runtime.view("TSLA", "test").has("plan"));
             runtime.pendingPersistence().get(2, TimeUnit.SECONDS);
         }
