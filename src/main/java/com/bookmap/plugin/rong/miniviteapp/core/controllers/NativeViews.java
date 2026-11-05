@@ -49,6 +49,20 @@ public final class NativeViews {
         buttons.add("tradebooks", groups); result.add(buttons);
         JsonObject keys = marketLevels(view); JsonArray levels = keys.getAsJsonArray("levels"), zones = keys.getAsJsonArray("zones"); Set<Double> seen = new HashSet<>(); Set<String> zoneKeys = new HashSet<>();
         for (JsonElement item : array(object(plan, "keyLevels"), "otherLevels")) { JsonObject level = item.getAsJsonObject(); double price = number(level, "price"); if (price > 0 && seen.add(price)) levels.add(level.deepCopy()); }
+        for (String side : new String[]{"long", "short"}) {
+            JsonObject direction = object(plan, side);
+            if (!bool(direction, "enabled")) continue;
+            for (JsonElement item : array(direction, "finalTargets")) {
+                JsonObject target = item.getAsJsonObject(); double price = number(target, "level");
+                if (!Double.isFinite(price) || price <= 0) continue;
+                String text = string(target, "text").trim();
+                String label = (side.equals("long") ? "Long" : "Short") + " target" + (text.isEmpty() ? "" : ": " + text);
+                JsonObject existing = null;
+                for (JsonElement level : levels) if (number(level.getAsJsonObject(), "price") == price) { existing = level.getAsJsonObject(); break; }
+                if (existing == null) { existing = new JsonObject(); existing.addProperty("price", price); existing.addProperty("label", label); levels.add(existing); }
+                else { String previousLabel = string(existing, "label"); if (!Arrays.asList(previousLabel.split(" / ")).contains(label)) existing.addProperty("label", previousLabel.isEmpty() ? label : previousLabel + " / " + label); }
+            }
+        }
         for (JsonElement item : array(object(plan, "keyLevels"), "zones")) zone(zones, zoneKeys, item.getAsJsonObject(), "", "");
         zone(zones, zoneKeys, object(object(plan, "rangeBoundReversalPlan"), "support"), "support", "green"); zone(zones, zoneKeys, object(object(plan, "rangeBoundReversalPlan"), "resistance"), "resistance", "red");
         zone(zones, zoneKeys, object(object(object(plan, "long"), "gapAndGoPlan"), "support"), "support", "green"); zone(zones, zoneKeys, object(object(object(plan, "long"), "gapDownAndGoUpPlan"), "support"), "support", "green");

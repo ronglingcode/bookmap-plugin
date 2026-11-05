@@ -17936,5 +17936,189 @@
       10
     ],
     "error": "Invalid profit reset fallback target"
+  },
+  {
+    "name": "planned targets visible while flat and merge shared levels",
+    "kind": "views",
+    "method": "nativeViews",
+    "args": [
+      {
+        "symbol": "U",
+        "timestamp": 1790861400000,
+        "plan": {
+          "keyLevels": {
+            "otherLevels": [
+              {
+                "price": 45,
+                "label": "support"
+              }
+            ]
+          },
+          "long": {
+            "enabled": true,
+            "finalTargets": [
+              {
+                "level": 50,
+                "text": "daily high"
+              },
+              {
+                "level": 45,
+                "text": ""
+              }
+            ]
+          },
+          "short": {
+            "enabled": true,
+            "finalTargets": [
+              {
+                "level": 45,
+                "text": "daily low"
+              },
+              {
+                "level": 45,
+                "text": "daily low"
+              },
+              {
+                "level": 0,
+                "atr": 1
+              },
+              {
+                "level": -1
+              }
+            ]
+          }
+        }
+      }
+    ],
+    "result": [
+      {
+        "type": "trade_button_config",
+        "symbol": "U",
+        "timestamp": 1790861400000,
+        "priceUnit": "real",
+        "tradebooks": []
+      },
+      {
+        "type": "key_levels_config",
+        "symbol": "U",
+        "timestamp": 1790861400000,
+        "priceUnit": "real",
+        "levels": [
+          {
+            "price": 45,
+            "label": "support / Long target / Short target: daily low"
+          },
+          {
+            "price": 50,
+            "label": "Long target: daily high"
+          }
+        ],
+        "zones": [],
+        "bookmapPatternsToMonitor": [],
+        "waitForBidRetest": "no",
+        "waitForOfferRetest": "no",
+        "premarket": {
+          "high": 0,
+          "low": 0
+        }
+      },
+      {
+        "type": "exit_order_pairs_config",
+        "symbol": "U",
+        "timestamp": 1790861400000,
+        "priceUnit": "real",
+        "pairs": []
+      },
+      {
+        "type": "account_state",
+        "symbol": "U",
+        "timestamp": 1790861400000,
+        "priceUnit": "real",
+        "openOrders": [],
+        "executions": []
+      },
+      {
+        "type": "core_plan_config",
+        "symbol": "U",
+        "timestamp": 1790861400000,
+        "priceUnit": "real",
+        "hasActiveTrade": false,
+        "reminderRequested": false,
+        "requestId": "",
+        "updateStatus": "",
+        "error": ""
+      }
+    ]
+  },
+  {
+    "name": "disabled direction targets removed",
+    "kind": "views",
+    "method": "nativeViews",
+    "args": [
+      {
+        "symbol": "U",
+        "timestamp": 1790861400000,
+        "plan": {
+          "short": {
+            "enabled": false,
+            "finalTargets": [
+              {
+                "level": 45
+              }
+            ]
+          }
+        }
+      }
+    ],
+    "result": [
+      {
+        "type": "trade_button_config",
+        "symbol": "U",
+        "timestamp": 1790861400000,
+        "priceUnit": "real",
+        "tradebooks": []
+      },
+      {
+        "type": "key_levels_config",
+        "symbol": "U",
+        "timestamp": 1790861400000,
+        "priceUnit": "real",
+        "levels": [],
+        "zones": [],
+        "bookmapPatternsToMonitor": [],
+        "waitForBidRetest": "no",
+        "waitForOfferRetest": "no",
+        "premarket": {
+          "high": 0,
+          "low": 0
+        }
+      },
+      {
+        "type": "exit_order_pairs_config",
+        "symbol": "U",
+        "timestamp": 1790861400000,
+        "priceUnit": "real",
+        "pairs": []
+      },
+      {
+        "type": "account_state",
+        "symbol": "U",
+        "timestamp": 1790861400000,
+        "priceUnit": "real",
+        "openOrders": [],
+        "executions": []
+      },
+      {
+        "type": "core_plan_config",
+        "symbol": "U",
+        "timestamp": 1790861400000,
+        "priceUnit": "real",
+        "hasActiveTrade": false,
+        "reminderRequested": false,
+        "requestId": "",
+        "updateStatus": "",
+        "error": ""
+      }
+    ]
   }
 ]
