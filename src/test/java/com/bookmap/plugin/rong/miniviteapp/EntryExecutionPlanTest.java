@@ -111,7 +111,7 @@ class EntryExecutionPlanTest {
         JsonObject action = JsonParser.parseString("{\"tradebook_id\":\"RangeBoundBidReversal\",\"entry_method\":\"1 R\"}").getAsJsonObject();
         assertEquals(1, EntryHandler.handleEntry(new Snapshot(state), action, "").requests.size());
         plan.addProperty("symbol", "AAPL");
-        assertEquals("premarket shares below 500000 hard floor", StartupEligibility.evaluate(plan, 10, 100000000, stats, new JsonArray()));
+        assertEquals("premarket shares below 0.9M and 4x prior average", StartupEligibility.evaluate(plan, 10, 100000000, stats, new JsonArray()));
     }
     @Test void onlyTenthRiskUsesOnePartialWhileOtherMethodsUseFullPartials() {
         var stream = getClass().getResourceAsStream("/direct-entry-fixtures.json"); assertNotNull(stream);

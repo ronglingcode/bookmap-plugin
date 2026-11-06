@@ -1602,64 +1602,56 @@
   },
   {
     "kind": "premarketEligibility",
-    "name": "shares eligibility 499999,1000,500000,0.9,4",
+    "name": "shares eligibility 499999,1000,0.9,4",
     "args": [
       499999,
       1000,
-      500000,
       0.9,
       4
     ],
     "result": {
-      "hardFloorPassed": false,
       "absolutePassed": false,
       "relativePassed": true
     }
   },
   {
     "kind": "premarketEligibility",
-    "name": "shares eligibility 500000,125000,500000,0.9,4",
+    "name": "shares eligibility 500000,125000,0.9,4",
     "args": [
       500000,
       125000,
-      500000,
       0.9,
       4
     ],
     "result": {
-      "hardFloorPassed": true,
       "absolutePassed": false,
       "relativePassed": true
     }
   },
   {
     "kind": "premarketEligibility",
-    "name": "shares eligibility 899999,0,500000,0.9,4",
+    "name": "shares eligibility 899999,0,0.9,4",
     "args": [
       899999,
       0,
-      500000,
       0.9,
       4
     ],
     "result": {
-      "hardFloorPassed": true,
       "absolutePassed": false,
       "relativePassed": false
     }
   },
   {
     "kind": "premarketEligibility",
-    "name": "shares eligibility 900000,0,500000,0.9,4",
+    "name": "shares eligibility 900000,0,0.9,4",
     "args": [
       900000,
       0,
-      500000,
       0.9,
       4
     ],
     "result": {
-      "hardFloorPassed": true,
       "absolutePassed": true,
       "relativePassed": false
     }
@@ -1781,7 +1773,7 @@
   },
   {
     "kind": "startupEligibility",
-    "name": "AMD bypasses hard floor with zero premarket volume",
+    "name": "AMD bypasses volume thresholds with zero premarket volume",
     "args": [
       {
         "symbol": "AMD",
@@ -1817,7 +1809,7 @@
   },
   {
     "kind": "startupEligibility",
-    "name": "AAPL still requires premarket hard floor",
+    "name": "AAPL with zero volume still fails absolute and relative thresholds",
     "args": [
       {
         "symbol": "AAPL",
@@ -1831,7 +1823,7 @@
       },
       []
     ],
-    "result": "premarket shares below 500000 hard floor"
+    "result": "premarket shares below 0.9M and 4x prior average"
   },
   {
     "kind": "startupEligibility",
@@ -1850,6 +1842,60 @@
       []
     ],
     "result": "premarket shares below 0.9M and 4x prior average"
+  },
+  {
+    "kind": "startupEligibility",
+    "name": "ABNB below former floor qualifies at exactly 4x prior average",
+    "args": [
+      {
+        "symbol": "ABNB",
+        "marketCapInMillions": 10000
+      },
+      10,
+      100000000,
+      {
+        "lastDayShares": 100000,
+        "previousDaysSharesAverage": 25000
+      },
+      []
+    ],
+    "result": ""
+  },
+  {
+    "kind": "startupEligibility",
+    "name": "ABNB below former floor fails below 4x prior average",
+    "args": [
+      {
+        "symbol": "ABNB",
+        "marketCapInMillions": 10000
+      },
+      10,
+      100000000,
+      {
+        "lastDayShares": 99999,
+        "previousDaysSharesAverage": 25000
+      },
+      []
+    ],
+    "result": "premarket shares below 0.9M and 4x prior average"
+  },
+  {
+    "kind": "startupEligibility",
+    "name": "ABNB qualifies at absolute threshold without relative volume",
+    "args": [
+      {
+        "symbol": "ABNB",
+        "marketCapInMillions": 10000
+      },
+      10,
+      100000000,
+      {
+        "lastDayShares": 900000,
+        "previousDaysSharesAverage": 1000000
+      },
+      []
+    ],
+    "result": ""
   },
   {
     "kind": "startupEligibility",

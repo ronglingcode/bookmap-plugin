@@ -44,7 +44,7 @@ class MarketParityTest {
                 case "mapper":
                     Trade mapped = Mapper.mapWebSocketTrade(fixture.getAsJsonObject("input")); result = mapped.toJson(); assertEquals(fixture.get("filtered").getAsBoolean(), Mapper.shouldFilterTrade(mapped), name); break;
                 case "premarketEligibility":
-                    JsonArray volumeArgs = fixture.getAsJsonArray("args"); result = Eligibility.premarketEligibility(volumeArgs.get(0).getAsDouble(), volumeArgs.get(1).getAsDouble(), volumeArgs.get(2).getAsDouble(), volumeArgs.get(3).getAsDouble(), volumeArgs.get(4).getAsDouble()); break;
+                    JsonArray volumeArgs = fixture.getAsJsonArray("args"); result = Eligibility.premarketEligibility(volumeArgs.get(0).getAsDouble(), volumeArgs.get(1).getAsDouble(), volumeArgs.get(2).getAsDouble(), volumeArgs.get(3).getAsDouble()); break;
                 case "startupEligibility":
                     JsonArray startupArgs = fixture.getAsJsonArray("args");
                     result = new JsonPrimitive(StartupEligibility.evaluate(startupArgs.get(0).getAsJsonObject(), startupArgs.get(1).getAsDouble(), startupArgs.get(2).getAsDouble(), startupArgs.get(3).getAsJsonObject(), startupArgs.get(4).getAsJsonArray())); break;

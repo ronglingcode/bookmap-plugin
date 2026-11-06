@@ -12,8 +12,8 @@ public final class Eligibility {
         return PREMARKET_VOLUME_WHITELIST.contains(symbol);
     }
     private Eligibility() {}
-    public static JsonObject premarketEligibility(double shares, double averageShares, double hardFloor, double absoluteThresholdInMillions, double relativeThreshold) {
-        JsonObject json = new JsonObject(); json.addProperty("hardFloorPassed", shares >= hardFloor);
+    public static JsonObject premarketEligibility(double shares, double averageShares, double absoluteThresholdInMillions, double relativeThreshold) {
+        JsonObject json = new JsonObject();
         json.addProperty("absolutePassed", shares / 1000000 >= absoluteThresholdInMillions);
         json.addProperty("relativePassed", Double.isFinite(averageShares) && averageShares > 0 && Double.isFinite(shares) && shares >= averageShares * relativeThreshold); return json;
     }

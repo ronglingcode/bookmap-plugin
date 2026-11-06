@@ -13,8 +13,7 @@ public final class StartupEligibility {
         double cap = Eligibility.impliedMarketCapInBillions(shares, price);
         if (!string(plan, "symbol").equals("STI") && cap > 0 && cap < 0.9) return "implied market cap below $0.9B";
         if (!Eligibility.isPremarketVolumeWhitelisted(string(plan, "symbol"))) {
-            JsonObject volume = Eligibility.premarketEligibility(number(stats, "lastDayShares"), number(stats, "previousDaysSharesAverage"), 500000, 0.9, 4);
-            if (!bool(volume, "hardFloorPassed")) return "premarket shares below 500000 hard floor";
+            JsonObject volume = Eligibility.premarketEligibility(number(stats, "lastDayShares"), number(stats, "previousDaysSharesAverage"), 0.9, 4);
             if (!bool(volume, "absolutePassed") && !bool(volume, "relativePassed")) return "premarket shares below 0.9M and 4x prior average";
         }
         if (!plan.has("rangeBoundReversalPlan")) return "";
