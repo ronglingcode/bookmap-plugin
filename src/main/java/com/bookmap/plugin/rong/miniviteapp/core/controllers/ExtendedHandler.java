@@ -29,7 +29,10 @@ public final class ExtendedHandler {
         Models.require(Models.positive(price), "partial entry price unavailable");
         price = TakeProfit.round(price);
         double stop = Models.number(context, isLong ? "customStopLong" : "customStopShort");
-        if (stop == 0) stop = Models.number(context, isLong ? "lowOfDay" : "highOfDay");
+        if (Models.bool(context, "selectedStopRequired")) {
+            double executable = shift ? isLong ? Math.max(price, state.ask) : Math.min(price, state.bid) : price;
+            Models.require(Models.positive(stop) && (isLong ? stop < executable : stop > executable), "Stop must be below long entry / above short entry; select stop again with Z");
+        } else if (stop == 0) stop = Models.number(context, isLong ? "lowOfDay" : "highOfDay");
         stop = (isLong ? Math.floor(stop * 100) : Math.ceil(stop * 100)) / 100;
         Models.require(Models.positive(stop), "invalid partial protective stop");
         double count = Models.number(direction, "partialsCount");
@@ -98,6 +101,7 @@ public final class ExtendedHandler {
         Models.require(Models.positive(initial) && Models.positive(riskDollars), "swap sizing inputs unavailable");
         double multiplier = Math.round((high - low) * initial / riskDollars * 1000) / 1000.0;
         double price = isLong ? Math.max(high, state.ask) : Math.min(low, state.bid), stop = isLong ? low : high;
+        if (Models.bool(context, "selectedStopRequired")) stop = Models.number(context, isLong ? "customStopLong" : "customStopShort");
         JsonObject definition = new JsonObject(); definition.addProperty("tradebookID", "");
         definition.add("basePlan", context.getAsJsonObject("activeBasePlan"));
         double requested = Models.number(definition.getAsJsonObject("basePlan").getAsJsonObject("planConfigs"), "sizingCount");

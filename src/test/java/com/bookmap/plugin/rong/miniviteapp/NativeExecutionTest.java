@@ -193,6 +193,62 @@ class NativeExecutionTest {
         }
         throw new AssertionError(name);
     }
+    @Test void selectedStopIsMandatorySingleUseAndExactlyReachesBrokerForBothSides() throws Exception {
+        for (boolean isLong : new boolean[]{true, false}) try (var rig = new Rig()) {
+            JsonObject command = rig.connectEntry();
+            command.addProperty("tradebook_id", isLong ? "RangeBoundBidReversal" : "RangeBoundOfferReversal");
+            command.addProperty("use_market_order", true);
+            var stop = new com.bookmap.plugin.rong.miniviteapp.core.controllers.SelectedStop();
+            rig.engine.requireSelectedStop(stop);
+            rig.engine.route(command); assertEquals(0, rig.mutations.get());
+            double level = isLong ? 9.5 : 10.5;
+            stop.select("AAPL", level); rig.engine.route(command);
+            assertEquals("accepted", rig.finish().get("outcome").getAsString());
+            for (var bracket : rig.bodies.get(0).getAsJsonArray("childOrderStrategies")) {
+                var protection = bracket.getAsJsonObject().getAsJsonArray("childOrderStrategies").get(0).getAsJsonObject();
+                assertEquals(level, protection.get("stopPrice").getAsDouble());
+            }
+            rig.engine.route(command); assertEquals(1, rig.mutations.get());
+            stop.select("AAPL", isLong ? 11 : 9); rig.engine.route(command);
+            assertEquals(1, rig.mutations.get(), "Wrong-side stop cannot open exposure");
+            assertEquals(0, stop.view().get("price").getAsDouble());
+        }
+    }
+    @Test void reloadAndSwapCannotBypassFreshStopAndExitOnlySwapStillWorks() throws Exception {
+        for (String name : new String[]{"long market reload", "short market reload",
+                "swap closes and reenters original long direction", "swap closes and reenters original short direction"}) try (var rig = new Rig()) {
+            JsonObject command = rig.connectExtended(name);
+            var stop = new com.bookmap.plugin.rong.miniviteapp.core.controllers.SelectedStop();
+            rig.engine.requireSelectedStop(stop); rig.engine.route(command);
+            assertEquals(0, rig.mutations.get(), name + " must block before closing or opening anything");
+            assertTrue(rig.events.stream().anyMatch(e -> e.has("reason") && e.get("reason").getAsString().contains("Select stop")));
+            boolean isLong = rig.state.get("netQuantity").getAsDouble() > 0;
+            stop.select("AAPL", isLong ? 9.5 : 10.5);
+            rig.engine.route(command);
+            assertEquals("accepted", rig.finish().get("outcome").getAsString(), name);
+        }
+        try (var rig = new Rig()) {
+            JsonObject command = rig.connectExtended("swap pending entry keeps final pair");
+            rig.engine.requireSelectedStop(new com.bookmap.plugin.rong.miniviteapp.core.controllers.SelectedStop());
+            rig.engine.route(command); assertEquals("accepted", rig.finish().get("outcome").getAsString());
+        }
+    }
+    @Test void selectedStopExpiryBlocksBeforeBrokerAndExitsRemainAvailable() throws Exception {
+        try (var rig = new Rig()) {
+            JsonObject command = rig.connectEntry();
+            var time = new java.util.concurrent.atomic.AtomicLong();
+            var stop = new com.bookmap.plugin.rong.miniviteapp.core.controllers.SelectedStop(time::get);
+            rig.engine.requireSelectedStop(stop); stop.select("AAPL", 9.5);
+            time.set(com.bookmap.plugin.rong.miniviteapp.core.controllers.SelectedStop.LIFETIME_NS);
+            rig.engine.route(command); assertEquals(0, rig.mutations.get());
+        }
+        try (var rig = new Rig()) {
+            rig.connect(); rig.engine.requireSelectedStop(new com.bookmap.plugin.rong.miniviteapp.core.controllers.SelectedStop());
+            rig.engine.route(action("KeyF"));
+            assertEquals("accepted", rig.finish().get("outcome").getAsString());
+            assertTrue(rig.mutations.get() > 0, "Flatten remains executable without a selected stop");
+        }
+    }
     private static final class Rig implements AutoCloseable {
         final Object connection = new Object();
         final List<JsonObject> events = new CopyOnWriteArrayList<>();

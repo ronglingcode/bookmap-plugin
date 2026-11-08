@@ -71,6 +71,7 @@ class TwoStockTradingTest {
                 })) {
             runtime.start().get(2, TimeUnit.SECONDS);
             for (String symbol : List.of("AAPL", "TSLA")) assertTrue(runtime.view(symbol, "test").has("market"), symbol);
+            runtime.dispatch(json("{\"symbol\":\"TSLA\",\"keyCode\":\"KeyZ\",\"price\":9}"));
             assertTrue(runtime.dispatch(json("{\"symbol\":\"TSLA\",\"tradebook_id\":\"GapGiveAndGoBookmapReversal\",\"entry_method\":\"0.1 R\",\"use_market_order\":true,\"price\":10}")));
             long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(2);
             while (events.stream().noneMatch(value -> value.has("outcome")) && System.nanoTime() < deadline) Thread.sleep(5);

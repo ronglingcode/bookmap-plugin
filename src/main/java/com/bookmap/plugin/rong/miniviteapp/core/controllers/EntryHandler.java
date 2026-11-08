@@ -59,7 +59,8 @@ public final class EntryHandler {
         double entry = market ? state.currentPrice : key.isEmpty() ? (custom > 0 ? custom : isLong ? high : low) : Models.number(action, "price");
         entry = key.isEmpty() && !market ? (isLong ? Math.ceil(entry * 100) : Math.floor(entry * 100)) / 100 : TakeProfit.round(entry);
         double stop = Models.number(context, isLong ? "customStopLong" : "customStopShort");
-        if (stop == 0) stop = isLong ? low : high;
+        if (Models.bool(context, "selectedStopRequired")) Models.require(Models.positive(stop), "Select stop: hover + Z");
+        else if (stop == 0) stop = isLong ? low : high;
         Models.require(Models.positive(entry) && Models.positive(stop), "invalid entry or protective stop");
         BookmapWallReversal.checkEntryPrice(definition, entry, isLong);
         String method = field(action, "entry_method", "entryMethod");

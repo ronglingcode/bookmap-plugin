@@ -38,6 +38,9 @@ is blocked at startup and during entry validation.
 
 ## Features
 
+- Every opening action requires a fresh human-selected stop: hover + Z, then
+  enter within five seconds. One thin chart line; each selection is single-use.
+  [Selected-stop flow](docs/selected-stop.md).
 - Native wall-reversal market/breakout entries, same-direction adds, pending-entry
   replacements, opposite-position entries, partial reload and Swap.
 - Cancel, flatten, partial exits, stop/target adjustments and Q/P workflows.

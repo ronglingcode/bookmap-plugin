@@ -27,13 +27,16 @@ The earlier flag-based rollout is historical; this document supersedes it.
 | Top-row digits | Move the selected stop/limit to hover price; Digit1 uses the first smallest pair, remaining digits are positional. |
 | G / H / T | Move half / half / all exit pairs at hover price; Shift+G/H markets out the first half, rounding pair count up. |
 | P / Reset Targets | Cancel current exit legs and rebuild captured profit targets with the captured stop. Reverse target order as in the browser, cap to actual remaining position and reject insufficient captured coverage. If capture, targets or stop are missing, use the day low for longs/day high for shorts and 2R from current price, splitting remaining shares across the normal batch count. Validate fallback prices before canceling exits. |
-| Z | Set long/short custom stops to hover price and update the captured invalidation reference. |
+| Z | Select a single-use stop at hover price for the next entry; expires after five seconds. Draws a thin Stop line and never changes working stops. |
 | Space | Clear manual entry and stop prices; preserve fixed quantity, matching browser price-line clearing. |
-| Entry Inputs dialog | Set custom entry, long/short stop and fixed share quantity locally; zero restores automatic selection. |
+| Entry Inputs dialog | Set custom entry and fixed share quantity locally. Every opening action requires a fresh stop selected with Z. |
 | Update Plan / third-partial reminder | Edit and persist active core target/count locally, with success/error feedback. |
-| Pending-entry stop job | During the first five minutes, widen a single unfilled entry's protective stop to a new day extreme and recalculate the protected entry via PUT. Suppress another replacement of the old order ID while it remains in the account snapshot. |
+| Pending-entry stop job | Disabled: an unfilled entry retains the human-selected protective stop. |
 
-Local risk policy mirrors ViteApp entry-area boundaries, watchlist/startup
+Every native opening action requires a fresh human-selected stop. See
+[selected-stop flow](selected-stop.md) for expiry, consumption and chart feedback.
+Z selection does not modify existing positions. This Bookmap-specific policy is
+additional to the mirrored engine's entry-area boundaries, watchlist/startup
 eligibility, liquidity, daily loss and no-trade-zone rules. Native sizing includes
 ATR caps, one-cent slippage, fixed quantity and risk-method partial counts.
 If estimated buying power is insufficient, both apps halve targets once;

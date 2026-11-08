@@ -9,6 +9,7 @@ import com.bookmap.plugin.rong.miniviteapp.core.configuration.TradingConfig;
 import com.bookmap.plugin.rong.miniviteapp.core.controllers.ExecutionInputs;
 import com.bookmap.plugin.rong.miniviteapp.core.controllers.Workflows;
 import com.bookmap.plugin.rong.miniviteapp.core.controllers.StopLossMonitor;
+import com.bookmap.plugin.rong.miniviteapp.core.controllers.SelectedStop;
 import com.bookmap.plugin.rong.miniviteapp.core.marketdata.MarketClock;
 import com.bookmap.plugin.rong.miniviteapp.core.marketdata.PremarketHistory;
 import com.bookmap.plugin.rong.miniviteapp.core.marketdata.StartupEligibility;
@@ -47,6 +48,8 @@ public final class TradingRuntime implements AutoCloseable {
     private final LongSupplier now;
     private final Events events;
     private final MiniViteApp execution;
+    private final SelectedStop selectedStop = new SelectedStop();
+    public JsonObject selectedStop() { return selectedStop.view(); }
     private final MarketLoader market;
     private final String massiveKey;
     private final List<Runnable> timers = new ArrayList<>();
@@ -55,9 +58,8 @@ public final class TradingRuntime implements AutoCloseable {
     private final Set<String> accountSymbols = new LinkedHashSet<>();
     private final Map<String, JsonObject> quotes = new HashMap<>(), manual = new HashMap<>(), histories = new HashMap<>();
     private final Map<String, String> eligibility = new HashMap<>();
-    private final Map<String, String> pendingReplacements = new HashMap<>();
     private final StopLossMonitor stopLossMonitor = new StopLossMonitor();
-    private final Map<String, Long> reminders = new HashMap<>(), entryWarnings = new HashMap<>();
+    private final Map<String, Long> reminders = new HashMap<>();
     private JsonObject account, ledger, policy = ExecutionInputs.defaultPolicy();
     private TradingConfig.Result config;
     private TradeState state;
@@ -92,6 +94,7 @@ public final class TradingRuntime implements AutoCloseable {
         market = new MarketLoader(massive, executor, now);
         if (object(sections, "tradingPolicy").has("coreTargetEnabled")) policy.addProperty("coreTargetEnabled", bool(object(sections, "tradingPolicy"), "coreTargetEnabled"));
         execution = new MiniViteApp(new Api(authenticatedReads, this.events::detail), (connection, message) -> executionEvent(message), this.events, String::trim);
+        execution.requireSelectedStop(selectedStop);
     }
     public CompletableFuture<Void> start() {
         final CompletableFuture<Void> pending;
@@ -119,7 +122,7 @@ public final class TradingRuntime implements AutoCloseable {
                 }
                 publishToken(); startStreamsAndHistory(); publishAccount(); checkStopLossProtection();
                 repeat(30000, this::refreshToken); repeat(3000, this::refreshAccount); repeat(60000, this::refreshConfig); repeat(100, this::publishDirty);
-                repeat(1000, this::pendingJobs); repeat(20000, this::disciplineJobs);
+                repeat(20000, this::disciplineJobs);
                 events.log("", "Native trading runtime initialized; account and configuration loaded; stream startup requested");
             } catch (Exception error) {
                 events.status("schwab", "startup failed");
@@ -323,7 +326,7 @@ public final class TradingRuntime implements AutoCloseable {
                     if (stopped) return;
                     if (!loaded.profile.equals(config.profile)) throw new IllegalArgumentException("Profile changed; restart native runtime to load its trade state");
                     restart = rollover || !loaded.symbols.equals(config.symbols); previous = streams; removed = new ArrayList<>(config.symbols); removed.removeAll(loaded.symbols); config = loaded;
-                    if (rollover) { state = new TradeState(date, number(account, "currentBalance"), now.getAsLong(), restored); histories.clear(); eligibility.clear(); pendingReplacements.clear(); reminders.clear(); entryWarnings.clear(); }
+                    if (rollover) { state = new TradeState(date, number(account, "currentBalance"), now.getAsLong(), restored); histories.clear(); eligibility.clear(); selectedStop.clear(); reminders.clear(); }
                     for (String symbol : loaded.symbols) if (histories.containsKey(symbol)) { JsonObject history = histories.get(symbol); eligibility.put(symbol, StartupEligibility.evaluate(loaded.plan(symbol), price(symbol), number(history, "sharesOutstanding"), object(history, "premarketDollarCollection"), array(history, "dailyBars"))); }
                 }
                 if (rollover) for (String symbol : loaded.symbols) market.forget(symbol);
@@ -399,6 +402,7 @@ public final class TradingRuntime implements AutoCloseable {
     public boolean dispatch(JsonObject action) {
         if (stopped) return false; String symbol = string(action, "symbol").trim(), type = string(action, "type"), key = string(action, "keyCode"); if (key.isEmpty()) key = string(action, "key_code");
         try {
+            if (type.equals("clear_selected_stop")) { selectedStop.clear(); return true; }
             if (type.equals("account_refresh")) {
                 events.log(symbol, "Manual account refresh requested");
                 refreshAccountWithFollowups(); return true;
@@ -419,15 +423,16 @@ public final class TradingRuntime implements AutoCloseable {
             }
             if (type.equals("core_plan_update")) { for (String field : new String[]{"coreTarget", "coreCount"}) if (!action.has(field) || !action.get(field).isJsonPrimitive() || !action.getAsJsonPrimitive(field).isNumber() || !Double.isFinite(action.get(field).getAsDouble())) throw new IllegalArgumentException("Invalid core plan input: " + field); synchronized (lock) { if (!bool(policy, "coreTargetEnabled") || state == null || number(object(object(account, "positions"), symbol), "netQuantity") == 0) throw new IllegalArgumentException("No active core plan"); boolean isLong = number(object(object(account, "positions"), symbol), "netQuantity") > 0; state.updateCorePlan(symbol, isLong, Math.round(number(action, "coreTarget") * 100) / 100.0, number(action, "coreCount")); }
                 persistState(); JsonObject view = view(symbol, "command_state"); view.addProperty("requestId", string(action, "requestId")); view.addProperty("updateStatus", "success"); events.message(view); return true; }
-            if (type.equals("manual_inputs") || key.equals("KeyZ") || key.equals("Space")) {
+            if (key.equals("KeyZ")) { selectedStop.select(symbol, number(action, "price")); return true; }
+            if (type.equals("manual_inputs") || key.equals("Space")) {
                 synchronized (lock) { JsonObject value = manual.computeIfAbsent(symbol, stock -> new JsonObject());
-                    if (key.equals("Space")) { for (String field : new String[]{"customEntryPrice", "customStopLong", "customStopShort"}) value.remove(field); }
-                    else if (key.equals("KeyZ")) { double price = number(action, "price"); if (!(price > 0)) throw new IllegalArgumentException("Hover price unavailable for custom stop"); value.addProperty("customStopLong", price); value.addProperty("customStopShort", price); if (state != null) { double net = number(object(object(account, "positions"), symbol), "netQuantity"); if (net != 0) { var loaded = market.getState(symbol); double extreme = loaded == null ? 0 : number(loaded.metrics(), net > 0 ? "lowOfDay" : "highOfDay"); state.direction(symbol, net > 0).addProperty("coreInvalidationLevel", extreme > 0 ? net > 0 ? Math.min(extreme, price) : Math.max(extreme, price) : price); } } }
+                    if (key.equals("Space")) { selectedStop.clear(); for (String field : new String[]{"customEntryPrice", "customStopLong", "customStopShort"}) value.remove(field); }
                     else for (String field : new String[]{"customEntryPrice", "customStopLong", "customStopShort", "fixedQuantity"}) if (action.has(field)) { if (!action.get(field).isJsonPrimitive() || !action.getAsJsonPrimitive(field).isNumber() || !Double.isFinite(action.get(field).getAsDouble()) || action.get(field).getAsDouble() < 0) throw new IllegalArgumentException("Invalid manual input: " + field); value.add(field, action.get(field)); }
                 } persistState(); events.message(view(symbol, "command_state")); return true;
             }
             if (key.equals("KeyE") || key.equals("KeyR") || key.equals("KeyV")) { events.log(symbol, key + " native command is disabled; no broker requests attempted"); return true; }
             if (key.equals("KeyC")) {
+                selectedStop.clear();
                 JsonObject command = action.deepCopy();
                 executor.execute(() -> cancelCurrentEntries(symbol, command));
                 return true;
@@ -495,7 +500,6 @@ public final class TradingRuntime implements AutoCloseable {
     public void resetAfterBrokerReview() { execution.resetAfterBrokerReview(); }
     private void executionEvent(JsonObject result) {
         String symbol = string(result, "symbol");
-        if ((string(result, "type").equals("execution_result") && string(result, "action").equals("refresh_pending_entry") && !string(result, "outcome").equals("accepted") && !string(result, "outcome").equals("unknown")) || string(result, "type").equals("execution_blocked")) synchronized (lock) { pendingReplacements.remove(symbol); }
         if (result.has("entry")) {
             boolean changed; synchronized (lock) { JsonObject plan = config == null ? null : selectedPlan(symbol); changed = state != null && state.acceptEntry(symbol, object(result, "entry"), object(plan, "atr"), now.getAsLong()); }
             if (changed) persistState();
@@ -506,22 +510,6 @@ public final class TradingRuntime implements AutoCloseable {
             if (number(result, "attemptedRequestCount") > 0) refreshAccountWithFollowups();
             else refreshAccount();
         }
-    }
-    private void pendingJobs() {
-        List<JsonObject> actions = new ArrayList<>(); List<String[]> notices = new ArrayList<>(); long time = now.getAsLong(); double seconds = MarketClock.marketTime(time).minutesSinceMarketOpen * 60;
-        synchronized (lock) { if (stopped || config == null || account == null) return;
-            for (String symbol : config.symbols) { var loaded = market.getState(symbol); if (loaded == null) continue; JsonObject prices = loaded.metrics(); JsonArray entries = array(object(account, "entryOrders"), symbol); String old = pendingReplacements.getOrDefault(symbol, "");
-                JsonObject decision = Workflows.pendingStopRefresh(entries, array(object(account, "exitPairs"), symbol).size(), seconds, old, number(prices, "lowOfDay"), number(prices, "highOfDay"));
-                if (decision != null) { pendingReplacements.put(symbol, string(decision, "orderID")); JsonObject action = message("native_job"); action.addProperty("symbol", symbol); action.addProperty("keyCode", "RefreshEntryStop"); actions.add(action); }
-                Set<String> activeWarnings = new HashSet<>();
-                for (JsonElement item : entries) { JsonObject order = item.getAsJsonObject(); boolean isLong = bool(order, "isBuy"); double stop = number(order, "exitStopPrice"), extreme = number(prices, isLong ? "lowOfDay" : "highOfDay");
-                    if (stop <= 0 || extreme <= 0 || !(isLong ? stop > extreme : stop < extreme)) continue; String key = symbol + ":" + string(order, "orderID") + ":" + stop; activeWarnings.add(key); Long last = entryWarnings.get(key);
-                    if (last == null || seconds >= 0 && seconds < 180 && time - last >= 60000) { entryWarnings.put(key, time); notices.add(new String[]{symbol, "Pending entry stop " + stop + " is inside day extreme " + extreme}); }
-                }
-                entryWarnings.keySet().removeIf(key -> key.startsWith(symbol + ":") && !activeWarnings.contains(key));
-            }
-        }
-        notices.forEach(value -> events.notify(value[0], value[1])); actions.forEach(this::dispatch);
     }
     private void disciplineJobs() {
         boolean changed = false; List<String[]> notices = new ArrayList<>(); long time = now.getAsLong();

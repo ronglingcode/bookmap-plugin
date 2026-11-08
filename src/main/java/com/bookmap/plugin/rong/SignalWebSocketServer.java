@@ -27,8 +27,14 @@ import com.google.gson.JsonObject;
 
 public class SignalWebSocketServer extends WebSocketServer {
     private com.bookmap.plugin.rong.pricelines.EntryBidReclaimManager entryBidReclaimManager;
+    private com.bookmap.plugin.rong.pricelines.SelectedStopManager selectedStopManager;
     public void setEntryBidReclaimStore(com.bookmap.plugin.rong.pricelines.PriceLineStore store) {
         entryBidReclaimManager = new com.bookmap.plugin.rong.pricelines.EntryBidReclaimManager(store);
+        selectedStopManager = new com.bookmap.plugin.rong.pricelines.SelectedStopManager(store);
+    }
+    public void updateSelectedStop(JsonObject stop) {
+        if (selectedStopManager != null) selectedStopManager.update(getString(stop, "symbol"),
+                stop.has("price") ? stop.get("price").getAsDouble() : 0);
     }
     private final HotkeyRiskSelection hotkeyRiskSelection = new HotkeyRiskSelection();
 
@@ -332,11 +338,13 @@ public class SignalWebSocketServer extends WebSocketServer {
         symbolToOrderBook.put(symbol, orderBook);
         symbolToPips.put(symbol, pips);
         if (entryBidReclaimManager != null) entryBidReclaimManager.register(symbol, pips);
+        if (selectedStopManager != null) selectedStopManager.register(symbol, pips);
     }
 
     /** Unregister a symbol when its plugin instance stops. */
     public void unregisterSymbol(String symbol) {
         if (entryBidReclaimManager != null) entryBidReclaimManager.unregister(symbol);
+        if (selectedStopManager != null) selectedStopManager.unregister(symbol);
         com.bookmap.plugin.rong.signal.CairoPatternFeed feed = patternFeeds.remove(symbol);
         if (feed != null) {
             feed.close(); observationWorker.execute(() -> { JsonObject terminal = feed.terminal(); if (terminal != null) broadcast(terminal.toString()); });

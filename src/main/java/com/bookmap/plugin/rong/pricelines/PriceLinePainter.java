@@ -175,7 +175,9 @@ public class PriceLinePainter implements ScreenSpacePainterFactory {
 
             // Draw the horizontal line
             g.setColor(color);
-            if (line.getType() == PriceLine.LineType.KEY_LEVEL
+            if (line.getType() == PriceLine.LineType.SELECTED_STOP) {
+                g.setStroke(new BasicStroke(1));
+            } else if (line.getType() == PriceLine.LineType.KEY_LEVEL
                     || line.getType() == PriceLine.LineType.EXIT_ORDER
                     || line.getType() == PriceLine.LineType.ENTRY_ORDER
                     || line.getType() == PriceLine.LineType.ENTRY_BID_RECLAIM) {

@@ -536,8 +536,8 @@ public class TradeButtonWindow {
     }
 
     private void showManualInputs() {
-        String[] fields = {"customEntryPrice", "customStopLong", "customStopShort", "fixedQuantity"};
-        String[] labels = {"Custom entry price (0 = automatic)", "Long stop (0 = day low)", "Short stop (0 = day high)", "Fixed shares (0 = risk sizing)"};
+        String[] fields = {"customEntryPrice", "fixedQuantity"};
+        String[] labels = {"Custom entry price (0 = automatic)", "Fixed shares (0 = risk sizing)"};
         JsonObject current = server.getManualInputs(symbol); JTextField[] inputs = new JTextField[fields.length]; JPanel panel = new JPanel(new GridLayout(0, 2, 8, 8));
         for (int i = 0; i < fields.length; i++) { panel.add(new JLabel(labels[i])); inputs[i] = new JTextField(current.has(fields[i]) ? current.get(fields[i]).getAsString() : "0", 12); panel.add(inputs[i]); }
         if (JOptionPane.showConfirmDialog(frame, panel, symbol + " Native Entry Inputs", JOptionPane.OK_CANCEL_OPTION, JOptionPane.PLAIN_MESSAGE) != JOptionPane.OK_OPTION) return;

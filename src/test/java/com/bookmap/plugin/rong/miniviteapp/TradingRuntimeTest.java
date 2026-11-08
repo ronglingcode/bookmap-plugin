@@ -252,7 +252,13 @@ class TradingRuntimeTest {
             assertEquals(1, tasks.stream().filter(task -> task.delay == 30000 && !task.canceled).count(), "token timer schedules its next tick");
             assertEquals(1, tasks.stream().filter(task -> task.delay == 3000 && !task.canceled).count(), "safety account poll schedules its next tick");
             // A real native decision and fake broker acceptance initialize state locally, without a ViteApp ACK.
-            JsonObject action = json("{\"symbol\":\"AAPL\",\"tradebook_id\":\"GapGiveAndGoBookmapReversal\",\"entry_method\":\"0.1 R\",\"use_market_order\":true,\"price\":10}"); runtime.dispatch(action);
+            JsonObject action = json("{\"symbol\":\"AAPL\",\"tradebook_id\":\"GapGiveAndGoBookmapReversal\",\"entry_method\":\"0.1 R\",\"use_market_order\":true,\"price\":10}");
+            runtime.dispatch(action);
+            assertEquals(0, mutations.get(), "Every production entry requires fresh human stop selection");
+            runtime.dispatch(json("{\"symbol\":\"AAPL\",\"keyCode\":\"KeyZ\",\"price\":9}"));
+            assertEquals(9, runtime.selectedStop().get("price").getAsDouble());
+            runtime.dispatch(action);
+            assertEquals(0, runtime.selectedStop().get("price").getAsDouble(), "Entry consumes the selected stop");
             long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(2); while (emitted.stream().noneMatch(event -> event.has("outcome")) && System.nanoTime() < deadline) Thread.sleep(5);
             assertEquals(1, mutations.get(), logs.toString()); assertTrue(emitted.stream().anyMatch(event -> event.has("outcome") && event.get("outcome").getAsString().equals("accepted")), emitted.toString());
             runtime.pendingPersistence().get(2, TimeUnit.SECONDS); assertEquals(2, writes.get());

@@ -8,6 +8,7 @@ import com.bookmap.plugin.rong.miniviteapp.core.controllers.ExtendedHandler;
 import com.bookmap.plugin.rong.miniviteapp.core.controllers.Handler;
 import com.bookmap.plugin.rong.miniviteapp.core.controllers.WallOut;
 import com.bookmap.plugin.rong.miniviteapp.core.controllers.BookmapSizeCap;
+import com.bookmap.plugin.rong.miniviteapp.core.controllers.SelectedStop;
 import com.bookmap.plugin.rong.miniviteapp.models.Models;
 import com.bookmap.plugin.rong.miniviteapp.models.Models.*;
 import com.google.gson.JsonArray;
@@ -36,6 +37,9 @@ public final class MiniViteApp implements AutoCloseable {
     private final Map<String, Snapshot> snapshots = new HashMap<>();
     private final Map<String, Long> cappedEntryRefreshAfter = new HashMap<>();
     private final Map<String, JsonObject> marketData = new HashMap<>();
+    private SelectedStop selectedStop;
+    /** Bookmap-specific execution policy, independent of the mirrored legacy core fixtures. */
+    public synchronized void requireSelectedStop(SelectedStop selection) { selectedStop = Objects.requireNonNull(selection); }
     public MiniViteApp(BiConsumer<Object, JsonObject> sender) {
         this(new Api(), sender);
     }
@@ -133,6 +137,27 @@ public final class MiniViteApp implements AutoCloseable {
                     + (key.isEmpty() ? Models.string(action, "tradebook_id") : key));
             Models.require(state != null, "execution inputs unavailable");
             if (marketData.containsKey(symbol)) state = new Snapshot(state, marketData.get(symbol));
+            boolean pendingSameSide = false;
+            for (Order pending : state.entries) if (pending.isBuy == (state.netQuantity > 0)) pendingSameSide = true;
+            boolean openingAction = wallOutCount == 0 && (entry || directionalEntry || key.equals("KeyA")
+                    || key.equals("KeyW") && !pendingSameSide);
+            if (selectedStop != null && key.equals("RefreshEntryStop"))
+                throw new IllegalArgumentException("Selected entry stops cannot be automatically widened");
+            SelectedStop.Claim stopClaim = null;
+            if (selectedStop != null && openingAction) {
+                stopClaim = selectedStop.consume(symbol);
+                double stop = stopClaim.price;
+                JsonObject prices = new JsonObject();
+                prices.addProperty("currentPrice", state.currentPrice); prices.addProperty("bid", state.bid); prices.addProperty("ask", state.ask);
+                if (state.entryContext != null) {
+                    prices.add("highOfDay", state.entryContext.get("highOfDay")); prices.add("lowOfDay", state.entryContext.get("lowOfDay"));
+                }
+                state = new Snapshot(state, prices);
+                Models.require(state.entryContext != null, "entry context unavailable");
+                state.entryContext.addProperty("selectedStopRequired", true);
+                state.entryContext.addProperty("customStopLong", stop);
+                state.entryContext.addProperty("customStopShort", stop);
+            }
             if (state.entryContext != null && action.has("bookmapDayHighLow")) {
                 JsonObject day = action.getAsJsonObject("bookmapDayHighLow");
                 Models.require(!day.has("priceUnit") || Models.string(day, "priceUnit").equals("real"), "unsupported day-level price unit");
@@ -155,6 +180,10 @@ public final class MiniViteApp implements AutoCloseable {
                             ? Handler.marketOutPartials(state, 2)
                     : key.equals("KeyW") ? ExtendedHandler.swap(state, action)
                     : KeyboardHandler.handleKeyPressed(state, key, shift, Models.number(action, "price"));
+            if (selectedStop != null && BookmapSizeCap.hasOpening(plan)) {
+                Models.require(stopClaim != null, "Select stop: hover + Z");
+                plan.selectedStopGuard = stopClaim::requireFresh;
+            }
             boolean cappedOpening = state.entryContext != null && state.entryContext.has("bookmapSizeCap") && BookmapSizeCap.hasOpening(plan);
             if (cappedOpening) Models.require(!cappedEntryRefreshAfter.containsKey(symbol), "Bookmap size cap: wait for broker account refresh before another entry");
             BookmapSizeCap.apply(state, plan);
@@ -207,6 +236,14 @@ public final class MiniViteApp implements AutoCloseable {
         return request.body != null && Models.string(request.body, "orderStrategyType").equals("TRIGGER");
     }
     private void execute(String accountHash, String actionId, Snapshot state, Plan plan) {
+        if (plan.selectedStopGuard != null) {
+            try { plan.selectedStopGuard.run(); }
+            catch (RuntimeException error) {
+                finishExecution(actionId, state, plan, new JsonArray(), 0, 0, 0, 0, false,
+                        "rejected", error.getMessage(), false);
+                return;
+            }
+        }
         JsonArray results = new JsonArray();
         int attempted = 0, acknowledged = 0, rejected = 0, uncertain = 0;
         boolean entryAccepted = false, stageFailed = false;
@@ -267,6 +304,7 @@ public final class MiniViteApp implements AutoCloseable {
         String operation = request.method + (request.orderId.isEmpty() ? " new order" : " order " + request.orderId);
         try {
             accessToken = guard(plan);
+            if (isProtectedEntry(request) && plan.selectedStopGuard != null) plan.selectedStopGuard.run();
             log.detail(state.symbol, "Native " + plan.action + " actionId=" + actionId + " request "
                     + index + "/" + plan.requests.size() + ": attempting " + operation);
             dispatched = true;
@@ -336,6 +374,7 @@ public final class MiniViteApp implements AutoCloseable {
     }
 
     @Override public synchronized void close() {
+        if (selectedStop != null) selectedStop.clear();
         closed = true; token = ""; account = ""; snapshots.clear(); marketData.clear(); executor.shutdownNow();
     }
 }

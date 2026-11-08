@@ -16,9 +16,12 @@ public final class OrderFlow {
         long requestedShares = EntrySizing.fixedShares(method);
         double fixed = requestedShares > 0 ? requestedShares : method.isEmpty() ? Models.number(context, "fixedQuantity") : 0;
         double riskPrice = stopPrice;
+        boolean selected = Models.bool(context, "selectedStopRequired");
+        if (selected) Models.require(Models.positive(stopPrice) && (isLong ? stopPrice < entryPrice : stopPrice > entryPrice),
+                "Stop must be below long entry / above short entry; select stop again with Z");
         String type = market ? "MARKET" : (isLong ? state.currentPrice > entryPrice : state.currentPrice < entryPrice) ? "LIMIT" : "STOP";
         double orderEntry = isLong ? RiskManager.addCents(entryPrice) : RiskManager.minusCents(entryPrice);
-        double orderStop = isLong ? RiskManager.minusCents(stopPrice) : RiskManager.addCents(stopPrice);
+        double orderStop = selected ? stopPrice : isLong ? RiskManager.minusCents(stopPrice) : RiskManager.addCents(stopPrice);
         int count = requestedShares > 0 ? EntrySizing.FIXED_SHARE_PARTIALS : requestedCount;
         double shares = fixed > 0 ? fixed : RiskManager.calculateTotalShares(orderEntry, riskPrice, multiplier, Models.number(context, "riskDollars"));
         double cap = Models.number(context, "maxQuantity");

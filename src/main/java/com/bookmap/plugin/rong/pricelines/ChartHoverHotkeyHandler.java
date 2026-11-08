@@ -97,6 +97,7 @@ public class ChartHoverHotkeyHandler implements ScreenSpacePainterFactory {
     private static KeyEventDispatcher keyDispatcher;
     private static KeyboardFocusManager keyFocusManager;
     private static javax.swing.Timer hoverDisplayTimer;
+    private static java.util.function.Consumer<String> highlightedChange;
     private static final Object listenerLock = new Object();
 
     private final SignalWebSocketServer wsServer;
@@ -107,6 +108,13 @@ public class ChartHoverHotkeyHandler implements ScreenSpacePainterFactory {
             IndicatorConfig config) {
         this.wsServer = wsServer;
         this.config = config;
+        highlightedChange = symbol -> {
+            if (wsServer != null) {
+                JsonObject action = new JsonObject(); action.addProperty("type", "clear_selected_stop");
+                action.addProperty("symbol", symbol == null ? "" : symbol);
+                wsServer.dispatchTradingAction(action);
+            }
+        };
         ensureAwtListener();
     }
 
@@ -148,6 +156,7 @@ public class ChartHoverHotkeyHandler implements ScreenSpacePainterFactory {
                 instrumentPips.clear();
                 lastHoverContext = null;
                 setHighlightedInstrument(null);
+                highlightedChange = null;
             }
         }
     }
@@ -183,6 +192,7 @@ public class ChartHoverHotkeyHandler implements ScreenSpacePainterFactory {
     private static void refreshHoverDisplay() {
         HoverContext hover = null;
         try {
+            updateHighlightedInstrumentFromWindowTitle(KeyboardFocusManager.getCurrentKeyboardFocusManager().getActiveWindow());
             HoverContext previous = lastHoverContext;
             if (previous != null && KeyboardFocusManager.getCurrentKeyboardFocusManager().getActiveWindow()
                     == SwingUtilities.getWindowAncestor(previous.component)) {
@@ -495,6 +505,7 @@ public class ChartHoverHotkeyHandler implements ScreenSpacePainterFactory {
             return;
         }
         highlightedInstrument = next;
+        if (highlightedChange != null) highlightedChange.accept(next);
         ActionLogWindow.updateHighlightedSymbol(next);
     }
 
