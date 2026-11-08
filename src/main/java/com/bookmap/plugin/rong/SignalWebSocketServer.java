@@ -174,13 +174,24 @@ public class SignalWebSocketServer extends WebSocketServer {
     /** All local actions go directly to the standalone runtime. */
     public void dispatchTradingAction(JsonObject action) {
         JsonObject local = action.deepCopy(); String key = getString(local, "keyCode"); if (key.isEmpty()) key = getString(local, "key_code");
+        boolean hoverShareDigit = key.matches("Digit[1-5]") && getString(local, "source").equals("bookmap_chart_hotkey");
+        if (hoverShareDigit) {
+            String symbol = getString(local, "symbol");
+            Double bid = getMarketEntryEstimate(symbol, false), ask = getMarketEntryEstimate(symbol, true);
+            local.addProperty("hoverEntryBid", bid == null ? 0 : bid);
+            local.addProperty("hoverEntryAsk", ask == null ? 0 : ask);
+            EntryRetestState retest = getEntryRetestState(symbol);
+            local.addProperty("hoverLongRetestBlocked", retest.isEntryRetestBlocked(true));
+            local.addProperty("hoverShortRetestBlocked", retest.isEntryRetestBlocked(false));
+            appendRegularSessionHighLow(symbol, local);
+        }
         if (key.equals("KeyB") || key.equals("KeyS") || key.isEmpty() && !getString(local, "tradebook_id").isEmpty()) {
             boolean isLong = key.equals("KeyB") || key.isEmpty() && getBoolean(local, "sideIsLong");
             EntryRetestState retest = getEntryRetestState(getString(local, "symbol"));
             local.addProperty("retest_blocked", retest.isEntryRetestBlocked(isLong));
             if (retest.isEntryRetestPending(isLong)) local.addProperty("retest_warning", isLong ? "wait for bid retest" : "wait for offer retest");
         }
-        if (key.equals("KeyB") || key.equals("KeyS") || key.equals("KeyW")
+        if (hoverShareDigit || key.equals("KeyB") || key.equals("KeyS") || key.equals("KeyW")
                 || key.isEmpty() && !getString(local, "tradebook_id").isEmpty())
             local.add("orderbook", entryWallSnapshot(getString(local, "symbol")));
         if (WallOut.count(local) > 0)

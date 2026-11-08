@@ -249,6 +249,50 @@ class NativeExecutionTest {
             assertTrue(rig.mutations.get() > 0, "Flatten remains executable without a selected stop");
         }
     }
+    @Test void flatChartDigitsAtomicallySelectHoverStopAndSubmitExactShareMarketEntry() throws Exception {
+        for (boolean isLong : new boolean[]{true, false}) for (int digit : new int[]{1, 2, 3, 4, 5}) try (var rig = new Rig()) {
+            rig.connectEntry();
+            rig.state.getAsJsonObject("entryContext").add("fixedShares", JsonParser.parseString("[500,1000,3000,5000,7000]"));
+            rig.state.addProperty("bid", 9.99); rig.state.addProperty("ask", 10.01); rig.updateState(System.currentTimeMillis());
+            var selection = new com.bookmap.plugin.rong.miniviteapp.core.controllers.SelectedStop();
+            rig.engine.requireSelectedStop(selection);
+            selection.select("AAPL", isLong ? 8 : 12); // An unrelated older Z selection must not supply this stop.
+            JsonObject command = action("Digit" + digit);
+            command.addProperty("source", "bookmap_chart_hotkey"); command.addProperty("price", isLong ? 9.5 : 10.5);
+            rig.engine.route(command); assertEquals("accepted", rig.finish().get("outcome").getAsString());
+            JsonObject order = rig.bodies.get(0);
+            assertEquals("MARKET", order.get("orderType").getAsString());
+            assertEquals(new int[]{500,1000,3000,5000,7000}[digit - 1], order.getAsJsonArray("orderLegCollection").get(0).getAsJsonObject().get("quantity").getAsInt());
+            assertEquals(isLong ? "BUY" : "SELL_SHORT", order.getAsJsonArray("orderLegCollection").get(0).getAsJsonObject().get("instruction").getAsString());
+            for (var pair : order.getAsJsonArray("childOrderStrategies"))
+                assertEquals(isLong ? 9.5 : 10.5, pair.getAsJsonObject().getAsJsonArray("childOrderStrategies").get(0).getAsJsonObject().get("stopPrice").getAsDouble());
+            assertEquals(0, selection.view().get("price").getAsDouble());
+        }
+    }
+    @Test void chartDigitsWhileHeldStillAdjustExistingExitsWithoutASelectedStop() throws Exception {
+        try (var rig = new Rig()) {
+            rig.connect(); rig.engine.requireSelectedStop(new com.bookmap.plugin.rong.miniviteapp.core.controllers.SelectedStop());
+            JsonObject command = action("Digit1"); command.addProperty("source", "bookmap_chart_hotkey"); command.addProperty("price", 11);
+            rig.engine.route(command); assertEquals("accepted", rig.finish().get("outcome").getAsString());
+            assertTrue(rig.requests.stream().allMatch(request -> request.startsWith("PUT ")));
+        }
+    }
+    @Test void flatDigitMissingButtonPendingEntryAndRetestBlockNeverReachBroker() throws Exception {
+        for (String reason : new String[]{"missing", "pending", "retest", "spread", "disabled"}) try (var rig = new Rig()) {
+            rig.connectEntry();
+            rig.state.getAsJsonObject("entryContext").add("fixedShares", JsonParser.parseString("[500,1000]"));
+            rig.state.addProperty("bid", 9.99); rig.state.addProperty("ask", 10.01);
+            if (reason.equals("pending")) rig.state.add("entries", JsonParser.parseString("[{\"orderID\":\"101\",\"orderType\":\"STOP\",\"quantity\":500,\"price\":10,\"exitStopPrice\":9.5,\"isBuy\":true}]"));
+            if (reason.equals("disabled")) for (var item : rig.state.getAsJsonObject("entryContext").getAsJsonArray("definitions")) item.getAsJsonObject().addProperty("enabled", false);
+            rig.updateState(System.currentTimeMillis());
+            JsonObject command = action(reason.equals("missing") ? "Digit3" : "Digit1");
+            command.addProperty("source", "bookmap_chart_hotkey"); command.addProperty("price", reason.equals("spread") ? 10 : 9.5);
+            if (reason.equals("retest")) command.addProperty("hoverLongRetestBlocked", true);
+            rig.engine.route(command);
+            assertEquals(0, rig.mutations.get(), reason);
+            assertTrue(rig.events.stream().anyMatch(event -> event.get("type").getAsString().equals("execution_blocked")), reason);
+        }
+    }
     private static final class Rig implements AutoCloseable {
         final Object connection = new Object();
         final List<JsonObject> events = new CopyOnWriteArrayList<>();

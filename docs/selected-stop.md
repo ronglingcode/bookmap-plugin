@@ -1,5 +1,28 @@
 # Select a stop before every entry
 
+## One-action fixed-share entry while flat
+
+On the Bookmap chart, hover the desired stop and press a **top-row 1–5** key.
+The key selects that symbol's corresponding fixed-share button, in configured
+order (risk buttons are not counted), and submits a **market entry** using the
+hovered price as its stop. No preceding Z selection is needed; the stop is
+selected and consumed in the same action. Shift is unnecessary.
+
+For example, `[500, 1000, 3000, 5000]` maps keys 1–4 to those share quantities.
+Key 5 blocks when there is no fifth button. No missing share slot falls back to
+risk sizing. A stop below the current bid selects long; above the ask selects
+short; a stop inside the spread is rejected. The matching enabled tradebook and
+all existing entry, retest, participation and risk checks still apply. Ambiguous
+same-side tradebook selection requires using the intended button instead.
+
+This shortcut applies only when flat with no exit pairs and no pending entry.
+With an existing position or exit pairs, the number keys keep their existing
+exit-adjustment behavior. Numpad keys and top-row 6–0 are unchanged. Adds and
+reloads still require the Z workflow below. The shortcut never reuses an older
+Z-selected stop and does not change the hotkey risk/share preference.
+
+## Existing Z workflow
+
 Hover the desired stop price on the Bookmap chart, press **Z**, then use your
 normal entry button or hotkey within **five seconds**. A thin solid line labeled
 **Stop** shows the selected price. No stop information is added to the floating
@@ -12,7 +35,7 @@ entry attempts also require a fresh selection. Repeated entry presses cannot
 reuse one selection. Missing, expired and wrong-side stops block entry before
 any broker request. A queued entry is checked again before dispatch.
 
-All native opening paths require this selection: entry buttons, chart/generic
+All other native opening paths require this selection: entry buttons, chart/generic
 B/S, fixed-share entries, same-direction adds, opposite-direction entries,
 A/partial reloads, and W/Swap when it re-enters. W's existing exit-only branch
 with a pending entry needs no selected stop. Exits, flatten, partial exits and

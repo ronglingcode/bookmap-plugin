@@ -9,6 +9,7 @@ import com.bookmap.plugin.rong.miniviteapp.core.controllers.Handler;
 import com.bookmap.plugin.rong.miniviteapp.core.controllers.WallOut;
 import com.bookmap.plugin.rong.miniviteapp.core.controllers.BookmapSizeCap;
 import com.bookmap.plugin.rong.miniviteapp.core.controllers.SelectedStop;
+import com.bookmap.plugin.rong.miniviteapp.core.controllers.HoverShareEntry;
 import com.bookmap.plugin.rong.miniviteapp.models.Models;
 import com.bookmap.plugin.rong.miniviteapp.models.Models.*;
 import com.google.gson.JsonArray;
@@ -119,24 +120,29 @@ public final class MiniViteApp implements AutoCloseable {
         String key = Models.string(action, "keyCode");
         if (key.isEmpty()) key = Models.string(action, "key_code");
         boolean shift = Models.bool(action, "shiftKey") || Models.bool(action, "shift_key");
-        boolean entry = EntryHandler.supports(action, key);
+        boolean entry = false;
         int wallOutCount = WallOut.count(action);
         String symbol = symbolKey.apply(Models.string(action, "symbol"));
         Snapshot state = snapshots.get(symbol);
-        boolean sameDirection = entry && EntryHandler.matchesPositionSide(state, action);
-        boolean extended = !KeyboardHandler.supports(key, shift) && !key.equals("KeyA") && !key.equals("KeyW")
-                && !(entry
-                && (state == null || state.entries.isEmpty()
-                && (sameDirection || state.netQuantity == 0 && state.pairs.isEmpty())));
         try {
             long now = System.currentTimeMillis();
             Models.require(!closed, "native executor stopped");
             Models.require(!requiresReview, "broker review required: " + reviewReason);
+            Models.require(state != null, "execution inputs unavailable");
+            if (marketData.containsKey(symbol)) state = new Snapshot(state, marketData.get(symbol));
+            boolean hoverEntry = HoverShareEntry.isChartDigit(action, key) && state.netQuantity == 0 && state.pairs.isEmpty();
+            if (hoverEntry) {
+                action = HoverShareEntry.prepare(state, action, key);
+                if (selectedStop == null) selectedStop = new SelectedStop();
+                key = ""; shift = true;
+            }
+            entry = EntryHandler.supports(action, key);
+            boolean sameDirection = entry && EntryHandler.matchesPositionSide(state, action);
+            boolean extended = !KeyboardHandler.supports(key, shift) && !key.equals("KeyA") && !key.equals("KeyW")
+                    && !(entry && state.entries.isEmpty() && (sameDirection || state.netQuantity == 0 && state.pairs.isEmpty()));
             boolean directionalEntry = (key.equals("KeyB") || key.equals("KeyS")) && !entry;
             Models.require(wallOutCount > 0 || entry || directionalEntry || key.equals("KeyA") || key.equals("KeyW") || KeyboardHandler.supports(key, shift), "unsupported native action: "
                     + (key.isEmpty() ? Models.string(action, "tradebook_id") : key));
-            Models.require(state != null, "execution inputs unavailable");
-            if (marketData.containsKey(symbol)) state = new Snapshot(state, marketData.get(symbol));
             boolean pendingSameSide = false;
             for (Order pending : state.entries) if (pending.isBuy == (state.netQuantity > 0)) pendingSameSide = true;
             boolean openingAction = wallOutCount == 0 && (entry || directionalEntry || key.equals("KeyA")
@@ -145,6 +151,7 @@ public final class MiniViteApp implements AutoCloseable {
                 throw new IllegalArgumentException("Selected entry stops cannot be automatically widened");
             SelectedStop.Claim stopClaim = null;
             if (selectedStop != null && openingAction) {
+                if (hoverEntry) selectedStop.select(symbol, Models.number(action, "hoverStopPrice"));
                 stopClaim = selectedStop.consume(symbol);
                 double stop = stopClaim.price;
                 JsonObject prices = new JsonObject();
