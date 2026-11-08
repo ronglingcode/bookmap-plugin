@@ -1,4 +1,5 @@
 build/
+/build-rebuild/
 .gradle/
 bin/
 secrets.json
