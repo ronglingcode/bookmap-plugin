@@ -96,6 +96,7 @@ public class ChartHoverHotkeyHandler implements ScreenSpacePainterFactory {
     private static volatile AWTEventListener awtListener;
     private static KeyEventDispatcher keyDispatcher;
     private static KeyboardFocusManager keyFocusManager;
+    private static javax.swing.Timer hoverDisplayTimer;
     private static final Object listenerLock = new Object();
 
     private final SignalWebSocketServer wsServer;
@@ -136,6 +137,8 @@ public class ChartHoverHotkeyHandler implements ScreenSpacePainterFactory {
         synchronized (listenerLock) {
             if (awtListener != null) {
                 Toolkit.getDefaultToolkit().removeAWTEventListener(awtListener);
+                if (hoverDisplayTimer != null) hoverDisplayTimer.stop();
+                hoverDisplayTimer = null;
                 keyFocusManager.removeKeyEventDispatcher(keyDispatcher);
                 keyDispatcher = null;
                 keyFocusManager = null;
@@ -171,15 +174,41 @@ public class ChartHoverHotkeyHandler implements ScreenSpacePainterFactory {
             };
             Toolkit.getDefaultToolkit().addAWTEventListener(awtListener,
                 AWTEvent.MOUSE_MOTION_EVENT_MASK);
+            // Recheck stationary pointers too: chart scales and window boundaries can change.
+            hoverDisplayTimer = new javax.swing.Timer(100, event -> refreshHoverDisplay());
+            hoverDisplayTimer.start();
         }
+    }
+
+    private static void refreshHoverDisplay() {
+        HoverContext hover = null;
+        try {
+            HoverContext previous = lastHoverContext;
+            if (previous != null && KeyboardFocusManager.getCurrentKeyboardFocusManager().getActiveWindow()
+                    == SwingUtilities.getWindowAncestor(previous.component)) {
+                hover = resolveCurrentHoverContext(true);
+            }
+        } catch (java.awt.HeadlessException | java.awt.IllegalComponentStateException | SecurityException ignored) {
+            // No trustworthy pointer mapping means n/a, never the previous price.
+        }
+        ActionLogWindow.updateHoveredPrice(currentHighlightedInstrument(), hover == null ? null : hover.price);
     }
 
     private void updateHoverContext(MouseEvent event) {
         Component component = event.getComponent();
+        Window window = SwingUtilities.getWindowAncestor(component);
+        if (window instanceof javax.swing.RootPaneContainer
+                && Boolean.TRUE.equals(((javax.swing.RootPaneContainer) window).getRootPane()
+                        .getClientProperty("bmtrader.noChartHover"))) {
+            lastHoverContext = null;
+            refreshHoverDisplay();
+            return;
+        }
         updateHighlightedInstrumentFromWindowTitle(component);
         ResolvedChartPrice price = resolveChartPrice(component, event.getY());
         if (price != null) {
             lastHoverContext = new HoverContext(price.instrument, price.price, component);
+            refreshHoverDisplay();
             if (config != null && config.isEnabled(IndicatorConfig.FIRE_KEYBOARD_EVENT)) {
                 KeyboardFocusManager manager = KeyboardFocusManager.getCurrentKeyboardFocusManager();
                 // Only transfer focus within an active Bookmap session. Hovering must not
@@ -199,6 +228,7 @@ public class ChartHoverHotkeyHandler implements ScreenSpacePainterFactory {
         }
         lastHoverContext =
                 instrument == null ? null : new HoverContext(instrument, null, component);
+        refreshHoverDisplay();
     }
 
     static void focusHoveredChart(Component component, Component focusOwner) {
@@ -227,8 +257,6 @@ public class ChartHoverHotkeyHandler implements ScreenSpacePainterFactory {
         if (!isChartHotkey(normalizedKey)) {
             return;
         }
-        if ("i".equals(normalizedKey)
-                && (event.isShiftDown() || event.isControlDown() || event.isAltDown() || event.isMetaDown())) return;
         if (config == null || !config.isEnabled(IndicatorConfig.FIRE_KEYBOARD_EVENT)) {
             return;
         }

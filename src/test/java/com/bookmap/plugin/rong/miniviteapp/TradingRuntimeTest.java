@@ -307,8 +307,21 @@ class TradingRuntimeTest {
             assertEquals(19.95, runtime.view("MSFT", "test").getAsJsonObject("state").getAsJsonObject("stateBySymbol")
                     .getAsJsonObject("MSFT").getAsJsonObject("breakoutTradeStateForShort").get("entryBidToReclaim").getAsDouble());
             runtime.dispatch(json("{\"symbol\":\"MSFT\",\"keyCode\":\"KeyI\",\"shift_key\":true,\"price\":20.2}"));
-            assertEquals(19.95, runtime.view("MSFT", "test").getAsJsonObject("state").getAsJsonObject("stateBySymbol")
+            assertEquals(20.2, runtime.view("MSFT", "test").getAsJsonObject("state").getAsJsonObject("stateBySymbol")
                     .getAsJsonObject("MSFT").getAsJsonObject("breakoutTradeStateForShort").get("entryBidToReclaim").getAsDouble());
+            for (int mask = 0; mask < 16; mask++) {
+                JsonObject marker = json("{\"symbol\":\"MSFT\",\"keyCode\":\"KeyI\"}");
+                marker.addProperty("shiftKey", (mask & 1) != 0);
+                marker.addProperty("ctrlKey", (mask & 2) != 0);
+                marker.addProperty("altKey", (mask & 4) != 0);
+                marker.addProperty("metaKey", (mask & 8) != 0);
+                double price = (2010 + mask) / 100.0;
+                marker.addProperty("price", price);
+                assertTrue(runtime.dispatch(marker));
+                assertEquals(price, runtime.view("MSFT", "test").getAsJsonObject("state").getAsJsonObject("stateBySymbol")
+                        .getAsJsonObject("MSFT").getAsJsonObject("breakoutTradeStateForShort").get("entryBidToReclaim").getAsDouble(),
+                        "I must mark the hover price regardless of modifier combination " + mask);
+            }
             runtime.dispatch(json("{\"symbol\":\"MSFT\",\"keyCode\":\"KeyI\",\"price\":20.1}"));
             positionData.set("[]"); now.addAndGet(3000); runtime.refreshAccount();
             assertFalse(runtime.view("MSFT", "test").getAsJsonObject("state").getAsJsonObject("stateBySymbol")

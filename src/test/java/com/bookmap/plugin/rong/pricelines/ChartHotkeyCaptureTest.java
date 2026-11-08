@@ -18,6 +18,36 @@ import org.junit.jupiter.api.Test;
 import velox.api.layer1.layers.strategies.interfaces.ScreenSpacePainter;
 
 class ChartHotkeyCaptureTest {
+    @Test
+    void entryBidWithAnyModifiersReachesNormalHotkeyValidation() {
+        int[] validations = {0};
+        com.bookmap.plugin.rong.IndicatorConfig config = new com.bookmap.plugin.rong.IndicatorConfig() {
+            @Override public boolean isEnabled(String key) {
+                assertEquals(FIRE_KEYBOARD_EVENT, key);
+                validations[0]++;
+                return false; // Stop before hover lookup; no live chart or trading runtime is needed.
+            }
+        };
+        ChartHoverHotkeyHandler handler = new ChartHoverHotkeyHandler(null, config);
+        try {
+            int[] modifiers = {KeyEvent.SHIFT_DOWN_MASK, KeyEvent.CTRL_DOWN_MASK,
+                    KeyEvent.ALT_DOWN_MASK, KeyEvent.META_DOWN_MASK};
+            for (int mask = 0; mask < 16; mask++) {
+                int flags = 0;
+                for (int bit = 0; bit < modifiers.length; bit++)
+                    if ((mask & (1 << bit)) != 0) flags |= modifiers[bit];
+                KeyEvent event = new KeyEvent(new Canvas(), KeyEvent.KEY_PRESSED,
+                        System.currentTimeMillis(), flags, KeyEvent.VK_I, KeyEvent.CHAR_UNDEFINED);
+                String key = ChartHoverHotkeyHandler.normalizeKey(event);
+                assertEquals("i", key);
+                handler.handleChartHotkey(event, key);
+                assertEquals(mask + 1, validations[0], "Modifiers must not silently discard I");
+            }
+        } finally {
+            ChartHoverHotkeyHandler.removeAwtListener();
+        }
+    }
+
     private static class FocusableChart extends JPanel {
         int focusRequests;
         @Override public boolean isShowing() { return true; }

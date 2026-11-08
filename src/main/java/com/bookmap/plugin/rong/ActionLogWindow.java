@@ -50,6 +50,7 @@ public class ActionLogWindow {
     private static JLabel persistenceStatusLabel;
     private static String persistenceStatus = "Local logs: starting";
     private static volatile String highlightedSymbol = "";
+    private static Double hoveredPrice;
 
     private ActionLogWindow() {}
 
@@ -105,6 +106,15 @@ public class ActionLogWindow {
     public static void updateHighlightedSymbol(String symbol) {
         invokeWhenActive(() -> {
             highlightedSymbol = symbol == null ? "" : symbol.trim();
+            hoveredPrice = null;
+            renderHighlightedSymbol();
+        });
+    }
+
+    public static void updateHoveredPrice(String symbol, Double price) {
+        invokeWhenActive(() -> {
+            if (!highlightedSymbol.equals(symbol == null ? "" : symbol.trim())) return;
+            hoveredPrice = price;
             renderHighlightedSymbol();
         });
     }
@@ -113,6 +123,7 @@ public class ActionLogWindow {
         session = null;
         SwingUtilities.invokeLater(() -> {
             highlightedSymbol = "";
+            hoveredPrice = null;
             persistenceStatus = "Local logs: starting";
             lines.clear();
             accountStates.clear();
@@ -136,6 +147,7 @@ public class ActionLogWindow {
             return;
         }
         frame = new JFrame(PluginVersion.NAME + " Logs");
+        frame.getRootPane().putClientProperty("bmtrader.noChartHover", true);
         frame.setAlwaysOnTop(true);
         frame.setDefaultCloseOperation(JFrame.DO_NOTHING_ON_CLOSE);
         frame.setContentPane(createContent());
@@ -206,8 +218,10 @@ public class ActionLogWindow {
         if (highlightedSymbolLabel == null) {
             return;
         }
-        highlightedSymbolLabel.setText(
-                "Highlighted chart: " + (highlightedSymbol.isEmpty() ? "unknown" : highlightedSymbol));
+        String text = "Highlighted chart: " + (highlightedSymbol.isEmpty() ? "unknown" : highlightedSymbol)
+                + " | Hover: " + (hoveredPrice != null && Double.isFinite(hoveredPrice) && hoveredPrice > 0
+                        ? String.format(java.util.Locale.ROOT, "%.2f", hoveredPrice) : "n/a");
+        if (!text.equals(highlightedSymbolLabel.getText())) highlightedSymbolLabel.setText(text);
     }
 
     private static DefaultTableModel createTableModel(String[] columns) {

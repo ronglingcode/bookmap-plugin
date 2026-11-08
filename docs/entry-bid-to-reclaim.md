@@ -7,8 +7,9 @@ in your installation. Chart hotkeys must be enabled.
 
 The chart draws a thick yellow horizontal line labeled **entry bid to reclaim**
 at the hovered price, independently of automatic pattern monitors. Press I at
-another hovered price to replace it. There is no manual clear hotkey;
-**Shift+I** does nothing. Each symbol has its own marker, which clears when
+another hovered price to replace it. Shift, Ctrl, Alt and Meta do not change
+the I action, including combinations of these modifiers. There is no manual
+clear hotkey. Each symbol has its own marker, which clears when
 the account snapshot shows that the short position is gone.
 
 Before marking, a yellow reminder at the position's average entry says

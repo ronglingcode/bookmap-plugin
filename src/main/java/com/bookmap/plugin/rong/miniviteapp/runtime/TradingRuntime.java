@@ -404,7 +404,6 @@ public final class TradingRuntime implements AutoCloseable {
                 refreshAccountWithFollowups(); return true;
             }
             if (key.equals("KeyI")) {
-                if (bool(action, "shiftKey") || bool(action, "shift_key")) return true;
                 synchronized (lock) {
                     if (state == null || number(object(object(account, "positions"), symbol), "netQuantity") >= 0)
                         throw new IllegalArgumentException("Entry bid to reclaim requires an active short position");
