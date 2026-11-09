@@ -193,7 +193,8 @@ public class PriceLinePainter implements ScreenSpacePainterFactory {
             // Draw label with background
             // Use custom label if set (KEY_LEVEL lines have user-defined text), else use LineType.label
             String labelText = line.getCustomLabel() != null ? line.getCustomLabel() : line.getType().label;
-            String label = labelText + " " + String.format("%.2f", line.getRealPrice());
+            String label = line.getType() == PriceLine.LineType.SELECTED_STOP && line.getCustomLabel() != null
+                    ? labelText : labelText + " " + String.format("%.2f", line.getRealPrice());
             boolean entryBid = line.getType() == PriceLine.LineType.ENTRY_BID_RECLAIM;
             g.setFont(entryBid ? LABEL_FONT.deriveFont(13f) : LABEL_FONT);
             FontMetrics fm = g.getFontMetrics();

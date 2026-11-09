@@ -7,6 +7,15 @@ import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.*;
 
 class SelectedStopTest {
+    @Test void countdownRoundsUpAndClearsAtExpiryOrConsumption() {
+        AtomicLong time = new AtomicLong(); SelectedStop stop = new SelectedStop(time::get);
+        stop.select("AAPL", 99);
+        assertEquals(30, stop.view().get("remainingSeconds").getAsInt());
+        time.set(1_000_000_000L); assertEquals(29, stop.view().get("remainingSeconds").getAsInt());
+        time.set(29_999_999_999L); assertEquals(1, stop.view().get("remainingSeconds").getAsInt());
+        time.incrementAndGet(); assertEquals(0, stop.view().get("remainingSeconds").getAsInt());
+        stop.select("AAPL", 99); stop.consume("AAPL"); assertEquals(0, stop.view().get("remainingSeconds").getAsInt());
+    }
     @Test void expiryReplacementClearAndSymbolMismatchCannotReuseAStop() {
         AtomicLong time = new AtomicLong(); SelectedStop stop = new SelectedStop(time::get);
         assertThrows(IllegalArgumentException.class, () -> stop.consume("AAPL"));

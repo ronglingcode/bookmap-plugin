@@ -4,6 +4,14 @@ import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.*;
 
 class SelectedStopManagerTest {
+    @Test void countdownRefreshesOnlyWhenTheDisplayedSecondChanges() {
+        PriceLineStore store = new PriceLineStore(); SelectedStopManager manager = new SelectedStopManager(store);
+        manager.register("AAPL", .01); manager.update("AAPL", 99, 30);
+        PriceLine first = store.getLines("AAPL").get(0); assertEquals("Stop 99.00 (30)", first.getCustomLabel());
+        manager.update("AAPL", 99, 30); assertSame(first, store.getLines("AAPL").get(0));
+        manager.update("AAPL", 99, 29); assertEquals("Stop 99.00 (29)", store.getLines("AAPL").get(0).getCustomLabel());
+        manager.update("AAPL", 99, 0); assertTrue(store.getLines("AAPL").isEmpty());
+    }
     @Test void selectionReplacesOneLineAndClearsWithoutTouchingBrokerOrders() {
         PriceLineStore store = new PriceLineStore(); SelectedStopManager manager = new SelectedStopManager(store);
         manager.register("AAPL", .01); manager.register("MSFT", .01);

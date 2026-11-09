@@ -33,8 +33,11 @@ public class SignalWebSocketServer extends WebSocketServer {
         selectedStopManager = new com.bookmap.plugin.rong.pricelines.SelectedStopManager(store);
     }
     public void updateSelectedStop(JsonObject stop) {
-        if (selectedStopManager != null) selectedStopManager.update(getString(stop, "symbol"),
-                stop.has("price") ? stop.get("price").getAsDouble() : 0);
+        String symbol = getString(stop, "symbol");
+        double price = stop.has("price") ? stop.get("price").getAsDouble() : 0;
+        int remainingSeconds = stop.has("remainingSeconds") ? stop.get("remainingSeconds").getAsInt() : 0;
+        if (selectedStopManager != null) selectedStopManager.update(symbol, price, remainingSeconds);
+        ActionLogWindow.updateSelectedStop(symbol, price, remainingSeconds);
     }
     private final HotkeyRiskSelection hotkeyRiskSelection = new HotkeyRiskSelection();
 

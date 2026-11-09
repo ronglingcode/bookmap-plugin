@@ -41,6 +41,8 @@ public class ActionLogWindow {
     private static Object session;
     private static JFrame frame;
     private static JLabel highlightedSymbolLabel;
+    private static JLabel hoveredPriceLabel;
+    private static JLabel selectedStopLabel;
     private static JLabel accountStatusLabel;
     private static JLabel positionStatusLabel;
     private static JLabel orderStatusLabel;
@@ -51,6 +53,9 @@ public class ActionLogWindow {
     private static String persistenceStatus = "Local logs: starting";
     private static volatile String highlightedSymbol = "";
     private static Double hoveredPrice;
+    private static String selectedStopSymbol = "";
+    private static double selectedStopPrice;
+    private static int selectedStopSeconds;
 
     private ActionLogWindow() {}
 
@@ -119,11 +124,23 @@ public class ActionLogWindow {
         });
     }
 
+    public static void updateSelectedStop(String symbol, double price, int remainingSeconds) {
+        invokeWhenActive(() -> {
+            selectedStopSymbol = symbol == null ? "" : symbol.trim();
+            selectedStopPrice = price;
+            selectedStopSeconds = remainingSeconds;
+            renderHighlightedSymbol();
+        });
+    }
+
     public static synchronized void dispose() {
         session = null;
         SwingUtilities.invokeLater(() -> {
             highlightedSymbol = "";
             hoveredPrice = null;
+            selectedStopSymbol = "";
+            selectedStopPrice = 0;
+            selectedStopSeconds = 0;
             persistenceStatus = "Local logs: starting";
             lines.clear();
             accountStates.clear();
@@ -131,6 +148,8 @@ public class ActionLogWindow {
                 frame.dispose();
                 frame = null;
                 highlightedSymbolLabel = null;
+                hoveredPriceLabel = null;
+                selectedStopLabel = null;
                 accountStatusLabel = null;
                 positionStatusLabel = null;
                 orderStatusLabel = null;
@@ -167,6 +186,8 @@ public class ActionLogWindow {
         highlightedSymbolLabel = new JLabel();
         highlightedSymbolLabel.setFont(
                 highlightedSymbolLabel.getFont().deriveFont(Font.BOLD));
+        hoveredPriceLabel = new JLabel();
+        selectedStopLabel = new JLabel();
         accountStatusLabel = new JLabel(VerticalWindowLayout.wrapText("Account: waiting for ViteApp", CONTENT_WIDTH));
         positionStatusLabel = new JLabel("Positions (0)");
         orderStatusLabel = new JLabel("0 exit pair(s)");
@@ -178,7 +199,11 @@ public class ActionLogWindow {
         JPanel accountPanel = new JPanel(new BorderLayout(0, 6));
         accountPanel.setBorder(BorderFactory.createEmptyBorder(8, 8, 4, 8));
         JPanel statusPanel = new JPanel(new BorderLayout(0, 4));
-        statusPanel.add(highlightedSymbolLabel, BorderLayout.NORTH);
+        JPanel chartStatusPanel = new JPanel(new GridLayout(3, 1, 0, 2));
+        chartStatusPanel.add(highlightedSymbolLabel);
+        chartStatusPanel.add(hoveredPriceLabel);
+        chartStatusPanel.add(selectedStopLabel);
+        statusPanel.add(chartStatusPanel, BorderLayout.NORTH);
         statusPanel.add(accountStatusLabel, BorderLayout.CENTER);
         JPanel headerPanel = new JPanel(new BorderLayout(0, 6));
         headerPanel.add(statusPanel, BorderLayout.CENTER);
@@ -218,10 +243,17 @@ public class ActionLogWindow {
         if (highlightedSymbolLabel == null) {
             return;
         }
-        String text = "Highlighted chart: " + (highlightedSymbol.isEmpty() ? "unknown" : highlightedSymbol)
-                + " | Hover: " + (hoveredPrice != null && Double.isFinite(hoveredPrice) && hoveredPrice > 0
-                        ? String.format(java.util.Locale.ROOT, "%.2f", hoveredPrice) : "n/a");
-        if (!text.equals(highlightedSymbolLabel.getText())) highlightedSymbolLabel.setText(text);
+        setLabelText(highlightedSymbolLabel, "Symbol: " + (highlightedSymbol.isEmpty() ? "unknown" : highlightedSymbol));
+        setLabelText(hoveredPriceLabel, "Hover: " + (hoveredPrice != null && Double.isFinite(hoveredPrice) && hoveredPrice > 0
+                ? String.format(java.util.Locale.ROOT, "%.2f", hoveredPrice) : "n/a"));
+        boolean hasStop = !highlightedSymbol.isEmpty() && highlightedSymbol.equals(selectedStopSymbol)
+                && Double.isFinite(selectedStopPrice) && selectedStopPrice > 0 && selectedStopSeconds > 0;
+        setLabelText(selectedStopLabel, "Stop: " + (hasStop
+                ? String.format(java.util.Locale.ROOT, "%.2f (%d)", selectedStopPrice, selectedStopSeconds) : "n/a"));
+    }
+
+    private static void setLabelText(JLabel label, String text) {
+        if (!text.equals(label.getText())) label.setText(text);
     }
 
     private static DefaultTableModel createTableModel(String[] columns) {

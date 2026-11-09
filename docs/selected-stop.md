@@ -25,8 +25,11 @@ Z-selected stop and does not change the hotkey risk/share preference.
 
 Hover the desired stop price on the Bookmap chart, press **Z**, then use your
 normal entry button or hotkey within **30 seconds**. A thin solid line labeled
-**Stop** shows the selected price. No stop information is added to the floating
-panel. Modifier keys do not change Z's behavior.
+**Stop {price} ({seconds remaining})** counts down from 30, updating once per
+displayed second. It disappears on expiry or consumption. The floating Logs panel shows
+the highlighted symbol, hover price and selected stop on three separate lines. The stop
+includes the same countdown and shows `n/a` when no selection is active for that symbol.
+Modifier keys do not change Z's behavior.
 
 The selection is local, single-use and symbol-specific. It disappears when an
 entry attempt consumes it, 30 seconds elapse, the highlighted chart symbol

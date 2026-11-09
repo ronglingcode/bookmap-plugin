@@ -39,9 +39,11 @@ public final class SelectedStop {
         return new Claim(result, selectedAt);
     }
     public synchronized JsonObject view() {
-        if (!fresh()) clear();
+        long remaining = LIFETIME_NS - (clock.getAsLong() - selectedAt);
+        if (remaining <= 0 || remaining > LIFETIME_NS) clear();
         JsonObject result = new JsonObject();
         result.addProperty("symbol", symbol); result.addProperty("price", price);
+        result.addProperty("remainingSeconds", price > 0 ? (remaining + 999_999_999L) / 1_000_000_000L : 0);
         return result;
     }
 }
