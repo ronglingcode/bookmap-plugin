@@ -27,7 +27,7 @@ The earlier flag-based rollout is historical; this document supersedes it.
 | Top-row digits | While flat with no exit pairs, 1–5 select the corresponding configured fixed-share button and enter at market with hover as stop. Pending entries block this shortcut. While held/with exit pairs, keep existing stop/limit adjustment behavior; Digit1 uses the first smallest pair, remaining digits are positional. |
 | G / H / T | Move half / half / all exit pairs at hover price; Shift+G/H markets out the first half, rounding pair count up. |
 | P / Reset Targets | Cancel current exit legs and rebuild captured profit targets with the captured stop. Reverse target order as in the browser, cap to actual remaining position and reject insufficient captured coverage. If capture, targets or stop are missing, use the day low for longs/day high for shorts and 2R from current price, splitting remaining shares across the normal batch count. Validate fallback prices before canceling exits. |
-| Z | Select a single-use stop at hover price for the next entry; expires after five seconds. Draws a thin Stop line and never changes working stops. |
+| Z | Select a single-use stop at hover price for the next entry; expires after 30 seconds. Draws a thin Stop line and never changes working stops. |
 | Space | Clear manual entry and stop prices; preserve fixed quantity, matching browser price-line clearing. |
 | Entry Inputs dialog | Set custom entry and fixed share quantity locally. Every opening action requires a fresh stop selected with Z. |
 | Update Plan / third-partial reminder | Edit and persist active core target/count locally, with success/error feedback. |

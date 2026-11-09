@@ -15,7 +15,7 @@ public final class SelectedStop {
             Models.require(age >= 0 && age < LIFETIME_NS, "Selected stop expired before submission; hover + Z again");
         }
     }
-    public static final long LIFETIME_NS = 5_000_000_000L;
+    public static final long LIFETIME_NS = 30_000_000_000L;
     private final LongSupplier clock;
     private String symbol = "";
     private double price;
@@ -35,7 +35,7 @@ public final class SelectedStop {
         boolean valid = fresh() && this.symbol.equals(symbol);
         double result = price;
         clear();
-        Models.require(valid, "Select stop: hover + Z (valid for 5 seconds, one entry)");
+        Models.require(valid, "Select stop: hover + Z (valid for 30 seconds, one entry)");
         return new Claim(result, selectedAt);
     }
     public synchronized JsonObject view() {

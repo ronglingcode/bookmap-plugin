@@ -24,12 +24,12 @@ Z-selected stop and does not change the hotkey risk/share preference.
 ## Existing Z workflow
 
 Hover the desired stop price on the Bookmap chart, press **Z**, then use your
-normal entry button or hotkey within **five seconds**. A thin solid line labeled
+normal entry button or hotkey within **30 seconds**. A thin solid line labeled
 **Stop** shows the selected price. No stop information is added to the floating
 panel. Modifier keys do not change Z's behavior.
 
 The selection is local, single-use and symbol-specific. It disappears when an
-entry attempt consumes it, five seconds elapse, the highlighted chart symbol
+entry attempt consumes it, 30 seconds elapse, the highlighted chart symbol
 changes, Space or Cancel Entry is pressed, or native trading restarts. Rejected
 entry attempts also require a fresh selection. Repeated entry presses cannot
 reuse one selection. Missing, expired and wrong-side stops block entry before

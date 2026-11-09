@@ -42,7 +42,7 @@ is blocked at startup and during entry validation.
   fixed-share button and the hovered price as stop, in one action. Held-position
   number keys still adjust exits; adds continue to use Z.
 - Every opening action requires a fresh human-selected stop: hover + Z, then
-  enter within five seconds. One thin chart line; each selection is single-use.
+  enter within 30 seconds. One thin chart line; each selection is single-use.
   [Selected-stop flow](docs/selected-stop.md).
 - Native wall-reversal market/breakout entries, same-direction adds, pending-entry
   replacements, opposite-position entries, partial reload and Swap.
