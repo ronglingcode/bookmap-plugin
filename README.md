@@ -4,13 +4,12 @@ bmtrader is a standalone Bookmap addon for Schwab equity trading. It reads Massi
 market data and Firestore configuration/state directly, refreshes local Schwab
 credentials, and executes trades without ViteApp or ProxyServer running.
 
-SignalComposer owns the Bookmap pattern pipeline and produces advisory LONG/SHORT markers
-and developing confirmation context. All detected patterns pass through it; the older
-wall-break checkbox and scored pattern automation have been removed. Cairo consumes
-aggregate pattern/composition snapshots from this pipeline. See the
-[operator guide](docs/signal-composer.md), [configuration template](config/signal-composer.template.json),
-and [Cairo bridge guide](docs/cairo-evidence.md). Existing `observerOnly` replay mode
-exposes these settings without credentials or native trading.
+Dedicated pattern detectors emit timestamped observations for future AI consumers.
+The event-only feed includes pattern evidence, revisions, readiness and liquidity;
+Signal Composer, advisory LONG/SHORT composition and its UI have been removed.
+See the [pattern-event guide](docs/pattern-events.md),
+[detector configuration](config/pattern-observation.template.json), and
+[Cairo event contract](docs/cairo-evidence.md).
 
 ## Setup
 

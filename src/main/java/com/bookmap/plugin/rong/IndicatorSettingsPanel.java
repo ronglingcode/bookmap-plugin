@@ -14,7 +14,6 @@ import javax.swing.SwingUtilities;
 import javax.swing.SpinnerNumberModel;
 
 import velox.gui.StrategyPanel;
-import com.bookmap.plugin.rong.signal.SignalComposerConfig;
 
 /**
  * Settings panel for enabling/disabling automatic indicators.
@@ -27,14 +26,10 @@ public class IndicatorSettingsPanel extends StrategyPanel {
 
     public IndicatorSettingsPanel(IndicatorConfig config, WallThresholdConfig wallThresholdConfig,
             NativeConnectionStatus connectionStatus) {
-        this(config, wallThresholdConfig, connectionStatus, SignalComposerConfig.defaults());
+        this(config, wallThresholdConfig, connectionStatus, false);
     }
     public IndicatorSettingsPanel(IndicatorConfig config, WallThresholdConfig wallThresholdConfig,
-            NativeConnectionStatus connectionStatus, SignalComposerConfig composerRules) {
-        this(config, wallThresholdConfig, connectionStatus, composerRules, false);
-    }
-    public IndicatorSettingsPanel(IndicatorConfig config, WallThresholdConfig wallThresholdConfig,
-            NativeConnectionStatus connectionStatus, SignalComposerConfig composerRules, boolean observerOnly) {
+            NativeConnectionStatus connectionStatus, boolean observerOnly) {
         super("Indicators");
         setLayout(new GridBagLayout());
 
@@ -113,16 +108,6 @@ public class IndicatorSettingsPanel extends StrategyPanel {
         wallChangeSoundCheckbox.addActionListener(e ->
                 config.setEnabled(IndicatorConfig.ORDER_WALL_CHANGE_SOUND, wallChangeSoundCheckbox.isSelected()));
         add(wallChangeSoundCheckbox, gbc);
-
-        gbc.gridy++;
-        JCheckBox composerCheckbox = new JCheckBox("SignalComposer (advisory)",
-                composerRules.valid && config.isEnabled(IndicatorConfig.SIGNAL_COMPOSER));
-        composerCheckbox.setEnabled(composerRules.valid);
-        composerCheckbox.setToolTipText(composerRules.valid
-                ? "Shared advisory switch for eligible charts. Rules reload after all attachments stop and reattach."
-                : composerRules.error);
-        composerCheckbox.addActionListener(e -> config.setEnabled(IndicatorConfig.SIGNAL_COMPOSER, composerCheckbox.isSelected()));
-        add(composerCheckbox, gbc);
 
         gbc.gridy++;
         add(new JLabel("<html>Wall labels / liquidity / False Breakout bids: fixed 5K<br>Entry / alerts / False Breakout offers / Reclaim bids: premarket volume (2K / 5K / 10K / 15K / 20K; fallback 5K)</html>"), gbc);

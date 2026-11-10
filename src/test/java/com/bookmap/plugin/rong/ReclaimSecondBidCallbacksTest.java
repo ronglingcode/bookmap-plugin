@@ -1,7 +1,7 @@
 package com.bookmap.plugin.rong;
 
 import static org.junit.jupiter.api.Assertions.*;
-import static com.bookmap.plugin.rong.SignalComposerActivationTest.*;
+import static com.bookmap.plugin.rong.PatternObservationActivationTest.*;
 import com.bookmap.plugin.rong.patterns.ReclaimSecondBidMonitor;
 import com.bookmap.plugin.rong.patterns.ReclaimSecondBidPainter;
 import java.time.Instant;
@@ -10,7 +10,7 @@ import org.junit.jupiter.api.Test;
 class ReclaimSecondBidCallbacksTest {
     @Test void replaySellingAtBidTracksPartialFillsAndQuotesAboveBothKeepTracking() throws Exception {
         withIsolatedActivation(() -> {
-            RongPlugin plugin = SignalComposerCallbacksTest.callbackPlugin();
+            RongPlugin plugin = PatternEventCallbacksTest.callbackPlugin();
             ReclaimSecondBidMonitor monitor = new ReclaimSecondBidMonitor(); monitor.setEnabled(true);
             ReclaimSecondBidPainter painter = new ReclaimSecondBidPainter(monitor);
             field("reclaimSecondBidMonitor").set(plugin, monitor); field("reclaimSecondBidPainter").set(plugin, painter);

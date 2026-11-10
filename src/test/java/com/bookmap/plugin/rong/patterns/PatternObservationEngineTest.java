@@ -5,7 +5,7 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import org.junit.jupiter.api.Test;
-import com.bookmap.plugin.rong.signal.SignalComposerConfig;
+import com.bookmap.plugin.rong.patterns.PatternObservationConfig;
 
 class PatternObservationEngineTest {
     @Test void bidWithdrawalIsTrackedAtInclusiveThreeThousandFloorButNotBelowIt() {
@@ -61,7 +61,7 @@ class PatternObservationEngineTest {
     static final PatternEvent.TimestampProvenance MARKET = PatternEvent.TimestampProvenance.MARKET;
     static class Fixture {
         final List<PatternEvent> events = new ArrayList<>();
-        final PatternObservationEngine engine = new PatternObservationEngine("TEST", .01, SignalComposerConfig.defaults(),
+        final PatternObservationEngine engine = new PatternObservationEngine("TEST", .01, PatternObservationConfig.defaults(),
                 events::add, (reason, epoch) -> {}, diagnostic -> {});
         Fixture() { this(false); }
         Fixture(boolean seedRange) {

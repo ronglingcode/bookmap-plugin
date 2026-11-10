@@ -2,12 +2,12 @@ package com.bookmap.plugin.rong.patterns;
 
 import static org.junit.jupiter.api.Assertions.*;
 import org.junit.jupiter.api.Test;
-import com.bookmap.plugin.rong.signal.SignalComposerConfig;
+import com.bookmap.plugin.rong.patterns.PatternObservationConfig;
 import com.google.gson.JsonParser;
 
 class EventTimeWallTrackerTest {
     @Test void stableClearUsesImmediatelyPreviousSizeAndInclusiveDecisionTime() {
-        EventTimeWallTracker t = new EventTimeWallTracker(1, SignalComposerConfig.defaults());
+        EventTimeWallTracker t = new EventTimeWallTracker(1, PatternObservationConfig.defaults());
         t.onDepth(true, 5100, 10000, 1); t.onTime(500_000_001L);
         t.onDepth(true, 5100, 6000, 600_000_001L);
         assertTrue(t.onDepth(true, 5100, 600, 700_000_001L).clears.isEmpty());
@@ -18,7 +18,7 @@ class EventTimeWallTrackerTest {
         assertNull(t.active(true, 5100)); assertTrue(t.onTime(1_300_000_001L).clears.isEmpty());
     }
     @Test void reloadCancelsClearAndFreshLossRestartsDecisionInterval() {
-        EventTimeWallTracker t = new EventTimeWallTracker(1, SignalComposerConfig.defaults());
+        EventTimeWallTracker t = new EventTimeWallTracker(1, PatternObservationConfig.defaults());
         t.onDepth(false, 5120, 3000, 1); t.onTime(500_000_001L);
         t.onDepth(false, 5120, 0, 600_000_001L);
         assertEquals(1, t.onDepth(false, 5120, 3000, 700_000_001L).diagnostics.size());
@@ -27,7 +27,7 @@ class EventTimeWallTrackerTest {
         assertEquals(3000, t.onTime(1_800_000_001L).clears.get(0).removedSize);
     }
     @Test void independentThreeThousandFloorQualifiesAfterInclusiveLifetime() {
-        EventTimeWallTracker t = new EventTimeWallTracker(1, SignalComposerConfig.defaults());
+        EventTimeWallTracker t = new EventTimeWallTracker(1, PatternObservationConfig.defaults());
         t.onDepth(true, 5100, 3000, 1);
         assertTrue(t.onTime(500_000_000L).qualified.isEmpty());
         assertEquals(3000, t.onTime(500_000_001L).qualified.get(0).size);
@@ -36,14 +36,14 @@ class EventTimeWallTrackerTest {
         assertEquals(id, t.active(true, 5100).phaseId);
     }
     @Test void flashWallsAreRemovedAndSnapshotSeedingIsNotImmediateQualification() {
-        EventTimeWallTracker t = new EventTimeWallTracker(1, SignalComposerConfig.defaults());
+        EventTimeWallTracker t = new EventTimeWallTracker(1, PatternObservationConfig.defaults());
         t.seed(false, 5120, 60000, 1); assertFalse(t.active(false, 5120).qualified);
         t.onDepth(false, 5120, 0, 100_000_001L);
         assertTrue(t.onTime(600_000_001L).qualified.isEmpty()); assertNull(t.active(false, 5120));
         t.seed(false, 5120, 60000, 700_000_001L); assertEquals(1, t.onTime(1_200_000_001L).qualified.size());
     }
     @Test void capAndResetAreExplicitAndBounded() {
-        SignalComposerConfig c = SignalComposerConfig.parse(JsonParser.parseString("{\"maxWallPhases\":1}").getAsJsonObject());
+        PatternObservationConfig c = PatternObservationConfig.parse(JsonParser.parseString("{\"maxWallPhases\":1}").getAsJsonObject());
         EventTimeWallTracker t = new EventTimeWallTracker(1, c);
         t.onDepth(true, 5100, 3000, 1);
         assertEquals(1, t.onDepth(false, 5120, 3000, 2).diagnostics.size());

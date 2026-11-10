@@ -5,6 +5,7 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Objects;
 import com.bookmap.plugin.rong.BookmapPriceNormalizer;
+import com.google.gson.annotations.SerializedName;
 
 /** Immutable semantic observation. Occurrence time and detection time are distinct. */
 public final class PatternEvent {
@@ -97,19 +98,46 @@ public final class PatternEvent {
 
     /** Typed rule evidence; supplemental strings are diagnostic only. */
     public static final class Evidence {
-        public final String wallPhaseId;
-        public final long previousSize, currentSize, removedSize, attributedTradeSize;
-        public final long growthBaselineSize, approachTimeNs, rejectionTimeNs;
-        public final Boolean buyAggressor;
-        public final Attribution attribution;
-        public final Coverage coverage;
-        public final Map<String, String> metadata;
+        @SerializedName("wallPhaseId") public final String wallPhaseId;
+        @SerializedName("previousSize") public final long previousSize;
+        @SerializedName("currentSize") public final long currentSize;
+        @SerializedName("removedSize") public final long removedSize;
+        @SerializedName("attributedTradeSize") public final long attributedTradeSize;
+        @SerializedName("growthBaselineSize") public final long growthBaselineSize;
+        @SerializedName("approachTimeNs") public final long approachTimeNs;
+        @SerializedName("rejectionTimeNs") public final long rejectionTimeNs;
+        @SerializedName("growthStartNs") public final long growthStartNs;
+        @SerializedName("growthEndNs") public final long growthEndNs;
+        @SerializedName("growthDurationNs") public final long growthDurationNs;
+        @SerializedName("addedSize") public final long addedSize;
+        @SerializedName("growthRatio") public final double growthRatio;
+        @SerializedName("growthIncreaseCount") public final int growthIncreaseCount;
+        @SerializedName("growthMaxGapNs") public final long growthMaxGapNs;
+        @SerializedName("growthLargestStepSize") public final long growthLargestStepSize;
+        @SerializedName("buyAggressor") public final Boolean buyAggressor;
+        @SerializedName("attribution") public final Attribution attribution;
+        @SerializedName("coverage") public final Coverage coverage;
+        @SerializedName("metadata") public final Map<String, String> metadata;
 
         private Evidence(EvidenceBuilder b) {
             if (b.previousSize < 0 || b.currentSize < 0 || b.attributedTradeSize < 0
                     || b.growthBaselineSize < 0 || b.approachTimeNs < 0 || b.rejectionTimeNs < 0) {
                 throw new IllegalArgumentException("Evidence quantities and times cannot be negative");
             }
+            if (b.growthStartNs < 0 || b.growthEndNs < b.growthStartNs
+                    || (b.growthStartNs == 0) != (b.growthEndNs == 0)
+                    || b.growthStartNs > 0 && (b.growthBaselineSize <= 0 || b.currentSize < b.growthBaselineSize)) {
+                throw new IllegalArgumentException("Growth evidence requires an ordered interval and positive baseline");
+            }
+            if (b.growthIncreaseCount < 0 || b.growthMaxGapNs < 0 || b.growthLargestStepSize < 0) {
+                throw new IllegalArgumentException("Growth sequence evidence cannot be negative");
+            }
+            growthIncreaseCount = b.growthIncreaseCount; growthMaxGapNs = b.growthMaxGapNs;
+            growthLargestStepSize = b.growthLargestStepSize;
+            growthStartNs = b.growthStartNs; growthEndNs = b.growthEndNs;
+            growthDurationNs = growthEndNs - growthStartNs;
+            addedSize = b.growthStartNs > 0 ? b.currentSize - b.growthBaselineSize : 0;
+            growthRatio = b.growthStartNs > 0 ? (double)addedSize / b.growthBaselineSize : 0;
             wallPhaseId = Objects.requireNonNull(b.wallPhaseId);
             previousSize = b.previousSize; currentSize = b.currentSize;
             removedSize = Math.max(0, previousSize - currentSize);
@@ -129,6 +157,8 @@ public final class PatternEvent {
     public static final class EvidenceBuilder {
         private String wallPhaseId = "";
         private long previousSize, currentSize, attributedTradeSize, growthBaselineSize, approachTimeNs, rejectionTimeNs;
+        private long growthStartNs, growthEndNs, growthMaxGapNs, growthLargestStepSize;
+        private int growthIncreaseCount;
         private Boolean buyAggressor;
         private Attribution attribution = Attribution.UNKNOWN;
         private Coverage coverage = Coverage.WARMUP;
@@ -137,6 +167,12 @@ public final class PatternEvent {
         public EvidenceBuilder trades(long size, Boolean buy) { attributedTradeSize = size; buyAggressor = buy; return this; }
         public EvidenceBuilder attribution(Attribution value, Coverage status) { attribution = value; coverage = status; return this; }
         public EvidenceBuilder interaction(long baseline, long approachNs, long rejectionNs) { growthBaselineSize = baseline; approachTimeNs = approachNs; rejectionTimeNs = rejectionNs; return this; }
+        public EvidenceBuilder growth(long baseline, long startNs, long endNs) {
+            growthBaselineSize = baseline; growthStartNs = startNs; growthEndNs = endNs; return this;
+        }
+        public EvidenceBuilder growthSequence(int count, long maxGapNs, long largestStepSize) {
+            growthIncreaseCount = count; growthMaxGapNs = maxGapNs; growthLargestStepSize = largestStepSize; return this;
+        }
         public EvidenceBuilder metadata(Map<String, String> value) { metadata = value; return this; }
         public Evidence build() { return new Evidence(this); }
     }

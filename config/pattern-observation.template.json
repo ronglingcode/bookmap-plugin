@@ -1,0 +1,30 @@
+{
+  "enabled": true,
+  "symbols": [],
+  "maxWallPhases": 4096,
+  "maxAttributionTrades": 8192,
+  "detectors": {
+    "wallLifetimeMs": 500,
+    "clearRemainingRatio": 0.1,
+    "clearDecisionMs": 500,
+    "attributionLookbackMs": 2000,
+    "consumptionRatio": 0.7,
+    "withdrawalMaxTradeRatio": 0.1,
+    "movePairWindowMs": 500,
+    "moveSizeToleranceRatio": 0.1,
+    "holdApproachRatio": 0.0005,
+    "holdRetreatRatio": 0.001,
+    "holdConfirmationMs": 500,
+    "interactionWindowMs": 15000,
+    "growthRatio": 0.25,
+    "breakoutDistanceTicks": 1,
+    "breakoutWindowMs": 3000,
+    "fastGrowthRatio": 0.5,
+    "fastGrowthMinIncrease": 5000,
+    "fastGrowthWindowMs": 5000,
+    "fastGrowthMinDurationMs": 2000,
+    "fastGrowthMaxGapMs": 500,
+    "fastGrowthMinUpdates": 5,
+    "fastGrowthMaxSingleStepRatio": 0.8
+  }
+}

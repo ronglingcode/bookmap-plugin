@@ -6,7 +6,7 @@ import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.function.Consumer;
-import com.bookmap.plugin.rong.signal.SignalComposerConfig;
+import com.bookmap.plugin.rong.patterns.PatternObservationConfig;
 
 /** Symmetric percentage-based wall tests; offer growth and consumed breakouts stay distinct. */
 public final class WallInteractionDetector {
@@ -20,7 +20,7 @@ public final class WallInteractionDetector {
         int growthRevision, holdRevision;
         String interactionId;
         boolean completed, broken, away, composite;
-        Interaction(EventTimeWallTracker.Wall wall, SignalComposerConfig config) {
+        Interaction(EventTimeWallTracker.Wall wall, PatternObservationConfig config) {
             phaseId = wall.phaseId; price = wall.priceTick; baselineSize = lastSize = wall.size;
             // Convert percentages to the natural trade grid once, without any fixed tick minimum.
             BigDecimal wallPrice = BigDecimal.valueOf(price);
@@ -34,12 +34,12 @@ public final class WallInteractionDetector {
     private final boolean bid;
     private final String alias;
     private final double pips;
-    private final SignalComposerConfig config;
+    private final PatternObservationConfig config;
     private final EventTimeWallTracker walls;
     private final Consumer<PatternEvent> output;
     private final Map<String, Interaction> interactions = new LinkedHashMap<>();
     private int lastTrade, bestBid, bestAsk;
-    public WallInteractionDetector(boolean bid, String alias, double pips, SignalComposerConfig config,
+    public WallInteractionDetector(boolean bid, String alias, double pips, PatternObservationConfig config,
             EventTimeWallTracker walls, Consumer<PatternEvent> output) {
         this.bid = bid; this.alias = alias; this.pips = pips; this.config = config;
         this.walls = walls; this.output = output;

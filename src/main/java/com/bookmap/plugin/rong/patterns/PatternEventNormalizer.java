@@ -2,7 +2,7 @@ package com.bookmap.plugin.rong.patterns;
 
 import java.util.LinkedHashMap;
 import java.util.Map;
-import com.bookmap.plugin.rong.signal.SignalComposerConfig;
+import com.bookmap.plugin.rong.patterns.PatternObservationConfig;
 
 /** Converts observations only; no legacy scoring or trade eligibility is consulted. */
 public final class PatternEventNormalizer {
@@ -12,10 +12,10 @@ public final class PatternEventNormalizer {
     }
     private final String alias;
     private final double pips;
-    private final SignalComposerConfig config;
+    private final PatternObservationConfig config;
     private final Map<String, Episode> episodes = new LinkedHashMap<>();
     private boolean overflowed;
-    public PatternEventNormalizer(String alias, double pips, SignalComposerConfig config) {
+    public PatternEventNormalizer(String alias, double pips, PatternObservationConfig config) {
         this.alias = alias; this.pips = pips; this.config = config;
     }
     PatternEvent normalize(PatternCandidate candidate, EventTimeWallTracker tracker, long epoch, long observedNs) {
@@ -24,7 +24,7 @@ public final class PatternEventNormalizer {
         if (current == null || !current.qualified || current.size < type.minimumTrackedSize()
                 || !current.phaseId.equals(candidate.triggerWall.phaseId)) return null;
         Episode episode = episodes.computeIfAbsent(candidate.episodeKey, key -> new Episode(candidate.eventTimeNs));
-        while (episodes.size() > config.maxEvents) { episodes.remove(episodes.keySet().iterator().next()); overflowed = true; }
+        while (episodes.size() > config.maxEpisodes) { episodes.remove(episodes.keySet().iterator().next()); overflowed = true; }
         return PatternEvent.builder(alias, epoch, type, current.phaseId).episodeKey(candidate.episodeKey)
                 .revision(++episode.revision).size(current.size, PatternEvent.SizeBasis.DISPLAYED_WALL)
                 .price(current.priceTick, pips).times(episode.occurrenceNs, observedNs)

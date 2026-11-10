@@ -19,7 +19,6 @@ public class IndicatorConfig {
      * The stored key is retained for compatibility with the previous enable/disable setting.
      */
     public static final String FILLED_EXECUTION_MARKERS = "filled_execution_markers";
-    public static final String SIGNAL_COMPOSER = "signal_composer";
     public static final String VWAP = "vwap";
     public static final String TRADING_NOTIFICATION_SOUND = "trading_notification_sound";
 
@@ -41,7 +40,6 @@ public class IndicatorConfig {
         enabled.put(ORDER_WALL_CHANGE_SOUND, true);
         enabled.put(FIRE_KEYBOARD_EVENT, true);
         enabled.put(FILLED_EXECUTION_MARKERS, true);
-        enabled.put(SIGNAL_COMPOSER, true);
         enabled.put(VWAP, true);
         enabled.put(TRADING_NOTIFICATION_SOUND, true);
     }

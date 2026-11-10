@@ -4,7 +4,7 @@ import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
 import java.util.function.Consumer;
-import com.bookmap.plugin.rong.signal.SignalComposerConfig;
+import com.bookmap.plugin.rong.patterns.PatternObservationConfig;
 
 /** One consumed-wall break rule, mirrored for bids and offers. */
 public final class WallBreakDetector {
@@ -18,11 +18,11 @@ public final class WallBreakDetector {
     }
     private final String alias;
     private final double pips;
-    private final SignalComposerConfig config;
+    private final PatternObservationConfig config;
     private final EventTimeTradeAttribution trades;
     private final Consumer<PatternEvent> output;
     private final List<Pending> pending = new ArrayList<>();
-    public WallBreakDetector(String alias, double pips, SignalComposerConfig config,
+    public WallBreakDetector(String alias, double pips, PatternObservationConfig config,
             EventTimeTradeAttribution trades, Consumer<PatternEvent> output) {
         this.alias = alias; this.pips = pips; this.config = config; this.trades = trades; this.output = output;
     }

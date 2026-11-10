@@ -2,7 +2,7 @@ package com.bookmap.plugin.rong.patterns;
 
 import java.util.ArrayDeque;
 import java.util.Deque;
-import com.bookmap.plugin.rong.signal.SignalComposerConfig;
+import com.bookmap.plugin.rong.patterns.PatternObservationConfig;
 
 /** Bounded callback-volume evidence. Unknown aggressor and lost coverage are explicit. */
 public final class EventTimeTradeAttribution {
@@ -32,12 +32,12 @@ public final class EventTimeTradeAttribution {
                     .trades(matchingVolume, !clear.bid).attribution(effectiveAttribution, effectiveCoverage).build();
         }
     }
-    private final SignalComposerConfig config;
+    private final PatternObservationConfig config;
     private final Deque<Trade> trades = new ArrayDeque<>();
     private long coverageStartNs, lostThroughNs, now;
     private long retainedFromNs;
     private boolean overflowed;
-    public EventTimeTradeAttribution(SignalComposerConfig config) { this.config = config; }
+    public EventTimeTradeAttribution(PatternObservationConfig config) { this.config = config; }
     public void markReady(long timeNs) {
         if (timeNs <= 0) throw new IllegalArgumentException("Market timestamp required");
         trades.clear(); coverageStartNs = retainedFromNs = timeNs; lostThroughNs = 0; now = timeNs; overflowed = false;

@@ -28,7 +28,6 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.IntSupplier;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
-import com.bookmap.plugin.rong.signal.SignalComposerInspection;
 
 import javax.swing.BorderFactory;
 import javax.swing.BoxLayout;
@@ -105,8 +104,6 @@ public class TradeButtonWindow {
     private JLabel massiveHistoryStatusLabel;
     private JLabel massiveStreamStatusLabel;
     private Timer wallThresholdTimer;
-    private final Supplier<SignalComposerInspection> composerInspectionSupplier;
-    private SignalComposerStatePanel composerInspectionPanel;
     private volatile CorePlanConfigDefinition corePlanConfig;
     private JDialog corePlanDialog;
     private JTextField coreTargetField;
@@ -126,15 +123,7 @@ public class TradeButtonWindow {
     public TradeButtonWindow(String symbol, SignalWebSocketServer server,
                              IntSupplier wallThresholdFloorSupplier,
                              NativeConnectionStatus connectionStatus) {
-        this(symbol, server, wallThresholdFloorSupplier, connectionStatus, null);
-    }
-
-    public TradeButtonWindow(String symbol, SignalWebSocketServer server,
-                             IntSupplier wallThresholdFloorSupplier,
-                             NativeConnectionStatus connectionStatus,
-                             Supplier<SignalComposerInspection> composerInspectionSupplier) {
         this.symbol = symbol;
-        this.composerInspectionSupplier = composerInspectionSupplier;
         this.server = server;
         this.wallThresholdFloorSupplier = wallThresholdFloorSupplier == null
                 ? () -> WallThresholdConfig.DEFAULT_THRESHOLD_FLOOR
@@ -468,7 +457,6 @@ public class TradeButtonWindow {
             waitingLabel.setAlignmentX(Component.LEFT_ALIGNMENT);
             buttonPanel.add(waitingLabel);
         }
-        if (composerInspectionSupplier != null) addFullWidth(createComposerInspectionPanel());
         buttonPanel.revalidate();
         buttonPanel.repaint();
         if (frame != null) {
@@ -485,15 +473,6 @@ public class TradeButtonWindow {
         row.setAlignmentX(Component.LEFT_ALIGNMENT);
         row.add(panel, BorderLayout.CENTER);
         buttonPanel.add(row);
-    }
-
-    private JPanel createComposerInspectionPanel() {
-        composerInspectionPanel = new SignalComposerStatePanel(composerInspectionSupplier);
-        return composerInspectionPanel;
-    }
-
-    private void updateComposerInspection() {
-        if (!disposed && composerInspectionPanel != null) composerInspectionPanel.refresh();
     }
 
     private JPanel createHotkeyPanel() {
@@ -875,7 +854,6 @@ public class TradeButtonWindow {
         }
         wallThresholdTimer = new Timer(WALL_THRESHOLD_REFRESH_MS, e -> {
             updateWallThresholdLabel();
-            updateComposerInspection();
         });
         wallThresholdTimer.setRepeats(true);
         wallThresholdTimer.start();

@@ -2,7 +2,7 @@
 
 Enable it per symbol with `"bookmapPatternsToMonitor": ["falseBreakout"]`.
 An empty or omitted list disables it. Both the Vite socket and native plan loader
-forward the list. It runs independently of SignalComposer and never submits orders.
+forward the list. It runs independently of the pattern-event export pipeline and never submits orders.
 
 The monitor uses Bookmap market timestamps and regular US equity hours
 (09:30 inclusive–16:00 exclusive, America/New_York, weekdays), after initial

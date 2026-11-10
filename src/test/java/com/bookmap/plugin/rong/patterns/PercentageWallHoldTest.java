@@ -6,7 +6,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
 import org.junit.jupiter.api.Test;
-import com.bookmap.plugin.rong.signal.SignalComposerConfig;
+import com.bookmap.plugin.rong.patterns.PatternObservationConfig;
 import com.bookmap.plugin.rong.signal.ResetReason;
 
 class PercentageWallHoldTest {
@@ -17,7 +17,7 @@ class PercentageWallHoldTest {
         final PatternObservationEngine engine;
         HoldFixture(boolean bid, int wall, double tickSize, long size) {
             this.bid = bid; this.wall = wall;
-            engine = new PatternObservationEngine("TEST", tickSize, SignalComposerConfig.defaults(),
+            engine = new PatternObservationEngine("TEST", tickSize, PatternObservationConfig.defaults(),
                     events::add, (reason, epoch) -> {}, diagnostic -> {});
             engine.markReady(); time(0);
             engine.onBbo(wall - 1, wall + 1, BASE, MARKET);

@@ -13,6 +13,8 @@ public enum PatternEventType {
     OFFER_SIZE_INCREASING_HOLD(PatternSide.OFFER, PatternMeaning.OFFER_BEARISH_CONFIRMATION),
     OFFER_BREAKOUT(PatternSide.OFFER, PatternMeaning.OFFER_BULLISH_CONFIRMATION),
     OFFER_SIZE_INCREASE(PatternSide.OFFER, PatternMeaning.UNKNOWN),
+    BID_FAST_GROWTH(PatternSide.BID, PatternMeaning.UNKNOWN),
+    OFFER_FAST_GROWTH(PatternSide.OFFER, PatternMeaning.UNKNOWN),
     UNKNOWN_BID_LOSS(PatternSide.BID, PatternMeaning.UNKNOWN),
     UNKNOWN_OFFER_LOSS(PatternSide.OFFER, PatternMeaning.UNKNOWN);
 

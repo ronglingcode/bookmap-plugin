@@ -1,7 +1,7 @@
 package com.bookmap.plugin.rong;
 
 import static org.junit.jupiter.api.Assertions.*;
-import static com.bookmap.plugin.rong.SignalComposerActivationTest.*;
+import static com.bookmap.plugin.rong.PatternObservationActivationTest.*;
 import com.bookmap.plugin.rong.patterns.*;
 import java.lang.reflect.Method;
 import java.time.Instant;
@@ -10,7 +10,7 @@ import org.junit.jupiter.api.Test;
 class BidBreakdownCallbacksTest {
     @Test void sharedPatternGateAlsoAcceptsRollingFillsWithoutASingleQualifyingWall() throws Exception {
         withIsolatedActivation(() -> {
-            RongPlugin plugin = SignalComposerCallbacksTest.callbackPlugin();
+            RongPlugin plugin = PatternEventCallbacksTest.callbackPlugin();
             SignalWebSocketServer server = new SignalWebSocketServer(0, 0);
             Object previousServer = field("sharedServer").get(null);
             field("sharedServer").set(null, server);
@@ -33,7 +33,7 @@ class BidBreakdownCallbacksTest {
 
     @Test void falseBreakoutGetsLevelOneQuotesAndUsesSharedEntryReclaimRules() throws Exception {
         withIsolatedActivation(() -> {
-            RongPlugin plugin = SignalComposerCallbacksTest.callbackPlugin();
+            RongPlugin plugin = PatternEventCallbacksTest.callbackPlugin();
             FalseBreakoutMonitor monitor = new FalseBreakoutMonitor(); monitor.setEnabled(true);
             FalseBreakoutPainter painter = new FalseBreakoutPainter(monitor);
             field("falseBreakoutMonitor").set(plugin, monitor); field("falseBreakoutPainter").set(plugin, painter);
@@ -55,7 +55,7 @@ class BidBreakdownCallbacksTest {
     }
     @Test void sharedEntryGateRejectsCanceledWallsAndUnlocksOnlyOnAccumulatedExecutions() throws Exception {
         withIsolatedActivation(() -> {
-            RongPlugin plugin = SignalComposerCallbacksTest.callbackPlugin();
+            RongPlugin plugin = PatternEventCallbacksTest.callbackPlugin();
             SignalWebSocketServer server = new SignalWebSocketServer(0, 90);
             Object previousServer = field("sharedServer").get(null);
             field("sharedServer").set(null, server);

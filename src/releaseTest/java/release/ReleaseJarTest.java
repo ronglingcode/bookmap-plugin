@@ -174,52 +174,43 @@ class ReleaseJarTest {
         }
     }
 
-    @Test void advisoryConfigCompositionAndRasterFieldsSurviveObfuscation() throws Exception {
-        String root = "com.bookmap.plugin.rong.", configName = root + "signal.SignalComposerConfig";
+    @Test void detectorConfigAndPatternEventExportSurviveObfuscation() throws Exception {
+        String root = "com.bookmap.plugin.rong.", configName = root + "patterns.PatternObservationConfig";
         Class<?> jsonObject = Class.forName("com.bookmap.plugin.shaded.gson.JsonObject");
         Class<?> parser = Class.forName("com.bookmap.plugin.shaded.gson.JsonParser");
         Object element = parser.getMethod("parseString", String.class).invoke(null,
-                "{\"enabled\":true,\"normalConfirmationSize\":6000,\"symbols\":[\"test\"]}");
+                "{\"enabled\":true,\"maxWallPhases\":6000,\"symbols\":[\"test\"]}");
         Object json = element.getClass().getMethod("getAsJsonObject").invoke(element);
         Object config = mappedMethod(configName, configName + " parse(com.bookmap.plugin.shaded.gson.JsonObject)", jsonObject).invoke(null, json);
-        assertEquals(true, mappedField(configName, "boolean enabled", config));
-        assertEquals(6000L, mappedField(configName, "long normalConfirmationSize", config));
-        assertEquals(1000L, mappedField(configName, "long observationFloorSize", config));
+        assertEquals(true, mappedField(configName, "boolean valid", config));
+        assertEquals(6000, mappedField(configName, "int maxWallPhases", config));
         assertEquals(true, mappedMethod(configName, "boolean eligible(java.lang.String)", String.class).invoke(config, "TEST"));
-        assertEquals(false, mappedMethod(configName, "boolean eligible(java.lang.String)", String.class).invoke(config, "OTHER"));
         Object template = mappedMethod(configName, configName + " load(java.nio.file.Path)", Path.class)
-                .invoke(null, Path.of(System.getProperty("signal.template")));
+                .invoke(null, Path.of(System.getProperty("pattern.template")));
         assertEquals(true, mappedField(configName, "boolean valid", template));
-        assertEquals(true, mappedField(configName, "boolean enabled", template));
-
-        for (String name : List.of("patterns.PatternEventType", "patterns.PatternMeaning", "patterns.PatternSide", "patterns.PatternSizeCategory",
-                "signal.ConfirmationStrength", "signal.SignalState", "signal.ResetReason")) {
-            Class<?> type = mappedClass(root + name);
-            for (Object value : type.getEnumConstants()) assertSame(value, enumValue(root + name, ((Enum<?>)value).name()));
+        for (String name : List.of("patterns.PatternEventType", "patterns.PatternMeaning", "patterns.PatternSide", "patterns.PatternSizeCategory", "signal.ResetReason")) {
+            for (Object value : mappedClass(root + name).getEnumConstants()) assertSame(value, enumValue(root + name, ((Enum<?>)value).name()));
         }
-        String composerName = root + "signal.SignalComposer", eventName = root + "patterns.PatternEvent";
-        Object small = releaseEvent("BIDS_CANCELLED", 1000, 5105, 50, "small");
-        assertEquals("LEAST_SIGNIFICANT", ((Enum<?>)mappedField(eventName, root + "patterns.PatternSizeCategory sizeCategory", small)).name());
-        Object composer = mappedClass(composerName).getConstructor(String.class, long.class, mappedClass(configName)).newInstance("TEST", 1L, config);
-        Method observe = mappedMethod(composerName, root + "signal.CompositionUpdate onPatternEvent(" + eventName + ")", mappedClass(eventName));
-        Object pending = observe.invoke(composer, releaseEvent("BIDS_CANCELLED", 3000, 5105, 100, "bid"));
-        assertTrue(((List<?>)mappedField(root + "signal.CompositionUpdate", "java.util.List signals", pending)).isEmpty());
-        Object update = observe.invoke(composer, releaseEvent("OFFER_BOUNCE", 60000, 5120, 200, "offer"));
-        List<?> signals = (List<?>)mappedField(root + "signal.CompositionUpdate", "java.util.List signals", update);
-        assertEquals(1, signals.size()); Object signal = signals.get(0); String signalName = root + "signal.TradingSignal";
-        assertEquals("SHORT", ((Enum<?>)mappedField(signalName, root + "patterns.Direction direction", signal)).name());
-        String validationName = signalName + "$FirstValidation";
-        Object first = mappedField(signalName, validationName + " firstValidation", signal);
-        assertEquals(3000L, mappedField(validationName, "long appliedTriggerThreshold", first));
-        assertEquals(200L, mappedField(validationName, "long eventTimeNs", first));
-        assertEquals("EXCEPTIONAL", ((Enum<?>)mappedField(validationName, root + "signal.ConfirmationStrength confirmationStrength", first)).name());
-        String explanation = (String)mappedField(signalName, "java.lang.String explanation", signal);
-        assertTrue(explanation.contains("60K")); assertTrue(explanation.contains("AFTER"));
-        String painterName = root + "signal.TradingSignalPainter";
-        java.awt.image.BufferedImage image = (java.awt.image.BufferedImage)mappedMethod(painterName,
-                "java.awt.image.BufferedImage renderBadge(" + signalName + ")", mappedClass(signalName)).invoke(null, signal);
-        assertTrue(image.getWidth() > 100); assertTrue(image.getHeight() > 20);
-        assertEquals(200L, mappedMethod(painterName, "long anchorTimeNs(" + signalName + ")", mappedClass(signalName)).invoke(null, signal));
+        String snapshotName=root+"signal.CairoPatternSnapshot", eventName=root+"patterns.PatternEvent";
+        Object snapshot=mappedClass(snapshotName).getConstructor(String.class,double.class,String.class,String.class)
+                .newInstance("TEST",.01,"replay","test");
+        mappedMethod(snapshotName,"void event("+eventName+")",mappedClass(eventName))
+                .invoke(snapshot,releaseEvent("BIDS_CANCELLED",6000,5105,100,"bid"));
+        for(String type:List.of("BID_FAST_GROWTH","OFFER_FAST_GROWTH")) {
+            mappedMethod(snapshotName,"void event("+eventName+")",mappedClass(eventName))
+                    .invoke(snapshot,releaseEvent(type,334000,17000,100,type));
+        }
+        Object wire=mappedMethod(snapshotName,"com.bookmap.plugin.shaded.gson.JsonObject snapshot(boolean,long,com.bookmap.plugin.shaded.gson.JsonObject,boolean)",
+                boolean.class,long.class,jsonObject,boolean.class).invoke(snapshot,true,100L,jsonObject.getConstructor().newInstance(),false);
+        String text=wire.toString();
+        assertTrue(text.contains("BIDS_CANCELLED")); assertTrue(text.contains("observedAt"));
+        assertTrue(text.contains("BID_FAST_GROWTH")); assertTrue(text.contains("OFFER_FAST_GROWTH"));
+        assertTrue(text.contains("\"growthBaselineSize\":172000"));
+        assertTrue(text.contains("\"addedSize\":162000"));
+        assertTrue(text.contains("\"growthIncreaseCount\":3"));
+        assertTrue(text.contains("\"growthMaxGapNs\":\"1000000000\""));
+        assertTrue(text.contains("\"growthStartNs\":\"10\""));
+        assertFalse(text.contains("\"signals\"")); assertFalse(text.contains("\"contexts\""));
         try (JarFile jar = new JarFile(JAR.toFile())) { assertNull(jar.getJarEntry("velox/api/layer1/common/helper/OpenGlHelper.class")); }
     }
 
@@ -230,6 +221,14 @@ class ReleaseJarTest {
         mappedMethod(evidenceBuilder, evidenceBuilder + " attribution(" + event + "$Attribution," + event + "$Coverage)",
                 mappedClass(event + "$Attribution"), mappedClass(event + "$Coverage"))
                 .invoke(details, enumValue(event + "$Attribution", "UNKNOWN"), enumValue(event + "$Coverage", "USABLE"));
+        if(type.endsWith("FAST_GROWTH")) {
+            mappedMethod(evidenceBuilder,evidenceBuilder+" wall(java.lang.String,long,long)",String.class,long.class,long.class)
+                    .invoke(details,"growth",172000L,size);
+            mappedMethod(evidenceBuilder,evidenceBuilder+" growth(long,long,long)",long.class,long.class,long.class)
+                    .invoke(details,172000L,10L,time);
+            mappedMethod(evidenceBuilder,evidenceBuilder+" growthSequence(int,long,long)",int.class,long.class,long.class)
+                    .invoke(details,3,1000000000L,74000L);
+        }
         Object builtEvidence = mappedMethod(evidenceBuilder, evidence + " build()").invoke(details);
         Object value = mappedMethod(event, builder + " builder(java.lang.String,long," + root + "PatternEventType,java.lang.String)",
                 String.class, long.class, mappedClass(root + "PatternEventType"), String.class)

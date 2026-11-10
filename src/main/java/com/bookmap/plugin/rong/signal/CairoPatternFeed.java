@@ -59,8 +59,7 @@ public final class CairoPatternFeed implements AutoCloseable {
         if (previous == null) return null;
         JsonObject value = previous.deepCopy(); value.addProperty("epoch", value.get("epoch").getAsLong() + 1);
         value.addProperty("sequence", 1); value.addProperty("readiness", "not-ready"); value.addProperty("coverage", "warming");
-        value.add("patterns", new com.google.gson.JsonArray()); value.add("signals", new com.google.gson.JsonArray());
-        value.add("contexts", new com.google.gson.JsonArray()); value.add("candidateStates", new JsonObject());
+        value.add("patterns", new com.google.gson.JsonArray());
         return value;
     }
     public void close() { closed = true; }

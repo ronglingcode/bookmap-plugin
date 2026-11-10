@@ -7,11 +7,11 @@ import java.util.Map;
 import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 import com.bookmap.plugin.rong.signal.ResetReason;
-import com.bookmap.plugin.rong.signal.SignalComposerConfig;
+import com.bookmap.plugin.rong.patterns.PatternObservationConfig;
 
-/** Canonical callback observer feeding SignalComposer; independent of execution. */
+/** Canonical callback observer emitting pattern events; independent of execution. */
 public final class PatternObservationEngine implements PatternRuntimeContext {
-    private final SignalComposerConfig config;
+    private final PatternObservationConfig config;
     private final ObservationClock clock = new ObservationClock();
     private final EventTimeWallTracker walls;
     private final EventTimeTradeAttribution attribution;
@@ -20,6 +20,7 @@ public final class PatternObservationEngine implements PatternRuntimeContext {
     private final BidFailureDetector bidFailures;
     private final WallBreakDetector wallBreaks;
     private final WallInteractionDetector offers, bids;
+    private final OrderFastGrowthDetector fastGrowth;
     private final Consumer<PatternEvent> output;
     private final BiConsumer<ResetReason, Long> resets;
     private final Consumer<String> diagnostics;
@@ -32,7 +33,7 @@ public final class PatternObservationEngine implements PatternRuntimeContext {
         final boolean bid; final int price; final long size;
         Depth(boolean bid, int price, long size) { this.bid = bid; this.price = price; this.size = size; }
     }
-    public PatternObservationEngine(String alias, double pips, SignalComposerConfig config, Consumer<PatternEvent> output,
+    public PatternObservationEngine(String alias, double pips, PatternObservationConfig config, Consumer<PatternEvent> output,
             BiConsumer<ResetReason, Long> resets, Consumer<String> diagnostics) {
         this.config = config; this.output = output; this.resets = resets; this.diagnostics = diagnostics;
         walls = new EventTimeWallTracker(clock.epoch(), config);
@@ -45,6 +46,7 @@ public final class PatternObservationEngine implements PatternRuntimeContext {
         bidFailures = new BidFailureDetector(alias, pips, usableOutput);
         offers = new WallInteractionDetector(false, alias, pips, config, walls, usableOutput);
         bids = new WallInteractionDetector(true, alias, pips, config, walls, usableOutput);
+        fastGrowth = new OrderFastGrowthDetector(alias, pips, config, walls, usableOutput);
         definitions.add(new ReappearPatternDefinition(PatternType.BID_REAPPEAR, true));
         definitions.add(new ReappearPatternDefinition(PatternType.OFFER_REAPPEAR, false));
         definitions.add(new StepPatternDefinition(PatternType.BID_STEP_UP, true));
@@ -60,7 +62,10 @@ public final class PatternObservationEngine implements PatternRuntimeContext {
         if (!tick.usable) return false;
         if (!seeded) {
             seeded = true; attribution.markReady(timeNs);
-            for (Depth depth : snapshot.values()) walls.seed(depth.bid, depth.price, depth.size, timeNs);
+            for (Depth depth : snapshot.values()) {
+                walls.seed(depth.bid, depth.price, depth.size, timeNs);
+                fastGrowth.onDepth(depth.bid, depth.price, depth.size, timeNs);
+            }
         }
         return true;
     }
@@ -77,7 +82,9 @@ public final class PatternObservationEngine implements PatternRuntimeContext {
         if (!usable) return;
         relocation.onDepth(isBid, price, previous == null ? 0 : previous.size, size, timeNs);
         if (relocation.consumeOverflow()) { coverageGap("Relocation buffer overflow"); return; }
-        attribution.onTime(timeNs); dispatch(walls.onDepth(isBid, price, size, timeNs)); dispatchTime();
+        attribution.onTime(timeNs); dispatch(walls.onDepth(isBid, price, size, timeNs));
+        if (!clock.usable()) return;
+        fastGrowth.onDepth(isBid, price, size, timeNs); dispatchTime();
     }
     public void onTrade(int price, long size, Boolean buyAggressor, long timeNs, PatternEvent.TimestampProvenance provenance) {
         if (!begin(timeNs, provenance) || price <= 0 || size <= 0) return;
@@ -139,6 +146,7 @@ public final class PatternObservationEngine implements PatternRuntimeContext {
     private void dispatchTime() {
         if (!clock.usable()) return;
         wallBreaks.onTime(nowNs());
+        fastGrowth.onTime(nowNs(), epoch());
         offers.onTime(nowNs(), epoch());
         bids.onTime(nowNs(), epoch());
         for (PatternDefinition definition : definitions) definition.onTime(this);
@@ -146,7 +154,7 @@ public final class PatternObservationEngine implements PatternRuntimeContext {
     }
     private static int safeInt(long value) { return (int)Math.min(Integer.MAX_VALUE, value); }
     private void clearState(long epoch) {
-        walls.reset(epoch); attribution.reset(); relocation.reset(); normalizer.reset(); wallBreaks.reset(); offers.reset(); bids.reset();
+        walls.reset(epoch); attribution.reset(); relocation.reset(); normalizer.reset(); wallBreaks.reset(); offers.reset(); bids.reset(); fastGrowth.reset();
         for (PatternDefinition definition : definitions) definition.reset();
         seeded = false; bid = ask = last = high = low = definitionObservations = 0;
         pendingCoverageGap = null;

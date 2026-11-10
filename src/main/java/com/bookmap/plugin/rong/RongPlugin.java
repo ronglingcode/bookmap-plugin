@@ -2,13 +2,8 @@ package com.bookmap.plugin.rong;
 
 import java.awt.Color;
 import java.time.Duration;
-import com.bookmap.plugin.rong.signal.SignalComposerConfig;
-import com.bookmap.plugin.rong.signal.SignalComposerInspection;
-import com.bookmap.plugin.rong.signal.SignalCompositionPipeline;
-import com.bookmap.plugin.rong.signal.TradingSignalStore;
+import com.bookmap.plugin.rong.patterns.PatternObservationConfig;
 import com.bookmap.plugin.rong.signal.ResetReason;
-import com.bookmap.plugin.rong.signal.TradingSignalPainter;
-import com.bookmap.plugin.rong.signal.SignalCompositionLog;
 import com.bookmap.plugin.rong.patterns.PatternEvent;
 
 import com.bookmap.plugin.rong.executions.FilledExecutionManager;
@@ -100,9 +95,7 @@ public class RongPlugin implements CustomModuleAdapter,
     private static FilledExecutionStore filledExecutionStore;
     private static FilledExecutionPainter filledExecutionPainter;
     private static FilledExecutionManager filledExecutionManager;
-    private static SignalComposerConfig signalComposerConfig;
-    private static TradingSignalStore tradingSignalStore;
-    private static TradingSignalPainter tradingSignalPainter;
+    private static PatternObservationConfig patternEventConfig;
 
     private String rawAlias;
     private volatile boolean initialized;
@@ -112,7 +105,7 @@ public class RongPlugin implements CustomModuleAdapter,
     private OrderBookState orderBook;
     private OrderWallLabelTracker wallLabelTracker;
     private OrderWallChangeTracker wallChangeTracker;
-    private SignalCompositionPipeline signalComposition;
+    private com.bookmap.plugin.rong.patterns.PatternEventPipeline patternEvents;
     private com.bookmap.plugin.rong.patterns.FalseBreakoutMonitor falseBreakoutMonitor;
     private com.bookmap.plugin.rong.patterns.FalseBreakoutPainter falseBreakoutPainter;
     private com.bookmap.plugin.rong.patterns.ReclaimSecondBidMonitor reclaimSecondBidMonitor;
@@ -120,16 +113,14 @@ public class RongPlugin implements CustomModuleAdapter,
     private com.bookmap.plugin.rong.patterns.BidBreakdownMonitor bidBreakdownMonitor;
     private com.bookmap.plugin.rong.patterns.BidBreakdownPainter bidBreakdownPainter;
     private SignalWebSocketServer.PatternMonitorConfigListener patternMonitorConfigListener;
-    private SignalComposerConfig compositionRules;
-    private SignalCompositionLog compositionLog;
-    private volatile boolean signalCompositionEnabled;
-    private volatile boolean compositionSnapshotComplete;
+    private PatternObservationConfig patternRules;
+    private volatile boolean patternEventSnapshotComplete;
     private volatile boolean patternMonitorSnapshotComplete;
     // HistoricalModeListener delivers stored callbacks before onRealtimeStart.
     // Keep their liquidity evidence separate from live pattern snapshot readiness.
     private boolean sessionHistoryLoading = true;
-    private volatile boolean compositionSeedFromSharedBook = true;
-    private final Object compositionLock = new Object();
+    private volatile boolean patternEventSeedFromSharedBook = true;
+    private final Object patternEventLock = new Object();
     private final com.bookmap.plugin.rong.patterns.CairoObservationConfig observationConfig = com.bookmap.plugin.rong.patterns.CairoObservationConfig.load();
     private boolean wallLabelsDirty;
     private long lastWallLabelRefreshMs;
@@ -242,7 +233,7 @@ public class RongPlugin implements CustomModuleAdapter,
                 this::getWallChangeDayHigh,
                 this::getWallChangeDayLow,
                 () -> wallChangeStockPrice);
-        initializeSignalComposition(info.pips);
+        initializePatternEvents(info.pips);
         falseBreakoutMonitor = new com.bookmap.plugin.rong.patterns.FalseBreakoutMonitor(this::getEffectiveWallThreshold);
         falseBreakoutPainter = new com.bookmap.plugin.rong.patterns.FalseBreakoutPainter(falseBreakoutMonitor);
         reclaimSecondBidMonitor = new com.bookmap.plugin.rong.patterns.ReclaimSecondBidMonitor(this::getEffectiveWallThreshold);
@@ -268,14 +259,11 @@ public class RongPlugin implements CustomModuleAdapter,
         api.sendUserMessage(Layer1ApiUserMessageModifyScreenSpacePainter.builder(RongPlugin.class,
                 com.bookmap.plugin.rong.patterns.BidBreakdownPainter.NAME_PREFIX + cleanAlias)
                 .setScreenSpacePainterFactory(bidBreakdownPainter).setAliasFilter(exactAliasFilter(rawAlias)).setIsAdd(true).build());
-        synchronized (RongPlugin.class) {
-            if (tradingSignalPainter == null) tradingSignalPainter = new TradingSignalPainter(tradingSignalStore, indicatorConfig);
-        }
-        tradingSignalPainter.registerInstrument(cleanAlias);
+
         indicatorConfig.addChangeListener(this);
         sharedServer.registerSymbol(cleanAlias, orderBook, info.pips);
         sharedServer.beginSessionHistory(cleanAlias);
-        if (observationConfig.exportsPatterns(cleanAlias) && signalComposition != null) {
+        if (observationConfig.exportsPatterns(cleanAlias) && patternEvents != null) {
             sharedServer.registerPatterns(cleanAlias, new com.bookmap.plugin.rong.signal.CairoPatternFeed(
                     reconnect -> cairoPatternSnapshot(reconnect), observationConfig.captureEvidence));
         }
@@ -330,9 +318,7 @@ public class RongPlugin implements CustomModuleAdapter,
                 .build());
 
         // Draw predefined key price levels for this instrument
-        api.sendUserMessage(Layer1ApiUserMessageModifyScreenSpacePainter.builder(RongPlugin.class,
-                TradingSignalPainter.PAINTER_NAME_PREFIX + cleanAlias).setScreenSpacePainterFactory(tradingSignalPainter)
-                .setAliasFilter(exactAliasFilter(rawAlias)).setIsAdd(true).build());
+
         if (keyLevelManager != null) {
             keyLevelManager.onInstrumentInitialized(cleanAlias, info.pips);
         }
@@ -354,8 +340,7 @@ public class RongPlugin implements CustomModuleAdapter,
 
         if (!observationConfig.observerOnly) {
             tradeButtonWindow = new TradeButtonWindow(
-                    cleanAlias, sharedServer, wallThresholdConfig::getThresholdFloor, nativeConnectionStatus,
-                    this::signalComposerInspection);
+                    cleanAlias, sharedServer, wallThresholdConfig::getThresholdFloor, nativeConnectionStatus);
         }
     }
 
@@ -368,61 +353,26 @@ public class RongPlugin implements CustomModuleAdapter,
         };
     }
 
-    SignalComposerInspection signalComposerInspection() {
-        synchronized (compositionLock) {
-            String diagnostics = signalComposerInspectionText();
-            if (compositionRules == null || !compositionRules.valid || !compositionRules.eligible(alias) || signalComposition == null) {
-                return new SignalComposerInspection(
-                        diagnostics.substring(diagnostics.indexOf('\n') + 1), diagnostics, java.util.List.of());
-            }
-            SignalComposerInspection snapshot = signalComposition.inspection();
-            return new SignalComposerInspection(
-                    signalCompositionEnabled ? snapshot.notice : "Disabled", diagnostics, snapshot.sections);
-        }
-    }
-
-    String signalComposerInspectionText() {
-        synchronized (compositionLock) {
-            String heading = "Signal Composer · " + alias + " · advisory\n";
-            if (compositionRules == null) return heading + "Inactive: attachment stopped or not initialized";
-            if (!compositionRules.valid) return heading + compositionRules.error;
-            if (!compositionRules.eligible(alias)) return heading + "Excluded by configured symbol filter";
-            if (signalComposition == null) return heading + "Unavailable: instrument tick size is unusable";
-            return heading + (signalCompositionEnabled ? "Enabled" : "Disabled")
-                    + " · configured sourceMode: " + observationConfig.sourceMode
-                    + "\nRules: " + compositionRules.revision.substring(0, 12)
-                    + " · bid normal / minimum: " + compositionRules.normalTriggerSize + " / " + compositionRules.minimumTriggerSize
-                    + "\n" + signalComposition.inspectionText();
-        }
-    }
-
-    /** Shared rules load once for an activation; each chart owns its observation state. */
-    void initializeSignalComposition(double pips) {
+    /** Shared detector settings; each chart owns independent event observation state. */
+    void initializePatternEvents(double pips) {
         synchronized (RongPlugin.class) {
-            if (indicatorConfig == null) indicatorConfig = new IndicatorConfig();
-            if (signalComposerConfig == null) {
-                signalComposerConfig = SignalComposerConfig.load();
-                indicatorConfig.setEnabled(IndicatorConfig.SIGNAL_COMPOSER, signalComposerConfig.valid && signalComposerConfig.enabled);
-                if (!signalComposerConfig.valid) PluginLog.action("", "SignalComposer", signalComposerConfig.error);
-            }
-            if (tradingSignalStore == null) tradingSignalStore = new TradingSignalStore();
-            compositionRules = signalComposerConfig;
+            if (patternEventConfig == null) patternEventConfig = PatternObservationConfig.load();
+            patternRules = patternEventConfig;
         }
-        if (!compositionRules.valid || !compositionRules.eligible(alias) || !Double.isFinite(pips) || pips <= 0) return;
-        compositionLog = new SignalCompositionLog(alias, compositionRules.maxEvents);
-        compositionLog.detail("Rules config=" + compositionRules.revision + "; sourceMode=" + observationConfig.sourceMode + "; advisory only");
-        signalComposition = new SignalCompositionPipeline(alias, pips, compositionRules, update -> {
-            if (compositionLog != null) compositionLog.update(update);
-            TradingSignalStore store = tradingSignalStore;
-            if (store != null) store.publish(alias, signalComposition.epoch(), update);
-        }, event -> { if (compositionLog != null) compositionLog.event(event); },
-                diagnostic -> { if (compositionLog != null) compositionLog.detail(diagnostic); }, System::currentTimeMillis);
-        signalComposition.setResetListener(reason -> {
+        if (!patternRules.enabled || !patternRules.eligible(alias) || !Double.isFinite(pips) || pips <= 0) {
+            if (!patternRules.valid) PluginLog.detail(alias, "PatternEvents", patternRules.error);
+            return;
+        }
+        patternEvents = new com.bookmap.plugin.rong.patterns.PatternEventPipeline(alias, pips, patternRules,
+                event -> PluginLog.detail(alias, "PatternEvents", "Event " + event.id + " revision=" + event.revision
+                        + " type=" + event.type + " size=" + event.size + " price=" + event.price
+                        + " occurrenceNs=" + event.eventTimeNs + " observedAtNs=" + event.observedAtNs),
+                diagnostic -> PluginLog.detail(alias, "PatternEvents", diagnostic));
+        patternEvents.setResetListener(reason -> {
             if (reason == ResetReason.COVERAGE_GAP || reason == ResetReason.REPLAY_SEEK) {
-                compositionSnapshotComplete = false; compositionSeedFromSharedBook = false;
+                patternEventSnapshotComplete = false; patternEventSeedFromSharedBook = false;
             }
         });
-        signalCompositionEnabled = indicatorConfig.isEnabled(IndicatorConfig.SIGNAL_COMPOSER);
     }
 
     @Override
@@ -456,11 +406,10 @@ public class RongPlugin implements CustomModuleAdapter,
                     .setScreenSpacePainterFactory(reclaimSecondBidPainter).setIsAdd(false).build()));
             reclaimSecondBidPainter.shutdown();
         }
-        synchronized (compositionLock) {
-            signalCompositionEnabled = false; compositionSnapshotComplete = false;
-            if (signalComposition != null) signalComposition.reset(ResetReason.STOPPED);
-            signalComposition = null; compositionRules = null; compositionLog = null;
-            if (tradingSignalStore != null) tradingSignalStore.removeAlias(alias);
+        synchronized (patternEventLock) {
+            patternEventSnapshotComplete = false;
+            if (patternEvents != null) patternEvents.reset(ResetReason.STOPPED);
+            patternEvents = null; patternRules = null;
         }
         if (indicatorConfig != null) {
             indicatorConfig.removeChangeListener(this);
@@ -498,12 +447,7 @@ public class RongPlugin implements CustomModuleAdapter,
         if (wallChangePainter != null) {
             wallChangePainter.unregisterInstrument(alias);
         }
-        if (tradingSignalPainter != null) {
-            tradingSignalPainter.unregisterInstrument(alias);
-            cleanup("remove chart painter", () -> api.sendUserMessage(Layer1ApiUserMessageModifyScreenSpacePainter.builder(RongPlugin.class,
-                    TradingSignalPainter.PAINTER_NAME_PREFIX + alias).setScreenSpacePainterFactory(tradingSignalPainter)
-                    .setIsAdd(false).build()));
-        }
+
         if (filledExecutionPainter != null) {
             filledExecutionPainter.unregisterInstrument(alias);
         }
@@ -648,9 +592,7 @@ public class RongPlugin implements CustomModuleAdapter,
                 instanceCount = 0;
             }
             if (instanceCount <= 0) {
-                if (tradingSignalPainter != null) cleanup("stop trading signal painter", () -> tradingSignalPainter.shutdown());
-                tradingSignalPainter = null;
-                signalComposerConfig = null; tradingSignalStore = null;
+                patternEventConfig = null;
             }
         }
     }
@@ -676,7 +618,6 @@ public class RongPlugin implements CustomModuleAdapter,
         }
         return new StrategyPanel[] {
             new IndicatorSettingsPanel(indicatorConfig, wallThresholdConfig, nativeConnectionStatus,
-                    signalComposerConfig == null ? SignalComposerConfig.defaults() : signalComposerConfig,
                     observationConfig.observerOnly)
         };
     }
@@ -688,7 +629,7 @@ public class RongPlugin implements CustomModuleAdapter,
         // A zero size at a positive price is a valid level removal.
         if (price <= 0 || size < 0) return;
         long eventTimeNs = getEventTimeNs();
-        PatternEvent.TimestampProvenance provenance = compositionProvenance();
+        PatternEvent.TimestampProvenance provenance = patternEventProvenance();
         if (wallChangeTracker != null) {
             wallChangeTracker.onDepth(isBid, price, size, eventTimeNs);
         }
@@ -706,8 +647,8 @@ public class RongPlugin implements CustomModuleAdapter,
             reclaimSecondBidMonitor.onDepth(isBid, price, size, lastTimestampNs, patternMonitorSnapshotComplete);
             reclaimSecondBidPainter.refresh();
         }
-        synchronized (compositionLock) {
-            if (shouldRunSignalComposition()) signalComposition.onDepth(isBid, price, size, eventTimeNs, provenance);
+        synchronized (patternEventLock) {
+            if (shouldRunPatternEvents()) patternEvents.onDepth(isBid, price, size, eventTimeNs, provenance);
         }
         if (wallLabelTracker != null && wallLabelTracker.onDepth(isBid, price, size, eventTimeNs)) {
             wallLabelsDirty = true;
@@ -721,7 +662,7 @@ public class RongPlugin implements CustomModuleAdapter,
         if (!Double.isFinite(price) || price < 0.5 || price > Integer.MAX_VALUE
                 || size <= 0) return;
         long eventTimeNs = getEventTimeNs();
-        PatternEvent.TimestampProvenance provenance = compositionProvenance();
+        PatternEvent.TimestampProvenance provenance = patternEventProvenance();
         double realPrice = BookmapPriceNormalizer.toWirePrice(price, instrumentInfo.pips);
         wallChangeStockPrice = realPrice;
         int priceTick = (int) Math.round(price);
@@ -757,8 +698,8 @@ public class RongPlugin implements CustomModuleAdapter,
         }
         flushPendingVwapPoints();
 
-        synchronized (compositionLock) {
-            if (shouldRunSignalComposition()) signalComposition.onTrade(priceTick, size,
+        synchronized (patternEventLock) {
+            if (shouldRunPatternEvents()) patternEvents.onTrade(priceTick, size,
                     tradeInfo == null ? null : tradeInfo.isBidAggressor, eventTimeNs, provenance);
         }
 
@@ -772,10 +713,10 @@ public class RongPlugin implements CustomModuleAdapter,
     public void onTimestamp(long timestampNs) {
         if (!initialized) return;
         if (timestampNs > 0 && lastTimestampNs > 0 && timestampNs < lastTimestampNs) {
-            compositionSnapshotComplete = false;
+            patternEventSnapshotComplete = false;
             patternMonitorSnapshotComplete = false;
             // Legacy book state can retain pre-seek levels. Only fresh callbacks may seed the observer now.
-            compositionSeedFromSharedBook = false;
+            patternEventSeedFromSharedBook = false;
         }
         this.lastTimestampNs = timestampNs;
         if (premarketSizeThreshold != null) premarketSizeThreshold.onMarketTime();
@@ -793,8 +734,8 @@ public class RongPlugin implements CustomModuleAdapter,
             reclaimSecondBidPainter.refresh();
         }
         flushPendingVwapPoints();
-        synchronized (compositionLock) {
-            if (shouldRunSignalComposition()) signalComposition.onTimestamp(timestampNs, compositionProvenance());
+        synchronized (patternEventLock) {
+            if (shouldRunPatternEvents()) patternEvents.onTimestamp(timestampNs, patternEventProvenance());
         }
         if (wallLabelTracker != null && wallLabelTracker.onTimestamp(timestampNs)) {
             wallLabelsDirty = true;
@@ -819,9 +760,9 @@ public class RongPlugin implements CustomModuleAdapter,
             reclaimSecondBidPainter.refresh();
         }
         long eventTimeNs = getEventTimeNs();
-        PatternEvent.TimestampProvenance provenance = compositionProvenance();
-        synchronized (compositionLock) {
-            if (shouldRunSignalComposition()) signalComposition.onBbo(bidPrice, askPrice, eventTimeNs, provenance);
+        PatternEvent.TimestampProvenance provenance = patternEventProvenance();
+        synchronized (patternEventLock) {
+            if (shouldRunPatternEvents()) patternEvents.onBbo(bidPrice, askPrice, eventTimeNs, provenance);
         }
     }
 
@@ -829,11 +770,11 @@ public class RongPlugin implements CustomModuleAdapter,
     public void onSnapshotEnd() {
         if (!initialized) return;
         patternMonitorSnapshotComplete = true;
-        compositionSnapshotComplete = true;
+        patternEventSnapshotComplete = true;
         if (wallChangeTracker != null) {
             wallChangeTracker.markReady();
         }
-        markSignalCompositionReady();
+        markPatternEventsReady();
     }
 
     @Override
@@ -842,12 +783,12 @@ public class RongPlugin implements CustomModuleAdapter,
         sessionHistoryLoading = false;
         if (sharedServer != null) sharedServer.finishSessionHistory(alias);
         patternMonitorSnapshotComplete = true;
-        compositionSnapshotComplete = true;
+        patternEventSnapshotComplete = true;
         // This callback alone does not prove a live provider (replay can catch up).
         if (wallChangeTracker != null) {
             wallChangeTracker.markReady();
         }
-        markSignalCompositionReady();
+        markPatternEventsReady();
     }
 
     public static void resetNativeExecutionAfterBrokerReview() {
@@ -873,14 +814,7 @@ public class RongPlugin implements CustomModuleAdapter,
     @Override
     public void onIndicatorConfigChanged(String indicatorKey, boolean enabled) {
         if (!initialized) return;
-        if (IndicatorConfig.SIGNAL_COMPOSER.equals(indicatorKey)) {
-            synchronized (compositionLock) {
-                signalCompositionEnabled = enabled && signalComposition != null && compositionRules.valid && compositionRules.eligible(alias);
-                if (signalComposition != null) signalComposition.reset(enabled ? ResetReason.ENABLED : ResetReason.DISABLED);
-                if (signalCompositionEnabled && compositionSnapshotComplete) markSignalCompositionReady();
-            }
-            return;
-        }
+
         if (IndicatorConfig.VWAP.equals(indicatorKey)) {
             updateVwapIndicatorVisibility();
             if (enabled && vwapTracker != null) {
@@ -931,14 +865,14 @@ public class RongPlugin implements CustomModuleAdapter,
     }
 
     private com.google.gson.JsonObject cairoPatternSnapshot(boolean reconnect) {
-        synchronized (compositionLock) {
-            if (signalComposition == null) return null;
+        synchronized (patternEventLock) {
+            if (patternEvents == null) return null;
             com.google.gson.JsonObject liquidity = new com.google.gson.JsonObject();
             synchronized (orderBook) {
                 int threshold = DISPLAY_LIQUIDITY_MIN_SIZE;
                 liquidity.addProperty("threshold", threshold);
-                liquidity.addProperty("bestBid", BookmapPriceNormalizer.toWirePrice(signalComposition.bestBidTick(), instrumentInfo.pips));
-                liquidity.addProperty("bestAsk", BookmapPriceNormalizer.toWirePrice(signalComposition.bestAskTick(), instrumentInfo.pips));
+                liquidity.addProperty("bestBid", BookmapPriceNormalizer.toWirePrice(patternEvents.bestBidTick(), instrumentInfo.pips));
+                liquidity.addProperty("bestAsk", BookmapPriceNormalizer.toWirePrice(patternEvents.bestAskTick(), instrumentInfo.pips));
                 liquidity.addProperty("asOf", Long.toString(getEventTimeNs()));
                 for (boolean bid : new boolean[]{true, false}) {
                     com.google.gson.JsonArray levels = new com.google.gson.JsonArray();
@@ -952,30 +886,30 @@ public class RongPlugin implements CustomModuleAdapter,
                     liquidity.add(bid ? "bids" : "offers", levels);
                 }
             }
-            com.google.gson.JsonObject value = signalComposition.aggregateSnapshot(liquidity, reconnect);
+            com.google.gson.JsonObject value = patternEvents.aggregateSnapshot(liquidity, reconnect);
             value.addProperty("mode", observationConfig.sourceMode);
             return value;
         }
     }
 
-    private boolean shouldRunSignalComposition() {
-        return initialized && signalCompositionEnabled && signalComposition != null
-                && compositionRules != null && compositionRules.valid && compositionRules.eligible(alias);
+    private boolean shouldRunPatternEvents() {
+        return initialized && patternEvents != null
+                && patternRules != null && patternRules.enabled && patternRules.eligible(alias);
     }
-    private PatternEvent.TimestampProvenance compositionProvenance() {
+    private PatternEvent.TimestampProvenance patternEventProvenance() {
         return lastTimestampNs > 0 ? PatternEvent.TimestampProvenance.MARKET : PatternEvent.TimestampProvenance.FALLBACK;
     }
-    private void markSignalCompositionReady() {
-        synchronized (compositionLock) {
-            if (!shouldRunSignalComposition()) return;
-            if (compositionSeedFromSharedBook && lastTimestampNs > 0 && orderBook != null) {
+    private void markPatternEventsReady() {
+        synchronized (patternEventLock) {
+            if (!shouldRunPatternEvents()) return;
+            if (patternEventSeedFromSharedBook && lastTimestampNs > 0 && orderBook != null) {
                 for (boolean bid : new boolean[] {true, false}) {
                     for (java.util.Map.Entry<Integer, Integer> level : orderBook.getLevelsSnapshot(bid).entrySet())
-                        signalComposition.onDepth(bid, level.getKey(), level.getValue(), lastTimestampNs, PatternEvent.TimestampProvenance.MARKET);
+                        patternEvents.onDepth(bid, level.getKey(), level.getValue(), lastTimestampNs, PatternEvent.TimestampProvenance.MARKET);
                 }
             }
-            signalComposition.markReady();
-            if (lastTimestampNs > 0) signalComposition.onTimestamp(lastTimestampNs, PatternEvent.TimestampProvenance.MARKET);
+            patternEvents.markReady();
+            if (lastTimestampNs > 0) patternEvents.onTimestamp(lastTimestampNs, PatternEvent.TimestampProvenance.MARKET);
         }
     }
 

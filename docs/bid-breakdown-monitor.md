@@ -1,7 +1,7 @@
 # Bid breakdown monitor
 
 Enable per symbol with `"bookmapPatternsToMonitor": ["bidBreakdown"]`.
-It runs independently of SignalComposer and only displays advisory labels.
+It runs independently of the pattern-event export pipeline and only displays advisory labels.
 It never submits an entry or stop order.
 
 The monitor waits for snapshot readiness, regular US equity hours

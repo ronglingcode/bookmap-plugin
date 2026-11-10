@@ -1,7 +1,7 @@
 package com.bookmap.plugin.rong;
 
 import static org.junit.jupiter.api.Assertions.*;
-import static com.bookmap.plugin.rong.SignalComposerActivationTest.*;
+import static com.bookmap.plugin.rong.PatternObservationActivationTest.*;
 
 import org.junit.jupiter.api.Test;
 
@@ -9,7 +9,7 @@ class RongPluginDepthValidationTest {
     @Test
     void invalidPricesNeverEnterBookAndValidLevelRemovalsStillWork() throws Exception {
         withIsolatedActivation(() -> {
-            RongPlugin plugin = SignalComposerCallbacksTest.callbackPlugin();
+            RongPlugin plugin = PatternEventCallbacksTest.callbackPlugin();
             OrderBookState book = (OrderBookState) field("orderBook").get(plugin);
             for (boolean bid : new boolean[]{true, false}) {
                 plugin.onDepth(bid, 10_000, 8_000);
@@ -30,7 +30,7 @@ class RongPluginDepthValidationTest {
 
     @Test void invalidTradesCannotReplaceTheLastValidStockPrice() throws Exception {
         withIsolatedActivation(() -> {
-            RongPlugin plugin = SignalComposerCallbacksTest.callbackPlugin();
+            RongPlugin plugin = PatternEventCallbacksTest.callbackPlugin();
             plugin.onTrade(10_000, 1, null);
             double valid = field("wallChangeStockPrice").getDouble(plugin);
             for (double price : new double[]{Double.NaN, Double.POSITIVE_INFINITY,

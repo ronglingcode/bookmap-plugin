@@ -1,7 +1,7 @@
 package com.bookmap.plugin.rong;
 
 import static org.junit.jupiter.api.Assertions.*;
-import static com.bookmap.plugin.rong.SignalComposerActivationTest.*;
+import static com.bookmap.plugin.rong.PatternObservationActivationTest.*;
 
 import com.google.gson.JsonObject;
 import org.junit.jupiter.api.Test;
@@ -21,7 +21,7 @@ class SessionLiquidityHistoryTest {
             SignalWebSocketServer server = new SignalWebSocketServer(0, 0);
             try {
                 field("sharedServer").set(null, server);
-                RongPlugin plugin = SignalComposerCallbacksTest.callbackPlugin();
+                RongPlugin plugin = PatternEventCallbacksTest.callbackPlugin();
                 server.registerSymbol("TEST", (OrderBookState) field("orderBook").get(plugin), .01);
                 server.beginSessionHistory("TEST");
                 scenario.run(plugin, server);

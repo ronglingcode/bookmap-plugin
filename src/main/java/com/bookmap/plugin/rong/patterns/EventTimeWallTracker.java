@@ -5,7 +5,7 @@ import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import com.bookmap.plugin.rong.signal.SignalComposerConfig;
+import com.bookmap.plugin.rong.patterns.PatternObservationConfig;
 
 /** Independent absolute-depth lifecycle; never reads a legacy percentile threshold. */
 public final class EventTimeWallTracker {
@@ -49,10 +49,10 @@ public final class EventTimeWallTracker {
             this.id = id; this.bid = bid; this.price = price; this.size = size; firstSeen = time;
         }
     }
-    private final SignalComposerConfig config;
+    private final PatternObservationConfig config;
     private final Map<String, Phase> phases = new LinkedHashMap<>();
     private long epoch, sequence, now;
-    public EventTimeWallTracker(long epoch, SignalComposerConfig config) {
+    public EventTimeWallTracker(long epoch, PatternObservationConfig config) {
         if (epoch <= 0 || !config.valid) throw new IllegalArgumentException("Invalid wall context");
         this.epoch = epoch; this.config = config;
     }

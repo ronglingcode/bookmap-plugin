@@ -53,4 +53,10 @@ class PatternEventTest {
                 .price(5120, .01).times(100, 100).build();
         assertEquals(rejection.id, composite.id);
     }
+    @Test void rejectsIncompleteOrReversedGrowthMeasurements() {
+        assertThrows(IllegalArgumentException.class, () -> PatternEvent.Evidence.builder().wall("w",100,200).growth(100,10,9).build());
+        assertThrows(IllegalArgumentException.class, () -> PatternEvent.Evidence.builder().wall("w",100,200).growth(100,0,10).build());
+        assertThrows(IllegalArgumentException.class, () -> PatternEvent.Evidence.builder().wall("w",100,50).growth(100,10,20).build());
+    }
+
 }
