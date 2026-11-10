@@ -63,6 +63,20 @@ public final class NativeViews {
                 else { String previousLabel = string(existing, "label"); if (!Arrays.asList(previousLabel.split(" / ")).contains(label)) existing.addProperty("label", previousLabel.isEmpty() ? label : previousLabel + " / " + label); }
             }
         }
+        for (String side : new String[]{"long", "short"}) {
+            JsonObject direction = object(plan, side);
+            if (!bool(direction, "enabled")) continue;
+            for (Map.Entry<String, JsonElement> entry : direction.entrySet()) {
+                if (!entry.getKey().endsWith("Plan") || !entry.getValue().isJsonObject()) continue;
+                double price = number(entry.getValue().getAsJsonObject(), "midpointCheck");
+                if (!Double.isFinite(price) || price <= 0) continue;
+                String label = (side.equals("long") ? "Long" : "Short") + " midpoint check";
+                JsonObject existing = null;
+                for (JsonElement level : levels) if (number(level.getAsJsonObject(), "price") == price) { existing = level.getAsJsonObject(); break; }
+                if (existing == null) { existing = new JsonObject(); existing.addProperty("price", price); existing.addProperty("label", label); levels.add(existing); }
+                else { String previousLabel = string(existing, "label"); if (!Arrays.asList(previousLabel.split(" / ")).contains(label)) existing.addProperty("label", previousLabel.isEmpty() ? label : previousLabel + " / " + label); }
+            }
+        }
         for (JsonElement item : array(object(plan, "keyLevels"), "zones")) zone(zones, zoneKeys, item.getAsJsonObject(), "", "");
         zone(zones, zoneKeys, object(object(plan, "rangeBoundReversalPlan"), "support"), "support", "green"); zone(zones, zoneKeys, object(object(plan, "rangeBoundReversalPlan"), "resistance"), "resistance", "red");
         zone(zones, zoneKeys, object(object(object(plan, "long"), "gapAndGoPlan"), "support"), "support", "green"); zone(zones, zoneKeys, object(object(object(plan, "long"), "gapDownAndGoUpPlan"), "support"), "support", "green");
