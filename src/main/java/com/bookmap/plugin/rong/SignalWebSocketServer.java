@@ -141,7 +141,7 @@ public class SignalWebSocketServer extends WebSocketServer {
         long rollingSize = rolling == null ? 0 : rolling.size;
         cap.addProperty("largestOrderSize", largest); cap.addProperty("requiredOrderSize", required);
         cap.addProperty("rollingOrderSize", rollingSize);
-        cap.addProperty("rollingContributorMinimum", (required + 3L) / 4);
+        cap.addProperty("rollingContributorMinimum", BookmapSizeCap.rollingContributorMinimum(required));
         cap.addProperty("rollingWindowMillis", SessionOrderSizeTracker.ROLLING_WINDOW_NS / 1_000_000L);
         cap.addProperty("mode", BookmapSizeCap.ACTIVE_MODE.name()); cap.addProperty("available", available);
         cap.addProperty("maxRiskMultiple", (double) Math.max(largest, rollingSize) / required);

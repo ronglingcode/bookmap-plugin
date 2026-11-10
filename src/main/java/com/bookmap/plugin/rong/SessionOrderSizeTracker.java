@@ -1,5 +1,6 @@
 package com.bookmap.plugin.rong;
 
+import com.bookmap.plugin.rong.miniviteapp.core.controllers.BookmapSizeCap;
 import java.time.*;
 import java.util.*;
 
@@ -19,7 +20,7 @@ final class SessionOrderSizeTracker {
 
     SessionOrderSizeTracker() {
         // History can precede the final volume: retain peaks for every rounded
-        // square-root requirement, each using its own 25% contributor minimum.
+        // square-root requirement, each using its own 8% contributor minimum.
         for (int required = PremarketSizeThreshold.MINIMUM; required <= PremarketSizeThreshold.MAXIMUM;
                 required += PremarketSizeThreshold.INCREMENT)
             rollingStates.put(required, new RollingState(required));
@@ -44,7 +45,7 @@ final class SessionOrderSizeTracker {
         long bidSize, offerSize;
         int bidCount, offerCount;
         RollingObservation best;
-        RollingState(int required) { minimum = (required + 3L) / 4; }
+        RollingState(int required) { minimum = BookmapSizeCap.rollingContributorMinimum(required); }
         void change(boolean bid, long before, long after) {
             long delta = (after >= minimum ? after : 0) - (before >= minimum ? before : 0);
             int countDelta = (after >= minimum ? 1 : 0) - (before >= minimum ? 1 : 0);

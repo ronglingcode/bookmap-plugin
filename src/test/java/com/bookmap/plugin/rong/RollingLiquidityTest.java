@@ -42,7 +42,7 @@ class RollingLiquidityTest {
             rig.fill(true, 9500, 15000, 2 * SECOND);
             assertEquals(45000, rig.best());
             assertEquals(30000, rig.cap().get("largestOrderSize").getAsLong());
-            assertEquals(10000, rig.cap().get("rollingContributorMinimum").getAsLong());
+            assertEquals(3200, rig.cap().get("rollingContributorMinimum").getAsLong());
             assertEquals(2000, rig.cap().get("rollingWindowMillis").getAsLong());
             assertEquals(2, rig.cap().get("rollingContributorCount").getAsInt());
             assertEquals("bid", rig.cap().get("rollingOrderSide").getAsString());
@@ -96,14 +96,14 @@ class RollingLiquidityTest {
         }
     }
 
-    @Test void contributorsBelowTenThousandAreExcludedButPartialsCanReachTheFloorExactly() {
+    @Test void contributorsBelowEightPercentAreExcludedButPartialsCanReachTheFloorExactly() {
         try (Rig rig = new Rig()) {
-            rig.fill(false, 10000, 30000, 0);
-            rig.fill(false, 10100, 9000, SECOND / 2);
-            rig.fill(false, 10200, 8000, SECOND);
-            assertEquals(30000, rig.best());
+            rig.fill(false, 10000, 36800, 0);
+            rig.fill(false, 10100, 3199, SECOND / 2);
+            rig.fill(false, 10200, 3000, SECOND);
+            assertEquals(36800, rig.best());
             assertFalse(BookmapSizeCap.liquidityQualified(rig.cap()));
-            rig.server.observeSessionTrade("TEST", 10100, 1000, true, OPEN + SECOND, true);
+            rig.server.observeSessionTrade("TEST", 10100, 1, true, OPEN + SECOND, true);
             assertEquals(40000, rig.best());
             assertEquals(2, rig.cap().get("rollingContributorCount").getAsInt());
             assertTrue(BookmapSizeCap.liquidityQualified(rig.cap()));
@@ -113,11 +113,11 @@ class RollingLiquidityTest {
     @Test void expiredPartialsCannotBeImportedFromLifetimeWallTotals() {
         try (Rig rig = new Rig()) {
             rig.fill(true, 10000, 1000, 0);
-            rig.server.observeSessionTrade("TEST", 10000, 9000, false, OPEN + SECOND / 10, true);
-            assertEquals(10000, rig.best());
-            // The wall now has 10K lifetime fills but just 9K inside the trailing window.
-            rig.fill(true, 9900, 30000, 2 * SECOND + 1);
-            assertEquals(30000, rig.best());
+            rig.server.observeSessionTrade("TEST", 10000, 2200, false, OPEN + SECOND / 10, true);
+            assertEquals(3200, rig.best());
+            // The wall has 3.2K lifetime fills but just 2.2K inside the trailing window.
+            rig.fill(true, 9900, 36800, 2 * SECOND + 1);
+            assertEquals(36800, rig.best());
             assertFalse(BookmapSizeCap.liquidityQualified(rig.cap()));
         }
     }
@@ -133,12 +133,12 @@ class RollingLiquidityTest {
 
     @Test void separateEpisodesAtSamePriceMustMeetTheContributorFloorIndividually() {
         try (Rig rig = new Rig()) {
-            rig.fill(true, 10000, 6000, 0);
+            rig.fill(true, 10000, 2000, 0);
             rig.depth(true, 10000, 0, 1);
-            rig.fill(true, 10000, 6000, 2);
-            rig.fill(true, 9900, 30000, SECOND);
-            assertEquals(30000, rig.best());
-            rig.server.observeSessionTrade("TEST", 10000, 4000, false, OPEN + SECOND, true);
+            rig.fill(true, 10000, 2000, 2);
+            rig.fill(true, 9900, 36800, SECOND);
+            assertEquals(36800, rig.best());
+            rig.server.observeSessionTrade("TEST", 10000, 1200, false, OPEN + SECOND, true);
             assertEquals(40000, rig.best());
         }
     }
@@ -146,13 +146,13 @@ class RollingLiquidityTest {
     @Test void historicalPrintsUseSameWindowAndFloorWithoutDoubleCountingMatchingDepth() {
         try (Rig rig = new Rig()) {
             rig.server.beginSessionHistory("TEST");
-            rig.depth(false, 10000, 30000, 0);
-            rig.history(false, 10000, 30000, 0);
-            assertEquals(30000, rig.best()); // Matching depth plus print is still one contribution.
-            rig.history(false, 10100, 6000, SECOND / 4);
-            rig.history(false, 10100, 6000, SECOND / 2);
-            assertEquals(30000, rig.best()); // No depth: separate 6K prints cannot form a 12K wall.
-            rig.history(false, 10200, 10000, SECOND);
+            rig.depth(false, 10000, 36800, 0);
+            rig.history(false, 10000, 36800, 0);
+            assertEquals(36800, rig.best()); // Matching depth plus print is still one contribution.
+            rig.history(false, 10100, 2000, SECOND / 4);
+            rig.history(false, 10100, 2000, SECOND / 2);
+            assertEquals(36800, rig.best()); // No depth: separate 2K prints cannot form a 4K wall.
+            rig.history(false, 10200, 3200, SECOND);
             assertEquals(40000, rig.best());
             assertFalse(BookmapSizeCap.liquidityQualified(rig.cap()));
             rig.server.finishSessionHistory("TEST");
@@ -167,12 +167,12 @@ class RollingLiquidityTest {
             SignalWebSocketServer server = new SignalWebSocketServer(0, 0);
             try {
                 server.registerSymbol("TEST", new OrderBookState(), .01);
-                server.observeSessionHistoricalTrade("TEST", 10000, 9000, true, OPEN);
-                server.observeSessionHistoricalTrade("TEST", 10100, 9000, true, OPEN + 1);
-                server.observeSessionHistoricalTrade("TEST", 10200, 22000, true, OPEN + 2);
+                server.observeSessionHistoricalTrade("TEST", 10000, 3000, true, OPEN);
+                server.observeSessionHistoricalTrade("TEST", 10100, 3000, true, OPEN + 1);
+                server.observeSessionHistoricalTrade("TEST", 10200, 34000, true, OPEN + 2);
                 assertEquals(40000, server.entrySizeCap("TEST").get("rollingOrderSize").getAsLong());
                 server.registerSizeThreshold("TEST", rig.policy);
-                assertEquals(22000, server.entrySizeCap("TEST").get("rollingOrderSize").getAsLong());
+                assertEquals(34000, server.entrySizeCap("TEST").get("rollingOrderSize").getAsLong());
                 assertFalse(BookmapSizeCap.liquidityQualified(server.entrySizeCap("TEST")));
             } finally { server.shutdown(); }
         }

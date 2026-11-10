@@ -22,6 +22,11 @@ public final class BookmapSizeCap {
         return cap.has("mode") ? Mode.valueOf(Models.string(cap, "mode")) : ACTIVE_MODE;
     }
 
+    /** Minimum executed shares per contributor inside the rolling window, rounded up. */
+    public static long rollingContributorMinimum(int required) {
+        return (required * 8L + 99) / 100;
+    }
+
     public static double rollingSize(JsonObject cap) {
         return cap.has("rollingOrderSize") ? Models.number(cap, "rollingOrderSize") : 0;
     }
@@ -58,7 +63,7 @@ public final class BookmapSizeCap {
                     && Models.positive(required), "Bookmap strict liquidity inputs unavailable");
             Models.require(liquidityQualified(cap), "Bookmap STRICT: ENTRY BLOCKED; largest executed size=" + largest
                     + " shares; best 2s accumulation=" + rolling + " shares; required=" + required
-                    + " shares (single wall/historical trade OR same-side 2s fills, each contributor >=25% of required)");
+                    + " shares (single wall/historical trade OR same-side 2s fills, each contributor >=8% of required)");
             if (plan.entry != null) plan.entry.add("bookmapSizeCap", cap.deepCopy());
             return;
         }

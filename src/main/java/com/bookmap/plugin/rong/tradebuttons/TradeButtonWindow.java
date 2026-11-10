@@ -593,7 +593,7 @@ public class TradeButtonWindow {
                 + "<br>Best 2s: " + formatShareSize(rolling) + " | "
                 + (loading ? "CHECKING" : rolling >= required ? "MET" : "WAITING")
                 + "<br>Required: " + formatShareSize(required) + " | 2s contributor: &ge;"
-                + formatShareSize((required + 3L) / 4);
+                + formatShareSize(BookmapSizeCap.rollingContributorMinimum(required));
         if (BookmapSizeCap.mode(cap) == Mode.STRICT) {
             if (loading) return rules + "<br><b>STRICT: checking fills since market open</b>";
             boolean qualified = BookmapSizeCap.liquidityQualified(cap);
@@ -880,7 +880,7 @@ public class TradeButtonWindow {
                 ? "Normal mode: 1R total risk ceiling; existing position and pending entries consume this budget. No qualifying wall fills required."
                 : "Single wall: executions at one wall episode or a single historical trade since market open. "
                 + "Best 2s: session's largest same-side total across prices in a rolling two-second window; "
-                + String.format(Locale.US, "each wall episode (or historical print without depth) must execute at least %,d shares inside that window. ", (required + 3L) / 4)
+                + String.format(Locale.US, "each wall episode (or historical print without depth) must execute at least %,d shares inside that window. ", BookmapSizeCap.rollingContributorMinimum(required))
                 + "No price-distance limit. Canceled size does not count. "
                 + (strict ? String.format(Locale.US, "Either rule reaching %,d executed shares satisfies liquidity for the session. ", required)
                         : String.format(Locale.US, "%.0f / %,d = %.6fR total risk ceiling; existing position and pending entries consume this budget. ", BookmapSizeCap.qualifyingSize(cap), required, cappedR));

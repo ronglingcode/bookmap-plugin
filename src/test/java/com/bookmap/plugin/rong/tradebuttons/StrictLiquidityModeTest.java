@@ -41,7 +41,7 @@ class StrictLiquidityModeTest {
         String text = TradeButtonWindow.liquidityStatusText(cap);
         assertTrue(text.contains("Single wall: 30K | WAITING"));
         assertTrue(text.contains("Best 2s: 45K | MET"));
-        assertTrue(text.contains("2s contributor: &ge;10K"));
+        assertTrue(text.contains("2s contributor: &ge;3.2K"));
         assertTrue(text.contains("liquidity threshold met"));
         assertFalse(text.contains("ENTRY BLOCKED"));
         cap.addProperty("available", false);

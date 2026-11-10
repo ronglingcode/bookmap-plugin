@@ -25,7 +25,7 @@ class SquareRootLiquidityThresholdTest {
                 SignalWebSocketServer server = new SignalWebSocketServer(0, 0);
                 try {
                     server.registerSymbol("TEST", new OrderBookState(), .01);
-                    int minimum = (required + 3) / 4;
+                    int minimum = (required * 8 + 99) / 100;
                     server.observeSessionHistoricalTrade("TEST", 10000, minimum, true, OPEN);
                     server.observeSessionHistoricalTrade("TEST", 10100, minimum, true, OPEN + 1);
                     server.observeSessionHistoricalTrade("TEST", 10200, required - 2 * minimum, true, OPEN + 2);
@@ -48,16 +48,16 @@ class SquareRootLiquidityThresholdTest {
             SignalWebSocketServer server = new SignalWebSocketServer(0, 0);
             try {
                 server.registerSymbol("TEST", new OrderBookState(), .01);
-                server.observeSessionHistoricalTrade("TEST", 10000, 1500, true, OPEN);
-                server.observeSessionHistoricalTrade("TEST", 10100, 1500, true, OPEN + 1);
-                server.observeSessionHistoricalTrade("TEST", 10200, 4000, true, OPEN + 2);
+                server.observeSessionHistoricalTrade("TEST", 10000, 500, true, OPEN);
+                server.observeSessionHistoricalTrade("TEST", 10100, 500, true, OPEN + 1);
+                server.observeSessionHistoricalTrade("TEST", 10200, 6000, true, OPEN + 2);
                 assertEquals(7000, server.entrySizeCap("TEST").get("rollingOrderSize").getAsInt());
                 server.observeSessionTime("TEST", OPEN + 60_000_000_000L);
                 server.registerSizeThreshold("TEST", policy);
                 JsonObject cap = server.entrySizeCap("TEST");
                 assertEquals(7000, cap.get("requiredOrderSize").getAsInt());
-                assertEquals(1750, cap.get("rollingContributorMinimum").getAsInt());
-                assertEquals(4000, cap.get("rollingOrderSize").getAsInt());
+                assertEquals(560, cap.get("rollingContributorMinimum").getAsInt());
+                assertEquals(6000, cap.get("rollingOrderSize").getAsInt());
                 assertFalse(BookmapSizeCap.liquidityQualified(cap));
             } finally { server.shutdown(); }
         }
