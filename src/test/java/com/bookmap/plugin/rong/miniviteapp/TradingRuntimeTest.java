@@ -267,15 +267,26 @@ class TradingRuntimeTest {
             assertEquals(2, tasks.stream().filter(task -> task.delay == 3000 && !task.canceled).count()); Task deferred = tasks.stream().filter(task -> task.delay == 3000 && !task.canceled).reduce((a, b) -> b).orElseThrow(); deferred.canceled = true; limited.set(true); now.addAndGet(3000); deferred.run.run(); assertEquals(4, accountReads.get());
             runtime.refreshAccount(); assertEquals(4, accountReads.get()); Task retry = tasks.stream().filter(task -> task.delay == 60000 && !task.canceled).reduce((a, b) -> b).orElseThrow(); retry.canceled = true; limited.set(false); now.addAndGet(60000); retry.run.run(); assertEquals(5, accountReads.get());
             positionData.set("[{\"instrument\":{\"symbol\":\"MSFT\",\"assetType\":\"EQUITY\"},\"longQuantity\":10,\"shortQuantity\":0,\"averagePrice\":20}]"); now.addAndGet(3000); runtime.refreshAccount(); assertEquals(10, runtime.view("MSFT", "test").getAsJsonObject("account").getAsJsonObject("positions").getAsJsonObject("MSFT").get("netQuantity").getAsInt());
-            now.addAndGet(9000); runtime.refreshAccount();
+            assertTrue(screen.contains("ERROR: 10.0 shares without stop loss; will close the full position if this persists more than 10 seconds"));
+            var autoClose = new java.util.concurrent.atomic.AtomicBoolean(false);
+            runtime.setAutoCloseUnprotectedPositions(autoClose::get);
+            int readsBeforeUnprotectedRefresh = accountReads.get();
+            now.addAndGet(12000); runtime.refreshAccount();
+            assertEquals(readsBeforeUnprotectedRefresh + 1, accountReads.get());
+            assertTrue(screen.contains("ERROR: 10.0 shares without stop loss. Automatic close is disabled."));
+            now.addAndGet(12000); runtime.refreshAccount();
+            assertTrue(screen.stream().noneMatch(value -> value.contains("closing FULL position")));
             assertTrue(emitted.stream().noneMatch(event -> event.has("action") && event.get("action").getAsString().equals("stop_loss_safety_close")));
+            assertEquals(1, mutations.get(), "persistent missing stop coverage must not submit orders");
+            autoClose.set(true);
             now.addAndGet(3000); runtime.refreshAccount();
+            assertTrue(screen.stream().noneMatch(value -> value.contains("closing FULL position")),
+                    "re-enabling starts a new grace period");
+            now.addAndGet(12000); runtime.refreshAccount();
             deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(2);
             while (emitted.stream().noneMatch(event -> event.has("action") && event.get("action").getAsString().equals("stop_loss_safety_close") && event.get("type").getAsString().equals("execution_result")) && System.nanoTime() < deadline) Thread.sleep(5);
             assertEquals(1, emitted.stream().filter(event -> event.has("action") && event.get("action").getAsString().equals("stop_loss_safety_close") && event.get("type").getAsString().equals("execution_result")).count());
-            assertEquals(2, mutations.get(), "safety close submits the off-watchlist position without a manual command");
-            now.addAndGet(3000); runtime.refreshAccount();
-            assertEquals(2, mutations.get(), "cached unprotected state must not submit duplicate market orders");
+            assertEquals(2, mutations.get(), "re-enabled safety close submits after the grace period");
             positionData.set("[]"); now.addAndGet(3000); runtime.refreshAccount(); assertTrue(emitted.stream().anyMatch(event -> event.has("symbol") && event.get("symbol").getAsString().equals("MSFT") && event.get("type").getAsString().equals("account_ready") && event.getAsJsonObject("account").getAsJsonObject("positions").size() == 0));
             configData.add("stockSelections", new JsonArray()); runtime.refreshConfig(); assertFalse(runtime.view("AAPL", "test").has("plan")); assertEquals(0, audits.get(), "Logs, notifications, orders and breakout snapshots must never be sent to Firestore");
             // Reporting includes all symbols after watchlist removal and never reads the broker.

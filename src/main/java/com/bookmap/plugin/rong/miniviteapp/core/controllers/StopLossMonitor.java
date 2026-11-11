@@ -17,7 +17,17 @@ public final class StopLossMonitor {
         public final List<String> close = new ArrayList<>();
     }
     private final Map<String, Exposure> exposed = new HashMap<>();
-    public synchronized Decision observe(JsonObject account, long now) {
+    private boolean autoCloseEnabled = true;
+
+    public Decision observe(JsonObject account, long now) {
+        return observe(account, now, true);
+    }
+
+    public synchronized Decision observe(JsonObject account, long now, boolean autoCloseEnabled) {
+        if (this.autoCloseEnabled != autoCloseEnabled) {
+            exposed.clear();
+            this.autoCloseEnabled = autoCloseEnabled;
+        }
         Decision result = new Decision();
         JsonObject positions = object(account, "positions");
         for (String symbol : positions.keySet()) {
@@ -38,7 +48,7 @@ public final class StopLossMonitor {
             if (exposure == null || exposure.isLong != (net > 0)) {
                 exposure = new Exposure(now, net > 0); exposed.put(symbol, exposure); result.warnings.put(symbol, uncovered);
             }
-            if (!exposure.closing && now - exposure.since > 10000) { exposure.closing = true; result.close.add(symbol); }
+            if (autoCloseEnabled && !exposure.closing && now - exposure.since > 10000) { exposure.closing = true; result.close.add(symbol); }
         }
         exposed.keySet().retainAll(positions.keySet());
         return result;

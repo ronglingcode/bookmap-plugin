@@ -20,7 +20,7 @@ See the [pattern-event guide](docs/pattern-events.md),
    `node scripts/importSecrets.mjs ..\secrets\storeSecrets.js`.
    See [credential setup](config/README.md).
 3. In Bookmap, open API Plugins Configuration, add
-   `build/libs/lingrong1988_bmtrader_1.44.jar`, and attach bmtrader to a chart.
+   `build/libs/lingrong1988_bmtrader_1.46.jar`, and attach bmtrader to a chart.
 4. The first attachment starts the trading runtime; the final detachment stops it.
    Check the bmtrader Logs window for startup errors. Settings offer
    **Restart Native Trading / Reload Secrets**, **Open Schwab Authorization**,
@@ -56,6 +56,9 @@ is blocked at startup and during entry validation.
   and trade-consumption alerts keep their existing behavior.
 - Local account/orders/fills and position-risk display, entry-input dialog,
   core-plan editor, trading notifications and optional sound.
+- **Auto-close positions without stop loss** is enabled by default. Uncheck it
+  in the plugin's **Indicators** settings to keep missing-stop warnings without
+  automatic closing. The setting applies across symbols and is saved across restarts.
 - One **Export** menu in Logs fetches complete session order history on demand
   and copies summary/detailed ThinkScript bubbles or trade CSV to the clipboard.
   Live account/order reads use one order request per refresh. [Formats and usage](docs/execution-exports-and-alert-cleanup.md).
@@ -149,7 +152,7 @@ TypeScript fixtures check Java parity; fake services cover standalone startup,
 renewal, requests, persistence and teardown. No live orders or real Firestore writes
 are sent by these checks.
 
-Share only `build/libs/lingrong1988_bmtrader_1.44.jar`. Unobfuscated intermediates
+Share only `build/libs/lingrong1988_bmtrader_1.46.jar`. Unobfuscated intermediates
 and the private mapping remain under `build/intermediates` and
 `build/private/obfuscation`. Obfuscation does not prevent reverse engineering.
 

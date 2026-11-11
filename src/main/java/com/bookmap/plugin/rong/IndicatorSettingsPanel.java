@@ -59,6 +59,14 @@ public class IndicatorSettingsPanel extends StrategyPanel {
             updateConnectionLabel(massiveStreamStatus, "Massive stream", status.getMassiveStream(), status.isMassiveStreamReceiving());
         }));
         add(connectionPanel, gbc);
+
+        gbc.gridy++;
+        JCheckBox autoClose = new JCheckBox("Auto-close positions without stop loss",
+                config.isEnabled(IndicatorConfig.AUTO_CLOSE_UNPROTECTED_POSITIONS));
+        autoClose.setToolTipText("Close the full position after more than 10 seconds of missing stop-loss coverage.");
+        autoClose.addActionListener(e ->
+                config.setEnabled(IndicatorConfig.AUTO_CLOSE_UNPROTECTED_POSITIONS, autoClose.isSelected()));
+        add(autoClose, gbc);
         } else {
             gbc.gridy++; add(new JLabel("Observer mode: native trading is inactive"), gbc);
         }

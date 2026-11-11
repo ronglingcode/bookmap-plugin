@@ -22,6 +22,7 @@ import com.google.gson.*;
 import java.util.*;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.function.BooleanSupplier;
 import java.util.function.LongSupplier;
 import static com.bookmap.plugin.rong.miniviteapp.models.DomainJson.*;
 
@@ -59,6 +60,7 @@ public final class TradingRuntime implements AutoCloseable {
     private final Map<String, JsonObject> quotes = new HashMap<>(), manual = new HashMap<>(), histories = new HashMap<>();
     private final Map<String, String> eligibility = new HashMap<>();
     private final StopLossMonitor stopLossMonitor = new StopLossMonitor();
+    private volatile BooleanSupplier autoCloseUnprotectedPositions = () -> true;
     private final Map<String, Long> reminders = new HashMap<>();
     private JsonObject account, ledger, policy = ExecutionInputs.defaultPolicy();
     private TradingConfig.Result config;
@@ -286,13 +288,18 @@ public final class TradingRuntime implements AutoCloseable {
     }
     private void checkStopLossProtection() {
         StopLossMonitor.Decision decision;
+        boolean autoClose;
         synchronized (lock) {
             if (stopped || state == null || config == null || account == null) return;
-            decision = stopLossMonitor.observe(account, now.getAsLong());
+            autoClose = autoCloseUnprotectedPositions.getAsBoolean();
+            decision = stopLossMonitor.observe(account, now.getAsLong(), autoClose);
         }
-        decision.warnings.forEach((symbol, uncovered) -> events.notify(symbol,
-                "ERROR: " + uncovered + " shares without stop loss; will close the full position if this persists more than 10 seconds"));
+        String warning = autoClose
+                ? " shares without stop loss; will close the full position if this persists more than 10 seconds"
+                : " shares without stop loss. Automatic close is disabled.";
+        decision.warnings.forEach((symbol, uncovered) -> events.notify(symbol, "ERROR: " + uncovered + warning));
         for (String symbol : decision.close) {
+            if (!autoCloseUnprotectedPositions.getAsBoolean()) return;
             events.notify(symbol, "ERROR: Missing stop-loss coverage for more than 10 seconds; closing FULL position");
             JsonObject action = message("native_job"); action.addProperty("symbol", symbol); action.addProperty("keyCode", "SafetyClosePosition");
             dispatch(action);
@@ -359,6 +366,9 @@ public final class TradingRuntime implements AutoCloseable {
     }
     private volatile java.util.function.Function<String, JsonObject> entrySizeCapProvider;
     public void setEntrySizeCapProvider(java.util.function.Function<String, JsonObject> provider) { entrySizeCapProvider = provider; }
+    public void setAutoCloseUnprotectedPositions(BooleanSupplier enabled) {
+        autoCloseUnprotectedPositions = Objects.requireNonNull(enabled);
+    }
     private void publishInputs(String symbol) {
         JsonObject input; var loaded = market.getState(symbol);
         synchronized (lock) {

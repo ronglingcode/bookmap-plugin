@@ -2,10 +2,11 @@ package com.bookmap.plugin.rong;
 
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.prefs.BackingStoreException;
+import java.util.prefs.Preferences;
 
 /**
- * Configuration for automatic indicators (enable/disable toggles).
- * Each indicator is identified by a string key.
+ * Shared plugin settings for indicators and trading controls.
  */
 public class IndicatorConfig {
 
@@ -21,7 +22,9 @@ public class IndicatorConfig {
     public static final String FILLED_EXECUTION_MARKERS = "filled_execution_markers";
     public static final String VWAP = "vwap";
     public static final String TRADING_NOTIFICATION_SOUND = "trading_notification_sound";
+    public static final String AUTO_CLOSE_UNPROTECTED_POSITIONS = "auto_close_unprotected_positions";
 
+    private final Preferences preferences = Preferences.userRoot().node("com/bookmap/plugin/rong");
     private final Map<String, Boolean> enabled = new ConcurrentHashMap<>();
 
     /** Listeners notified when any indicator toggle changes. */
@@ -42,6 +45,8 @@ public class IndicatorConfig {
         enabled.put(FILLED_EXECUTION_MARKERS, true);
         enabled.put(VWAP, true);
         enabled.put(TRADING_NOTIFICATION_SOUND, true);
+        enabled.put(AUTO_CLOSE_UNPROTECTED_POSITIONS,
+                preferences.getBoolean(AUTO_CLOSE_UNPROTECTED_POSITIONS, true));
     }
 
     public boolean isEnabled(String indicatorKey) {
@@ -60,6 +65,14 @@ public class IndicatorConfig {
 
     public void setEnabled(String indicatorKey, boolean value) {
         enabled.put(indicatorKey, value);
+        if (AUTO_CLOSE_UNPROTECTED_POSITIONS.equals(indicatorKey)) {
+            preferences.putBoolean(indicatorKey, value);
+            try {
+                preferences.flush();
+            } catch (BackingStoreException error) {
+                PluginLog.action("", "Could not save the automatic close setting for the next Bookmap session");
+            }
+        }
         for (ChangeListener l : listeners) {
             l.onIndicatorConfigChanged(indicatorKey, value);
         }
