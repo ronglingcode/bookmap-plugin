@@ -141,7 +141,7 @@ public class TradeButtonWindow {
         if (disposed) {
             return;
         }
-        frame = new JFrame("Trade: " + symbol);
+        frame = new JFrame("Trade: " + symbol + " [LIVE]");
         frame.getRootPane().putClientProperty("bmtrader.noChartHover", true);
         frame.setAlwaysOnTop(true);
         frame.setDefaultCloseOperation(JFrame.DO_NOTHING_ON_CLOSE);

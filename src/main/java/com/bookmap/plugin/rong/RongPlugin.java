@@ -128,13 +128,17 @@ public class RongPlugin implements CustomModuleAdapter,
     private PremarketSizeThreshold premarketSizeThreshold;
     private volatile double wallChangeStockPrice = Double.NaN;
     private TradeButtonWindow tradeButtonWindow;
+    private volatile ReplayTradeWindow replayTradeWindow;
+    private BookmapRunMode runMode = BookmapRunMode.UNKNOWN;
     private VwapTracker vwapTracker;
     private SignalWebSocketServer.VwapUpdateListener vwapUpdateListener;
     private IndicatorModifiable vwapIndicator;
 
     @Override
     public void initialize(String alias, InstrumentInfo info, Api api, InitialState initialState) {
-        if (!LocalCredentials.fileExists() && !observationConfig.observerOnly) return;
+        runMode = BookmapRunMode.detect(observationConfig.sourceMode);
+        if (!LocalCredentials.fileExists() && !observationConfig.observerOnly && runMode != BookmapRunMode.REPLAY) return;
+        boolean nativeExecution = runMode == BookmapRunMode.LIVE && !observationConfig.observerOnly;
         this.rawAlias = alias;
         patternMonitorSnapshotComplete = false;
         sessionHistoryLoading = true;
@@ -157,7 +161,7 @@ public class RongPlugin implements CustomModuleAdapter,
 
         synchronized (RongPlugin.class) {
             if (sharedServer == null) {
-                ActionLogWindow.showWindow();
+                ActionLogWindow.showWindow(runMode.banner);
                 PluginLog.start();
                 sharedServer = new SignalWebSocketServer(WS_PORT, ORDERBOOK_PERCENTILE);
                 sharedServer.start();
@@ -198,7 +202,7 @@ public class RongPlugin implements CustomModuleAdapter,
                 filledExecutionManager = new FilledExecutionManager(filledExecutionStore);
                 sharedServer.registerAccountStateListener(filledExecutionManager);
             }
-            if (!observationConfig.observerOnly) {
+            if (nativeExecution) {
             nativeApis.put(cleanAlias, api);
             if (nativeTrading == null) { nativeTrading = new NativeTradingAdapter(sharedServer, indicatorConfig, nativeConnectionStatus); nativeTrading.attach(cleanAlias, api); nativeTrading.start(); }
             else nativeTrading.attach(cleanAlias, api);
@@ -262,13 +266,14 @@ public class RongPlugin implements CustomModuleAdapter,
 
         indicatorConfig.addChangeListener(this);
         sharedServer.registerSymbol(cleanAlias, orderBook, info.pips);
+        sharedServer.publishCairoChart(cleanAlias, runMode.dataMode);
         sharedServer.beginSessionHistory(cleanAlias);
         if (observationConfig.exportsPatterns(cleanAlias) && patternEvents != null) {
             sharedServer.registerPatterns(cleanAlias, new com.bookmap.plugin.rong.signal.CairoPatternFeed(
                     reconnect -> cairoPatternSnapshot(reconnect), observationConfig.captureEvidence));
         }
         sharedServer.registerVwapUpdateListener(cleanAlias, vwapUpdateListener);
-        if (!observationConfig.observerOnly) chartHoverHotkeyHandler.registerSymbol(cleanAlias, info.pips);
+        if (nativeExecution) chartHoverHotkeyHandler.registerSymbol(cleanAlias, info.pips);
         priceZonePainter.registerInstrument(cleanAlias);
         priceLinePainter.registerInstrument(cleanAlias);
         wallLabelPainter.registerInstrument(cleanAlias);
@@ -338,7 +343,10 @@ public class RongPlugin implements CustomModuleAdapter,
             filledExecutionManager.onInstrumentInitialized(cleanAlias, info.pips);
         }
 
-        if (!observationConfig.observerOnly) {
+        if (runMode == BookmapRunMode.REPLAY) {
+            replayTradeWindow = new ReplayTradeWindow(cleanAlias, sharedServer::broadcastReplayEvent);
+            replayTradeWindow.open();
+        } else if (nativeExecution) {
             tradeButtonWindow = new TradeButtonWindow(
                     cleanAlias, sharedServer, wallThresholdConfig::getThresholdFloor, nativeConnectionStatus);
         }
@@ -426,6 +434,9 @@ public class RongPlugin implements CustomModuleAdapter,
             tradeButtonWindow.dispose();
             tradeButtonWindow = null;
         }
+        ReplayTradeWindow replay = replayTradeWindow;
+        replayTradeWindow = null;
+        if (replay != null) replay.dispose();
         if (sharedServer != null && vwapUpdateListener != null) {
             sharedServer.unregisterVwapUpdateListener(alias, vwapUpdateListener);
         }
@@ -607,7 +618,8 @@ public class RongPlugin implements CustomModuleAdapter,
 
     @Override
     public StrategyPanel[] getCustomSettingsPanels() {
-        if (!LocalCredentials.fileExists() && !observationConfig.observerOnly) return new StrategyPanel[0];
+        BookmapRunMode mode = BookmapRunMode.detect(observationConfig.sourceMode);
+        if (!LocalCredentials.fileExists() && !observationConfig.observerOnly && mode != BookmapRunMode.REPLAY) return new StrategyPanel[0];
         synchronized (RongPlugin.class) {
             if (indicatorConfig == null) {
                 indicatorConfig = new IndicatorConfig();
@@ -618,7 +630,7 @@ public class RongPlugin implements CustomModuleAdapter,
         }
         return new StrategyPanel[] {
             new IndicatorSettingsPanel(indicatorConfig, wallThresholdConfig, nativeConnectionStatus,
-                    observationConfig.observerOnly)
+                    observationConfig.observerOnly || mode != BookmapRunMode.LIVE)
         };
     }
 
@@ -664,6 +676,9 @@ public class RongPlugin implements CustomModuleAdapter,
         long eventTimeNs = getEventTimeNs();
         PatternEvent.TimestampProvenance provenance = patternEventProvenance();
         double realPrice = BookmapPriceNormalizer.toWirePrice(price, instrumentInfo.pips);
+        if (sharedServer != null) sharedServer.publishCairoTrade(alias, runMode.dataMode, realPrice, lastTimestampNs);
+        ReplayTradeWindow replay = replayTradeWindow;
+        if (replay != null) replay.observeTrade(realPrice, lastTimestampNs);
         wallChangeStockPrice = realPrice;
         int priceTick = (int) Math.round(price);
         if (falseBreakoutMonitor != null) {
@@ -712,6 +727,8 @@ public class RongPlugin implements CustomModuleAdapter,
     @Override
     public void onTimestamp(long timestampNs) {
         if (!initialized) return;
+        ReplayTradeWindow replay = replayTradeWindow;
+        if (replay != null) replay.observeTime(timestampNs);
         if (timestampNs > 0 && lastTimestampNs > 0 && timestampNs < lastTimestampNs) {
             patternEventSnapshotComplete = false;
             patternMonitorSnapshotComplete = false;
@@ -887,7 +904,7 @@ public class RongPlugin implements CustomModuleAdapter,
                 }
             }
             com.google.gson.JsonObject value = patternEvents.aggregateSnapshot(liquidity, reconnect);
-            value.addProperty("mode", observationConfig.sourceMode);
+            value.addProperty("mode", runMode.dataMode);
             return value;
         }
     }

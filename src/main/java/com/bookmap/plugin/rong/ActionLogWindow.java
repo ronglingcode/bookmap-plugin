@@ -56,10 +56,16 @@ public class ActionLogWindow {
     private static String selectedStopSymbol = "";
     private static double selectedStopPrice;
     private static int selectedStopSeconds;
+    private static String modeBanner;
 
     private ActionLogWindow() {}
 
     public static synchronized void showWindow() {
+        showWindow(null);
+    }
+
+    static synchronized void showWindow(String banner) {
+        modeBanner = banner;
         if (session == null) session = new Object();
         invokeWhenActive(ActionLogWindow::ensureWindow);
     }
@@ -206,6 +212,11 @@ public class ActionLogWindow {
         statusPanel.add(chartStatusPanel, BorderLayout.NORTH);
         statusPanel.add(accountStatusLabel, BorderLayout.CENTER);
         JPanel headerPanel = new JPanel(new BorderLayout(0, 6));
+        if (modeBanner != null) {
+            JLabel banner = new JLabel(modeBanner);
+            banner.setFont(banner.getFont().deriveFont(Font.BOLD));
+            headerPanel.add(banner, BorderLayout.NORTH);
+        }
         headerPanel.add(statusPanel, BorderLayout.CENTER);
         headerPanel.add(ExecutionExportMenu.create(frame, RongPlugin::exportNativeExecutions), BorderLayout.SOUTH);
         accountPanel.add(headerPanel, BorderLayout.NORTH);

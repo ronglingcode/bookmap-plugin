@@ -361,7 +361,7 @@ public final class TradingRuntime implements AutoCloseable {
         JsonObject value = message(type); value.addProperty("symbol", symbol); value.addProperty("timestamp", now.getAsLong());
         if (type.equals("market_update")) { var loaded = market.getState(symbol); if (loaded != null) value.add("market", loaded.metrics()); return value; }
         synchronized (lock) { if (config != null) { JsonObject plan = selectedPlan(symbol); if (plan != null) value.add("plan", plan.deepCopy()); value.add("tradingSettings", config.tradingSettings.deepCopy()); value.add("policy", policy.deepCopy()); }
-            if (account != null) value.add("account", account.deepCopy()); if (ledger != null) value.add("ledger", ledger.deepCopy()); if (state != null) value.add("state", state.snapshot()); if (histories.containsKey(symbol)) value.add("history", histories.get(symbol).deepCopy()); }
+            if (account != null) { value.add("account", account.deepCopy()); value.addProperty("accountAsOf", accountReadStartedAt); } if (ledger != null) value.add("ledger", ledger.deepCopy()); if (state != null) value.add("state", state.snapshot()); if (histories.containsKey(symbol)) value.add("history", histories.get(symbol).deepCopy()); }
         var loaded = market.getState(symbol); if (loaded != null) value.add("market", loaded.snapshot()); return value;
     }
     private volatile java.util.function.Function<String, JsonObject> entrySizeCapProvider;

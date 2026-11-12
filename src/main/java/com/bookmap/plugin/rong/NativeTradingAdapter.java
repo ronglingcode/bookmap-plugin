@@ -98,7 +98,12 @@ public final class NativeTradingAdapter implements AutoCloseable {
             NativeRuntime current = runtime;
             if (current != null) { JsonObject targetMarket = current.trading.targetMarket(string(value, "symbol")); if (targetMarket != null) display.updateTargetMarket(targetMarket); }
             if (type.equals("market_update")) display.acceptLocalMessage(NativeViews.premarketLevels(value));
-            NativeViews.project(value).forEach(display::acceptLocalMessage);
+            NativeViews.project(value).forEach(projected -> {
+                display.acceptLocalMessage(projected);
+                if (type.equals("account_ready") && string(projected, "type").equals("account_state") && value.has("accountAsOf")) {
+                    display.publishCairoAccount(projected, value.get("accountAsOf").getAsLong());
+                }
+            });
         }
     }
     private void notifyUser(String symbol, String text) {

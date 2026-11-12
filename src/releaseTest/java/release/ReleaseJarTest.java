@@ -3,6 +3,8 @@ package release;
 import static org.junit.jupiter.api.Assertions.*;
 
 import java.lang.reflect.Method;
+import java.lang.invoke.MethodHandles;
+import java.lang.invoke.MethodType;
 import java.lang.reflect.Proxy;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -161,6 +163,18 @@ class ReleaseJarTest {
             if (previous == null) System.clearProperty("bmtrader.secrets"); else System.setProperty("bmtrader.secrets", previous);
             Files.deleteIfExists(directory);
         }
+    }
+
+    @Test
+    void replayPublisherIsAccessibleFromThePackagedAddonEntryPoint() throws Exception {
+        String serverName = "com.bookmap.plugin.rong.SignalWebSocketServer";
+        Class<?> entry = Class.forName(ENTRY);
+        Class<?> server = mappedClass(serverName);
+        Class<?> json = Class.forName("com.bookmap.plugin.shaded.gson.JsonObject");
+        String publisher = MEMBERS.get(serverName + "#void broadcastReplayEvent(com.bookmap.plugin.shaded.gson.JsonObject)");
+        assertNotNull(publisher);
+        MethodHandles.privateLookupIn(entry, MethodHandles.lookup())
+                .findVirtual(server, publisher, MethodType.methodType(void.class, json));
     }
 
     @Test

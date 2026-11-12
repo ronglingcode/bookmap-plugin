@@ -21,8 +21,32 @@ Preferences load at attachment from `%USERPROFILE%\bmtrader\cairo-observation.js
 `evidenceEnabled` defaults to false; empty/missing `evidenceSymbols` covers all
 eligible attached charts. `captureEvidence` defaults to true. Historical detector
 lists do not filter the feed. Detector observation must also be enabled with valid
-settings. `sourceMode` is explicit (`live`, `replay`, `unknown`); callbacks do not
-prove live data. `observerOnly` omits native broker startup. Reattach to reload.
+settings. The plugin reads Bookmap's run-mode flags at attachment. A configured
+`sourceMode: "replay"` is a fallback for hosts without mode information. An unknown
+mode leaves broker execution unavailable. `observerOnly` also omits native broker
+startup. Reattach to reload settings.
+
+## Replay fills
+
+The replay Trade window shows a **REPLAY** banner and a **Buy (simulated)** control.
+The control fills the entered share count at the latest recorded trade price and
+publishes `cairo_replay_fill` version 1 over the loopback connection. The event
+carries `mode`, `sourceInstanceId`, `symbol`, `epoch`, `sequence`, `eventTime`
+(Bookmap cursor in nanoseconds as a string), `executionId`, `positionId`, `side`, `price` (USD),
+`quantity`, `positionQuantity`, `positionAveragePrice`, and `opening`. On rewind,
+`cairo_replay_reset` marks the new epoch and the replay window waits for a new trade.
+New subscribers receive the latest replay position or reset with `delivery: "snapshot"`.
+
+## Cairo Live data bridge
+
+The loopback connection also sends version 1 `cairo_chart`, `cairo_trade`, and
+`cairo_account` records. Chart records identify attached symbols and data mode.
+Trades use normalized USD prices and Bookmap market timestamps. Consumers can
+detect dropped ticks via gaps in the per-symbol `tradeSequence`. Account records
+carry the completed native account projection's `asOf` timestamp, net position,
+average price, working stops, and normalized executions with stable opaque IDs.
+Connect and reconnect snapshots carry `delivery: "snapshot"` and are baselines.
+The bridge has no order submission endpoint or credentials.
 
 ## Version 2 snapshot
 

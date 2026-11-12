@@ -58,6 +58,16 @@ public class SignalWebSocketServer extends WebSocketServer {
         }
     }
     private final java.util.concurrent.ArrayBlockingQueue<Runnable> observationQueue = new java.util.concurrent.ArrayBlockingQueue<>(512);
+    private final CairoLiveFeed cairoLive = new CairoLiveFeed(this::broadcast);
+
+    void publishCairoChart(String symbol, String mode) { cairoLive.chart(symbol, mode, true); }
+
+    void publishCairoTrade(String symbol, String mode, double price, long time) {
+        JsonObject event = cairoLive.makeTrade(symbol, mode, price, time);
+        if (event != null) observationQueue.offer(() -> cairoLive.trade(event));
+    }
+
+    void publishCairoAccount(JsonObject account, long asOf) { cairoLive.account(account, asOf); }
     private final java.util.concurrent.ScheduledExecutorService observationWorker = java.util.concurrent.Executors.newSingleThreadScheduledExecutor(r -> { Thread t = new Thread(r, "cairo-patterns"); t.setDaemon(true); return t; });
     private final Map<String, com.bookmap.plugin.rong.signal.CairoPatternFeed> patternFeeds = new ConcurrentHashMap<>();
     public void registerPatterns(String alias, com.bookmap.plugin.rong.signal.CairoPatternFeed feed) { patternFeeds.put(alias, feed); }
@@ -358,6 +368,7 @@ public class SignalWebSocketServer extends WebSocketServer {
     /** Unregister a symbol when its plugin instance stops. */
     public void unregisterSymbol(String symbol) {
         if (entryBidReclaimManager != null) entryBidReclaimManager.unregister(symbol);
+        cairoLive.chart(symbol, BookmapRunMode.detect("unknown").dataMode, false);
         if (selectedStopManager != null) selectedStopManager.unregister(symbol);
         com.bookmap.plugin.rong.signal.CairoPatternFeed feed = patternFeeds.remove(symbol);
         if (feed != null) {
@@ -712,6 +723,7 @@ public class SignalWebSocketServer extends WebSocketServer {
     @Override
     public void onOpen(WebSocket conn, ClientHandshake handshake) {
         conn.send("{\"type\":\"standalone_status\",\"native\":true}");
+        cairoLive.snapshot(conn::send);
         for (JsonObject target : targetMarkets.values()) conn.send(target.toString());
         observationQueue.offer(() -> { for (com.bookmap.plugin.rong.signal.CairoPatternFeed recorder : patternFeeds.values()) for (JsonObject batch : recorder.snapshot()) if (conn.isOpen()) conn.send(batch.toString());
             });
@@ -740,6 +752,11 @@ public class SignalWebSocketServer extends WebSocketServer {
     /** Broker hints bypass the lossy market-observation queue. */
     public void broadcastAccountActivity(JsonObject json) {
         if ("cairo_account_activity".equals(json.get("type").getAsString())) broadcast(json.toString());
+    }
+
+    // RongPlugin's method reference crosses packages in the obfuscated release.
+    public void broadcastReplayEvent(JsonObject event) {
+        cairoLive.replay(event);
     }
     public void acceptLocalMessage(JsonObject json) {
         if (json != null) {

@@ -1,0 +1,50 @@
+package com.bookmap.plugin.rong;
+
+import com.google.gson.JsonObject;
+import java.util.ArrayList;
+import java.util.List;
+import org.junit.jupiter.api.Test;
+import static org.junit.jupiter.api.Assertions.*;
+
+class ReplayTradingTest {
+    @Test void separatesDataModeFromTradingMode() {
+        assertEquals(BookmapRunMode.REPLAY, BookmapRunMode.fromFlags(false, false));
+        assertEquals(BookmapRunMode.LIVE, BookmapRunMode.fromFlags(true, true));
+        assertEquals(BookmapRunMode.LIVE_SIMULATED, BookmapRunMode.fromFlags(true, false));
+        assertEquals(BookmapRunMode.UNKNOWN, BookmapRunMode.fromFlags(null, null));
+    }
+
+    @Test void publishesOpeningAndAddFillsAndDiscardsPriceAndPositionAfterRewind() {
+        List<JsonObject> events = new ArrayList<>();
+        ReplayTradeWindow replay = new ReplayTradeWindow("TEST", events::add);
+        replay.buy(10);
+        assertTrue(events.isEmpty());
+
+        replay.observeTrade(101.25, 100);
+        replay.observeTime(120);
+        replay.buy(10);
+        JsonObject first = events.get(0);
+        assertEquals("cairo_replay_fill", first.get("type").getAsString());
+        assertEquals("replay", first.get("mode").getAsString());
+        assertEquals("120", first.get("eventTime").getAsString());
+        assertEquals(101.25, first.get("price").getAsDouble());
+        assertTrue(first.get("opening").getAsBoolean());
+
+        replay.observeTrade(102.25, 130);
+        replay.buy(10);
+        assertEquals(20, events.get(1).get("positionQuantity").getAsInt());
+        assertEquals(101.75, events.get(1).get("positionAveragePrice").getAsDouble());
+        assertFalse(events.get(1).get("opening").getAsBoolean());
+
+        replay.observeTime(90);
+        assertEquals("cairo_replay_reset", events.get(2).get("type").getAsString());
+        replay.buy(5);
+        assertEquals(3, events.size());
+        replay.observeTrade(99.25, 91);
+        replay.buy(5);
+        assertEquals(2, events.get(3).get("epoch").getAsInt());
+        assertEquals(5, events.get(3).get("positionQuantity").getAsInt());
+        assertTrue(events.get(3).get("opening").getAsBoolean());
+        assertNotEquals(first.get("executionId"), events.get(3).get("executionId"));
+    }
+}
