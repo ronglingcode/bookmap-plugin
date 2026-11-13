@@ -7,6 +7,21 @@ import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.*;
 
 class ReplayTradingTest {
+    @Test void replayVwapWeightsRecordedVolumeAndTracksCoverage() {
+        ReplayVwap vwap = new ReplayVwap();
+        long premarket = java.time.Instant.parse("2026-11-12T09:00:00Z").toEpochMilli() * 1_000_000L;
+        vwap.observe(premarket);
+        vwap.trade(99, 200, premarket - 1_000_000_000L);
+        vwap.trade(150, 100, premarket + 1_000_000_000L);
+        vwap.trade(156, 300, premarket + 2_000_000_000L);
+        assertEquals(154.5, vwap.value());
+        assertTrue(vwap.coversPremarketStart());
+        ReplayVwap afterSeek = new ReplayVwap();
+        afterSeek.trade(151, 50, premarket + 1_000_000_000L);
+        assertEquals(151, afterSeek.value());
+        assertFalse(afterSeek.coversPremarketStart());
+    }
+
     @Test void sellsPartialsAndClosesWithoutOpeningAShort() {
         List<JsonObject> events = new ArrayList<>();
         ReplayTradeWindow replay = new ReplayTradeWindow("TEST", events::add);

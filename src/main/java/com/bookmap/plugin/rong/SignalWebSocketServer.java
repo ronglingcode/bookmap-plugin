@@ -63,7 +63,16 @@ public class SignalWebSocketServer extends WebSocketServer {
     void publishCairoChart(String symbol, String mode) { cairoLive.chart(symbol, mode, true); }
 
     void publishCairoTrade(String symbol, String mode, double price, long time) {
+        publishCairoTrade(symbol, mode, price, time, null);
+    }
+
+    void publishCairoTrade(String symbol, String mode, double price, long time, ReplayVwap vwap) {
         JsonObject event = cairoLive.makeTrade(symbol, mode, price, time);
+        if (event != null && vwap != null && Double.isFinite(vwap.value())) {
+            event.addProperty("replayVwap", vwap.value());
+            event.addProperty("vwapFirstObserved", Long.toString(vwap.firstObserved()));
+            event.addProperty("vwapCoversPremarketStart", vwap.coversPremarketStart());
+        }
         if (event != null) observationQueue.offer(() -> cairoLive.trade(event));
     }
 

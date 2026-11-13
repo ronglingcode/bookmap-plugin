@@ -131,6 +131,8 @@ public class RongPlugin implements CustomModuleAdapter,
     private volatile ReplayTradeWindow replayTradeWindow;
     private BookmapRunMode runMode = BookmapRunMode.UNKNOWN;
     private VwapTracker vwapTracker;
+    private ReplayVwap replayVwap;
+    private long lastReplayVwapPoint;
     private SignalWebSocketServer.VwapUpdateListener vwapUpdateListener;
     private IndicatorModifiable vwapIndicator;
 
@@ -153,6 +155,8 @@ public class RongPlugin implements CustomModuleAdapter,
         this.lastTimestampNs = initialState != null ? initialState.getCurrentTime() : 0L;
         this.orderBook = new OrderBookState();
         this.vwapTracker = new VwapTracker(cleanAlias);
+        this.replayVwap = runMode == BookmapRunMode.REPLAY ? new ReplayVwap() : null;
+        this.lastReplayVwapPoint = 0;
         this.vwapUpdateListener = update -> {
             if (vwapTracker != null) {
                 vwapTracker.applyUpdate(update);
@@ -684,7 +688,16 @@ public class RongPlugin implements CustomModuleAdapter,
         long eventTimeNs = getEventTimeNs();
         PatternEvent.TimestampProvenance provenance = patternEventProvenance();
         double realPrice = BookmapPriceNormalizer.toWirePrice(price, instrumentInfo.pips);
-        if (sharedServer != null) sharedServer.publishCairoTrade(alias, runMode.dataMode, realPrice, lastTimestampNs);
+        ReplayVwap recorded = replayVwap;
+        if (recorded != null) {
+            recorded.trade(realPrice, size, lastTimestampNs);
+            if (lastTimestampNs - lastReplayVwapPoint >= 1_000_000_000L && Double.isFinite(recorded.value())
+                    && vwapIndicator != null && indicatorConfig.isEnabled(IndicatorConfig.VWAP)) {
+                addPrimaryPricePoint(vwapIndicator, lastTimestampNs, recorded.value());
+                lastReplayVwapPoint = lastTimestampNs;
+            }
+        }
+        if (sharedServer != null) sharedServer.publishCairoTrade(alias, runMode.dataMode, realPrice, lastTimestampNs, recorded);
         ReplayTradeWindow replay = replayTradeWindow;
         if (replay != null) replay.observeTrade(realPrice, lastTimestampNs);
         wallChangeStockPrice = realPrice;
@@ -737,6 +750,11 @@ public class RongPlugin implements CustomModuleAdapter,
         if (!initialized) return;
         ReplayTradeWindow replay = replayTradeWindow;
         if (timestampNs > 0 && lastTimestampNs > 0 && timestampNs < lastTimestampNs) {
+            if (replayVwap != null) {
+                replayVwap = new ReplayVwap();
+                lastReplayVwapPoint = 0;
+                if (vwapIndicator != null) addPrimaryPricePoint(vwapIndicator, timestampNs, Double.NaN);
+            }
             if (replay != null && sharedServer != null) sharedServer.resetCairoReplayDepth(alias);
             patternEventSnapshotComplete = false;
             patternMonitorSnapshotComplete = false;
@@ -744,6 +762,7 @@ public class RongPlugin implements CustomModuleAdapter,
             patternEventSeedFromSharedBook = false;
         }
         if (replay != null) replay.observeTime(timestampNs);
+        if (replayVwap != null) replayVwap.observe(timestampNs);
         this.lastTimestampNs = timestampNs;
         if (premarketSizeThreshold != null) premarketSizeThreshold.onMarketTime();
         if (sharedServer != null) sharedServer.observeSessionTime(alias, timestampNs);
