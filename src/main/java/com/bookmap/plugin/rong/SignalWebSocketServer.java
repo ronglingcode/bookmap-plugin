@@ -62,12 +62,8 @@ public class SignalWebSocketServer extends WebSocketServer {
 
     void publishCairoChart(String symbol, String mode) { cairoLive.chart(symbol, mode, true); }
 
-    void publishCairoTrade(String symbol, String mode, double price, long time) {
-        publishCairoTrade(symbol, mode, price, time, null);
-    }
-
-    void publishCairoTrade(String symbol, String mode, double price, long time, ReplayVwap vwap) {
-        JsonObject event = cairoLive.makeTrade(symbol, mode, price, time);
+    void publishCairoTrade(String symbol, String mode, double price, long time, int size, ReplayVwap vwap) {
+        JsonObject event = cairoLive.makeTrade(symbol, mode, price, time, size);
         if (event != null && vwap != null && Double.isFinite(vwap.value())) {
             event.addProperty("replayVwap", vwap.value());
             event.addProperty("vwapFirstObserved", Long.toString(vwap.firstObserved()));
@@ -755,6 +751,10 @@ public class SignalWebSocketServer extends WebSocketServer {
                 conn.send(cairoDepthResponse(request).toString());
                 return;
             }
+            if (conn != null && getString(request, "type").equals("cairo_minute_bars_request")) {
+                conn.send(cairoMinuteBarsResponse(request).toString());
+                return;
+            }
             if (!getString(request, "type").equals("wall_out_snapshot_request") || conn == null) return;
             String symbol = SymbolUtils.cleanSymbol(getString(request, "symbol"));
             JsonObject response = new JsonObject();
@@ -765,6 +765,24 @@ public class SignalWebSocketServer extends WebSocketServer {
             conn.send(response.toString());
         } catch (RuntimeException ignored) { }
     }
+
+    JsonObject cairoMinuteBarsResponse(JsonObject request) {
+        String symbol = SymbolUtils.cleanSymbol(getString(request, "symbol"));
+        String mode = getString(request, "mode");
+        JsonObject response = new JsonObject();
+        response.addProperty("type", "cairo_minute_bars");
+        response.addProperty("version", 1);
+        response.addProperty("requestId", getString(request, "requestId"));
+        response.addProperty("symbol", symbol);
+        response.addProperty("mode", mode);
+        JsonObject nativeBars = "live".equals(mode) ? cairoMinuteBarsProvider.apply(symbol) : null;
+        if (nativeBars != null) nativeBars.entrySet().forEach(field -> response.add(field.getKey(), field.getValue()));
+        else cairoLive.minuteBars(response, symbol, mode);
+        return response;
+    }
+
+    private volatile java.util.function.Function<String, JsonObject> cairoMinuteBarsProvider = symbol -> null;
+    void setCairoMinuteBarsProvider(java.util.function.Function<String, JsonObject> provider) { cairoMinuteBarsProvider = provider; }
 
     void markCairoLiveDepth(String symbol, long timestampNs) {
         if (timestampNs > 0) cairoDepthTimes.merge(symbol, timestampNs, Math::max);

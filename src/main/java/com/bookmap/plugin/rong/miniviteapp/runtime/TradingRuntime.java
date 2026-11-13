@@ -170,6 +170,10 @@ public final class TradingRuntime implements AutoCloseable {
         JsonObject levels = state.sessionLevels();
         return string(levels, "sessionDate").equals(MarketClock.marketTime(now.getAsLong()).date) ? levels : null;
     }
+    public JsonObject cairoMinuteBars(String symbol) {
+        var state = market.getState(symbol);
+        return state == null ? null : state.cairoMinuteBars(MarketClock.marketTime(now.getAsLong()).date);
+    }
     public JsonObject targetMarket(String symbol) {
         JsonObject levels = sessionLevels(symbol);
         if (levels == null) return null;

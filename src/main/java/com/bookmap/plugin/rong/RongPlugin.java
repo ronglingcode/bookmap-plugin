@@ -697,7 +697,7 @@ public class RongPlugin implements CustomModuleAdapter,
                 lastReplayVwapPoint = lastTimestampNs;
             }
         }
-        if (sharedServer != null) sharedServer.publishCairoTrade(alias, runMode.dataMode, realPrice, lastTimestampNs, recorded);
+        if (sharedServer != null) sharedServer.publishCairoTrade(alias, runMode.dataMode, realPrice, lastTimestampNs, size, recorded);
         ReplayTradeWindow replay = replayTradeWindow;
         if (replay != null) replay.observeTrade(realPrice, lastTimestampNs);
         wallChangeStockPrice = realPrice;

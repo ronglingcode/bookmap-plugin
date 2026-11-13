@@ -151,6 +151,22 @@ public final class MarketState {
         json.addProperty("openPrice", levels.has("openPrice") ? levels.get("openPrice").getAsDouble() : 0);
         return json;
     }
+    public synchronized JsonObject cairoMinuteBars(String sessionDate) {
+        if (!date.equals(sessionDate) || buckets.isEmpty()) return null;
+        JsonObject result = new JsonObject();
+        result.addProperty("sessionDate", date);
+        result.addProperty("source", "Bookmap native market runtime");
+        // Bookmap price-only level observations do not advance the candle's coverage.
+        result.addProperty("asOf", buckets.lastEntry().getValue().lastTradeTime);
+        JsonArray bars = new JsonArray();
+        for (Bucket bar : buckets.values()) {
+            JsonArray row = new JsonArray();
+            row.add(bar.datetime); row.add(bar.open); row.add(bar.high); row.add(bar.low); row.add(bar.close); row.add(bar.volume);
+            bars.add(row);
+        }
+        result.add("bars", bars);
+        return result;
+    }
     public synchronized JsonObject snapshot() {
         JsonObject json = new JsonObject(); json.addProperty("symbol", symbol); json.addProperty("date", date);
         JsonArray candles = new JsonArray(), series = new JsonArray(); double openPrice = currentPrice; boolean foundOpen = false;

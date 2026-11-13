@@ -3,21 +3,49 @@ package com.bookmap.plugin.rong;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
+import com.bookmap.plugin.rong.miniviteapp.core.marketdata.MarketClock;
 import java.util.LinkedHashMap;
 import java.util.ArrayDeque;
 import java.util.Deque;
 import java.util.Map;
+import java.util.TreeMap;
 import java.util.UUID;
 import java.util.function.Consumer;
 
 /** Loopback projections for Cairo Live. Never accepts trading commands or credentials. */
 final class CairoLiveFeed {
+    private static final long MINUTE = 60_000L;
+    private static final class Minute {
+        long first, last, volume;
+        double open, high, low, close;
+
+        Minute(long time, double price) {
+            first = last = time;
+            open = high = low = close = price;
+        }
+
+        void trade(long time, double price, int size) {
+            if (time < first) { first = time; open = price; }
+            if (time >= last) { last = time; close = price; }
+            high = Math.max(high, price);
+            low = Math.min(low, price);
+            volume += size;
+        }
+    }
+
+    private static final class Chart {
+        String date;
+        long asOf;
+        final TreeMap<Long, Minute> minutes = new TreeMap<>();
+    }
+
     private final String source = UUID.randomUUID().toString();
     private final Consumer<String> send;
     private final Map<String, JsonObject> charts = new LinkedHashMap<>();
     private final Map<String, JsonObject> accounts = new LinkedHashMap<>();
     private final Map<String, Deque<JsonObject>> replay = new LinkedHashMap<>();
     private final Map<String, JsonObject> prices = new LinkedHashMap<>();
+    private final Map<String, Chart> candles = new LinkedHashMap<>();
     private final Map<String, Long> tradeSequences = new LinkedHashMap<>();
     private final Map<String, Long> resetWatermarks = new LinkedHashMap<>();
     private long sequence;
@@ -41,17 +69,52 @@ final class CairoLiveFeed {
         JsonObject event = envelope("cairo_chart", symbol, mode);
         event.addProperty("attached", attached);
         if (attached) charts.put(symbol, event);
-        else { charts.remove(symbol); prices.remove(symbol); replay.remove(symbol); tradeSequences.remove(symbol); resetWatermarks.remove(symbol); }
+        else { charts.remove(symbol); prices.remove(symbol); replay.remove(symbol); tradeSequences.remove(symbol); resetWatermarks.remove(symbol); candles.remove(symbol); }
         send.accept(event.toString());
     }
 
-    synchronized JsonObject makeTrade(String symbol, String mode, double price, long timestampNs) {
-        if (!charts.containsKey(symbol) || !Double.isFinite(price) || price <= 0 || timestampNs <= 0) return null;
+    synchronized JsonObject makeTrade(String symbol, String mode, double price, long timestampNs, int size) {
+        JsonObject attached = charts.get(symbol);
+        if (attached == null || !mode.equals(attached.get("mode").getAsString()) ||
+                !Double.isFinite(price) || price <= 0 || timestampNs <= 0) return null;
+        if (size > 0) {
+            long time = timestampNs / 1_000_000L;
+            Chart chart = candles.computeIfAbsent(symbol, ignored -> new Chart());
+            long bucket = time / MINUTE * MINUTE;
+            // Resolve the session date on minute transitions rather than on every print.
+            if (chart.minutes.isEmpty() || bucket > chart.minutes.lastKey() || bucket < chart.minutes.firstKey()) {
+                String date = MarketClock.marketTime(time).date;
+                if (!date.equals(chart.date)) {
+                    if (chart.date != null && date.compareTo(chart.date) < 0) return null;
+                    chart.date = date;
+                    chart.minutes.clear();
+                    chart.asOf = 0;
+                }
+            }
+            chart.minutes.computeIfAbsent(bucket, ignored -> new Minute(timestampNs, price)).trade(timestampNs, price, size);
+            chart.asOf = Math.max(chart.asOf, time);
+        }
         JsonObject event = envelope("cairo_trade", symbol, mode);
         event.addProperty("tradeSequence", tradeSequences.merge(symbol, 1L, Long::sum));
         event.addProperty("price", price);
         event.addProperty("eventTime", Long.toString(timestampNs));
         return event;
+    }
+
+    synchronized void minuteBars(JsonObject response, String symbol, String mode) {
+        Chart chart = candles.get(symbol);
+        JsonObject attached = charts.get(symbol);
+        if (chart == null || attached == null || !mode.equals(attached.get("mode").getAsString())) return;
+        response.addProperty("sessionDate", chart.date);
+        response.addProperty("asOf", chart.asOf);
+        response.addProperty("source", "Bookmap observed trades");
+        JsonArray bars = new JsonArray();
+        chart.minutes.forEach((time, bar) -> {
+            JsonArray row = new JsonArray();
+            row.add(time); row.add(bar.open); row.add(bar.high); row.add(bar.low); row.add(bar.close); row.add(bar.volume);
+            bars.add(row);
+        });
+        response.add("bars", bars);
     }
 
     synchronized void trade(JsonObject event) {
@@ -70,6 +133,7 @@ final class CairoLiveFeed {
         if (event.get("type").getAsString().equals("cairo_replay_reset")) {
             history.clear();
             prices.remove(symbol);
+            candles.remove(symbol);
             resetWatermarks.put(symbol, sequence);
         }
         history.addLast(event.deepCopy());

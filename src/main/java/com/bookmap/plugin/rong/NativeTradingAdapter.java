@@ -40,6 +40,10 @@ public final class NativeTradingAdapter implements AutoCloseable {
             NativeRuntime current = runtime;
             return current == null || closed ? null : current.trading.sessionLevels(symbol);
         });
+        display.setCairoMinuteBarsProvider(symbol -> {
+            NativeRuntime current = runtime;
+            return current == null || closed ? null : current.trading.cairoMinuteBars(symbol);
+        });
     }
     public void attach(String symbol, Api api) { apis.put(symbol, api); }
     public void detach(String symbol) { apis.remove(symbol); }
