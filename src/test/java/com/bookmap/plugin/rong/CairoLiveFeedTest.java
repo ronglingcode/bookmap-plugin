@@ -8,6 +8,34 @@ import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.*;
 
 class CairoLiveFeedTest {
+    @Test void depthUsesLiveTimestampAndCanLookUpASmallerExactPrice() {
+        SignalWebSocketServer server = new SignalWebSocketServer(0, 0);
+        try {
+            OrderBookState book = new OrderBookState();
+            server.registerSymbol("META", book, 0.01);
+            server.setWallThresholdFloor(() -> 5000);
+            book.update(true, 18831, 7143);
+            book.update(true, 18830, 12000);
+            book.update(false, 18834, 300);
+            JsonObject request = new JsonObject();
+            request.addProperty("symbol", "META");
+            request.addProperty("requestId", "test-request");
+            assertFalse(server.cairoDepthResponse(request).has("asOf"));
+            server.markCairoLiveDepth("META", 12345);
+            JsonObject snapshot = server.cairoDepthResponse(request);
+            assertEquals("test-request", snapshot.get("requestId").getAsString());
+            assertEquals("12345", snapshot.get("asOf").getAsString());
+            JsonObject bookPayload = snapshot.getAsJsonObject("orderbook");
+            assertEquals(12000, bookPayload.getAsJsonArray("largeBids").get(0).getAsJsonArray().get(1).getAsInt());
+            assertEquals(0, bookPayload.getAsJsonArray("largeAsks").size());
+            request.addProperty("price", 188.34);
+            JsonObject exact = server.cairoDepthResponse(request).getAsJsonObject("orderbook");
+            assertEquals(300, exact.getAsJsonArray("largeAsks").get(0).getAsJsonArray().get(1).getAsInt());
+            server.unregisterSymbol("META");
+            assertFalse(server.cairoDepthResponse(request).has("asOf"));
+        } finally { server.shutdown(); }
+    }
+
     @Test void replayResetInvalidatesQueuedPricesAndIsDeliveredOnReconnect() {
         List<String> messages = new ArrayList<>();
         CairoLiveFeed feed = new CairoLiveFeed(messages::add);

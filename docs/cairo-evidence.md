@@ -48,6 +48,14 @@ average price, working stops, and normalized executions with stable opaque IDs.
 Connect and reconnect snapshots carry `delivery: "snapshot"` and are baselines.
 The bridge has no order submission endpoint or credentials.
 
+A client can send `cairo_depth_request` with `requestId`, `symbol`, and optional USD
+`price` over its existing connection. The `cairo_depth` version 1 reply echoes the
+request ID and reports the last live depth update time in nanoseconds as a string.
+It returns up to 20 displayed levels per side sorted by size, using the effective
+wall threshold, or the aggregate displayed size at the requested exact price.
+If live depth is unavailable, the reply omits the timestamp and order book.
+For replay depth, use the version 2 pattern snapshot and its coverage metadata.
+
 ## Version 2 snapshot
 
 `type: "cairo_patterns"`, `version: 2` is a complete bounded per-chart snapshot,

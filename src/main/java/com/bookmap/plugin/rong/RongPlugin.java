@@ -646,7 +646,12 @@ public class RongPlugin implements CustomModuleAdapter,
             wallChangeTracker.onDepth(isBid, price, size, eventTimeNs);
         }
         if (sharedServer != null) sharedServer.observeSessionDepth(alias, isBid, price, size, lastTimestampNs);
-        orderBook.update(isBid, price, size);
+        synchronized (orderBook) {
+            orderBook.update(isBid, price, size);
+            if (sharedServer != null && runMode.dataMode.equals("live") && !sessionHistoryLoading) {
+                sharedServer.markCairoLiveDepth(alias, lastTimestampNs);
+            }
+        }
         if (bidBreakdownMonitor != null) {
             bidBreakdownMonitor.onDepth(isBid, price, size, lastTimestampNs, patternMonitorSnapshotComplete);
             bidBreakdownPainter.refresh();

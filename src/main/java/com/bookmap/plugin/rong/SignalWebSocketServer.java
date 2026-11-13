@@ -314,6 +314,7 @@ public class SignalWebSocketServer extends WebSocketServer {
 
     // Per-symbol state
     private final Map<String, OrderBookState> symbolToOrderBook = new ConcurrentHashMap<>();
+    private final Map<String, Long> cairoDepthTimes = new ConcurrentHashMap<>();
     private final Map<String, Double> symbolToPips = new ConcurrentHashMap<>();
     private final Map<String, List<TradebookButtonGroup>> symbolToTradebooks = new ConcurrentHashMap<>();
     private final Map<String, List<KeyLevelDefinition>> symbolToKeyLevels = new ConcurrentHashMap<>();
@@ -368,6 +369,7 @@ public class SignalWebSocketServer extends WebSocketServer {
     /** Unregister a symbol when its plugin instance stops. */
     public void unregisterSymbol(String symbol) {
         if (entryBidReclaimManager != null) entryBidReclaimManager.unregister(symbol);
+        cairoDepthTimes.remove(symbol);
         cairoLive.chart(symbol, BookmapRunMode.detect("unknown").dataMode, false);
         if (selectedStopManager != null) selectedStopManager.unregister(symbol);
         com.bookmap.plugin.rong.signal.CairoPatternFeed feed = patternFeeds.remove(symbol);
@@ -738,6 +740,10 @@ public class SignalWebSocketServer extends WebSocketServer {
         // External clients may read current depth; execution and local views remain native.
         try {
             JsonObject request = com.google.gson.JsonParser.parseString(message).getAsJsonObject();
+            if (conn != null && getString(request, "type").equals("cairo_depth_request")) {
+                conn.send(cairoDepthResponse(request).toString());
+                return;
+            }
             if (!getString(request, "type").equals("wall_out_snapshot_request") || conn == null) return;
             String symbol = SymbolUtils.cleanSymbol(getString(request, "symbol"));
             JsonObject response = new JsonObject();
@@ -747,6 +753,55 @@ public class SignalWebSocketServer extends WebSocketServer {
             response.add("orderbook", wallOutSnapshot(symbol));
             conn.send(response.toString());
         } catch (RuntimeException ignored) { }
+    }
+
+    void markCairoLiveDepth(String symbol, long timestampNs) {
+        if (timestampNs > 0) cairoDepthTimes.merge(symbol, timestampNs, Math::max);
+    }
+
+    JsonObject cairoDepthResponse(JsonObject request) {
+        String symbol = SymbolUtils.cleanSymbol(getString(request, "symbol"));
+        JsonObject response = new JsonObject();
+        response.addProperty("type", "cairo_depth");
+        response.addProperty("version", 1);
+        response.addProperty("requestId", getString(request, "requestId"));
+        response.addProperty("symbol", symbol);
+        OrderBookState book = symbolToOrderBook.get(symbol);
+        if (book != null) {
+            synchronized (book) {
+                Long time = cairoDepthTimes.get(symbol);
+                if (time != null) {
+                    response.addProperty("asOf", Long.toString(time));
+                    response.add("orderbook", cairoDepthLevels(symbol, book, getDouble(request, "price")));
+                }
+            }
+        }
+        return response;
+    }
+
+    private JsonObject cairoDepthLevels(String symbol, OrderBookState book, double requestedPrice) {
+        double pips = symbolToPips.getOrDefault(symbol, 0.0);
+        JsonObject result = new JsonObject();
+        if (!Double.isFinite(pips) || pips <= 0) return result;
+        int threshold = effectiveThreshold(symbol, book, wallThresholdFloor.getAsInt()).effectiveMinSize;
+        result.addProperty("effectiveWallThreshold", threshold);
+        boolean exact = Double.isFinite(requestedPrice) && requestedPrice > 0;
+        for (boolean bid : new boolean[] {true, false}) {
+            JsonArray levels = new JsonArray();
+            book.getLevelsSnapshot(bid).entrySet().stream()
+                    .filter(level -> level.getKey() > 0 && (exact
+                            ? Math.abs(BookmapPriceNormalizer.toWirePrice(level.getKey(), pips) - requestedPrice) < 1e-7
+                            : level.getValue() >= threshold))
+                    .sorted(Map.Entry.<Integer, Integer>comparingByValue().reversed())
+                    .limit(20).forEach(level -> {
+                        JsonArray pair = new JsonArray();
+                        pair.add(BookmapPriceNormalizer.toWirePrice(level.getKey(), pips));
+                        pair.add(level.getValue());
+                        levels.add(pair);
+                    });
+            result.add(bid ? "largeBids" : "largeAsks", levels);
+        }
+        return result;
     }
 
     /** Broker hints bypass the lossy market-observation queue. */
