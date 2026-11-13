@@ -35,7 +35,9 @@ carries `mode`, `sourceInstanceId`, `symbol`, `epoch`, `sequence`, `eventTime`
 (Bookmap cursor in nanoseconds as a string), `executionId`, `positionId`, `side`, `price` (USD),
 `quantity`, `positionQuantity`, `positionAveragePrice`, and `opening`. On rewind,
 `cairo_replay_reset` marks the new epoch and the replay window waits for a new trade.
-New subscribers receive the latest replay position or reset with `delivery: "snapshot"`.
+**Sell (simulated)** reduces or closes the long and publishes a fill with `side: "SELL"`.
+A full close reports zero remaining shares. New subscribers receive up to 1,000
+replay records per symbol for the current epoch with `delivery: "snapshot"`.
 
 ## Cairo Live data bridge
 

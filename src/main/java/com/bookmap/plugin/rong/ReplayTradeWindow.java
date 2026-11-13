@@ -55,16 +55,22 @@ final class ReplayTradeWindow {
         JPanel controls = new JPanel();
         JSpinner shares = new JSpinner(new SpinnerNumberModel(1, 1, Integer.MAX_VALUE, 1));
         JButton buy = new JButton("Buy (simulated)");
+        JButton sell = new JButton("Sell (simulated)");
+        sell.setToolTipText("Enter the shares to exit, up to the number held.");
         buy.setEnabled(false);
-        buy.addActionListener(event -> buy((Integer) shares.getValue()));
+        sell.setEnabled(false);
+        buy.addActionListener(event -> submit(shares, true));
+        sell.addActionListener(event -> submit(shares, false));
         controls.add(new JLabel("Shares"));
         controls.add(shares);
         controls.add(buy);
+        controls.add(sell);
         panel.add(controls, BorderLayout.SOUTH);
         refresh = new Timer(200, event -> {
             synchronized (this) {
                 boolean ready = !disposed && Double.isFinite(price);
                 buy.setEnabled(ready);
+                sell.setEnabled(ready && quantity > 0);
                 status.setText(ready ? String.format(Locale.ROOT, "$%.4f · %d shares held", price, quantity)
                         : "Waiting for a recorded trade");
             }
@@ -73,6 +79,17 @@ final class ReplayTradeWindow {
         frame.pack();
         frame.setVisible(true);
         refresh.start();
+    }
+
+    private synchronized void submit(JSpinner shares, boolean buying) {
+        try { shares.commitEdit(); } catch (java.text.ParseException invalid) { return; }
+        int size = (Integer) shares.getValue();
+        if (!buying && size > quantity) {
+            java.awt.Toolkit.getDefaultToolkit().beep();
+            shares.setValue((int) Math.max(1, Math.min(quantity, Integer.MAX_VALUE)));
+            return;
+        }
+        if (buying) buy(size); else sell(size);
     }
 
     synchronized void observeTrade(double tradePrice, long timestamp) {
@@ -102,12 +119,26 @@ final class ReplayTradeWindow {
         boolean opening = quantity == 0;
         averagePrice = (averagePrice * quantity + price * shares) / (quantity + shares);
         quantity += shares;
+        publishFill(shares, true, opening);
+    }
+
+    synchronized void sell(int shares) {
+        if (disposed || !Double.isFinite(price) || shares <= 0 || shares > quantity) return;
+        quantity -= shares;
+        publishFill(shares, false, false);
+        if (quantity == 0) {
+            averagePrice = 0;
+            positionId = null;
+        }
+    }
+
+    private void publishFill(int shares, boolean buying, boolean opening) {
         JsonObject fill = event("cairo_replay_fill");
         String executionId = sourceId + ":" + epoch + ":" + sequence;
         if (opening) positionId = executionId;
         fill.addProperty("executionId", executionId);
         fill.addProperty("positionId", positionId);
-        fill.addProperty("side", "BUY");
+        fill.addProperty("side", buying ? "BUY" : "SELL");
         fill.addProperty("quantity", shares);
         fill.addProperty("price", price);
         fill.addProperty("positionQuantity", quantity);

@@ -7,6 +7,29 @@ import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.*;
 
 class ReplayTradingTest {
+    @Test void sellsPartialsAndClosesWithoutOpeningAShort() {
+        List<JsonObject> events = new ArrayList<>();
+        ReplayTradeWindow replay = new ReplayTradeWindow("TEST", events::add);
+        replay.observeTrade(148, 100);
+        replay.sell(1);
+        replay.buy(100);
+        replay.observeTrade(150, 200);
+        replay.sell(20);
+        replay.sell(81);
+        assertEquals(2, events.size());
+        JsonObject partial = events.get(1);
+        assertEquals("SELL", partial.get("side").getAsString());
+        assertEquals(150, partial.get("price").getAsDouble());
+        assertEquals(80, partial.get("positionQuantity").getAsInt());
+        assertEquals(148, partial.get("positionAveragePrice").getAsDouble());
+        assertEquals(events.get(0).get("positionId"), partial.get("positionId"));
+        replay.sell(80);
+        assertEquals(0, events.get(2).get("positionQuantity").getAsInt());
+        replay.buy(1);
+        assertTrue(events.get(3).get("opening").getAsBoolean());
+        assertNotEquals(events.get(0).get("positionId"), events.get(3).get("positionId"));
+    }
+
     @Test void separatesDataModeFromTradingMode() {
         assertEquals(BookmapRunMode.REPLAY, BookmapRunMode.fromFlags(false, false));
         assertEquals(BookmapRunMode.LIVE, BookmapRunMode.fromFlags(true, true));

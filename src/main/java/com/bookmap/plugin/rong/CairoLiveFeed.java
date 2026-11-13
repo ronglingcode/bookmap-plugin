@@ -4,6 +4,8 @@ import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import java.util.LinkedHashMap;
+import java.util.ArrayDeque;
+import java.util.Deque;
 import java.util.Map;
 import java.util.UUID;
 import java.util.function.Consumer;
@@ -14,7 +16,7 @@ final class CairoLiveFeed {
     private final Consumer<String> send;
     private final Map<String, JsonObject> charts = new LinkedHashMap<>();
     private final Map<String, JsonObject> accounts = new LinkedHashMap<>();
-    private final Map<String, JsonObject> replay = new LinkedHashMap<>();
+    private final Map<String, Deque<JsonObject>> replay = new LinkedHashMap<>();
     private final Map<String, JsonObject> prices = new LinkedHashMap<>();
     private final Map<String, Long> tradeSequences = new LinkedHashMap<>();
     private final Map<String, Long> resetWatermarks = new LinkedHashMap<>();
@@ -23,12 +25,16 @@ final class CairoLiveFeed {
     CairoLiveFeed(Consumer<String> send) { this.send = send; }
 
     synchronized void snapshot(Consumer<String> client) {
-        for (Map<String, JsonObject> entries : java.util.List.of(charts, accounts, replay, prices)) {
-            for (JsonObject entry : entries.values()) {
-                JsonObject copy = entry.deepCopy(); copy.addProperty("delivery", "snapshot");
-                client.accept(copy.toString());
-            }
-        }
+        charts.values().forEach(entry -> sendSnapshot(client, entry));
+        accounts.values().forEach(entry -> sendSnapshot(client, entry));
+        replay.values().forEach(history -> history.forEach(entry -> sendSnapshot(client, entry)));
+        prices.values().forEach(entry -> sendSnapshot(client, entry));
+    }
+
+    private static void sendSnapshot(Consumer<String> client, JsonObject entry) {
+        JsonObject copy = entry.deepCopy();
+        copy.addProperty("delivery", "snapshot");
+        client.accept(copy.toString());
     }
 
     synchronized void chart(String symbol, String mode, boolean attached) {
@@ -60,11 +66,14 @@ final class CairoLiveFeed {
 
     synchronized void replay(JsonObject event) {
         String symbol = event.get("symbol").getAsString();
+        Deque<JsonObject> history = replay.computeIfAbsent(symbol, ignored -> new ArrayDeque<>());
         if (event.get("type").getAsString().equals("cairo_replay_reset")) {
+            history.clear();
             prices.remove(symbol);
             resetWatermarks.put(symbol, sequence);
         }
-        replay.put(symbol, event.deepCopy());
+        history.addLast(event.deepCopy());
+        if (history.size() > 1000) history.removeFirst();
         send.accept(event.toString());
     }
 
@@ -89,6 +98,7 @@ final class CairoLiveFeed {
             JsonObject fill = project(value.getAsJsonObject(), "timestamp", "price", "quantity", "isBuy", "positionEffectIsOpen");
             JsonObject raw = value.getAsJsonObject();
             String identity = raw.get("orderID").getAsString() + ":" + fill;
+            fill.addProperty("orderId", UUID.nameUUIDFromBytes(raw.get("orderID").getAsString().getBytes(java.nio.charset.StandardCharsets.UTF_8)).toString());
             fill.addProperty("executionId", UUID.nameUUIDFromBytes(identity.getBytes(java.nio.charset.StandardCharsets.UTF_8)).toString());
             fills.add(fill);
         }

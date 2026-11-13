@@ -180,6 +180,18 @@ public final class TradingRuntime implements AutoCloseable {
         result.addProperty("sessionDate", string(levels, "sessionDate"));
         result.addProperty("atr", atr); result.addProperty("lowOfDay", number(levels, "lowOfDay"));
         result.addProperty("highOfDay", number(levels, "highOfDay"));
+        var loaded = market.getState(symbol);
+        if (loaded != null) {
+            JsonObject metrics = loaded.metrics();
+            long priceTime = (long) number(metrics, "latestPriceTime");
+            if (priceTime > 0 && MarketClock.marketTime(priceTime).date.equals(string(levels, "sessionDate"))) {
+                result.addProperty("marketAsOf", priceTime);
+                for (String field : new String[] {"vwap", "premarketHigh", "premarketLow"}) {
+                    double value = number(metrics, field);
+                    if (Double.isFinite(value) && value > 0) result.addProperty(field, value);
+                }
+            }
+        }
         return result;
     }
     private void publishToken() throws Exception {
