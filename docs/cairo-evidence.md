@@ -56,7 +56,9 @@ request ID and reports the last live depth update time in nanoseconds as a strin
 It returns up to 20 displayed levels per side sorted by size, using the effective
 wall threshold, or the aggregate displayed size at the requested exact price.
 If live depth is unavailable, the reply omits the timestamp and order book.
-For replay depth, use the version 2 pattern snapshot and its coverage metadata.
+Send `mode: "replay"` to read the depth reconstructed from the recording, even
+when pattern evidence is disabled. A rewind clears the replay depth until fresh
+depth callbacks arrive. Use version 2 pattern snapshots for detector coverage.
 
 ## Version 2 snapshot
 

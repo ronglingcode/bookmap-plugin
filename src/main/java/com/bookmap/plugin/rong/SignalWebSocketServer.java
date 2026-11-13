@@ -315,6 +315,7 @@ public class SignalWebSocketServer extends WebSocketServer {
     // Per-symbol state
     private final Map<String, OrderBookState> symbolToOrderBook = new ConcurrentHashMap<>();
     private final Map<String, Long> cairoDepthTimes = new ConcurrentHashMap<>();
+    private final Map<String, OrderBookState> cairoReplayDepth = new ConcurrentHashMap<>();
     private final Map<String, Double> symbolToPips = new ConcurrentHashMap<>();
     private final Map<String, List<TradebookButtonGroup>> symbolToTradebooks = new ConcurrentHashMap<>();
     private final Map<String, List<KeyLevelDefinition>> symbolToKeyLevels = new ConcurrentHashMap<>();
@@ -370,6 +371,7 @@ public class SignalWebSocketServer extends WebSocketServer {
     public void unregisterSymbol(String symbol) {
         if (entryBidReclaimManager != null) entryBidReclaimManager.unregister(symbol);
         cairoDepthTimes.remove(symbol);
+        cairoReplayDepth.remove(symbol);
         cairoLive.chart(symbol, BookmapRunMode.detect("unknown").dataMode, false);
         if (selectedStopManager != null) selectedStopManager.unregister(symbol);
         com.bookmap.plugin.rong.signal.CairoPatternFeed feed = patternFeeds.remove(symbol);
@@ -759,6 +761,20 @@ public class SignalWebSocketServer extends WebSocketServer {
         if (timestampNs > 0) cairoDepthTimes.merge(symbol, timestampNs, Math::max);
     }
 
+    void observeCairoReplayDepth(String symbol, boolean bid, int price, int size, long time) {
+        OrderBookState book = cairoReplayDepth.computeIfAbsent(symbol, ignored -> new OrderBookState());
+        synchronized (book) {
+            book.update(bid, price, size);
+            if (time > 0) cairoDepthTimes.put(symbol, time);
+        }
+    }
+
+    void resetCairoReplayDepth(String symbol) {
+        OrderBookState book = cairoReplayDepth.remove(symbol);
+        if (book == null) cairoDepthTimes.remove(symbol);
+        else synchronized (book) { cairoDepthTimes.remove(symbol); }
+    }
+
     JsonObject cairoDepthResponse(JsonObject request) {
         String symbol = SymbolUtils.cleanSymbol(getString(request, "symbol"));
         JsonObject response = new JsonObject();
@@ -766,11 +782,14 @@ public class SignalWebSocketServer extends WebSocketServer {
         response.addProperty("version", 1);
         response.addProperty("requestId", getString(request, "requestId"));
         response.addProperty("symbol", symbol);
-        OrderBookState book = symbolToOrderBook.get(symbol);
+        boolean replay = "replay".equals(getString(request, "mode"));
+        OrderBookState book = replay ? cairoReplayDepth.get(symbol) :
+                cairoReplayDepth.containsKey(symbol) ? null : symbolToOrderBook.get(symbol);
+        response.addProperty("mode", replay ? "replay" : "live");
         if (book != null) {
             synchronized (book) {
                 Long time = cairoDepthTimes.get(symbol);
-                if (time != null) {
+                if (time != null && (!replay || cairoReplayDepth.get(symbol) == book)) {
                     response.addProperty("asOf", Long.toString(time));
                     response.add("orderbook", cairoDepthLevels(symbol, book, getDouble(request, "price")));
                 }

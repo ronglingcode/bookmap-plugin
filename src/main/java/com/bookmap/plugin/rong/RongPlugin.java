@@ -646,6 +646,9 @@ public class RongPlugin implements CustomModuleAdapter,
             wallChangeTracker.onDepth(isBid, price, size, eventTimeNs);
         }
         if (sharedServer != null) sharedServer.observeSessionDepth(alias, isBid, price, size, lastTimestampNs);
+        if (sharedServer != null && runMode == BookmapRunMode.REPLAY) {
+            sharedServer.observeCairoReplayDepth(alias, isBid, price, size, lastTimestampNs);
+        }
         synchronized (orderBook) {
             orderBook.update(isBid, price, size);
             if (sharedServer != null && runMode.dataMode.equals("live") && !sessionHistoryLoading) {
@@ -733,13 +736,14 @@ public class RongPlugin implements CustomModuleAdapter,
     public void onTimestamp(long timestampNs) {
         if (!initialized) return;
         ReplayTradeWindow replay = replayTradeWindow;
-        if (replay != null) replay.observeTime(timestampNs);
         if (timestampNs > 0 && lastTimestampNs > 0 && timestampNs < lastTimestampNs) {
+            if (replay != null && sharedServer != null) sharedServer.resetCairoReplayDepth(alias);
             patternEventSnapshotComplete = false;
             patternMonitorSnapshotComplete = false;
             // Legacy book state can retain pre-seek levels. Only fresh callbacks may seed the observer now.
             patternEventSeedFromSharedBook = false;
         }
+        if (replay != null) replay.observeTime(timestampNs);
         this.lastTimestampNs = timestampNs;
         if (premarketSizeThreshold != null) premarketSizeThreshold.onMarketTime();
         if (sharedServer != null) sharedServer.observeSessionTime(alias, timestampNs);

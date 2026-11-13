@@ -31,6 +31,14 @@ class CairoLiveFeedTest {
             request.addProperty("price", 188.34);
             JsonObject exact = server.cairoDepthResponse(request).getAsJsonObject("orderbook");
             assertEquals(300, exact.getAsJsonArray("largeAsks").get(0).getAsJsonArray().get(1).getAsInt());
+            request.addProperty("mode", "replay");
+            assertFalse(server.cairoDepthResponse(request).has("asOf"));
+            server.observeCairoReplayDepth("META", false, 18834, 765, 999);
+            assertEquals("999", server.cairoDepthResponse(request).get("asOf").getAsString());
+            assertEquals(765, server.cairoDepthResponse(request).getAsJsonObject("orderbook")
+                    .getAsJsonArray("largeAsks").get(0).getAsJsonArray().get(1).getAsInt());
+            server.resetCairoReplayDepth("META");
+            assertFalse(server.cairoDepthResponse(request).has("asOf"));
             server.unregisterSymbol("META");
             assertFalse(server.cairoDepthResponse(request).has("asOf"));
         } finally { server.shutdown(); }
