@@ -178,6 +178,30 @@ class ReleaseJarTest {
     }
 
     @Test
+    void marketDataWorkerCallbacksAreAccessibleFromThePackagedEntryPoint() throws Throwable {
+        String name = "com.bookmap.plugin.rong.MarketDataDispatcher";
+        Class<?> workerType = mappedClass(name);
+        var lookup = MethodHandles.privateLookupIn(Class.forName(ENTRY), MethodHandles.lookup());
+        // Use the entry point's access rights, not reflection's setAccessible bypass.
+        // initialize() links a BooleanSupplier method reference to healthy().
+        var healthy = lookup.findVirtual(workerType, MEMBERS.get(name + "#boolean healthy()"),
+                MethodType.methodType(boolean.class));
+        var submit = lookup.findVirtual(workerType, MEMBERS.get(name + "#boolean submit(java.lang.Runnable)"),
+                MethodType.methodType(boolean.class, Runnable.class));
+        var constructor = lookup.findConstructor(workerType,
+                MethodType.methodType(void.class, String.class, java.util.function.Consumer.class));
+        java.util.concurrent.CountDownLatch processed = new java.util.concurrent.CountDownLatch(1);
+        AtomicReference<String> error = new AtomicReference<>();
+        try (AutoCloseable worker = (AutoCloseable) constructor.invoke("TEST",
+                (java.util.function.Consumer<String>) error::set)) {
+            assertTrue((boolean) healthy.invoke(worker));
+            assertTrue((boolean) submit.invoke(worker, (Runnable) processed::countDown));
+            assertTrue(processed.await(3, java.util.concurrent.TimeUnit.SECONDS));
+            assertNull(error.get());
+        }
+    }
+
+    @Test
     void enumReflectionStillWorksForPatternState() throws Exception {
         Class<?> type = mappedClass("com.bookmap.plugin.rong.patterns.PatternType");
         Object[] constants = type.getEnumConstants();

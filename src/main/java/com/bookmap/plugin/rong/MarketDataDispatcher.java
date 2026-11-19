@@ -6,7 +6,7 @@ import java.util.function.Consumer;
 import java.util.function.LongSupplier;
 
 /** Ordered, bounded callback handoff. Producers never wait for processing or UI work. */
-final class MarketDataDispatcher implements AutoCloseable {
+public final class MarketDataDispatcher implements AutoCloseable {
     private static final long MAX_LAG_NS = 250_000_000L;
     private final ArrayBlockingQueue<Work> queue;
     private final AtomicBoolean failed = new AtomicBoolean();
@@ -22,7 +22,7 @@ final class MarketDataDispatcher implements AutoCloseable {
         Work(Runnable task, long enqueued) { this.task = task; this.enqueued = enqueued; }
     }
 
-    MarketDataDispatcher(String symbol, Consumer<String> failure) {
+    public MarketDataDispatcher(String symbol, Consumer<String> failure) {
         this(symbol, 32768, System::nanoTime, failure);
     }
 
@@ -35,14 +35,16 @@ final class MarketDataDispatcher implements AutoCloseable {
         worker.start();
     }
 
-    boolean submit(Runnable task) {
+    public boolean submit(Runnable task) {
         if (closed || failed.get()) return false;
         if (queue.offer(new Work(task, clock.getAsLong()))) return true;
         fail("market-data queue overflow; disable and re-enable the addon to rebuild liquidity state");
         return false;
     }
 
-    boolean healthy() {
+    // RongPlugin retains its package while this class is relocated by obfuscation.
+    // Method-reference linkage requires public access across that package boundary.
+    public boolean healthy() {
         if (closed || failed.get()) return false;
         Work active = current, next = queue.peek();
         long now = clock.getAsLong();
