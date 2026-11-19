@@ -4,12 +4,11 @@ bmtrader is a standalone Bookmap addon for Schwab equity trading. It reads Massi
 market data and Firestore configuration/state directly, refreshes local Schwab
 credentials, and executes trades without ViteApp or ProxyServer running.
 
-Dedicated pattern detectors emit timestamped observations for future AI consumers.
-The event-only feed includes pattern evidence, revisions, readiness and liquidity;
-Signal Composer, advisory LONG/SHORT composition and its UI have been removed.
-See the [pattern-event guide](docs/pattern-events.md),
-[detector configuration](config/pattern-observation.template.json), and
-[Cairo event contract](docs/cairo-evidence.md).
+Pattern recognition is not started by the addon: the general pattern engine,
+False Breakout, Reclaim Second Bid, Bid Breakdown, their painters and pattern
+export subscriptions are inactive, regardless of old pattern configuration.
+Standalone detector classes and their tests remain available for offline research.
+Cairo's price/candle feed continues independently.
 
 ## Setup
 
@@ -20,7 +19,7 @@ See the [pattern-event guide](docs/pattern-events.md),
    `node scripts/importSecrets.mjs ..\secrets\storeSecrets.js`.
    See [credential setup](config/README.md).
 3. In Bookmap, open API Plugins Configuration, add
-   `build/libs/lingrong1988_bmtrader_1.46.jar`, and attach bmtrader to a chart.
+   `build/libs/lingrong1988_bmtrader_1.47.jar`, and attach bmtrader to a chart.
 4. The first attachment starts the trading runtime; the final detachment stops it.
    Check the bmtrader Logs window for startup errors. Settings offer
    **Restart Native Trading / Reload Secrets**, **Open Schwab Authorization**,
@@ -94,6 +93,32 @@ first/last-attachment lifecycle. Existing rendering remains under `pricelines`,
 reuses display parsers in process. Its optional port 8765 is not a trading dependency;
 incoming external messages cannot replace locally owned tokens, inputs or views.
 
+### Market-data processing
+
+Each chart hands depth, trade, quote, timestamp and history-boundary callbacks to
+one ordered background worker. Calculations, liquidity accounting and wall tracking
+run there; Bookmap's callback thread only validates input and queues the event.
+Trade metadata is immutable, and timestamps and the history/live transition are
+processed in the same order as depth and trades. Detachment cancels queued work.
+
+The handoff is bounded at 32,768 queued events per chart. Entry liquidity becomes
+unavailable while the oldest queued/in-progress event is more than 250 ms old,
+and recovers after the worker catches up. A queue overflow or processing failure
+invalidates the attachment's liquidity evidence and reports an error; disable and
+re-enable the addon to rebuild it. Incomplete depth is never silently used for new
+entries. Existing exit/cancel/flatten controls remain available.
+
+The session tracker expires removed levels through an expiration queue instead of
+scanning the entire book per callback, preserving the 250 ms late-fill grace,
+separate refill episodes and rolling execution evidence. Session boundaries are
+cached and duplicate maintenance at the same timestamp is skipped.
+
+Wall labels and wall-change badges redraw on dedicated background timers, at most
+once per 200 ms per painter. Data/configuration/viewport callbacks only mark them
+dirty. Label images are cached (up to 512 per chart), and the newest 2,000 inactive
+wall segments are retained per chart along with all active levels. The order book
+and entry liquidity evidence are not pruned by this display retention limit.
+
 This is a personal MVP with one running app and one account. Exits submit without
 broker preflight reads. Initial flat entries retain the existing broker exposure
 preflight. There are no session ownership checks, input-age cutoffs or execution
@@ -152,7 +177,7 @@ TypeScript fixtures check Java parity; fake services cover standalone startup,
 renewal, requests, persistence and teardown. No live orders or real Firestore writes
 are sent by these checks.
 
-Share only `build/libs/lingrong1988_bmtrader_1.46.jar`. Unobfuscated intermediates
+Share only `build/libs/lingrong1988_bmtrader_1.47.jar`. Unobfuscated intermediates
 and the private mapping remain under `build/intermediates` and
 `build/private/obfuscation`. Obfuscation does not prevent reverse engineering.
 

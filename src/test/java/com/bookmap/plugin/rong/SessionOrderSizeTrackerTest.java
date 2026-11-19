@@ -92,4 +92,25 @@ class SessionOrderSizeTrackerTest {
         assertEquals(2L * Integer.MAX_VALUE, rig.largest());
         rig.server.unregisterSymbol("TEST"); assertEquals(0, rig.largest());
     }
+    @Test void expirationOfAnOldRemovalDoesNotDeleteRefilledWallAtTheSamePrice() {
+        Rig rig = new Rig();
+        rig.depth(true, 10000, 9000, OPEN);
+        rig.depth(true, 10000, 0, OPEN + 1);
+        rig.depth(true, 10000, 8000, OPEN + 2);
+        rig.trade(10000, 3000, false, OPEN + 300_000_001L);
+        rig.trade(10000, 3000, false, OPEN + 300_000_002L);
+        assertEquals(6000, rig.largest());
+    }
+    @Test void removalGraceIsInclusiveAndRepeatedTimestampStillUpdatesDepth() {
+        Rig rig = new Rig();
+        rig.depth(true, 10000, 9000, OPEN);
+        rig.depth(true, 10000, 0, OPEN);
+        rig.trade(10000, 2000, false, OPEN + 250_000_000L);
+        assertEquals(2000, rig.largest());
+        rig.trade(10000, 9000, false, OPEN + 250_000_001L);
+        assertEquals(2000, rig.largest());
+        rig.depth(true, 10000, 7000, OPEN + 250_000_001L);
+        rig.trade(10000, 6000, false, OPEN + 250_000_001L);
+        assertEquals(6000, rig.largest());
+    }
 }

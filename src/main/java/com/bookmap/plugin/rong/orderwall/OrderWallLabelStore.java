@@ -116,6 +116,21 @@ public class OrderWallLabelStore {
         return Collections.unmodifiableList(new ArrayList<>(instrumentLabels.labelsById.values()));
     }
 
+    /** Called by the render worker. Active liquidity is never pruned. */
+    void pruneHistorical(String instrumentAlias, int keep) {
+        InstrumentLabels labels = labelsByInstrument.get(instrumentAlias);
+        if (labels == null || labels.labelsById.size() <= keep) return;
+        List<OrderWallLabel> historical = new ArrayList<>();
+        for (OrderWallLabel label : labels.labelsById.values()) if (!label.isActive()) historical.add(label);
+        if (historical.size() <= keep) return;
+        historical.sort(java.util.Comparator.comparingLong(OrderWallLabel::getEndTimeNs).reversed());
+        for (int i = keep; i < historical.size(); i++) {
+            OrderWallLabel label = historical.get(i);
+            // An active/replaced version may have arrived while the snapshot was sorted.
+            if (labels.labelsById.remove(label.getId(), label)) labels.displayedLabelIds.remove(label.getId());
+        }
+    }
+
     public void clearAll(String instrumentAlias) {
         labelsByInstrument.remove(instrumentAlias);
     }

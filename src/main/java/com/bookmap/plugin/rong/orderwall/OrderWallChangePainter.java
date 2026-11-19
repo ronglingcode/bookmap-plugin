@@ -61,6 +61,8 @@ public class OrderWallChangePainter implements ScreenSpacePainterFactory,
     private final Map<String, CopyOnWriteArrayList<PainterInstance>> paintersByInstrument = new ConcurrentHashMap<>();
     private final ScheduledExecutorService scheduler;
     private volatile String lastRegisteredInstrument;
+    private final java.util.Set<String> dirtyInstruments = ConcurrentHashMap.newKeySet();
+    private boolean animatedLastTick;
 
     public OrderWallChangePainter(OrderWallChangeStore store, IndicatorConfig config) {
         this.store = store;
@@ -72,8 +74,8 @@ public class OrderWallChangePainter implements ScreenSpacePainterFactory,
             t.setDaemon(true);
             return t;
         });
-        this.scheduler.scheduleAtFixedRate(this::refreshAnimatedAlerts,
-                250, 250, TimeUnit.MILLISECONDS);
+        this.scheduler.scheduleWithFixedDelay(this::refreshAnimatedAlerts,
+                200, 200, TimeUnit.MILLISECONDS);
     }
 
     public void registerInstrument(String instrumentAlias) {
@@ -84,16 +86,12 @@ public class OrderWallChangePainter implements ScreenSpacePainterFactory,
     public void unregisterInstrument(String instrumentAlias) {
         painterToInstrument.entrySet().removeIf(entry -> instrumentAlias.equals(entry.getValue()));
         paintersByInstrument.remove(instrumentAlias);
+        dirtyInstruments.remove(instrumentAlias);
     }
 
+    /** Request only: callbacks and UI coordinate changes never render inline. */
     public void refreshInstrument(String instrumentAlias) {
-        List<PainterInstance> painters = paintersByInstrument.get(instrumentAlias);
-        if (painters == null) {
-            return;
-        }
-        for (PainterInstance painter : painters) {
-            painter.rebuildAlerts();
-        }
+        if (instrumentAlias != null) dirtyInstruments.add(instrumentAlias);
     }
 
     @Override
@@ -136,17 +134,25 @@ public class OrderWallChangePainter implements ScreenSpacePainterFactory,
                     .computeIfAbsent(instrumentAlias, ignored -> new CopyOnWriteArrayList<>())
                     .add(instance);
         }
+        refreshInstrument(instrumentAlias);
         return instance;
     }
 
     private void refreshAnimatedAlerts() {
         long nowMs = System.currentTimeMillis();
-        if (!store.hasRecentEvents(OrderWallAlertDisplayTiming.maxTtlMs(), nowMs)) {
-            return;
+        boolean animated = store.hasRecentEvents(OrderWallAlertDisplayTiming.maxTtlMs(), nowMs);
+        for (Map.Entry<String, CopyOnWriteArrayList<PainterInstance>> entry : paintersByInstrument.entrySet()) {
+            String instrumentAlias = entry.getKey();
+            boolean requested = dirtyInstruments.remove(instrumentAlias);
+            if (!requested && !animated && !animatedLastTick) continue;
+            try {
+                for (PainterInstance painter : entry.getValue()) painter.rebuildAlerts();
+            } catch (RuntimeException error) {
+                // Bookmap may be disposing a canvas. Retry without killing the scheduled worker.
+                dirtyInstruments.add(instrumentAlias);
+            }
         }
-        for (String instrumentAlias : paintersByInstrument.keySet()) {
-            refreshInstrument(instrumentAlias);
-        }
+        animatedLastTick = animated;
     }
 
     private class PainterInstance implements ScreenSpacePainterAdapter {
@@ -167,7 +173,7 @@ public class OrderWallChangePainter implements ScreenSpacePainterFactory,
 
         @Override
         public void onHeatmapFullPixelsWidth(int width) {
-            rebuildAlerts();
+            refreshInstrument(instrumentAlias);
         }
 
         private void rebuildAlerts() {

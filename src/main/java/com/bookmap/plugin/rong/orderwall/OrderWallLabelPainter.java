@@ -74,6 +74,8 @@ public class OrderWallLabelPainter implements ScreenSpacePainterFactory,
     private final Map<String, CopyOnWriteArrayList<PainterInstance>> paintersByInstrument = new ConcurrentHashMap<>();
     private final ScheduledExecutorService scheduler;
     private volatile String lastRegisteredInstrument;
+    private final java.util.Set<String> dirtyInstruments = ConcurrentHashMap.newKeySet();
+    private boolean animatedLastTick;
 
     public OrderWallLabelPainter(OrderWallLabelStore store, IndicatorConfig config,
                                  OrderWallChangeStore wallChangeStore) {
@@ -87,8 +89,8 @@ public class OrderWallLabelPainter implements ScreenSpacePainterFactory,
             t.setDaemon(true);
             return t;
         });
-        this.scheduler.scheduleAtFixedRate(this::refreshAnimatedChangeLabels,
-                250, 250, TimeUnit.MILLISECONDS);
+        this.scheduler.scheduleWithFixedDelay(this::refreshAnimatedChangeLabels,
+                200, 200, TimeUnit.MILLISECONDS);
     }
 
     public void registerInstrument(String instrumentAlias) {
@@ -99,16 +101,12 @@ public class OrderWallLabelPainter implements ScreenSpacePainterFactory,
     public void unregisterInstrument(String instrumentAlias) {
         painterToInstrument.entrySet().removeIf(entry -> instrumentAlias.equals(entry.getValue()));
         paintersByInstrument.remove(instrumentAlias);
+        dirtyInstruments.remove(instrumentAlias);
     }
 
+    /** Request only: callbacks and UI coordinate changes never render inline. */
     public void refreshInstrument(String instrumentAlias) {
-        List<PainterInstance> painters = paintersByInstrument.get(instrumentAlias);
-        if (painters == null) {
-            return;
-        }
-        for (PainterInstance painter : painters) {
-            painter.rebuildLabels();
-        }
+        if (instrumentAlias != null) dirtyInstruments.add(instrumentAlias);
     }
 
     @Override
@@ -152,17 +150,26 @@ public class OrderWallLabelPainter implements ScreenSpacePainterFactory,
                     .computeIfAbsent(instrumentAlias, ignored -> new CopyOnWriteArrayList<>())
                     .add(instance);
         }
+        refreshInstrument(instrumentAlias);
         return instance;
     }
 
     private void refreshAnimatedChangeLabels() {
         long nowMs = System.currentTimeMillis();
-        if (!wallChangeStore.hasRecentEvents(OrderWallAlertDisplayTiming.maxTtlMs(), nowMs)) {
-            return;
+        boolean animated = wallChangeStore.hasRecentEvents(OrderWallAlertDisplayTiming.maxTtlMs(), nowMs);
+        for (Map.Entry<String, CopyOnWriteArrayList<PainterInstance>> entry : paintersByInstrument.entrySet()) {
+            String instrumentAlias = entry.getKey();
+            boolean requested = dirtyInstruments.remove(instrumentAlias);
+            if (!requested && !animated && !animatedLastTick) continue;
+            try {
+                store.pruneHistorical(instrumentAlias, 2000);
+                for (PainterInstance painter : entry.getValue()) painter.rebuildLabels();
+            } catch (RuntimeException error) {
+                // Bookmap may be disposing a canvas. Retry without killing the scheduled worker.
+                dirtyInstruments.add(instrumentAlias);
+            }
         }
-        for (String instrumentAlias : paintersByInstrument.keySet()) {
-            refreshInstrument(instrumentAlias);
-        }
+        animatedLastTick = animated;
     }
 
     private class PainterInstance implements ScreenSpacePainterAdapter {
@@ -171,6 +178,9 @@ public class OrderWallLabelPainter implements ScreenSpacePainterFactory,
         private final String instrumentAlias;
         private final ScreenSpaceCanvas canvas;
         private final Map<String, CanvasIcon> activeShapes = new HashMap<>();
+        private final Map<String, BufferedImage> images = new java.util.LinkedHashMap<String, BufferedImage>(64, .75f, true) {
+            @Override protected boolean removeEldestEntry(Map.Entry<String, BufferedImage> entry) { return size() > 512; }
+        };
         private final Object shapeLock = new Object();
 
         private volatile long priceBottom;
@@ -188,25 +198,25 @@ public class OrderWallLabelPainter implements ScreenSpacePainterFactory,
         @Override
         public void onHeatmapPriceBottom(long priceBottom) {
             this.priceBottom = priceBottom;
-            rebuildLabels();
+            refreshInstrument(instrumentAlias);
         }
 
         @Override
         public void onHeatmapPriceHeight(long priceHeight) {
             this.priceHeight = priceHeight;
-            rebuildLabels();
+            refreshInstrument(instrumentAlias);
         }
 
         @Override
         public void onHeatmapTimeLeft(long timeLeft) {
             this.timeLeft = timeLeft;
-            rebuildLabels();
+            refreshInstrument(instrumentAlias);
         }
 
         @Override
         public void onHeatmapFullTimeWidth(long width) {
             this.timeWidth = width;
-            rebuildLabels();
+            refreshInstrument(instrumentAlias);
         }
 
         private void rebuildLabels() {
@@ -337,7 +347,11 @@ public class OrderWallLabelPainter implements ScreenSpacePainterFactory,
             OrderWallLabel label = placement.label;
             long nowMs = System.currentTimeMillis();
             OrderWallChangeEvent recentChange = placement.changeEvent;
-            BufferedImage image = renderLabelImage(label, recentChange, nowMs);
+            String imageKey = label.isBid() + ":" + label.isActive() + ":"
+                    + (recentChange == null ? formatSizePath(label)
+                    : recentChange.getType() + ":" + formatChangeText(recentChange) + ":" + changePulseAlpha(recentChange, nowMs));
+            BufferedImage image = images.computeIfAbsent(imageKey,
+                    ignored -> renderLabelImage(label, recentChange, nowMs));
             PreparedImage prepared = new PreparedImage(image);
             long anchorTime = anchorTimeNs(label, recentChange);
             CompositeHorizontalCoordinate anchor = new CompositeHorizontalCoordinate(
@@ -559,6 +573,7 @@ public class OrderWallLabelPainter implements ScreenSpacePainterFactory,
                     return;
                 }
                 disposed = true;
+                images.clear();
                 removeActiveShapesLocked();
                 canvas.dispose();
             }

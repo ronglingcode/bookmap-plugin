@@ -81,6 +81,14 @@ public class SignalWebSocketServer extends WebSocketServer {
     private final Map<String, PremarketSizeThreshold> sizeThresholds = new ConcurrentHashMap<>();
     private final Map<String, SessionOrderSizeTracker> sessionOrderSizes = new ConcurrentHashMap<>();
     private final Set<String> sessionHistoryLoading = ConcurrentHashMap.newKeySet();
+    private final Map<String, java.util.function.BooleanSupplier> marketDataHealth = new ConcurrentHashMap<>();
+    void registerMarketDataHealth(String symbol, java.util.function.BooleanSupplier health) {
+        marketDataHealth.put(SymbolUtils.cleanSymbol(symbol), health);
+    }
+    private boolean marketDataHealthy(String symbol) {
+        java.util.function.BooleanSupplier health = marketDataHealth.get(symbol);
+        return health == null || health.getAsBoolean();
+    }
     public void beginSessionHistory(String symbol) { sessionHistoryLoading.add(SymbolUtils.cleanSymbol(symbol)); }
     public void finishSessionHistory(String symbol) {
         String clean = SymbolUtils.cleanSymbol(symbol);
@@ -147,6 +155,10 @@ public class SignalWebSocketServer extends WebSocketServer {
         boolean loading = sessionHistoryLoading.contains(clean);
         cap.addProperty("historyLoading", loading);
         if (loading) cap.addProperty("available", false);
+        if (!marketDataHealthy(clean)) {
+            cap.addProperty("available", false);
+            cap.addProperty("processingDelayed", true);
+        }
         return cap;
     }
     private static void fillSizeCap(JsonObject cap, SessionOrderSizeTracker.Observation counted,
@@ -226,6 +238,7 @@ public class SignalWebSocketServer extends WebSocketServer {
         JsonObject result = new JsonObject();
         BookmapPriceNormalizer.addWirePriceUnit(result);
         String cleanSymbol = SymbolUtils.cleanSymbol(symbol);
+        if (!marketDataHealthy(cleanSymbol)) return result;
         OrderBookState book = symbolToOrderBook.get(cleanSymbol);
         Double pips = symbolToPips.get(cleanSymbol);
         if (book == null || pips == null || !Double.isFinite(pips) || pips <= 0) return result;
@@ -374,6 +387,7 @@ public class SignalWebSocketServer extends WebSocketServer {
 
     /** Unregister a symbol when its plugin instance stops. */
     public void unregisterSymbol(String symbol) {
+        marketDataHealth.remove(symbol);
         if (entryBidReclaimManager != null) entryBidReclaimManager.unregister(symbol);
         cairoDepthTimes.remove(symbol);
         cairoReplayDepth.remove(symbol);

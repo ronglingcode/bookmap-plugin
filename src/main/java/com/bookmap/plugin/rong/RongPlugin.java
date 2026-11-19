@@ -63,7 +63,6 @@ public class RongPlugin implements CustomModuleAdapter,
     private static final double ORDERBOOK_PERCENTILE = 97;
     private static final int DISPLAY_LIQUIDITY_MIN_SIZE = 5_000;
     private static final int WALL_LABEL_RETAIN_TICKS = 2_000;
-    private static final int WALL_LABEL_REFRESH_MS = 200;
     private static final double WALL_CHANGE_REMAINING_RATIO = 0.50;
     private static final long WALL_CHANGE_DECISION_DELAY_MS = 500;
     private static final byte[] WALL_CHANGE_SOUND = OrderWallChangeSound.createAlertSound();
@@ -122,8 +121,8 @@ public class RongPlugin implements CustomModuleAdapter,
     private volatile boolean patternEventSeedFromSharedBook = true;
     private final Object patternEventLock = new Object();
     private final com.bookmap.plugin.rong.patterns.CairoObservationConfig observationConfig = com.bookmap.plugin.rong.patterns.CairoObservationConfig.load();
-    private boolean wallLabelsDirty;
-    private long lastWallLabelRefreshMs;
+    private volatile boolean wallLabelsDirty;
+    private volatile MarketDataDispatcher marketDataDispatcher;
     private volatile long lastTimestampNs;
     private PremarketSizeThreshold premarketSizeThreshold;
     private volatile double wallChangeStockPrice = Double.NaN;
@@ -212,6 +211,8 @@ public class RongPlugin implements CustomModuleAdapter,
             else nativeTrading.attach(cleanAlias, api);
             }
             instanceCount++;
+            marketDataDispatcher = new MarketDataDispatcher(cleanAlias,
+                    message -> PluginLog.action(cleanAlias, "ERROR: " + message));
             initialized = true;
         }
         this.vwapIndicator = api.registerIndicatorModifiable("VWAP", GraphType.PRIMARY);
@@ -241,41 +242,13 @@ public class RongPlugin implements CustomModuleAdapter,
                 this::getWallChangeDayHigh,
                 this::getWallChangeDayLow,
                 () -> wallChangeStockPrice);
-        initializePatternEvents(info.pips);
-        falseBreakoutMonitor = new com.bookmap.plugin.rong.patterns.FalseBreakoutMonitor(this::getEffectiveWallThreshold);
-        falseBreakoutPainter = new com.bookmap.plugin.rong.patterns.FalseBreakoutPainter(falseBreakoutMonitor);
-        reclaimSecondBidMonitor = new com.bookmap.plugin.rong.patterns.ReclaimSecondBidMonitor(this::getEffectiveWallThreshold);
-        reclaimSecondBidPainter = new com.bookmap.plugin.rong.patterns.ReclaimSecondBidPainter(reclaimSecondBidMonitor);
-        bidBreakdownMonitor = new com.bookmap.plugin.rong.patterns.BidBreakdownMonitor(this::isEntryLiquidityReady);
-        bidBreakdownPainter = new com.bookmap.plugin.rong.patterns.BidBreakdownPainter(bidBreakdownMonitor);
-        patternMonitorConfigListener = (symbol, patterns) -> {
-            if (!cleanAlias.equals(symbol)) return;
-            falseBreakoutMonitor.setEnabled(patterns.contains(com.bookmap.plugin.rong.patterns.FalseBreakoutMonitor.PATTERN));
-            falseBreakoutPainter.refresh();
-            reclaimSecondBidMonitor.setEnabled((patterns.contains(com.bookmap.plugin.rong.patterns.ReclaimSecondBidMonitor.PATTERN) || patterns.contains("falseBreakdown")));
-            reclaimSecondBidPainter.refresh();
-            bidBreakdownMonitor.setEnabled(patterns.contains(com.bookmap.plugin.rong.patterns.BidBreakdownMonitor.PATTERN));
-            bidBreakdownPainter.refresh();
-        };
-        sharedServer.registerPatternMonitorConfigListener(patternMonitorConfigListener);
-        api.sendUserMessage(Layer1ApiUserMessageModifyScreenSpacePainter.builder(RongPlugin.class,
-                com.bookmap.plugin.rong.patterns.FalseBreakoutPainter.NAME_PREFIX + cleanAlias)
-                .setScreenSpacePainterFactory(falseBreakoutPainter).setAliasFilter(exactAliasFilter(rawAlias)).setIsAdd(true).build());
-        api.sendUserMessage(Layer1ApiUserMessageModifyScreenSpacePainter.builder(RongPlugin.class,
-                com.bookmap.plugin.rong.patterns.ReclaimSecondBidPainter.NAME_PREFIX + cleanAlias)
-                .setScreenSpacePainterFactory(reclaimSecondBidPainter).setAliasFilter(exactAliasFilter(rawAlias)).setIsAdd(true).build());
-        api.sendUserMessage(Layer1ApiUserMessageModifyScreenSpacePainter.builder(RongPlugin.class,
-                com.bookmap.plugin.rong.patterns.BidBreakdownPainter.NAME_PREFIX + cleanAlias)
-                .setScreenSpacePainterFactory(bidBreakdownPainter).setAliasFilter(exactAliasFilter(rawAlias)).setIsAdd(true).build());
+        // Recognition is intentionally not attached. Offline detector classes remain available.
 
         indicatorConfig.addChangeListener(this);
         sharedServer.registerSymbol(cleanAlias, orderBook, info.pips);
+        sharedServer.registerMarketDataHealth(cleanAlias, marketDataDispatcher::healthy);
         sharedServer.publishCairoChart(cleanAlias, runMode.dataMode);
         sharedServer.beginSessionHistory(cleanAlias);
-        if (observationConfig.exportsPatterns(cleanAlias) && patternEvents != null) {
-            sharedServer.registerPatterns(cleanAlias, new com.bookmap.plugin.rong.signal.CairoPatternFeed(
-                    reconnect -> cairoPatternSnapshot(reconnect), observationConfig.captureEvidence));
-        }
         sharedServer.registerVwapUpdateListener(cleanAlias, vwapUpdateListener);
         if (nativeExecution) chartHoverHotkeyHandler.registerSymbol(cleanAlias, info.pips);
         priceZonePainter.registerInstrument(cleanAlias);
@@ -391,6 +364,8 @@ public class RongPlugin implements CustomModuleAdapter,
     public synchronized void stop() {
         if (!initialized) return;
         initialized = false;
+        MarketDataDispatcher dispatcher = marketDataDispatcher;
+        if (dispatcher != null) dispatcher.close();
         try {
             stopAttachment();
         } finally {
@@ -640,6 +615,23 @@ public class RongPlugin implements CustomModuleAdapter,
 
     @Override
     public void onDepth(boolean isBid, int price, int size) {
+        if (price <= 0 || size < 0) return;
+        dispatchMarketData(() -> processDepth(isBid, price, size));
+    }
+
+    private void dispatchMarketData(Runnable task) {
+        if (!initialized) return;
+        MarketDataDispatcher dispatcher = marketDataDispatcher;
+        // Unattached test/offline instances can exercise processing without a live worker.
+        if (dispatcher == null) { task.run(); return; }
+        dispatcher.submit(() -> {
+            synchronized (this) {
+                if (initialized) task.run();
+            }
+        });
+    }
+
+    private void processDepth(boolean isBid, int price, int size) {
         if (!initialized) return;
         // Discard absent/invalid price levels before any tracker or shared book sees them.
         // A zero size at a positive price is a valid level removal.
@@ -671,17 +663,22 @@ public class RongPlugin implements CustomModuleAdapter,
             reclaimSecondBidMonitor.onDepth(isBid, price, size, lastTimestampNs, patternMonitorSnapshotComplete);
             reclaimSecondBidPainter.refresh();
         }
-        synchronized (patternEventLock) {
+        if (patternEvents != null) synchronized (patternEventLock) {
             if (shouldRunPatternEvents()) patternEvents.onDepth(isBid, price, size, eventTimeNs, provenance);
         }
         if (wallLabelTracker != null && wallLabelTracker.onDepth(isBid, price, size, eventTimeNs)) {
             wallLabelsDirty = true;
-            refreshWallLabelsIfNeeded(false);
+            refreshWallLabelsIfNeeded();
         }
     }
 
     @Override
     public void onTrade(double price, int size, TradeInfo tradeInfo) {
+        if (!Double.isFinite(price) || price < 0.5 || price > Integer.MAX_VALUE || size <= 0) return;
+        dispatchMarketData(() -> processTrade(price, size, tradeInfo));
+    }
+
+    private void processTrade(double price, int size, TradeInfo tradeInfo) {
         if (!initialized) return;
         if (!Double.isFinite(price) || price < 0.5 || price > Integer.MAX_VALUE
                 || size <= 0) return;
@@ -734,7 +731,7 @@ public class RongPlugin implements CustomModuleAdapter,
         }
         flushPendingVwapPoints();
 
-        synchronized (patternEventLock) {
+        if (patternEvents != null) synchronized (patternEventLock) {
             if (shouldRunPatternEvents()) patternEvents.onTrade(priceTick, size,
                     tradeInfo == null ? null : tradeInfo.isBidAggressor, eventTimeNs, provenance);
         }
@@ -742,11 +739,15 @@ public class RongPlugin implements CustomModuleAdapter,
         if (wallLabelTracker != null && wallLabelTracker.cleanup(priceTick)) {
             wallLabelsDirty = true;
         }
-        refreshWallLabelsIfNeeded(true);
+        refreshWallLabelsIfNeeded();
     }
 
     @Override
     public void onTimestamp(long timestampNs) {
+        dispatchMarketData(() -> processTimestamp(timestampNs));
+    }
+
+    private void processTimestamp(long timestampNs) {
         if (!initialized) return;
         ReplayTradeWindow replay = replayTradeWindow;
         if (timestampNs > 0 && lastTimestampNs > 0 && timestampNs < lastTimestampNs) {
@@ -779,17 +780,21 @@ public class RongPlugin implements CustomModuleAdapter,
             reclaimSecondBidPainter.refresh();
         }
         flushPendingVwapPoints();
-        synchronized (patternEventLock) {
+        if (patternEvents != null) synchronized (patternEventLock) {
             if (shouldRunPatternEvents()) patternEvents.onTimestamp(timestampNs, patternEventProvenance());
         }
         if (wallLabelTracker != null && wallLabelTracker.onTimestamp(timestampNs)) {
             wallLabelsDirty = true;
-            refreshWallLabelsIfNeeded(true);
+            refreshWallLabelsIfNeeded();
         }
     }
 
     @Override
     public void onBbo(int bidPrice, int bidSize, int askPrice, int askSize) {
+        dispatchMarketData(() -> processBbo(bidPrice, bidSize, askPrice, askSize));
+    }
+
+    private void processBbo(int bidPrice, int bidSize, int askPrice, int askSize) {
         if (!initialized) return;
         if (sharedServer != null) sharedServer.observeSessionBbo(alias, bidPrice, askPrice, lastTimestampNs);
         if (falseBreakoutMonitor != null) {
@@ -806,13 +811,17 @@ public class RongPlugin implements CustomModuleAdapter,
         }
         long eventTimeNs = getEventTimeNs();
         PatternEvent.TimestampProvenance provenance = patternEventProvenance();
-        synchronized (patternEventLock) {
+        if (patternEvents != null) synchronized (patternEventLock) {
             if (shouldRunPatternEvents()) patternEvents.onBbo(bidPrice, askPrice, eventTimeNs, provenance);
         }
     }
 
     @Override
     public void onSnapshotEnd() {
+        dispatchMarketData(() -> processSnapshotEnd());
+    }
+
+    private void processSnapshotEnd() {
         if (!initialized) return;
         patternMonitorSnapshotComplete = true;
         patternEventSnapshotComplete = true;
@@ -824,6 +833,10 @@ public class RongPlugin implements CustomModuleAdapter,
 
     @Override
     public void onRealtimeStart() {
+        dispatchMarketData(() -> processRealtimeStart());
+    }
+
+    private void processRealtimeStart() {
         if (!initialized) return;
         sessionHistoryLoading = false;
         if (sharedServer != null) sharedServer.finishSessionHistory(alias);
@@ -1035,22 +1048,17 @@ public class RongPlugin implements CustomModuleAdapter,
         }
     }
 
-    private void refreshWallLabelsIfNeeded(boolean force) {
+    private void refreshWallLabelsIfNeeded() {
         if (!wallLabelsDirty || wallLabelPainter == null) {
-            return;
-        }
-        long now = System.currentTimeMillis();
-        if (!force && now - lastWallLabelRefreshMs < WALL_LABEL_REFRESH_MS) {
             return;
         }
         wallLabelPainter.refreshInstrument(alias);
         wallLabelsDirty = false;
-        lastWallLabelRefreshMs = now;
     }
 
     private void handleWallLabelTrackerChange() {
         wallLabelsDirty = true;
-        refreshWallLabelsIfNeeded(true);
+        refreshWallLabelsIfNeeded();
     }
 
     private long getEventTimeNs() {

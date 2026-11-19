@@ -11,12 +11,15 @@ final class SessionOrderSizeTracker {
     static final long ROLLING_WINDOW_NS = 2_000_000_000L;
     private final TreeMap<Double, Wall> bids = new TreeMap<>(), offers = new TreeMap<>();
     private final Deque<Fill> rollingFills = new ArrayDeque<>();
+    private final Deque<Removal> removals = new ArrayDeque<>();
     private final Map<Integer, RollingState> rollingStates = new LinkedHashMap<>();
     private LocalDate date;
     private long lastTimestampNs;
     private boolean regular, started, seedFromSharedBook = true;
     private Double bestBid, bestAsk;
     private Observation largest;
+    private long dayStartNs, dayEndNs, openNs, closeNs;
+    private boolean weekday;
 
     SessionOrderSizeTracker() {
         // History can precede the final volume: retain peaks for every rounded
@@ -39,6 +42,12 @@ final class SessionOrderSizeTracker {
         Fill(Wall wall, int size, long timestampNs) {
             this.wall = wall; this.size = size; this.timestampNs = timestampNs;
         }
+    }
+    private static final class Removal {
+        final boolean bid;
+        final double price;
+        final Wall wall;
+        Removal(boolean bid, double price, Wall wall) { this.bid = bid; this.price = price; this.wall = wall; }
     }
     private static final class RollingState {
         final long minimum;
@@ -77,31 +86,39 @@ final class SessionOrderSizeTracker {
     }
     synchronized boolean advance(long timestampNs, OrderBookState book, double pips) {
         if (timestampNs <= 0) { regular = false; return false; }
-        ZonedDateTime time = Instant.ofEpochSecond(timestampNs / 1_000_000_000L,
-                timestampNs % 1_000_000_000L).atZone(NEW_YORK);
+        if (timestampNs == lastTimestampNs && regular) return true;
         if (lastTimestampNs > 0 && timestampNs < lastTimestampNs) {
             clearRolling();
-            bids.clear(); offers.clear(); largest = null; bestBid = bestAsk = null;
+            bids.clear(); offers.clear(); removals.clear(); largest = null; bestBid = bestAsk = null;
             started = false; seedFromSharedBook = false;
         }
         lastTimestampNs = timestampNs;
-        if (!time.toLocalDate().equals(date)) {
+        if (date == null || timestampNs < dayStartNs || timestampNs >= dayEndNs) {
+            LocalDate nextDate = Instant.ofEpochSecond(timestampNs / 1_000_000_000L,
+                    timestampNs % 1_000_000_000L).atZone(NEW_YORK).toLocalDate();
             clearRolling();
-            date = time.toLocalDate(); largest = null; started = false; bestBid = bestAsk = null;
+            date = nextDate; largest = null; started = false; bestBid = bestAsk = null;
+            dayStartNs = date.atStartOfDay(NEW_YORK).toEpochSecond() * 1_000_000_000L;
+            dayEndNs = date.plusDays(1).atStartOfDay(NEW_YORK).toEpochSecond() * 1_000_000_000L;
+            openNs = date.atTime(9, 30).atZone(NEW_YORK).toEpochSecond() * 1_000_000_000L;
+            closeNs = date.atTime(16, 0).atZone(NEW_YORK).toEpochSecond() * 1_000_000_000L;
+            weekday = date.getDayOfWeek().getValue() <= 5;
+            removals.clear();
             // Resting quotes may persist overnight, but yesterday's executions cannot.
             for (TreeMap<Double, Wall> side : List.of(bids, offers)) {
                 side.values().removeIf(wall -> wall.removedAt != 0);
                 side.values().forEach(wall -> wall.filled = 0);
             }
         }
-        LocalTime local = time.toLocalTime();
-        regular = time.getDayOfWeek().getValue() <= 5 && !local.isBefore(LocalTime.of(9, 30))
-                && local.isBefore(LocalTime.of(16, 0));
+        regular = weekday && timestampNs >= openNs && timestampNs < closeNs;
         while (!rollingFills.isEmpty() && timestampNs - rollingFills.peekFirst().timestampNs > ROLLING_WINDOW_NS) {
             Fill expired = rollingFills.removeFirst(); changeRolling(expired.wall, -expired.size);
         }
-        for (TreeMap<Double, Wall> side : List.of(bids, offers))
-            side.values().removeIf(wall -> wall.removedAt != 0 && timestampNs - wall.removedAt > REMOVAL_GRACE_NS);
+        while (!removals.isEmpty() && timestampNs - removals.peekFirst().wall.removedAt > REMOVAL_GRACE_NS) {
+            Removal expired = removals.removeFirst();
+            // A refill at the same price is a new episode and must survive an old expiration.
+            (expired.bid ? bids : offers).remove(expired.price, expired.wall);
+        }
         if (!regular) return false;
         if (!started) {
             started = true;
@@ -122,7 +139,10 @@ final class SessionOrderSizeTracker {
         TreeMap<Double, Wall> side = isBid ? bids : offers;
         Wall wall = side.get(price);
         if (size == 0) {
-            if (wall != null && wall.removedAt == 0) { wall.size = 0; wall.removedAt = timestampNs; }
+            if (wall != null && wall.removedAt == 0) {
+                wall.size = 0; wall.removedAt = timestampNs;
+                removals.addLast(new Removal(isBid, price, wall));
+            }
         } else if (wall == null || wall.removedAt != 0) side.put(price, new Wall(size, isBid));
         else wall.size = size;
     }
