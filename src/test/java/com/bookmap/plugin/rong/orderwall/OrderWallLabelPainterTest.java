@@ -68,6 +68,40 @@ class OrderWallLabelPainterTest {
         assertNotNull(store.getLabel("TEST", "old-8"));
     }
 
+    @Test void addingCurrentWallRetainsHistoricalLabelShape() throws Exception {
+        OrderWallLabelStore store = new OrderWallLabelStore();
+        OrderWallLabel historical = new OrderWallLabel("history", "TEST", true, 10000, 100,
+                0, 6000, 1, 2, 3, true);
+        store.putLabel(historical); store.markDisplayed("TEST", historical.getId());
+        java.util.Set<Object> shapes = java.util.concurrent.ConcurrentHashMap.newKeySet();
+        AtomicInteger added = new AtomicInteger();
+        ScreenSpaceCanvas canvas = (ScreenSpaceCanvas) Proxy.newProxyInstance(ScreenSpaceCanvas.class.getClassLoader(),
+                new Class<?>[]{ScreenSpaceCanvas.class}, (proxy, method, args) -> {
+                    if (method.getName().equals("addShape")) { added.incrementAndGet(); shapes.add(args[0]); }
+                    else if (method.getName().equals("removeShape")) shapes.remove(args[0]);
+                    else if (method.getName().equals("getUniqueId")) return 1L;
+                    return null;
+                });
+        OrderWallLabelPainter painter = new OrderWallLabelPainter(store, new IndicatorConfig(), new OrderWallChangeStore());
+        painter.registerInstrument("TEST");
+        ScreenSpacePainter instance = painter.createScreenSpacePainter("TEST", "wallLabels_TEST", type -> canvas);
+        try {
+            waitFor(() -> shapes.size() == 1);
+            Object original = shapes.iterator().next();
+            store.putLabel(new OrderWallLabel("TEST", false, 10100, 101, 7000, 7000, 1, 2, 3));
+            painter.refreshInstrument("TEST");
+            waitFor(() -> shapes.size() == 2);
+            assertTrue(shapes.contains(original)); assertEquals(2, added.get());
+            assertNotNull(store.getLabel("TEST", "history"));
+        } finally { painter.shutdown(); instance.dispose(); }
+    }
+
+    private static void waitFor(java.util.function.BooleanSupplier condition) throws Exception {
+        long end = System.nanoTime() + TimeUnit.SECONDS.toNanos(5);
+        while (!condition.getAsBoolean() && System.nanoTime() < end) Thread.sleep(5);
+        assertTrue(condition.getAsBoolean());
+    }
+
     @Test
     void compactSizePathKeepsPeakVisibleAfterStableDecreases() {
         OrderWallLabel label = new OrderWallLabel(

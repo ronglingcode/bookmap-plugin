@@ -23,7 +23,18 @@ public final class PremarketSizeThreshold implements AutoCloseable {
     private volatile String unavailableReason = "waiting for history";
     private final AtomicBoolean refreshQueued = new AtomicBoolean();
     private volatile long requestedMinute = Long.MIN_VALUE;
+    private volatile long observedMinute = Long.MIN_VALUE;
+    private volatile DateWindow dateWindow;
     private volatile boolean closed;
+    private static final class DateWindow {
+        final LocalDate date;
+        final long start, end;
+        DateWindow(LocalDate date) {
+            this.date = date;
+            start = date.atStartOfDay(NEW_YORK).toInstant().toEpochMilli();
+            end = date.plusDays(1).atStartOfDay(NEW_YORK).toInstant().toEpochMilli();
+        }
+    }
     private static final class History {
         final LocalDate date;
         final List<Candle> candles;
@@ -53,7 +64,10 @@ public final class PremarketSizeThreshold implements AutoCloseable {
     public void onMarketTime() {
         long time = marketTime.getAsLong();
         if (time <= 0 || closed) return;
-        LocalDate date = Instant.ofEpochMilli(time).atZone(NEW_YORK).toLocalDate();
+        long rawMinute = time / 60000;
+        if (observedMinute == rawMinute) return;
+        observedMinute = rawMinute;
+        LocalDate date = dateAt(time);
         long open = date.atTime(9, 30).atZone(NEW_YORK).toInstant().toEpochMilli();
         long minute = Math.min(time, open) / 60000;
         if (minute == requestedMinute) return;
@@ -71,7 +85,15 @@ public final class PremarketSizeThreshold implements AutoCloseable {
     }
     private LocalDate chartDate() {
         long time = marketTime.getAsLong();
-        return time > 0 ? Instant.ofEpochMilli(time).atZone(NEW_YORK).toLocalDate() : null;
+        return time > 0 ? dateAt(time) : null;
+    }
+    private LocalDate dateAt(long time) {
+        DateWindow cached = dateWindow;
+        if (cached == null || time < cached.start || time >= cached.end) {
+            cached = new DateWindow(Instant.ofEpochMilli(time).atZone(NEW_YORK).toLocalDate());
+            dateWindow = cached;
+        }
+        return cached.date;
     }
     void refresh() {
         LocalDate date = chartDate();

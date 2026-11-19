@@ -554,6 +554,8 @@ public class RongPlugin implements CustomModuleAdapter,
                 if (wallLabelPainter != null) {
                     cleanup("shut down shared resource", () -> wallLabelPainter.shutdown());
                 }
+                if (priceLinePainter != null) cleanup("stop price line renderer", priceLinePainter::shutdown);
+                if (priceZonePainter != null) cleanup("stop price zone renderer", priceZonePainter::shutdown);
                 if (wallChangePainter != null) {
                     cleanup("shut down shared resource", () -> wallChangePainter.shutdown());
                 }

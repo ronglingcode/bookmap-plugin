@@ -182,6 +182,11 @@ class ReleaseJarTest {
         String name = "com.bookmap.plugin.rong.MarketDataDispatcher";
         Class<?> workerType = mappedClass(name);
         var lookup = MethodHandles.privateLookupIn(Class.forName(ENTRY), MethodHandles.lookup());
+        for (String painter : List.of("PriceLinePainter", "PriceZonePainter")) {
+            String owner = "com.bookmap.plugin.rong.pricelines." + painter;
+            lookup.findVirtual(mappedClass(owner), MEMBERS.get(owner + "#void shutdown()"),
+                    MethodType.methodType(void.class));
+        }
         // Use the entry point's access rights, not reflection's setAccessible bypass.
         // initialize() links a BooleanSupplier method reference to healthy().
         var healthy = lookup.findVirtual(workerType, MEMBERS.get(name + "#boolean healthy()"),

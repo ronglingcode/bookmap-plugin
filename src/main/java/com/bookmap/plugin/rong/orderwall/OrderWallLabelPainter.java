@@ -178,8 +178,9 @@ public class OrderWallLabelPainter implements ScreenSpacePainterFactory,
         private final String instrumentAlias;
         private final ScreenSpaceCanvas canvas;
         private final Map<String, CanvasIcon> activeShapes = new HashMap<>();
-        private final Map<String, BufferedImage> images = new java.util.LinkedHashMap<String, BufferedImage>(64, .75f, true) {
-            @Override protected boolean removeEldestEntry(Map.Entry<String, BufferedImage> entry) { return size() > 512; }
+        private final Map<String, String> signatures = new HashMap<>();
+        private final Map<String, CachedImage> images = new java.util.LinkedHashMap<String, CachedImage>(64, .75f, true) {
+            @Override protected boolean removeEldestEntry(Map.Entry<String, CachedImage> entry) { return size() > 512; }
         };
         private final Object shapeLock = new Object();
 
@@ -225,23 +226,36 @@ public class OrderWallLabelPainter implements ScreenSpacePainterFactory,
                     return;
                 }
 
-                removeActiveShapesLocked();
                 if (!config.isEnabled(IndicatorConfig.ORDER_WALL_SIZE_LABELS)) {
+                    removeActiveShapesLocked();
                     return;
                 }
 
                 List<LabelPlacement> labels = selectLabelsToDraw();
-
+                java.util.Set<String> retained = new java.util.HashSet<>();
+                long nowMs = System.currentTimeMillis();
                 for (LabelPlacement placement : labels) {
                     OrderWallLabel label = placement.label;
                     if (label.isActive() || placement.changeEvent != null) {
                         store.markDisplayed(instrumentAlias, label.getId());
                     }
-                    CanvasIcon icon = createLabelIcon(placement);
+                    String key = placement.shapeKey();
+                    retained.add(key);
+                    String signature = imageKey(label, placement.changeEvent, nowMs) + ":" + label.getPriceTick()
+                            + ":" + anchorTimeNs(label, placement.changeEvent) + ":" + placement.historicalSlot;
+                    if (signature.equals(signatures.get(key))) continue;
+                    CanvasIcon icon = createLabelIcon(placement, nowMs);
                     if (icon != null) {
+                        CanvasIcon previous = activeShapes.remove(key);
+                        if (previous != null) canvas.removeShape(previous);
                         canvas.addShape(icon);
-                        activeShapes.put(placement.shapeKey(), icon);
+                        activeShapes.put(key, icon);
+                        signatures.put(key, signature);
                     }
+                }
+                for (String key : new ArrayList<>(activeShapes.keySet())) {
+                    if (retained.contains(key)) continue;
+                    canvas.removeShape(activeShapes.remove(key)); signatures.remove(key);
                 }
             }
         }
@@ -261,12 +275,15 @@ public class OrderWallLabelPainter implements ScreenSpacePainterFactory,
             List<OrderWallLabel> clearedLabels = new ArrayList<>();
             Map<OrderWallLabel, OrderWallChangeEvent> recentChanges = new HashMap<>();
             long nowMs = System.currentTimeMillis();
+            List<OrderWallChangeEvent> recentEvents = config.isEnabled(IndicatorConfig.ORDER_WALL_CHANGE_ALERTS)
+                    ? wallChangeStore.getRecentEvents(instrumentAlias, OrderWallAlertDisplayTiming.maxTtlMs(), nowMs)
+                    : java.util.Collections.emptyList();
 
             for (OrderWallLabel label : store.getLabels(instrumentAlias)) {
                 if (!isVisible(label) || !isDisplayable(label)) {
                     continue;
                 }
-                OrderWallChangeEvent recentChange = findRecentChange(label, nowMs);
+                OrderWallChangeEvent recentChange = findRecentChange(label, nowMs, recentEvents);
                 recentChanges.put(label, recentChange);
                 if (label.isActive()) {
                     activeLabels.add(label);
@@ -343,32 +360,33 @@ public class OrderWallLabelPainter implements ScreenSpacePainterFactory,
             return stacked;
         }
 
-        private CanvasIcon createLabelIcon(LabelPlacement placement) {
-            OrderWallLabel label = placement.label;
-            long nowMs = System.currentTimeMillis();
-            OrderWallChangeEvent recentChange = placement.changeEvent;
-            String imageKey = label.isBid() + ":" + label.isActive() + ":"
+        private String imageKey(OrderWallLabel label, OrderWallChangeEvent recentChange, long nowMs) {
+            return label.isBid() + ":" + label.isActive() + ":"
                     + (recentChange == null ? formatSizePath(label)
                     : recentChange.getType() + ":" + formatChangeText(recentChange) + ":" + changePulseAlpha(recentChange, nowMs));
-            BufferedImage image = images.computeIfAbsent(imageKey,
-                    ignored -> renderLabelImage(label, recentChange, nowMs));
-            PreparedImage prepared = new PreparedImage(image);
+        }
+
+        private CanvasIcon createLabelIcon(LabelPlacement placement, long nowMs) {
+            OrderWallLabel label = placement.label;
+            OrderWallChangeEvent recentChange = placement.changeEvent;
+            CachedImage image = images.computeIfAbsent(imageKey(label, recentChange, nowMs),
+                    ignored -> new CachedImage(renderLabelImage(label, recentChange, nowMs)));
             long anchorTime = anchorTimeNs(label, recentChange);
             CompositeHorizontalCoordinate anchor = new CompositeHorizontalCoordinate(
                     CompositeCoordinateBase.DATA_ZERO, 0, anchorTime);
             ScreenSpaceCanvas.HorizontalCoordinate x1 =
-                    new RelativePixelHorizontalCoordinate(anchor, -image.getWidth() / 2);
+                    new RelativePixelHorizontalCoordinate(anchor, -image.width / 2);
             ScreenSpaceCanvas.HorizontalCoordinate x2 =
-                    new RelativePixelHorizontalCoordinate(anchor, image.getWidth() - image.getWidth() / 2);
+                    new RelativePixelHorizontalCoordinate(anchor, image.width - image.width / 2);
 
-            int imageHeight = image.getHeight();
+            int imageHeight = image.height;
             int verticalOffset = placement.historicalSlot * (imageHeight + STACKED_LABEL_GAP);
             CompositeVerticalCoordinate y1 = new CompositeVerticalCoordinate(
                     CompositeCoordinateBase.DATA_ZERO, -imageHeight / 2 + verticalOffset, label.getPriceTick());
             CompositeVerticalCoordinate y2 = new CompositeVerticalCoordinate(
                     CompositeCoordinateBase.DATA_ZERO, imageHeight / 2 + verticalOffset, label.getPriceTick());
 
-            return new CanvasIcon(prepared, x1, y1, x2, y2);
+            return new CanvasIcon(image.prepared, x1, y1, x2, y2);
         }
 
         private boolean isVisibleInTime(OrderWallLabel label) {
@@ -432,14 +450,13 @@ public class OrderWallLabelPainter implements ScreenSpacePainterFactory,
             return value == null ? "" : value;
         }
 
-        private OrderWallChangeEvent findRecentChange(OrderWallLabel label, long nowMs) {
+        private OrderWallChangeEvent findRecentChange(OrderWallLabel label, long nowMs, List<OrderWallChangeEvent> recentEvents) {
             if (!config.isEnabled(IndicatorConfig.ORDER_WALL_CHANGE_ALERTS)) {
                 return null;
             }
             OrderWallChangeEvent bestEvent = null;
             long bestDistanceNs = Long.MAX_VALUE;
-            for (OrderWallChangeEvent event : wallChangeStore.getRecentEvents(
-                    instrumentAlias, OrderWallAlertDisplayTiming.maxTtlMs(), nowMs)) {
+            for (OrderWallChangeEvent event : recentEvents) {
                 if (!OrderWallAlertDisplayTiming.isVisible(event, nowMs)) {
                     continue;
                 }
@@ -589,6 +606,7 @@ public class OrderWallLabelPainter implements ScreenSpacePainterFactory,
         }
 
         private void removeActiveShapesLocked() {
+            signatures.clear();
             List<CanvasIcon> icons = new ArrayList<>(activeShapes.values());
             activeShapes.clear();
             for (CanvasIcon icon : icons) {
@@ -615,6 +633,14 @@ public class OrderWallLabelPainter implements ScreenSpacePainterFactory,
                 String suffix = changeEvent == null ? "normal" : "change:" + changeEvent.getId();
                 return label.getKey() + ":" + suffix + ":" + historicalSlot;
             }
+        }
+    }
+
+    private static final class CachedImage {
+        final int width, height;
+        final PreparedImage prepared;
+        CachedImage(BufferedImage image) {
+            width = image.getWidth(); height = image.getHeight(); prepared = new PreparedImage(image);
         }
     }
 

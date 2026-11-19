@@ -19,7 +19,7 @@ Cairo's price/candle feed continues independently.
    `node scripts/importSecrets.mjs ..\secrets\storeSecrets.js`.
    See [credential setup](config/README.md).
 3. In Bookmap, open API Plugins Configuration, add
-   `build/libs/lingrong1988_bmtrader_1.47.jar`, and attach bmtrader to a chart.
+   `build/libs/lingrong1988_bmtrader_1.48.jar`, and attach bmtrader to a chart.
 4. The first attachment starts the trading runtime; the final detachment stops it.
    Check the bmtrader Logs window for startup errors. Settings offer
    **Restart Native Trading / Reload Secrets**, **Open Schwab Authorization**,
@@ -119,6 +119,13 @@ dirty. Label images are cached (up to 512 per chart), and the newest 2,000 inact
 wall segments are retained per chart along with all active levels. The order book
 and entry liquidity evidence are not pruned by this display retention limit.
 
+Price lines, zones and fill markers coalesce data/viewport redraw requests on
+background workers at 100 ms intervals. Unchanged levels and executions retain
+their existing canvas shapes. Wall labels also retain unchanged historical shapes
+and cache the Bookmap-prepared image, avoiding repeated pixel conversion. Historical
+wall labels remain enabled. Premarket dates/minute checks are cached, and duplicate
+depth sizes skip redundant order-book histogram updates; trades are never sampled.
+
 This is a personal MVP with one running app and one account. Exits submit without
 broker preflight reads. Initial flat entries retain the existing broker exposure
 preflight. There are no session ownership checks, input-age cutoffs or execution
@@ -177,7 +184,7 @@ TypeScript fixtures check Java parity; fake services cover standalone startup,
 renewal, requests, persistence and teardown. No live orders or real Firestore writes
 are sent by these checks.
 
-Share only `build/libs/lingrong1988_bmtrader_1.47.jar`. Unobfuscated intermediates
+Share only `build/libs/lingrong1988_bmtrader_1.48.jar`. Unobfuscated intermediates
 and the private mapping remain under `build/intermediates` and
 `build/private/obfuscation`. Obfuscation does not prevent reverse engineering.
 

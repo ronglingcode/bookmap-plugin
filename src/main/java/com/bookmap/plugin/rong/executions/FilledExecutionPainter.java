@@ -60,6 +60,7 @@ public class FilledExecutionPainter implements ScreenSpacePainterFactory,
     private final Map<String, CopyOnWriteArrayList<PainterInstance>> paintersByInstrument = new ConcurrentHashMap<>();
     private final ScheduledExecutorService scheduler;
     private ScheduledFuture<?> transientRefreshTask;
+    private final com.bookmap.plugin.rong.BackgroundChartRenderer renderer;
     private volatile String lastRegisteredInstrument;
 
     public FilledExecutionPainter(FilledExecutionStore store, IndicatorConfig config) {
@@ -72,6 +73,7 @@ public class FilledExecutionPainter implements ScreenSpacePainterFactory,
             thread.setDaemon(true);
             return thread;
         });
+        renderer = new com.bookmap.plugin.rong.BackgroundChartRenderer(scheduler);
         setTransientRefreshEnabled(!areLabelsPersistent());
     }
 
@@ -93,14 +95,14 @@ public class FilledExecutionPainter implements ScreenSpacePainterFactory,
             return;
         }
         for (PainterInstance painter : painters) {
-            painter.rebuildMarkers();
+            painter.requestRedraw();
         }
     }
 
     private void refreshAllInstruments() {
         for (CopyOnWriteArrayList<PainterInstance> painters : paintersByInstrument.values()) {
             for (PainterInstance painter : painters) {
-                painter.rebuildMarkers();
+                painter.requestRedraw();
             }
         }
     }
@@ -123,7 +125,7 @@ public class FilledExecutionPainter implements ScreenSpacePainterFactory,
         store.removeListener(this);
         config.removeChangeListener(this);
         setTransientRefreshEnabled(false);
-        scheduler.shutdownNow();
+        renderer.close();
     }
 
     private synchronized void setTransientRefreshEnabled(boolean enabled) {
@@ -173,6 +175,7 @@ public class FilledExecutionPainter implements ScreenSpacePainterFactory,
                     .computeIfAbsent(instrumentAlias, ignored -> new CopyOnWriteArrayList<>())
                     .add(instance);
         }
+        instance.requestRedraw();
         return instance;
     }
 
@@ -188,7 +191,9 @@ public class FilledExecutionPainter implements ScreenSpacePainterFactory,
         private volatile long priceHeight;
         private volatile long timeLeft;
         private volatile long timeWidth;
-        private boolean disposed;
+        private volatile boolean disposed;
+        private final Runnable redraw = this::rebuildMarkers;
+        private final Map<String, CanvasIcon> shapesByMarker = new java.util.HashMap<>();
 
         PainterInstance(String painterAlias, String instrumentAlias, ScreenSpaceCanvas canvas) {
             this.painterAlias = painterAlias;
@@ -199,25 +204,29 @@ public class FilledExecutionPainter implements ScreenSpacePainterFactory,
         @Override
         public void onHeatmapPriceBottom(long priceBottom) {
             this.priceBottom = priceBottom;
-            rebuildMarkers();
+            requestRedraw();
         }
 
         @Override
         public void onHeatmapPriceHeight(long priceHeight) {
             this.priceHeight = priceHeight;
-            rebuildMarkers();
+            requestRedraw();
         }
 
         @Override
         public void onHeatmapTimeLeft(long timeLeft) {
             this.timeLeft = timeLeft;
-            rebuildMarkers();
+            requestRedraw();
         }
 
         @Override
         public void onHeatmapFullTimeWidth(long width) {
             this.timeWidth = width;
-            rebuildMarkers();
+            requestRedraw();
+        }
+
+        private void requestRedraw() {
+            if (!disposed) renderer.request(redraw);
         }
 
         private void rebuildMarkers() {
@@ -225,15 +234,22 @@ public class FilledExecutionPainter implements ScreenSpacePainterFactory,
                 if (disposed || instrumentAlias == null) {
                     return;
                 }
-                removeActiveShapesLocked();
-
                 List<FilledExecutionMarker> markers = selectMarkersToDraw();
+                java.util.Set<String> retained = new java.util.HashSet<>();
                 for (FilledExecutionMarker marker : markers) {
+                    retained.add(marker.getId());
+                    if (shapesByMarker.containsKey(marker.getId())) continue;
                     CanvasIcon icon = createMarkerIcon(marker);
                     if (icon != null) {
                         canvas.addShape(icon);
                         activeShapes.add(icon);
+                        shapesByMarker.put(marker.getId(), icon);
                     }
+                }
+                for (String id : new ArrayList<>(shapesByMarker.keySet())) {
+                    if (retained.contains(id)) continue;
+                    CanvasIcon icon = shapesByMarker.get(id);
+                    canvas.removeShape(icon); activeShapes.remove(icon); shapesByMarker.remove(id);
                 }
             }
         }
@@ -337,6 +353,7 @@ public class FilledExecutionPainter implements ScreenSpacePainterFactory,
                     return;
                 }
                 disposed = true;
+                renderer.forget(redraw);
                 removeActiveShapesLocked();
                 canvas.dispose();
             }
@@ -351,6 +368,7 @@ public class FilledExecutionPainter implements ScreenSpacePainterFactory,
         }
 
         private void removeActiveShapesLocked() {
+            shapesByMarker.clear();
             List<CanvasIcon> icons = new ArrayList<>(activeShapes);
             activeShapes.clear();
             for (CanvasIcon icon : icons) {

@@ -36,6 +36,7 @@ public class OrderBookState {
         }
         TreeMap<Integer, Integer> book = isBid ? bids : asks;
         Integer previousSize = book.get(price);
+        if (previousSize == null ? size == 0 : previousSize == size) return;
 
         if (previousSize != null) {
             decrementSizeCount(previousSize);

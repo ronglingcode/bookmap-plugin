@@ -31,7 +31,7 @@ import velox.api.layer1.layers.strategies.interfaces.ScreenSpacePainterFactory;
  */
 public class PriceLinePainter implements ScreenSpacePainterFactory {
 
-    private static final int LINE_IMAGE_WIDTH = 5000;
+    private static final int LINE_IMAGE_WIDTH = 1024;
     private static final int LINE_IMAGE_HEIGHT = 20; // enough for line + label text
     private static final int LINE_THICKNESS = 2;
     private static final Font LABEL_FONT = new Font("SansSerif", Font.BOLD, 11);
@@ -42,6 +42,10 @@ public class PriceLinePainter implements ScreenSpacePainterFactory {
     /** Map painter alias → instrument alias. Set when painter is created. */
     private final Map<String, String> painterToInstrument = new ConcurrentHashMap<>();
     private volatile String lastRegisteredInstrument;
+    private final com.bookmap.plugin.rong.BackgroundChartRenderer renderer =
+            new com.bookmap.plugin.rong.BackgroundChartRenderer("price-line-renderer");
+
+    public void shutdown() { renderer.close(); }
 
     public PriceLinePainter(PriceLineStore store) {
         this.store = store;
@@ -96,29 +100,36 @@ public class PriceLinePainter implements ScreenSpacePainterFactory {
         private final ScreenSpaceCanvas canvas;
 
         /** Currently displayed shapes: lineId → CanvasIcon */
-        private final Map<String, CanvasIcon> activeShapes = new ConcurrentHashMap<>();
+        private final Map<List<Object>, CanvasIcon> activeShapes = new ConcurrentHashMap<>();
+        private int renderedWidth;
 
         private volatile int fullPixelsWidth;
-        private boolean disposed;
+        private volatile boolean disposed;
+        private final Runnable redraw = this::rebuildLines;
 
         PainterInstance(String painterAlias, String instrumentAlias, ScreenSpaceCanvas canvas) {
             this.painterAlias = painterAlias;
             this.instrumentAlias = instrumentAlias;
             this.canvas = canvas;
             store.addListener(this);
+            requestRedraw();
         }
 
         @Override
         public void onHeatmapFullPixelsWidth(int width) {
             this.fullPixelsWidth = width;
-            rebuildLines();
+            requestRedraw();
         }
 
         @Override
         public void onLinesChanged(String changedInstrument) {
             if (instrumentAlias != null && instrumentAlias.equals(changedInstrument)) {
-                rebuildLines();
+                requestRedraw();
             }
+        }
+
+        private void requestRedraw() {
+            if (!disposed) renderer.request(redraw);
         }
 
         private synchronized void rebuildLines() {
@@ -127,25 +138,34 @@ public class PriceLinePainter implements ScreenSpacePainterFactory {
             // Canvas callbacks and account updates can arrive on different threads.
             // Keep removal, tracking and replacement atomic so no shape is orphaned.
 
-            // Remove all existing shapes
-            for (CanvasIcon icon : activeShapes.values()) {
-                canvas.removeShape(icon);
+            int width = (fullPixelsWidth > 0 ? fullPixelsWidth : LINE_IMAGE_WIDTH);
+            if (renderedWidth != width) {
+                for (CanvasIcon icon : activeShapes.values()) canvas.removeShape(icon);
+                activeShapes.clear();
+                renderedWidth = width;
             }
-            activeShapes.clear();
-
-            // Add shapes for current lines
             List<PriceLine> lines = store.getLines(instrumentAlias);
+            java.util.Set<List<Object>> retained = new java.util.HashSet<>();
             for (PriceLine line : lines) {
+                List<Object> key = java.util.Arrays.asList(line.getType(), line.getPriceInTicks(), line.getRealPrice(),
+                        line.getCustomLabel(), line.getCustomColor());
+                retained.add(key);
+                // Config/account refreshes can assign new IDs to identical visual lines.
+                if (activeShapes.containsKey(key)) continue;
                 CanvasIcon icon = createLineIcon(line);
                 if (icon != null) {
                     canvas.addShape(icon);
-                    activeShapes.put(line.getId(), icon);
+                    activeShapes.put(key, icon);
                 }
+            }
+            for (List<Object> key : new java.util.ArrayList<>(activeShapes.keySet())) {
+                if (retained.contains(key)) continue;
+                canvas.removeShape(activeShapes.get(key)); activeShapes.remove(key);
             }
         }
 
         private CanvasIcon createLineIcon(PriceLine line) {
-            int width = Math.max(fullPixelsWidth, LINE_IMAGE_WIDTH);
+            int width = (fullPixelsWidth > 0 ? fullPixelsWidth : LINE_IMAGE_WIDTH);
             BufferedImage img = renderLineImage(line, width);
             PreparedImage prepared = new PreparedImage(img);
 
@@ -221,6 +241,7 @@ public class PriceLinePainter implements ScreenSpacePainterFactory {
         public synchronized void dispose() {
             if (disposed) return;
             disposed = true;
+            renderer.forget(redraw);
             store.removeListener(this);
             for (CanvasIcon icon : activeShapes.values()) {
                 canvas.removeShape(icon);

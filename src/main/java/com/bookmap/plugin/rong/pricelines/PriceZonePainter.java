@@ -46,6 +46,10 @@ public class PriceZonePainter implements ScreenSpacePainterFactory {
     private final PriceZoneStore store;
     private final Map<String, String> painterToInstrument = new ConcurrentHashMap<>();
     private volatile String lastRegisteredInstrument;
+    private final com.bookmap.plugin.rong.BackgroundChartRenderer renderer =
+            new com.bookmap.plugin.rong.BackgroundChartRenderer("price-zone-renderer");
+
+    public void shutdown() { renderer.close(); }
 
     public PriceZonePainter(PriceZoneStore store) {
         this.store = store;
@@ -96,29 +100,37 @@ public class PriceZonePainter implements ScreenSpacePainterFactory {
         private final String instrumentAlias;
         private final ScreenSpaceCanvas canvas;
         private final List<CanvasIcon> activeShapes = new ArrayList<>();
+        private final Map<List<Object>, List<CanvasIcon>> shapesByZone = new java.util.HashMap<>();
+        private int renderedWidth;
         private final Object shapeLock = new Object();
 
         private volatile int fullPixelsWidth;
-        private boolean disposed;
+        private volatile boolean disposed;
+        private final Runnable redraw = this::rebuildZones;
 
         PainterInstance(String painterAlias, String instrumentAlias, ScreenSpaceCanvas canvas) {
             this.painterAlias = painterAlias;
             this.instrumentAlias = instrumentAlias;
             this.canvas = canvas;
             store.addListener(this);
+            requestRedraw();
         }
 
         @Override
         public void onHeatmapFullPixelsWidth(int width) {
             this.fullPixelsWidth = width;
-            rebuildZones();
+            requestRedraw();
         }
 
         @Override
         public void onZonesChanged(String changedInstrument) {
             if (instrumentAlias != null && instrumentAlias.equals(changedInstrument)) {
-                rebuildZones();
+                requestRedraw();
             }
+        }
+
+        private void requestRedraw() {
+            if (!disposed) renderer.request(redraw);
         }
 
         private void rebuildZones() {
@@ -126,14 +138,37 @@ public class PriceZonePainter implements ScreenSpacePainterFactory {
                 if (disposed || instrumentAlias == null) {
                     return;
                 }
-                removeActiveShapesLocked();
-
+                // Labels are anchored to the actual viewport width, even when the line texture is wider.
+                int width = fullPixelsWidth;
+                if (renderedWidth != width) {
+                    removeActiveShapesLocked(); shapesByZone.clear(); renderedWidth = width;
+                }
                 List<PriceZone> zones = store.getZones(instrumentAlias);
+                java.util.Set<List<Object>> retained = new java.util.HashSet<>();
                 for (PriceZone zone : zones) {
-                    for (CanvasIcon icon : createZoneIcons(zone)) {
-                        canvas.addShape(icon);
-                        activeShapes.add(icon);
+                    List<Object> key = java.util.Arrays.asList(zone.getLowPriceInTicks(), zone.getHighPriceInTicks(),
+                            zone.getRealLowPrice(), zone.getRealHighPrice(), zone.getLabel(), zone.getColor());
+                    retained.add(key);
+                    if (shapesByZone.containsKey(key)) continue;
+                    List<CanvasIcon> icons = createZoneIcons(zone);
+                    try {
+                        for (CanvasIcon icon : icons) {
+                            canvas.addShape(icon); activeShapes.add(icon);
+                        }
+                    } catch (RuntimeException failure) {
+                        for (CanvasIcon icon : icons) if (activeShapes.remove(icon)) {
+                            try { canvas.removeShape(icon); } catch (IllegalArgumentException alreadyRemoved) { }
+                        }
+                        throw failure;
                     }
+                    shapesByZone.put(key, icons);
+                }
+                for (List<Object> key : new ArrayList<>(shapesByZone.keySet())) {
+                    if (retained.contains(key)) continue;
+                    for (CanvasIcon icon : shapesByZone.get(key)) {
+                        canvas.removeShape(icon); activeShapes.remove(icon);
+                    }
+                    shapesByZone.remove(key);
                 }
             }
         }
@@ -272,6 +307,7 @@ public class PriceZonePainter implements ScreenSpacePainterFactory {
                     return;
                 }
                 disposed = true;
+                renderer.forget(redraw);
                 store.removeListener(this);
                 removeActiveShapesLocked();
                 canvas.dispose();
@@ -280,6 +316,7 @@ public class PriceZonePainter implements ScreenSpacePainterFactory {
         }
 
         private void removeActiveShapesLocked() {
+            shapesByZone.clear();
             List<CanvasIcon> icons = new ArrayList<>(activeShapes);
             activeShapes.clear();
             for (CanvasIcon icon : icons) {
