@@ -114,6 +114,8 @@ public class TradeButtonWindow {
     private String lastReminderTradeId = "";
     private volatile SignalWebSocketServer.EntryRetestState entryRetestState;
     private volatile boolean disposed;
+    private final TradeButtonRefresh buttonRefresh = new TradeButtonRefresh(
+            () -> TradeButtonRefresh.pressed(buttonPanel), this::renderButtons);
 
     public TradeButtonWindow(String symbol, SignalWebSocketServer server,
                              IntSupplier wallThresholdFloorSupplier) {
@@ -174,7 +176,7 @@ public class TradeButtonWindow {
     private void setButtons(List<TradebookButtonGroup> tradebooks) {
         SwingUtilities.invokeLater(() -> {
             if (!disposed) {
-                renderButtons(tradebooks);
+                buttonRefresh.request(tradebooks);
             }
         });
     }
@@ -542,6 +544,7 @@ public class TradeButtonWindow {
         button.getAccessibleContext().setAccessibleName(label);
         applyHotkeyButtonStyle(button);
         button.addActionListener(e -> sendHotkeyButtonMessage(id, label, keyCode, shiftKey));
+        ButtonGestureTrace.attach(button, label, this::recordButtonGesture);
         return button;
     }
 
@@ -704,6 +707,8 @@ public class TradeButtonWindow {
             setShiftPressed(useMarketOrder);
             sendTradeButtonMessage(tradebook, entryMethod, useMarketOrder);
         });
+        ButtonGestureTrace.attach(button, tradebook.getLabel() + " " + entryMethod,
+                this::recordButtonGesture);
         return button;
     }
 
@@ -861,7 +866,9 @@ public class TradeButtonWindow {
     }
 
     private void updateWallThresholdLabel() {
-        if (wallThresholdLabel == null) {
+        // Wrapping status text changes row heights. Keep the pressed control still
+        // until its normal mouse-up action has completed.
+        if (wallThresholdLabel == null || TradeButtonRefresh.pressed(buttonPanel)) {
             return;
         }
         int thresholdFloor = getWallThresholdFloor();
@@ -1021,6 +1028,12 @@ public class TradeButtonWindow {
         HotkeyButtonAction.send(server, symbol, buttonId, buttonName, keyCode, shiftKey);
     }
 
+    private void recordButtonGesture(String message) {
+        if (message.startsWith("Button mouse-down") || message.startsWith("Button gesture cancelled"))
+            PluginLog.action(symbol, message);
+        else PluginLog.detail(symbol, message);
+    }
+
     private int getWallThresholdFloor() {
         try {
             return Math.max(0, wallThresholdFloorSupplier.getAsInt());
@@ -1096,6 +1109,7 @@ public class TradeButtonWindow {
 
     public void dispose() {
         disposed = true;
+        SwingUtilities.invokeLater(buttonRefresh::stop);
         if (hotkeyRiskPanel != null) hotkeyRiskPanel.dispose();
         if (wallThresholdTimer != null) {
             wallThresholdTimer.stop();

@@ -16,6 +16,22 @@ public final class ExecutionInputs {
     private static double number(JsonObject value, String key) { try { double n = value.has(key) ? value.get(key).getAsDouble() : 0; return Double.isFinite(n) ? n : 0; } catch (RuntimeException e) { return 0; } }
     private static boolean bool(JsonObject value, String key) { return value.has(key) && !value.get(key).isJsonNull() && value.get(key).getAsBoolean(); }
     private static void copy(JsonObject to, JsonObject from, String... keys) { for (String key : keys) if (from.has(key)) to.add(key, from.get(key).deepCopy()); }
+    private static boolean reloadIsLong(String symbol, double net, JsonObject account, JsonArray trades) {
+        if (net != 0) return net > 0;
+        // A capped live history may start with covers and corrupt position-based
+        // trade grouping. Use the broker's original effect on this symbol's latest
+        // fill: BUY/CLOSING describes a short, not a newly opened long.
+        JsonObject latest = null;
+        for (JsonElement item : array(object(account, "executions"), symbol)) {
+            JsonObject fill = item.getAsJsonObject();
+            if (!fill.has("positionEffectIsOpen") || fill.get("positionEffectIsOpen").isJsonNull()
+                    || !fill.has("isBuy") || fill.get("isBuy").isJsonNull()) continue;
+            if (latest == null || number(fill, "timestamp") >= number(latest, "timestamp")) latest = fill;
+        }
+        if (latest != null) return bool(latest, "positionEffectIsOpen") == bool(latest, "isBuy");
+        return trades.size() == 0 || bool(trades.get(trades.size() - 1).getAsJsonObject()
+                .getAsJsonArray("entries").get(0).getAsJsonObject(), "isBuy");
+    }
     public static JsonObject defaultPolicy() {
         JsonObject value = new JsonObject(); value.addProperty("batchCount", 10); value.addProperty("riskDollars", 1000); value.addProperty("dailyMaxLoss", 4000);
         value.addProperty("coreTargetEnabled", false); value.addProperty("maxRiskMultipleWithExistingPosition", 1.2); value.addProperty("allowAddIfBelow", 1000); return value;
@@ -58,7 +74,7 @@ public final class ExecutionInputs {
         for (JsonElement item : array(market, "candles")) { JsonObject candle = item.getAsJsonObject(); if (!MarketClock.marketTime(candle.get("datetime").getAsLong()).isPremarket) volumes.add(candle.get("volume")); } context.add("volumes", volumes);
         for (String key : new String[]{"customEntryPrice", "customStopLong", "customStopShort", "crosshairPrice"}) context.addProperty(key, number(manual, key));
         context.addProperty("fixedQuantity", manual.has("fixedQuantity") && !manual.get("fixedQuantity").isJsonNull() ? number(manual, "fixedQuantity") : number(plan, "fixedQuantity")); context.addProperty("availableBuyingPower", number(account, "currentBalance") * 3.9 - used);
-        context.addProperty("reloadIsLong", net != 0 ? isLong : trades.size() == 0 || bool(trades.get(trades.size() - 1).getAsJsonObject().getAsJsonArray("entries").get(0).getAsJsonObject(), "isBuy"));
+        context.addProperty("reloadIsLong", reloadIsLong(symbol, net, account, trades));
         double lastExit = 0; for (int index = trades.size() - 1; index >= 0; index--) { JsonArray exits = array(trades.get(index).getAsJsonObject(), "exits"); if (exits.size() > 0) { lastExit = number(exits.get(exits.size() - 1).getAsJsonObject(), "quantity"); break; } } context.addProperty("lastExitSize", lastExit);
         context.addProperty("todayRange", Math.round(number(atr, "average") * number(atr, "mutiplier") * 100) / 100.0); context.add("longState", direction(symbol, true, state, openTrade, policy)); context.add("shortState", direction(symbol, false, state, openTrade, policy));
         if (state.symbol(symbol).has("activeBasePlan")) context.add("activeBasePlan", state.symbol(symbol).get("activeBasePlan").deepCopy()); context.addProperty("isGappedUp", number(market, "openPrice") > number(object(analysis, "gap"), "pdc"));
