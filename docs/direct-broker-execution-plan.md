@@ -143,7 +143,7 @@ Route every button/hotkey through one native plugin router:
   operations. This never changes the established native group.
 - Unsupported or missing inputs: reject visibly through `execution_blocked`.
 - Clients must supply compatible native execution inputs. Native failures never
-  fall back, and unresolved broker review blocks both routes for those actions.
+  fall back. Errors are logged without locking subsequent native actions.
 
 Readiness includes compatible versions and supplied decision inputs, without
 age cutoffs or in-progress/reconciliation waits. Token authorization is delegated to the broker.
@@ -164,7 +164,7 @@ the adapter.
 
 Action IDs identify lifecycle messages. Never automatically resubmit or forward an action
 after a mutation may have reached Schwab. On a broker timeout or unknown outcome,
-require broker review before further native execution. Track partial success
+log the error and allow subsequent explicit actions without a manual reset. Track partial success
 separately for multi-request actions. Accepted results do not create a
 reconciliation wait.
 

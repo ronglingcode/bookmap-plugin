@@ -73,7 +73,7 @@ public class TradeButtonWindow {
     private static final Color THRESHOLD_TEXT_COLOR = new Color(24, 35, 46);
     private static final int CONTENT_WIDTH = VerticalWindowLayout.CONTENT_WIDTH;
     private static final int ENTRY_COLUMNS = 3;
-    private static final int WALL_THRESHOLD_REFRESH_MS = 1_000;
+    private static final int WALL_THRESHOLD_REFRESH_MS = 200;
     private static final String SHIFT_DOWN_CLIENT_PROPERTY = "rong.shiftDownForClick";
     private static final Object SHIFT_LISTENER_LOCK = new Object();
     private static final Set<TradeButtonWindow> OPEN_WINDOWS =
@@ -584,27 +584,52 @@ public class TradeButtonWindow {
         return modePanel;
     }
 
+    static String marketDataStatusText(JsonObject cap) {
+        String state = cap.has("marketDataState") ? cap.get("marketDataState").getAsString() : "";
+        if (state.equals("failed")) return "<b>Market data ERROR: processing failed</b><br>Fill counters incomplete; addon reload needed.";
+        if (state.equals("stopped")) return "<b>Market data STOPPED</b><br>Fill counters unavailable.";
+        if (state.equals("backpressure") || state.equals("catching_up")
+                || cap.has("processingDelayed") && cap.get("processingDelayed").getAsBoolean()) {
+            String depth = cap.has("queueDepth") ? String.format(Locale.US, "%,d", cap.get("queueDepth").getAsLong()) : "?";
+            String lag = cap.has("lagMillis") ? String.format(Locale.US, "%,d", cap.get("lagMillis").getAsLong()) : "?";
+            return "<b>Market data CATCHING UP</b><br>Queued: " + depth + " | Lag: " + lag + " ms"
+                    + "<br>" + (state.equals("backpressure") ? "Intake slowed; preserving all events." : "Counters delayed; recovering automatically.");
+        }
+        if (cap.has("historyLoading") && cap.get("historyLoading").getAsBoolean())
+            return "History loading; fill counts incomplete.";
+        return "";
+    }
+
     static String liquidityStatusText(JsonObject cap) {
+        String processing = marketDataStatusText(cap);
+        String prefix = processing.isEmpty() ? "" : processing + "<br>";
         if (BookmapSizeCap.mode(cap) == Mode.NORMAL_1R)
-            return "NORMAL 1R: risk capped at 1.00R<br>No qualifying wall fills required.";
+            return prefix + "NORMAL 1R: risk capped at 1.00R<br>No qualifying wall fills required.";
+        if (!BookmapSizeCap.liquidityRequired(cap))
+            return prefix + "Liquidity requirement OFF<br>Disabled from 09:35 New York time.";
+        String state = cap.has("marketDataState") ? cap.get("marketDataState").getAsString() : "";
+        if (state.equals("failed") || state.equals("stopped"))
+            return prefix + "<b>ENTRY BLOCKED: liquidity evidence unavailable</b>";
         long largest = cap.get("largestOrderSize").getAsLong();
         int required = cap.get("requiredOrderSize").getAsInt();
         long rolling = (long) BookmapSizeCap.rollingSize(cap);
         boolean loading = cap.has("historyLoading") && cap.get("historyLoading").getAsBoolean();
+        boolean delayed = cap.has("processingDelayed") && cap.get("processingDelayed").getAsBoolean();
+        boolean incomplete = loading || delayed;
         String rules = "Single wall: " + formatShareSize(largest) + " | "
-                + (loading ? "CHECKING" : largest >= required ? "MET" : "WAITING")
+                + (incomplete ? "INCOMPLETE" : largest >= required ? "MET" : "WAITING")
                 + "<br>Best 2s: " + formatShareSize(rolling) + " | "
-                + (loading ? "CHECKING" : rolling >= required ? "MET" : "WAITING")
+                + (incomplete ? "INCOMPLETE" : rolling >= required ? "MET" : "WAITING")
                 + "<br>Required: " + formatShareSize(required) + " | 2s contributor: &ge;"
                 + formatShareSize(BookmapSizeCap.rollingContributorMinimum(required));
         if (BookmapSizeCap.mode(cap) == Mode.STRICT) {
-            if (loading) return rules + "<br><b>STRICT: checking fills since market open</b>";
+            if (incomplete) return prefix + rules + "<br><b>STRICT: ENTRY BLOCKED until data catches up</b>";
             boolean qualified = BookmapSizeCap.liquidityQualified(cap);
-            return rules
+            return prefix + rules
                     + "<br><b>STRICT: " + (qualified ? "liquidity threshold met" : "ENTRY BLOCKED until qualifying fills")
-                    + "</b><br>Either rule qualifies for the session.";
+                    + "</b><br>Either rule qualifies; requirement ends at 09:35 New York time.";
         }
-        return rules + "<br>Cap: "
+        return prefix + rules + "<br>Cap: "
                 + String.format(Locale.US, "%.2fR", cap.get("maxRiskMultiple").getAsDouble())
                 + "<br>PROPORTIONAL: size capped by qualifying liquidity"
                 + "<br>Uses the larger result from either rule.";
@@ -880,16 +905,20 @@ public class TradeButtonWindow {
         double cappedR = cap.get("maxRiskMultiple").getAsDouble();
         boolean strict = BookmapSizeCap.mode(cap) == Mode.STRICT;
         boolean blocked = strict && !BookmapSizeCap.liquidityQualified(cap);
-        wallThresholdLabel.setBackground(blocked ? new Color(255, 220, 220) : THRESHOLD_BACKGROUND);
+        boolean processingProblem = cap.has("processingDelayed") && cap.get("processingDelayed").getAsBoolean();
+        wallThresholdLabel.setBackground(blocked ? new Color(255, 220, 220)
+                : processingProblem ? new Color(255, 239, 194) : THRESHOLD_BACKGROUND);
         wallThresholdLabel.setForeground(blocked ? new Color(150, 20, 20) : THRESHOLD_TEXT_COLOR);
         String capText = liquidityStatusText(cap);
-        String capDescription = BookmapSizeCap.mode(cap) == Mode.NORMAL_1R
+        String capDescription = !BookmapSizeCap.liquidityRequired(cap) && BookmapSizeCap.mode(cap) != Mode.NORMAL_1R
+                ? "Liquidity entry requirement disabled from 09:35 New York time (five minutes after market open)."
+                : BookmapSizeCap.mode(cap) == Mode.NORMAL_1R
                 ? "Normal mode: 1R total risk ceiling; existing position and pending entries consume this budget. No qualifying wall fills required."
                 : "Single wall: executions at one wall episode or a single historical trade since market open. "
                 + "Best 2s: session's largest same-side total across prices in a rolling two-second window; "
                 + String.format(Locale.US, "each wall episode (or historical print without depth) must execute at least %,d shares inside that window. ", BookmapSizeCap.rollingContributorMinimum(required))
                 + "No price-distance limit. Canceled size does not count. "
-                + (strict ? String.format(Locale.US, "Either rule reaching %,d executed shares satisfies liquidity for the session. ", required)
+                + (strict ? String.format(Locale.US, "Either rule reaching %,d executed shares satisfies liquidity until the requirement ends at 09:35 New York time. ", required)
                         : String.format(Locale.US, "%.0f / %,d = %.6fR total risk ceiling; existing position and pending entries consume this budget. ", BookmapSizeCap.qualifyingSize(cap), required, cappedR));
         if (cap.has("largestOrderPrice")) {
             String observed = java.time.Instant.ofEpochMilli(cap.get("largestOrderObservedAt").getAsLong())

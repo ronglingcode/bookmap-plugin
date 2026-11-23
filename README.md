@@ -95,23 +95,41 @@ incoming external messages cannot replace locally owned tokens, inputs or views.
 
 ### Market-data processing
 
-Each chart hands depth, trade, quote, timestamp and history-boundary callbacks to
-one ordered background worker. Calculations, liquidity accounting and wall tracking
-run there; Bookmap's callback thread only validates input and queues the event.
-Trade metadata is immutable, and timestamps and the history/live transition are
-processed in the same order as depth and trades. Detachment cancels queued work.
+Each chart applies every depth, trade, quote, timestamp and history-boundary event
+synchronously to its ordered internal state. There is no raw-event queue, capacity
+cutoff or market-worker handoff. Books, wall episodes, executed liquidity, candles,
+VWAP and session levels update before the callback returns. Detachment waits for
+an in-progress event before dismantling its state. A processing exception is
+reported as incomplete evidence rather than zero fills.
 
-The handoff is bounded at 32,768 queued events per chart. Entry liquidity becomes
-unavailable while the oldest queued/in-progress event is more than 250 ms old,
-and recovers after the worker catches up. A queue overflow or processing failure
-invalidates the attachment's liquidity evidence and reports an error; disable and
-re-enable the addon to rebuild it. Incomplete depth is never silently used for new
-entries. Existing exit/cancel/flatten controls remain available.
+Display projections and market publications are batched at 200 ms intervals (at
+most five updates per second per publication stream). Native state remains current;
+trading commands do not wait for a display timer. Price lines, zones, wall labels,
+fill markers and hover displays use coalesced background refreshes. Display snapshots
+may replace obsolete pending snapshots; historical wall segments remain retained.
+
+Cairo consumes `cairo_batch` version 1 envelopes containing ordered original events.
+Every trade is retained, including its original timestamp, sequence and quantity;
+JSON serialization is deferred until publication. Candles and latest-price snapshots
+are queryable before publication. The former 512-event delivery queue and Cairo's
+8,192-event staging cutoff are removed. Publication failures retain the batch for
+retry; sequence handling makes duplicate deliveries distinguishable. New-connection
+snapshots and explicit request replies are available immediately. Cairo Live 0.1.10
+and the updated ViteApp socket receiver understand the envelope; reload these clients
+with the rebuilt plugin. No deployment is performed by the build.
+
+The liquidity entry requirement automatically turns off at 09:35 America/New_York,
+five minutes after market open. It applies again before the next session's cutoff.
+Other entry rules and exit/cancel/flatten controls remain unchanged.
 
 The session tracker expires removed levels through an expiration queue instead of
 scanning the entire book per callback, preserving the 250 ms late-fill grace,
 separate refill episodes and rolling execution evidence. Session boundaries are
-cached and duplicate maintenance at the same timestamp is skipped.
+cached and duplicate maintenance at the same timestamp is skipped. Wall-label
+maturity uses a due-time queue rather than scanning all pending walls per timestamp;
+one-second maturity, refill episodes and historical labels remain unchanged.
+Diagnostics retain processed-event counts and the slowest callback type/time.
+No raw callback is sampled or replaced by a display snapshot.
 
 Wall labels and wall-change badges redraw on dedicated background timers, at most
 once per 200 ms per painter. Data/configuration/viewport callbacks only mark them
@@ -120,7 +138,7 @@ wall segments are retained per chart along with all active levels. The order boo
 and entry liquidity evidence are not pruned by this display retention limit.
 
 Price lines, zones and fill markers coalesce data/viewport redraw requests on
-background workers at 100 ms intervals. Unchanged levels and executions retain
+background workers at 200 ms intervals. Unchanged levels and executions retain
 their existing canvas shapes. Wall labels also retain unchanged historical shapes
 and cache the Bookmap-prepared image, avoiding repeated pixel conversion. Historical
 wall labels remain enabled. Premarket dates/minute checks are cached, and duplicate
@@ -129,8 +147,9 @@ depth sizes skip redundant order-book histogram updates; trades are never sample
 This is a personal MVP with one running app and one account. Exits submit without
 broker preflight reads. Initial flat entries retain the existing broker exposure
 preflight. There are no session ownership checks, input-age cutoffs or execution
-coordination fences. Ambiguous mutation outcomes require broker review and manual
-reset; they are never automatically resent or forwarded to ViteApp.
+coordination fences. Broker errors and ambiguous mutation outcomes are logged
+without locking subsequent trading actions. Failed requests are never automatically
+resent or forwarded to ViteApp; each later click is a new action.
 
 ## Local logging
 

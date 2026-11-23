@@ -29,7 +29,7 @@ public final class ReclaimSecondBidPainter implements ScreenSpacePainterFactory 
     public static final String NAME_PREFIX = "reclaim2ndBid_";
     public ReclaimSecondBidPainter(ReclaimSecondBidMonitor monitor) {
         this.monitor = monitor;
-        scheduler.scheduleAtFixedRate(() -> { if (dirty.getAndSet(false)) refreshNow(); }, 100, 100, java.util.concurrent.TimeUnit.MILLISECONDS);
+        scheduler.scheduleAtFixedRate(() -> { if (dirty.getAndSet(false)) refreshNow(); }, 200, 200, java.util.concurrent.TimeUnit.MILLISECONDS);
     }
     public ScreenSpacePainter createScreenSpacePainter(String alias, String name, ScreenSpaceCanvasFactory factory) {
         Instance instance = new Instance(factory.createCanvas(ScreenSpaceCanvasType.HEATMAP));

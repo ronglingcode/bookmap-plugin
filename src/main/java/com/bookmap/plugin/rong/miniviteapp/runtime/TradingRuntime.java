@@ -123,7 +123,7 @@ public final class TradingRuntime implements AutoCloseable {
                     state = new TradeState(date, number(projected, "currentBalance"), now.getAsLong(), restored);
                 }
                 publishToken(); startStreamsAndHistory(); publishAccount(); checkStopLossProtection();
-                repeat(30000, this::refreshToken); repeat(3000, this::refreshAccount); repeat(60000, this::refreshConfig); repeat(100, this::publishDirty);
+                repeat(30000, this::refreshToken); repeat(3000, this::refreshAccount); repeat(60000, this::refreshConfig); repeat(200, this::publishDirty);
                 repeat(20000, this::disciplineJobs);
                 events.log("", "Native trading runtime initialized; account and configuration loaded; stream startup requested");
             } catch (Exception error) {
@@ -403,6 +403,7 @@ public final class TradingRuntime implements AutoCloseable {
         var capProvider = entrySizeCapProvider;
         if (capProvider != null) {
             JsonObject cap = capProvider.apply(symbol).deepCopy();
+            com.bookmap.plugin.rong.miniviteapp.core.controllers.BookmapSizeCap.setSessionTime(cap, now.getAsLong());
             if (!string(cap, "sessionDate").equals(MarketClock.marketTime(now.getAsLong()).date)) {
                 cap.addProperty("available", false); cap.addProperty("maxRiskMultiple", 0);
             }
@@ -523,7 +524,6 @@ public final class TradingRuntime implements AutoCloseable {
             throw new IllegalStateException("Execution export failed: " + ExecutionDiagnostics.describe(error, token, hash, massiveKey), error);
         }
     }
-    public void resetAfterBrokerReview() { execution.resetAfterBrokerReview(); }
     private void executionEvent(JsonObject result) {
         String symbol = string(result, "symbol");
         if (result.has("entry")) {

@@ -12,7 +12,7 @@ class RollingLiquidityTest {
     private static final long SECOND = 1_000_000_000L;
 
     private static class Rig implements AutoCloseable {
-        final SignalWebSocketServer server = new SignalWebSocketServer(0, 0);
+        final SignalWebSocketServer server = new SignalWebSocketServer(0, 0, () -> java.time.Instant.parse("2026-11-23T14:30:00Z").toEpochMilli());
         final OrderBookState book = new OrderBookState();
         final PremarketSizeThreshold policy = new PremarketSizeThreshold("TEST", () -> OPEN / 1_000_000,
                 () -> OPEN / 1_000_000, (symbol, start, end) -> List.of(
@@ -164,7 +164,7 @@ class RollingLiquidityTest {
     @Test void finalPremarketTierReevaluatesHistoricalContributorsRatherThanReusingFallbackPeak() {
         try (Rig rig = new Rig()) {
             // Deliver history before its premarket policy is registered (fallback requires 5K).
-            SignalWebSocketServer server = new SignalWebSocketServer(0, 0);
+            SignalWebSocketServer server = new SignalWebSocketServer(0, 0, () -> java.time.Instant.parse("2026-11-23T14:30:00Z").toEpochMilli());
             try {
                 server.registerSymbol("TEST", new OrderBookState(), .01);
                 server.observeSessionHistoricalTrade("TEST", 10000, 3000, true, OPEN);

@@ -178,7 +178,7 @@ class ReleaseJarTest {
     }
 
     @Test
-    void marketDataWorkerCallbacksAreAccessibleFromThePackagedEntryPoint() throws Throwable {
+    void immediateStateReducerAndDiagnosticsAreAccessibleFromThePackagedEntryPoint() throws Throwable {
         String name = "com.bookmap.plugin.rong.MarketDataDispatcher";
         Class<?> workerType = mappedClass(name);
         var lookup = MethodHandles.privateLookupIn(Class.forName(ENTRY), MethodHandles.lookup());
@@ -193,6 +193,11 @@ class ReleaseJarTest {
                 MethodType.methodType(boolean.class));
         var submit = lookup.findVirtual(workerType, MEMBERS.get(name + "#boolean submit(java.lang.Runnable)"),
                 MethodType.methodType(boolean.class, Runnable.class));
+        var taggedSubmit = lookup.findVirtual(workerType, MEMBERS.get(name + "#boolean submit(java.lang.String,java.lang.Runnable)"),
+                MethodType.methodType(boolean.class, String.class, Runnable.class));
+        Class<?> json = Class.forName("com.bookmap.plugin.shaded.gson.JsonObject");
+        var status = lookup.findVirtual(workerType, MEMBERS.get(name + "#com.bookmap.plugin.shaded.gson.JsonObject status()"),
+                MethodType.methodType(json));
         var constructor = lookup.findConstructor(workerType,
                 MethodType.methodType(void.class, String.class, java.util.function.Consumer.class));
         java.util.concurrent.CountDownLatch processed = new java.util.concurrent.CountDownLatch(1);
@@ -200,8 +205,11 @@ class ReleaseJarTest {
         try (AutoCloseable worker = (AutoCloseable) constructor.invoke("TEST",
                 (java.util.function.Consumer<String>) error::set)) {
             assertTrue((boolean) healthy.invoke(worker));
-            assertTrue((boolean) submit.invoke(worker, (Runnable) processed::countDown));
+            assertTrue((boolean) submit.invoke(worker, (Runnable) () -> {}));
+            assertTrue((boolean) taggedSubmit.invoke(worker, "trade", (Runnable) processed::countDown));
             assertTrue(processed.await(3, java.util.concurrent.TimeUnit.SECONDS));
+            String snapshot = status.invoke(worker).toString();
+            assertTrue(snapshot.contains("processedEvents")); assertTrue(snapshot.contains("marketDataState"));
             assertNull(error.get());
         }
     }

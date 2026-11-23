@@ -11,7 +11,7 @@ class BidBreakdownCallbacksTest {
     @Test void sharedPatternGateAlsoAcceptsRollingFillsWithoutASingleQualifyingWall() throws Exception {
         withIsolatedActivation(() -> {
             RongPlugin plugin = PatternEventCallbacksTest.callbackPlugin();
-            SignalWebSocketServer server = new SignalWebSocketServer(0, 0);
+            SignalWebSocketServer server = new SignalWebSocketServer(0, 0, () -> java.time.Instant.parse("2026-11-23T14:30:00Z").toEpochMilli());
             Object previousServer = field("sharedServer").get(null);
             field("sharedServer").set(null, server);
             server.registerSymbol("TEST", (OrderBookState) field("orderBook").get(plugin), .01);
@@ -56,7 +56,7 @@ class BidBreakdownCallbacksTest {
     @Test void sharedEntryGateRejectsCanceledWallsAndUnlocksOnlyOnAccumulatedExecutions() throws Exception {
         withIsolatedActivation(() -> {
             RongPlugin plugin = PatternEventCallbacksTest.callbackPlugin();
-            SignalWebSocketServer server = new SignalWebSocketServer(0, 90);
+            SignalWebSocketServer server = new SignalWebSocketServer(0, 90, () -> java.time.Instant.parse("2026-11-23T14:30:00Z").toEpochMilli());
             Object previousServer = field("sharedServer").get(null);
             field("sharedServer").set(null, server);
             server.registerSymbol("TEST", (OrderBookState) field("orderBook").get(plugin), .01);

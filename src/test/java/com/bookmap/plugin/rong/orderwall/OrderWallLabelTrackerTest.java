@@ -14,6 +14,27 @@ import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.Test;
 
 class OrderWallLabelTrackerTest {
+    @Test void densePendingWallsKeepMaturityAndReplacementSemanticsDuringTimestampBurst() {
+        OrderWallLabelStore store = new OrderWallLabelStore();
+        OrderWallLabelTracker tracker = new OrderWallLabelTracker("TEST", .01, store, 5000, 2000);
+        long start = 10_000_000_000L;
+        try {
+            for (int i = 0; i < 5000; i++) tracker.onDepth(true, 10000 + i, 6000, start);
+            tracker.onTimestamp(start);
+            long measured = System.nanoTime();
+            for (int i = 1; i <= 20_000; i++) tracker.onTimestamp(start + i);
+            System.out.println("pending-wall timestamp burst millis=" + (System.nanoTime() - measured) / 1_000_000.0);
+            assertNull(store.getActiveLabel("TEST", true, 10000));
+            tracker.onDepth(true, 10000, 0, start + 100_000_000L);
+            tracker.onDepth(true, 10000, 7000, start + 500_000_000L);
+            tracker.onTimestamp(start + 1_000_000_000L);
+            assertNull(store.getActiveLabel("TEST", true, 10000));
+            assertNotNull(store.getActiveLabel("TEST", true, 10001));
+            tracker.onTimestamp(start + 1_500_000_000L);
+            assertEquals(7000, store.getActiveLabel("TEST", true, 10000).getPeakSize());
+        } finally { tracker.shutdown(); }
+    }
+
 
     @Test
     void thresholdChangeReevaluatesUnchangedDepthOnTimestamp() {

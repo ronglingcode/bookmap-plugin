@@ -24,7 +24,36 @@ public final class NativeTradingAdapter implements AutoCloseable {
     private final NativeConnectionStatus connectionStatus;
     private volatile NativeRuntime runtime;
     private volatile boolean closed;
-    private final javax.swing.Timer stopDisplayTimer = new javax.swing.Timer(50, event -> publishSelectedStop());
+    private final java.util.Map<String, JsonObject> pendingViews = new java.util.LinkedHashMap<>();
+    private final javax.swing.Timer stopDisplayTimer = new javax.swing.Timer(200, event -> flushDisplay());
+    private long lastDisplayNanos;
+    private void flushDisplay() {
+        long now = System.nanoTime();
+        if (lastDisplayNanos != 0 && now - lastDisplayNanos < 200_000_000L) return;
+        lastDisplayNanos = now;
+        java.util.List<JsonObject> values;
+        synchronized (pendingViews) { values = new java.util.ArrayList<>(pendingViews.values()); pendingViews.clear(); }
+        java.util.Map<String, JsonObject> projectedViews = new java.util.LinkedHashMap<>();
+        java.util.Set<String> symbols = new java.util.LinkedHashSet<>();
+        for (JsonObject value : values) {
+            String type = string(value, "type"); symbols.add(string(value, "symbol"));
+            if (type.equals("market_update")) {
+                JsonObject levels = NativeViews.premarketLevels(value);
+                projectedViews.put(string(levels, "type") + ":" + string(levels, "symbol"), levels);
+            }
+            NativeViews.project(value).forEach(projected -> {
+                projectedViews.put(string(projected, "type") + ":" + string(projected, "symbol"), projected);
+                if (type.equals("account_ready") && string(projected, "type").equals("account_state") && value.has("accountAsOf"))
+                    display.publishCairoAccount(projected, value.get("accountAsOf").getAsLong());
+            });
+        }
+        NativeRuntime current = runtime;
+        for (String symbol : symbols) if (current != null && !closed) {
+            JsonObject target = current.trading.targetMarket(symbol); if (target != null) display.updateTargetMarket(target);
+        }
+        projectedViews.values().forEach(display::acceptLocalMessage);
+        publishSelectedStop();
+    }
     private void publishSelectedStop() {
         NativeRuntime current = runtime;
         display.updateSelectedStop(current == null || closed ? new JsonObject() : current.trading.selectedStop());
@@ -72,7 +101,6 @@ public final class NativeTradingAdapter implements AutoCloseable {
     }
     public void dispatch(JsonObject action) {
         if (runtime == null || closed || !runtime.trading.dispatch(action)) PluginLog.action(string(action, "symbol"), "Native runtime unavailable; no native action dispatched");
-        publishSelectedStop();
     }
     public void observeBookmapTrade(String symbol, double price, long timestampNs) {
         NativeRuntime current = runtime;
@@ -89,25 +117,18 @@ public final class NativeTradingAdapter implements AutoCloseable {
         try { java.awt.Desktop.getDesktop().browse(runtime.trading.authorizationUrl()); }
         catch (Exception error) { PluginLog.action("", "Cannot open Schwab authorization: " + error.getClass().getSimpleName()); }
     }
-    public void resetAfterBrokerReview() { if (runtime != null && !closed) runtime.trading.resetAfterBrokerReview(); }
     public String exportExecutions(com.bookmap.plugin.rong.miniviteapp.core.account.ExecutionExports.Format format) {
         NativeRuntime current = runtime;
         if (current == null || closed) throw new IllegalStateException("Native trading is unavailable");
         return current.trading.exportExecutions(format);
     }
     private void accept(JsonObject value) {
-        if (closed) return; String type = string(value, "type");
+        if (closed) return;
+        String type = string(value, "type");
         if (type.equals("cairo_account_activity")) { display.broadcastAccountActivity(value); return; }
         if (type.equals("account_ready") || type.equals("market_ready") || type.equals("market_update") || type.equals("command_state")) {
-            NativeRuntime current = runtime;
-            if (current != null) { JsonObject targetMarket = current.trading.targetMarket(string(value, "symbol")); if (targetMarket != null) display.updateTargetMarket(targetMarket); }
-            if (type.equals("market_update")) display.acceptLocalMessage(NativeViews.premarketLevels(value));
-            NativeViews.project(value).forEach(projected -> {
-                display.acceptLocalMessage(projected);
-                if (type.equals("account_ready") && string(projected, "type").equals("account_state") && value.has("accountAsOf")) {
-                    display.publishCairoAccount(projected, value.get("accountAsOf").getAsLong());
-                }
-            });
+            String key = type + ":" + string(value, "symbol");
+            synchronized (pendingViews) { pendingViews.remove(key); pendingViews.put(key, value); }
         }
     }
     private void notifyUser(String symbol, String text) {

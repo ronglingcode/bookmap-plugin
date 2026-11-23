@@ -54,22 +54,17 @@ public class SignalWebSocketServer extends WebSocketServer {
                 || !old.get("atr").equals(value.get("atr")) || !old.get("lowOfDay").equals(value.get("lowOfDay"))
                 || !old.get("highOfDay").equals(value.get("highOfDay"))
                 || value.get("timestamp").getAsLong() - targetMarketBroadcastAt.getOrDefault(symbol, 0L) >= 10000) {
-            targetMarketBroadcastAt.put(symbol, value.get("timestamp").getAsLong()); broadcast(value.toString());
+            targetMarketBroadcastAt.put(symbol, value.get("timestamp").getAsLong()); JsonObject publication = value.deepCopy(); publications.add(publication::toString);
         }
     }
-    private final java.util.concurrent.ArrayBlockingQueue<Runnable> observationQueue = new java.util.concurrent.ArrayBlockingQueue<>(512);
-    private final CairoLiveFeed cairoLive = new CairoLiveFeed(this::broadcast);
+    private final java.util.concurrent.ConcurrentLinkedQueue<Runnable> observationQueue = new java.util.concurrent.ConcurrentLinkedQueue<>();
+    private final ConsumerPublicationBatch publications = new ConsumerPublicationBatch(this::broadcast);
+    private final CairoLiveFeed cairoLive = new CairoLiveFeed(this::broadcast, publications);
 
     void publishCairoChart(String symbol, String mode) { cairoLive.chart(symbol, mode, true); }
 
     void publishCairoTrade(String symbol, String mode, double price, long time, int size, ReplayVwap vwap) {
-        JsonObject event = cairoLive.makeTrade(symbol, mode, price, time, size);
-        if (event != null && vwap != null && Double.isFinite(vwap.value())) {
-            event.addProperty("replayVwap", vwap.value());
-            event.addProperty("vwapFirstObserved", Long.toString(vwap.firstObserved()));
-            event.addProperty("vwapCoversPremarketStart", vwap.coversPremarketStart());
-        }
-        if (event != null) observationQueue.offer(() -> cairoLive.trade(event));
+        cairoLive.observeTrade(symbol, mode, price, time, size, vwap);
     }
 
     void publishCairoAccount(JsonObject account, long asOf) { cairoLive.account(account, asOf); }
@@ -82,10 +77,16 @@ public class SignalWebSocketServer extends WebSocketServer {
     private final Map<String, SessionOrderSizeTracker> sessionOrderSizes = new ConcurrentHashMap<>();
     private final Set<String> sessionHistoryLoading = ConcurrentHashMap.newKeySet();
     private final Map<String, java.util.function.BooleanSupplier> marketDataHealth = new ConcurrentHashMap<>();
+    private final Map<String, java.util.function.Supplier<JsonObject>> marketDataStatus = new ConcurrentHashMap<>();
+    void registerMarketDataStatus(String symbol, java.util.function.Supplier<JsonObject> status) {
+        marketDataStatus.put(SymbolUtils.cleanSymbol(symbol), status);
+    }
     void registerMarketDataHealth(String symbol, java.util.function.BooleanSupplier health) {
         marketDataHealth.put(SymbolUtils.cleanSymbol(symbol), health);
     }
     private boolean marketDataHealthy(String symbol) {
+        java.util.function.Supplier<JsonObject> status = marketDataStatus.get(symbol);
+        if (status != null) return status.get().get("healthy").getAsBoolean();
         java.util.function.BooleanSupplier health = marketDataHealth.get(symbol);
         return health == null || health.getAsBoolean();
     }
@@ -155,10 +156,14 @@ public class SignalWebSocketServer extends WebSocketServer {
         boolean loading = sessionHistoryLoading.contains(clean);
         cap.addProperty("historyLoading", loading);
         if (loading) cap.addProperty("available", false);
-        if (!marketDataHealthy(clean)) {
+        java.util.function.Supplier<JsonObject> statusProvider = marketDataStatus.get(clean);
+        JsonObject processing = statusProvider == null ? null : statusProvider.get();
+        if (processing != null) for (var field : processing.entrySet()) cap.add(field.getKey(), field.getValue());
+        if (processing != null ? !processing.get("healthy").getAsBoolean() : !marketDataHealthy(clean)) {
             cap.addProperty("available", false);
             cap.addProperty("processingDelayed", true);
         }
+        BookmapSizeCap.setSessionTime(cap, liquidityClock.getAsLong());
         return cap;
     }
     private static void fillSizeCap(JsonObject cap, SessionOrderSizeTracker.Observation counted,
@@ -365,17 +370,26 @@ public class SignalWebSocketServer extends WebSocketServer {
 
     // Wall filtering config
     private final double orderbookPercentile;
+    private final java.util.function.LongSupplier liquidityClock;
 
     public SignalWebSocketServer(int port, double orderbookPercentile) {
+        this(port, orderbookPercentile, System::currentTimeMillis);
+    }
+
+    public SignalWebSocketServer(int port, double orderbookPercentile, java.util.function.LongSupplier liquidityClock) {
         super(new InetSocketAddress("127.0.0.1", port));
         setDaemon(true);
         setReuseAddr(true);
         this.orderbookPercentile = orderbookPercentile;
+        this.liquidityClock = liquidityClock;
         observationWorker.scheduleWithFixedDelay(() -> {
-            try { for (com.bookmap.plugin.rong.signal.CairoPatternFeed recorder : patternFeeds.values()) for (JsonObject batch : recorder.drain(System.currentTimeMillis())) broadcast(batch.toString());
-            for (int i = 0; i < 64; i++) { Runnable next = observationQueue.poll(); if (next == null) break; next.run(); } } catch (RuntimeException ignored) { }
-        }, 100, 100, java.util.concurrent.TimeUnit.MILLISECONDS);
+            try { for (com.bookmap.plugin.rong.signal.CairoPatternFeed recorder : patternFeeds.values()) for (JsonObject batch : recorder.drain(System.currentTimeMillis())) publications.add(batch::toString);
+            for (int i = 0; i < 64; i++) { Runnable next = observationQueue.poll(); if (next == null) break; next.run(); }
+            flushPublications(System.nanoTime() / 1_000_000L); } catch (RuntimeException error) { PluginLog.action("", "Consumer publication failed: " + error.getClass().getSimpleName()); }
+        }, 200, 200, java.util.concurrent.TimeUnit.MILLISECONDS);
     }
+
+    void flushPublications(long monotonicMillis) { publications.flush(monotonicMillis); }
 
     /** Register a symbol's order book and pips multiplier. */
     public void registerSymbol(String symbol, OrderBookState orderBook, double pips) {
@@ -389,6 +403,7 @@ public class SignalWebSocketServer extends WebSocketServer {
     public void unregisterSymbol(String symbol) {
         marketDataHealth.remove(symbol);
         if (entryBidReclaimManager != null) entryBidReclaimManager.unregister(symbol);
+        marketDataStatus.remove(symbol);
         cairoDepthTimes.remove(symbol);
         cairoReplayDepth.remove(symbol);
         cairoLive.chart(symbol, BookmapRunMode.detect("unknown").dataMode, false);
@@ -619,7 +634,7 @@ public class SignalWebSocketServer extends WebSocketServer {
         json.addProperty("message", bidRetest ? "bid retest done" : "offer retest done");
         json.addProperty("timestamp", System.currentTimeMillis());
         retestNotification.accept(symbol, json.get("message").getAsString());
-        broadcast(json.toString());
+        publications.add(json::toString);
     }
 
     private void updateEntryRetestConfiguration(
@@ -864,9 +879,9 @@ public class SignalWebSocketServer extends WebSocketServer {
         return result;
     }
 
-    /** Broker hints bypass the lossy market-observation queue. */
+    /** Broker hints join the lossless 200 ms consumer batch; internal account processing is immediate. */
     public void broadcastAccountActivity(JsonObject json) {
-        if ("cairo_account_activity".equals(json.get("type").getAsString())) broadcast(json.toString());
+        if ("cairo_account_activity".equals(json.get("type").getAsString())) publications.add(json::toString);
     }
 
     // RongPlugin's method reference crosses packages in the obfuscated release.
@@ -2005,6 +2020,11 @@ public class SignalWebSocketServer extends WebSocketServer {
         patternFeeds.values().forEach(com.bookmap.plugin.rong.signal.CairoPatternFeed::close);
         patternFeeds.clear();
         observationWorker.shutdown(); observationQueue.clear();
+        try {
+            observationWorker.awaitTermination(2, java.util.concurrent.TimeUnit.SECONDS);
+            publications.finish();
+        } catch (InterruptedException error) { Thread.currentThread().interrupt(); }
+        catch (RuntimeException error) { PluginLog.action("", "Final consumer publication failed: " + error.getClass().getSimpleName()); }
         try {
             stop(1000);
         } catch (InterruptedException e) {

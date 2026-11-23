@@ -10,7 +10,7 @@ class SessionOrderSizeTrackerTest {
         return LocalDateTime.parse(value).atZone(ZoneId.of("America/New_York")).toInstant().toEpochMilli() * 1_000_000L;
     }
     static class Rig {
-        final SignalWebSocketServer server = new SignalWebSocketServer(0, 0);
+        final SignalWebSocketServer server = new SignalWebSocketServer(0, 0, () -> java.time.Instant.parse("2026-11-23T14:30:00Z").toEpochMilli());
         final OrderBookState book = new OrderBookState();
         Rig() { server.registerSymbol("TEST", book, .01); }
         void depth(boolean bid, int price, int size, long time) {

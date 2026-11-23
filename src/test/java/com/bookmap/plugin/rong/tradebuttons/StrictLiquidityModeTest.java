@@ -6,8 +6,54 @@ import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.*;
 
 class StrictLiquidityModeTest {
+    @Test void failedWorkerOverridesHistoryLoadingAndNeverClaimsZeroFills() {
+        JsonObject cap = new SignalWebSocketServer(0, 0,
+                () -> java.time.Instant.parse("2026-11-23T14:30:00Z").toEpochMilli()).entrySizeCap("TEST");
+        cap.addProperty("marketDataState", "failed"); cap.addProperty("processingDelayed", true);
+        cap.addProperty("historyLoading", true);
+        String text = TradeButtonWindow.liquidityStatusText(cap);
+        assertTrue(text.contains("Market data ERROR")); assertTrue(text.contains("counters incomplete"));
+        assertFalse(text.contains("Single wall: 0")); assertFalse(text.contains("History loading"));
+        assertFalse(text.contains("CHECKING")); assertTrue(text.contains("ENTRY BLOCKED"));
+        cap.addProperty("liquidityRequired", false);
+        text = TradeButtonWindow.liquidityStatusText(cap);
+        assertTrue(text.contains("Market data ERROR")); assertTrue(text.contains("Liquidity requirement OFF"));
+        assertFalse(text.contains("ENTRY BLOCKED"));
+    }
+
+    @Test void backlogReportsQueueAndLagThenReturnsToConfirmedFillCounts() {
+        JsonObject cap = new SignalWebSocketServer(0, 0,
+                () -> java.time.Instant.parse("2026-11-23T14:30:00Z").toEpochMilli()).entrySizeCap("TEST");
+        cap.addProperty("marketDataState", "backpressure"); cap.addProperty("processingDelayed", true);
+        cap.addProperty("queueDepth", 32768); cap.addProperty("lagMillis", 432);
+        cap.addProperty("largestOrderSize", 6000);
+        String text = TradeButtonWindow.liquidityStatusText(cap);
+        assertTrue(text.contains("CATCHING UP")); assertTrue(text.contains("32,768"));
+        assertTrue(text.contains("432 ms")); assertTrue(text.contains("INCOMPLETE"));
+        assertFalse(text.contains("liquidity threshold met"));
+        cap.addProperty("marketDataState", "current"); cap.addProperty("processingDelayed", false);
+        cap.addProperty("available", true);
+        text = TradeButtonWindow.liquidityStatusText(cap);
+        assertTrue(text.contains("liquidity threshold met")); assertFalse(text.contains("CATCHING UP"));
+    }
+
+    @Test void cutoffUpdatesStatusEvenWhenMarketDataWorkerIsUnhealthy() {
+        var clock = new java.util.concurrent.atomic.AtomicLong(java.time.Instant.parse("2026-11-23T14:34:59.999Z").toEpochMilli());
+        SignalWebSocketServer server = new SignalWebSocketServer(0, 0, clock::get);
+        try {
+            JsonObject cap = server.entrySizeCap("NVDA");
+            assertFalse(cap.get("available").getAsBoolean());
+            assertTrue(TradeButtonWindow.liquidityStatusText(cap).contains("ENTRY BLOCKED"));
+            clock.incrementAndGet();
+            cap = server.entrySizeCap("NVDA");
+            assertFalse(cap.get("available").getAsBoolean());
+            assertTrue(TradeButtonWindow.liquidityStatusText(cap).contains("Liquidity requirement OFF"));
+            assertFalse(TradeButtonWindow.liquidityStatusText(cap).contains("ENTRY BLOCKED"));
+        } finally { server.shutdown(); }
+    }
+
     @Test void readOnlyStatusShowsBlockedStateQualificationAndRetainedProportionalDescription() {
-        SignalWebSocketServer server = new SignalWebSocketServer(0, 0);
+        SignalWebSocketServer server = new SignalWebSocketServer(0, 0, () -> java.time.Instant.parse("2026-11-23T14:30:00Z").toEpochMilli());
         assertEquals("STRICT", server.entrySizeCap("TEST").get("mode").getAsString());
         assertTrue(TradeButtonWindow.liquidityStatusText(server.entrySizeCap("TEST")).contains("ENTRY BLOCKED"));
         JsonObject normal = server.entrySizeCap("TEST").deepCopy();
@@ -28,12 +74,12 @@ class StrictLiquidityModeTest {
         assertTrue(TradeButtonWindow.liquidityStatusText(qualified).contains("Best 2s: 0 | WAITING"));
         assertFalse(TradeButtonWindow.liquidityStatusText(qualified).contains("trigger price"));
         qualified.addProperty("historyLoading", true);
-        assertTrue(TradeButtonWindow.liquidityStatusText(qualified).contains("checking fills since market open"));
+        assertTrue(TradeButtonWindow.liquidityStatusText(qualified).contains("History loading"));
         assertFalse(TradeButtonWindow.liquidityStatusText(qualified).contains("threshold met"));
     }
 
     @Test void rollingRuleIndependentlyUnlocksStatusAndBothRuleResultsRemainVisible() {
-        JsonObject cap = new SignalWebSocketServer(0, 0).entrySizeCap("TEST");
+        JsonObject cap = new SignalWebSocketServer(0, 0, () -> java.time.Instant.parse("2026-11-23T14:30:00Z").toEpochMilli()).entrySizeCap("TEST");
         cap.addProperty("available", true);
         cap.addProperty("requiredOrderSize", 40000);
         cap.addProperty("largestOrderSize", 30000);
@@ -47,7 +93,7 @@ class StrictLiquidityModeTest {
         cap.addProperty("available", false);
         assertTrue(TradeButtonWindow.liquidityStatusText(cap).contains("ENTRY BLOCKED"));
         cap.addProperty("available", true); cap.addProperty("historyLoading", true);
-        assertTrue(TradeButtonWindow.liquidityStatusText(cap).contains("Best 2s: 45K | CHECKING"));
+        assertTrue(TradeButtonWindow.liquidityStatusText(cap).contains("Best 2s: 45K | INCOMPLETE"));
         assertFalse(TradeButtonWindow.liquidityStatusText(cap).contains("threshold met"));
     }
 }

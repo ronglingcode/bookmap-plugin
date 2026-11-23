@@ -17,7 +17,7 @@ class StrictLiquidityEntryTest {
     private static final long OPEN = LocalDateTime.parse("2026-10-16T09:30:00")
             .atZone(ZoneId.of("America/New_York")).toInstant().toEpochMilli() * 1_000_000L;
     private SignalWebSocketServer server() {
-        SignalWebSocketServer server = new SignalWebSocketServer(0, 0);
+        SignalWebSocketServer server = new SignalWebSocketServer(0, 0, () -> java.time.Instant.parse("2026-11-23T14:30:00Z").toEpochMilli());
         server.registerSymbol("TEST", new OrderBookState(), .01);
         server.observeSessionTime("TEST", OPEN);
         server.updateRegularSessionHighLow("TEST", 99, OPEN);
@@ -81,7 +81,7 @@ class StrictLiquidityEntryTest {
         }
     }
     @Test void historicalFillQualifiesLateAttachmentOnceHistoryCatchesUp() {
-        SignalWebSocketServer server = new SignalWebSocketServer(0, 0);
+        SignalWebSocketServer server = new SignalWebSocketServer(0, 0, () -> java.time.Instant.parse("2026-11-23T14:30:00Z").toEpochMilli());
         server.registerSymbol("TEST", new OrderBookState(), .01);
         server.beginSessionHistory("TEST");
         server.observeSessionHistoricalTrade("TEST", 10000, 5000, true, OPEN);
@@ -175,7 +175,7 @@ class StrictLiquidityEntryTest {
         assertThrows(IllegalArgumentException.class, () -> BookmapSizeCap.apply(new Snapshot(state(strictCap(server))), entry(true, "LIMIT", 100)));
     }
     @Test void normalOneRiskIgnoresMissingFillHistoryWhenSelected() {
-        SignalWebSocketServer server = new SignalWebSocketServer(0, 0);
+        SignalWebSocketServer server = new SignalWebSocketServer(0, 0, () -> java.time.Instant.parse("2026-11-23T14:30:00Z").toEpochMilli());
         JsonObject cap = server.entrySizeCap("TEST");
         cap.addProperty("mode", Mode.NORMAL_1R.name());
         assertEquals(Mode.NORMAL_1R, BookmapSizeCap.mode(cap));

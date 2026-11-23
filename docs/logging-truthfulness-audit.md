@@ -27,7 +27,8 @@ this groups account updates without claiming they belong to a verified parent or
 | Fill projection | Calls records projected fills available for display; does not claim they were rendered on a chart. |
 | Risk/partial advisories | Labels estimated risk and partial-count inference as based on the cached account. |
 | Local exit-plan edits | Reports a local plan update with no broker request and persistence requested; does not claim a protective order changed or the save completed. |
-| Review reset | Says the user cleared the execution block and that reset did not verify broker state. |
+| Execution errors | Logs broker and entry-state errors without a persistent execution lock or manual reset. Later explicit actions remain available. |
+| Market-data processing | Every event updates state synchronously; there is no raw-event queue. Diagnostics report processed-event counts and slow callback timing. UI distinguishes incomplete history, processing errors and stopped processors; errors remain visible after the liquidity cutoff. Market displays and ordered consumer records publish in 200 ms batches. |
 | Startup/streams/auth | Initialization reports loaded account/configuration and requested stream startup. Stream connected status follows login acknowledgment; authorization saved follows credential save. |
 | External action/screen reports | Source marked `External report`; forwarded text is attributed rather than presented as native verification. |
 | Clipboard exports | Success follows completed clipboard write; failed export uses the error dialog. |

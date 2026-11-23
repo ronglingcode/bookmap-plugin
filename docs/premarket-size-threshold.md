@@ -40,6 +40,15 @@ Canonical observation (1K) and Composer trigger/confirmation policies are unchan
 
 The programmer-only constant `BookmapSizeCap.ACTIVE_MODE` selects **STRICT** (current setting), **PROPORTIONAL**, or **NORMAL_1R**. Changing it requires editing the source and rebuilding the plugin. Traders cannot change the mode through the UI or a runtime setter. The active rule applies to all entry buttons, chart/directional hotkeys, adds/reloads, swaps/reentries, and automatic pending-entry replacements. The UI reports the active mode and qualification status without offering a switch. Existing entry/sizing rules still apply in all modes. Exits and protective-stop adjustments remain available.
 
+The liquidity-derived entry requirement applies only until **09:35 America/New_York**,
+five minutes after the regular-session open. At exactly 09:35, Strict qualification
+and Proportional liquidity sizing stop applying, including unavailable/history-loading
+or delayed liquidity evidence and the associated account-refresh wait. The UI shows
+**Liquidity requirement OFF**. This uses the current clock independently of Bookmap
+callbacks, so a processing error cannot prevent the cutoff. The requirement applies
+again before the following session's cutoff. Normal 1R sizing and all other entry
+rules remain unchanged; wall labels, tracking and threshold calculations continue.
+
 Strict blocks the entire opening action until **either** of two execution rules meets the premarket threshold. Equality qualifies:
 
 1. **Single wall:** accumulated executions in one continuous bid/offer wall episode, or one historical executed print, reach the full requirement. There is no two-second limit on this original rule.
@@ -47,7 +56,7 @@ Strict blocks the entire opening action until **either** of two execution rules 
 
 For a 40K requirement, the contributor minimum is 3.2K: 30K + 15K qualifies at 45K; 30K + 3K + 2K counts only 30K and does not qualify. Separate canceled/replaced episodes must each meet the 3.2K floor, even at the same price. One 40K execution can satisfy both rules. One wall accumulating 40K over a longer period may satisfy only the original rule. Each rule retains its best result for the session; qualification does not expire when its rolling window moves on. The tracker retains separate peaks for all 77 possible rounded requirements from 2K through 40K, so fallback evidence cannot later import contributors below the final requirement's minimum.
 
-Once either rule qualifies, Strict leaves the requested size and protective brackets unchanged; it does not apply the proportional R ceiling. Smaller R requests, fixed shares, low-risk reload overrides, and favorable VWAP conditions cannot bypass qualification. When blocked, the UI highlights **STRICT: ENTRY BLOCKED until qualifying fills** in red. It shows **Single wall** and **Best 2s** separately, each with a **MET**, **WAITING**, or history-loading **CHECKING** status, plus the full requirement and 8% contributor minimum. Market, limit, STOP, and STOP_LIMIT entries all use the same executed evidence. Once qualified, it shows **liquidity threshold met**, which refers only to liquidity, not all trading eligibility checks.
+Once either rule qualifies, Strict leaves the requested size and protective brackets unchanged; it does not apply the proportional R ceiling. Smaller R requests, fixed shares, low-risk reload overrides, and favorable VWAP conditions cannot bypass qualification. When blocked, the UI highlights **STRICT: ENTRY BLOCKED until qualifying fills** in red. It shows **Single wall** and **Best 2s** separately, each with a **MET**, **WAITING**, or history/backlog **INCOMPLETE** status, plus the full requirement and 8% contributor minimum. Market, limit, STOP, and STOP_LIMIT entries all use the same executed evidence. Once qualified, it shows **liquidity threshold met**, which refers only to liquidity, not all trading eligibility checks.
 
 Proportional uses the larger result from the two rules:
 
@@ -73,7 +82,7 @@ The plugin uses Bookmap's `HistoricalModeListener` to process stored trades/dept
 
 During this catch-up, regular-session historical wall fills accumulate under the same episode rules as live fills. A single historical executed print also proves its own share size when the historical feed has no matching depth. For example, loading at 10:30 after a 6K print at 09:45 qualifies a 5K threshold as soon as history catches up. This path does not depend on live pattern snapshot readiness. Without matching depth, each known-side historical print is a separate contributor for the rolling rule and must individually reach the 8% minimum. Smaller unrelated prints at the same price are not grouped into a fictitious wall. A print with matching depth enters accounting once, without an additional historical contribution. Premarket, after-hours, and previous-session fills cannot qualify today's trading. The cap's `evidenceBasis` identifies `historicalTrade` or `wallExecutions` for the original rule; `rollingOrderSize`, `rollingOrderSide`, `rollingOrderObservedAt`, and `rollingContributorCount` identify the rolling rule's best evidence, while `rollingWindowMillis` and `rollingContributorMinimum` describe its limits.
 
-Strict and Proportional remain unavailable while catch-up runs; the UI shows **checking fills since market open**. `onRealtimeStart` releases the history-loading gate, preserves the largest executed size and ongoing wall episode, and resumes the existing live accounting without replaying the evidence a second time. Qualification still uses the current premarket threshold. A backward seek or new session clears historical qualification as well as live evidence.
+Before 09:35 New York time, Strict and Proportional remain unavailable while catch-up runs. The UI distinguishes **History loading; fill counts incomplete** from **Market data CATCHING UP**, which includes queued callbacks and processing lag. A failed or stopped worker overrides history-loading text and marks counters unavailable. After 09:35 the liquidity requirement is off, but processing warnings remain visible. `onRealtimeStart` releases the history-loading gate, preserves the largest executed size and ongoing wall episode, and resumes the existing live accounting without replaying the evidence a second time. Qualification still uses the current premarket threshold. A backward seek or new session clears historical qualification as well as live evidence.
 
 Coverage is limited to tick history that Bookmap has retained or can backfill. This cannot reconstruct fills absent from those sources, and aggregate minute candles cannot prove an individual print or wall fill. Missing history does not grant qualification.
 

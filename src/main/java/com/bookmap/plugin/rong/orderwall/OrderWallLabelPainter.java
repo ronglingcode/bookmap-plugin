@@ -287,8 +287,8 @@ public class OrderWallLabelPainter implements ScreenSpacePainterFactory,
                 recentChanges.put(label, recentChange);
                 if (label.isActive()) {
                     activeLabels.add(label);
-                } else if (store.hasBeenDisplayed(instrumentAlias, label.getId())
-                        || recentChange != null) {
+                } else {
+                    // Mature wall episodes remain drawable even if they ended between publication frames.
                     clearedLabels.add(label);
                 }
             }

@@ -149,11 +149,6 @@ public class IndicatorSettingsPanel extends StrategyPanel {
         gbc.gridy++;
         javax.swing.JButton authorize = new javax.swing.JButton("Import Schwab Authorization Callback URL");
         authorize.addActionListener(e -> { String callback = javax.swing.JOptionPane.showInputDialog(this, "Paste the redirected Schwab authorization URL (containing code). It is exchanged locally and is never logged."); if (callback != null && !callback.isBlank()) RongPlugin.authorizeNativeTrading(callback); }); add(authorize, gbc);
-        gbc.gridy++;
-        javax.swing.JButton resetNative = new javax.swing.JButton("Reset Native Execution After Broker Review");
-        resetNative.setToolTipText("Use only after checking unresolved orders at the broker. Does not resend orders.");
-        resetNative.addActionListener(e -> RongPlugin.resetNativeExecutionAfterBrokerReview());
-        add(resetNative, gbc);
         }
     }
 

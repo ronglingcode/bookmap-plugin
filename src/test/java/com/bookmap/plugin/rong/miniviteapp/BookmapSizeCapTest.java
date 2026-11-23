@@ -10,6 +10,30 @@ import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.*;
 
 class BookmapSizeCapTest {
+    @Test void liquidityRequirementEndsExactlyFiveMinutesAfterOpenAndResetsNextDay() {
+        for (String date : new String[]{"2026-11-23", "2026-07-06"}) {
+            JsonObject json = state(0), cap = json.getAsJsonObject("entryContext").getAsJsonObject("bookmapSizeCap");
+            cap.addProperty("mode", "STRICT"); cap.addProperty("available", false);
+            cap.addProperty("historyLoading", true); cap.addProperty("processingDelayed", true);
+            long cutoff = java.time.LocalDateTime.parse(date + "T09:35:00")
+                    .atZone(java.time.ZoneId.of("America/New_York")).toInstant().toEpochMilli();
+            BookmapSizeCap.setSessionTime(cap, cutoff - 1);
+            assertTrue(BookmapSizeCap.liquidityRequired(cap));
+            assertThrows(IllegalArgumentException.class, () -> BookmapSizeCap.apply(new Snapshot(json), entry(true, 100, 10, 9)));
+            for (long time : new long[]{cutoff, cutoff + 60_000, cutoff + 6 * 3600_000}) {
+                BookmapSizeCap.setSessionTime(cap, time);
+                assertFalse(BookmapSizeCap.liquidityRequired(cap));
+                assertTrue(BookmapSizeCap.liquidityQualified(cap));
+                for (boolean isLong : new boolean[]{true, false}) {
+                    Plan plan = entry(isLong, 100, 10, isLong ? 9 : 11);
+                    BookmapSizeCap.apply(new Snapshot(json), plan); assertEquals(100, shares(plan));
+                }
+            }
+            BookmapSizeCap.setSessionTime(cap, cutoff + 24 * 3600_000 - 60_000);
+            assertTrue(BookmapSizeCap.liquidityRequired(cap));
+        }
+    }
+
     private JsonObject state(double cap) {
         JsonObject state = JsonParser.parseReader(new InputStreamReader(getClass().getResourceAsStream("/direct-entry-fixtures.json"), StandardCharsets.UTF_8))
                 .getAsJsonArray().get(0).getAsJsonObject().getAsJsonObject("state").deepCopy();

@@ -68,11 +68,11 @@ class OrderWallLabelPainterTest {
         assertNotNull(store.getLabel("TEST", "old-8"));
     }
 
-    @Test void addingCurrentWallRetainsHistoricalLabelShape() throws Exception {
+    @Test void wallThatEndsBeforeFirstFrameIsStillDrawnAndRetainedWhenAnotherWallAppears() throws Exception {
         OrderWallLabelStore store = new OrderWallLabelStore();
         OrderWallLabel historical = new OrderWallLabel("history", "TEST", true, 10000, 100,
-                0, 6000, 1, 2, 3, true);
-        store.putLabel(historical); store.markDisplayed("TEST", historical.getId());
+                0, 6000, 1, 2, 3, false);
+        store.putLabel(historical);
         java.util.Set<Object> shapes = java.util.concurrent.ConcurrentHashMap.newKeySet();
         AtomicInteger added = new AtomicInteger();
         ScreenSpaceCanvas canvas = (ScreenSpaceCanvas) Proxy.newProxyInstance(ScreenSpaceCanvas.class.getClassLoader(),

@@ -21,7 +21,7 @@ public final class BackgroundChartRenderer implements AutoCloseable {
 
     public BackgroundChartRenderer(ScheduledExecutorService worker) {
         this.worker = worker;
-        worker.scheduleWithFixedDelay(this::drain, 100, 100, TimeUnit.MILLISECONDS);
+        worker.scheduleWithFixedDelay(this::drain, 200, 200, TimeUnit.MILLISECONDS);
     }
 
     public void request(Runnable redraw) {

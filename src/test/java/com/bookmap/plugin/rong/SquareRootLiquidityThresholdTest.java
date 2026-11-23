@@ -22,7 +22,7 @@ class SquareRootLiquidityThresholdTest {
         for (int required = 2000; required <= 40000; required += 500) {
             double volume = 1000000 * Math.pow(required / 5000.0, 2);
             try (PremarketSizeThreshold policy = policy(volume)) {
-                SignalWebSocketServer server = new SignalWebSocketServer(0, 0);
+                SignalWebSocketServer server = new SignalWebSocketServer(0, 0, () -> java.time.Instant.parse("2026-11-23T14:30:00Z").toEpochMilli());
                 try {
                     server.registerSymbol("TEST", new OrderBookState(), .01);
                     int minimum = (required * 8 + 99) / 100;
@@ -45,7 +45,7 @@ class SquareRootLiquidityThresholdTest {
 
     @Test void sevenThousandRequirementExcludesSmallerFallbackContributorsAfterWindowExpires() {
         try (PremarketSizeThreshold policy = policy(2000000)) {
-            SignalWebSocketServer server = new SignalWebSocketServer(0, 0);
+            SignalWebSocketServer server = new SignalWebSocketServer(0, 0, () -> java.time.Instant.parse("2026-11-23T14:30:00Z").toEpochMilli());
             try {
                 server.registerSymbol("TEST", new OrderBookState(), .01);
                 server.observeSessionHistoricalTrade("TEST", 10000, 500, true, OPEN);

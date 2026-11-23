@@ -178,6 +178,7 @@ Entries and exits submit from the current local account cache without experiment
 position/pending-order preflight GETs. Trading restrictions follow ViteApp; see
 [viteapp-rule-parity-audit.md](viteapp-rule-parity-audit.md). There are no input-age
 cutoffs, session ownership, action coordination fences or waits
-for reconciliation. All independent requests within a workflow stage dispatch concurrently and every response is collected, including rejections and unknown outcomes. Explicit delays and protected-entry transitions separate dependent stages (Swap, target reset, opposite-position entries and entry-before-cancel workflows). A failed stage stops later dependent stages; requests already dispatched in its batch are all accounted for. Accepted protected entries remain captured even when subsequent cancellations fail. An ambiguous
-mutation outcome requires broker review; use **Reset After Broker Review** only
-after checking the account. It never triggers automatic resend or a browser fallback.
+for reconciliation. All independent requests within a workflow stage dispatch concurrently and every response is collected, including rejections and unknown outcomes. Explicit delays and protected-entry transitions separate dependent stages (Swap, target reset, opposite-position entries and entry-before-cancel workflows). A failed stage stops later dependent stages; requests already dispatched in its batch are all accounted for. Accepted protected entries remain captured even when subsequent cancellations fail.
+Broker errors, ambiguous mutation outcomes and entry-state initialization failures
+are logged without locking subsequent actions. Each later click is a new action;
+failed requests are never automatically resent or forwarded to the browser.

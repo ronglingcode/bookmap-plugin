@@ -26,7 +26,7 @@ public class BidBreakdownPainter implements ScreenSpacePainterFactory {
     }
     protected BidBreakdownPainter(BidBreakdownMonitor monitor, String title, int captionY) {
         this.monitor = monitor; this.title = title; this.captionY = captionY;
-        scheduler.scheduleAtFixedRate(() -> { if (dirty.getAndSet(false)) refreshNow(); }, 100, 100, java.util.concurrent.TimeUnit.MILLISECONDS);
+        scheduler.scheduleAtFixedRate(() -> { if (dirty.getAndSet(false)) refreshNow(); }, 200, 200, java.util.concurrent.TimeUnit.MILLISECONDS);
     }
     public final ScreenSpacePainter createScreenSpacePainter(String alias, String name, ScreenSpaceCanvasFactory factory) {
         Instance instance = new Instance(factory.createCanvas(ScreenSpaceCanvasType.HEATMAP));

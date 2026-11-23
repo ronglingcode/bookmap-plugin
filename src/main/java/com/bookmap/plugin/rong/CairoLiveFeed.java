@@ -41,6 +41,7 @@ final class CairoLiveFeed {
 
     private final String source = UUID.randomUUID().toString();
     private final Consumer<String> send;
+    private final ConsumerPublicationBatch publications;
     private final Map<String, JsonObject> charts = new LinkedHashMap<>();
     private final Map<String, JsonObject> accounts = new LinkedHashMap<>();
     private final Map<String, Deque<JsonObject>> replay = new LinkedHashMap<>();
@@ -50,13 +51,19 @@ final class CairoLiveFeed {
     private final Map<String, Long> resetWatermarks = new LinkedHashMap<>();
     private long sequence;
 
-    CairoLiveFeed(Consumer<String> send) { this.send = send; }
+    CairoLiveFeed(Consumer<String> send) { this(send, null); }
+    CairoLiveFeed(Consumer<String> send, ConsumerPublicationBatch publications) { this.send = send; this.publications = publications; }
+    private void publish(JsonObject event) {
+        if (publications == null) send.accept(event.toString());
+        else publications.add(event::toString);
+    }
 
     synchronized void snapshot(Consumer<String> client) {
         charts.values().forEach(entry -> sendSnapshot(client, entry));
         accounts.values().forEach(entry -> sendSnapshot(client, entry));
         replay.values().forEach(history -> history.forEach(entry -> sendSnapshot(client, entry)));
-        prices.values().forEach(entry -> sendSnapshot(client, entry));
+        prices.forEach((symbol, entry) -> { if (!pendingPrices.containsKey(symbol)) sendSnapshot(client, entry); });
+        pendingPrices.values().forEach(record -> sendSnapshot(client, com.google.gson.JsonParser.parseString(record.get()).getAsJsonObject()));
     }
 
     private static void sendSnapshot(Consumer<String> client, JsonObject entry) {
@@ -69,14 +76,14 @@ final class CairoLiveFeed {
         JsonObject event = envelope("cairo_chart", symbol, mode);
         event.addProperty("attached", attached);
         if (attached) charts.put(symbol, event);
-        else { charts.remove(symbol); prices.remove(symbol); replay.remove(symbol); tradeSequences.remove(symbol); resetWatermarks.remove(symbol); candles.remove(symbol); }
-        send.accept(event.toString());
+        else { charts.remove(symbol); pendingPrices.remove(symbol); prices.remove(symbol); replay.remove(symbol); tradeSequences.remove(symbol); resetWatermarks.remove(symbol); candles.remove(symbol); }
+        publish(event);
     }
 
-    synchronized JsonObject makeTrade(String symbol, String mode, double price, long timestampNs, int size) {
+    private boolean accumulate(String symbol, String mode, double price, long timestampNs, int size) {
         JsonObject attached = charts.get(symbol);
         if (attached == null || !mode.equals(attached.get("mode").getAsString()) ||
-                !Double.isFinite(price) || price <= 0 || timestampNs <= 0) return null;
+                !Double.isFinite(price) || price <= 0 || timestampNs <= 0) return false;
         if (size > 0) {
             long time = timestampNs / 1_000_000L;
             Chart chart = candles.computeIfAbsent(symbol, ignored -> new Chart());
@@ -85,7 +92,7 @@ final class CairoLiveFeed {
             if (chart.minutes.isEmpty() || bucket > chart.minutes.lastKey() || bucket < chart.minutes.firstKey()) {
                 String date = MarketClock.marketTime(time).date;
                 if (!date.equals(chart.date)) {
-                    if (chart.date != null && date.compareTo(chart.date) < 0) return null;
+                    if (chart.date != null && date.compareTo(chart.date) < 0) return false;
                     chart.date = date;
                     chart.minutes.clear();
                     chart.asOf = 0;
@@ -94,10 +101,44 @@ final class CairoLiveFeed {
             chart.minutes.computeIfAbsent(bucket, ignored -> new Minute(timestampNs, price)).trade(timestampNs, price, size);
             chart.asOf = Math.max(chart.asOf, time);
         }
+        return true;
+    }
+
+    synchronized JsonObject makeTrade(String symbol, String mode, double price, long timestampNs, int size) {
+        if (!accumulate(symbol, mode, price, timestampNs, size)) return null;
         JsonObject event = envelope("cairo_trade", symbol, mode);
         event.addProperty("tradeSequence", tradeSequences.merge(symbol, 1L, Long::sum));
-        event.addProperty("price", price);
-        event.addProperty("eventTime", Long.toString(timestampNs));
+        event.addProperty("price", price); event.addProperty("eventTime", Long.toString(timestampNs));
+        return event;
+    }
+
+    synchronized void observeTrade(String symbol, String mode, double price, long time, int size, ReplayVwap vwap) {
+        if (!accumulate(symbol, mode, price, time, size)) return;
+        long assignedSequence = ++sequence;
+        long tradeSequence = tradeSequences.merge(symbol, 1L, Long::sum);
+        double observedVwap = vwap == null ? Double.NaN : vwap.value();
+        long firstVwap = vwap == null ? 0 : vwap.firstObserved();
+        boolean coversPremarket = vwap != null && vwap.coversPremarketStart();
+        java.util.function.Supplier<String> record = () -> {
+            JsonObject event = tradeEvent(symbol, mode, price, time, size, assignedSequence, tradeSequence);
+            if (Double.isFinite(observedVwap)) {
+                event.addProperty("replayVwap", observedVwap); event.addProperty("vwapFirstObserved", Long.toString(firstVwap));
+                event.addProperty("vwapCoversPremarketStart", coversPremarket);
+            }
+            return event.toString();
+        };
+        // Latest-price snapshots need only one lazy record per symbol, while output retains every trade.
+        pendingPrices.put(symbol, record);
+        if (publications != null) publications.add(record); else send.accept(record.get());
+    }
+    private final Map<String, java.util.function.Supplier<String>> pendingPrices = new LinkedHashMap<>();
+    private JsonObject tradeEvent(String symbol, String mode, double price, long time, int size, long assignedSequence, long tradeSequence) {
+        JsonObject event = new JsonObject();
+        event.addProperty("type", "cairo_trade"); event.addProperty("version", 1); event.addProperty("symbol", symbol);
+        event.addProperty("mode", mode); event.addProperty("sourceInstanceId", source); event.addProperty("epoch", 1);
+        event.addProperty("sequence", assignedSequence); event.addProperty("delivery", "stream");
+        event.addProperty("tradeSequence", tradeSequence); event.addProperty("price", price);
+        event.addProperty("quantity", size); event.addProperty("eventTime", Long.toString(time));
         return event;
     }
 
@@ -124,7 +165,7 @@ final class CairoLiveFeed {
         JsonObject previous = prices.get(symbol);
         if (previous != null && previous.get("sequence").getAsLong() >= event.get("sequence").getAsLong()) return;
         prices.put(symbol, event);
-        send.accept(event.toString());
+        publish(event);
     }
 
     synchronized void replay(JsonObject event) {
@@ -132,13 +173,13 @@ final class CairoLiveFeed {
         Deque<JsonObject> history = replay.computeIfAbsent(symbol, ignored -> new ArrayDeque<>());
         if (event.get("type").getAsString().equals("cairo_replay_reset")) {
             history.clear();
-            prices.remove(symbol);
+            prices.remove(symbol); pendingPrices.remove(symbol);
             candles.remove(symbol);
             resetWatermarks.put(symbol, sequence);
         }
         history.addLast(event.deepCopy());
         if (history.size() > 1000) history.removeFirst();
-        send.accept(event.toString());
+        publish(event);
     }
 
     synchronized void account(JsonObject view, long asOf) {
@@ -168,7 +209,7 @@ final class CairoLiveFeed {
         }
         event.add("executions", fills);
         accounts.put(symbol, event);
-        send.accept(event.toString());
+        publish(event);
     }
 
     private JsonObject envelope(String type, String symbol, String mode) {

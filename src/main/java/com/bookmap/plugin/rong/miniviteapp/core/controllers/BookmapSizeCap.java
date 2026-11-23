@@ -35,8 +35,19 @@ public final class BookmapSizeCap {
         return Math.max(Models.number(cap, "largestOrderSize"), rollingSize(cap));
     }
 
+    /** Use a clock independent of Bookmap callbacks, which can stop after an overflow. */
+    public static void setSessionTime(JsonObject cap, long epochMillis) {
+        cap.addProperty("liquidityRequired", com.bookmap.plugin.rong.miniviteapp.core.marketdata.MarketClock
+                .marketTime(epochMillis).minutesSinceMarketOpen < 5);
+    }
+
+    public static boolean liquidityRequired(JsonObject cap) {
+        return !cap.has("liquidityRequired") || Models.bool(cap, "liquidityRequired");
+    }
+
     /** Shared by entry submission, pattern readiness, and the read-only Trade window. */
     public static boolean liquidityQualified(JsonObject cap) {
+        if (!liquidityRequired(cap)) return true;
         double size = qualifyingSize(cap), required = Models.number(cap, "requiredOrderSize");
         return (!cap.has("available") || Models.bool(cap, "available"))
                 && (!cap.has("historyLoading") || !Models.bool(cap, "historyLoading"))
@@ -54,6 +65,7 @@ public final class BookmapSizeCap {
         if (openings.isEmpty()) return; // Exits and stop adjustments are never restricted.
         JsonObject cap = state.entryContext.getAsJsonObject("bookmapSizeCap");
         Mode mode = mode(cap);
+        if (mode != Mode.NORMAL_1R && !liquidityRequired(cap)) return;
         if (mode != Mode.NORMAL_1R)
             Models.require(!cap.has("available") || Models.bool(cap, "available"), "Bookmap liquidity session unavailable");
         if (mode == Mode.STRICT) {

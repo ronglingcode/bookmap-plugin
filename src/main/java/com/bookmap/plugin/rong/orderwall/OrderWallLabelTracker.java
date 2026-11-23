@@ -35,6 +35,8 @@ public class OrderWallLabelTracker {
     private final Map<LevelKey, Integer> currentRawSizes = new HashMap<>();
     private int lastMinimumSize = -1;
     private final Map<LevelKey, PendingLabel> pendingLabels = new HashMap<>();
+    private final java.util.PriorityQueue<PendingLabel> pendingMaturities = new java.util.PriorityQueue<>(
+            java.util.Comparator.comparingLong(label -> label.startTimeNs));
     private final Map<LevelKey, PendingDecrease> pendingDecreases = new HashMap<>();
     private boolean shutdown;
 
@@ -197,12 +199,12 @@ public class OrderWallLabelTracker {
                 changed |= onDepth(key.bid, key.priceTick, entry.getValue(), timestampNs);
             }
         }
-        List<Map.Entry<LevelKey, PendingLabel>> candidates =
-                new ArrayList<>(pendingLabels.entrySet());
-        for (Map.Entry<LevelKey, PendingLabel> entry : candidates) {
-            LevelKey key = entry.getKey();
-            PendingLabel pending = entry.getValue();
-            if (pendingLabels.get(key) != pending || !isPendingLabelMature(pending, timestampNs)) {
+        // Timestamp callbacks are frequent during history. Visit only walls whose
+        // one-second lifetime has elapsed, rather than copying/scanning every wall.
+        while (!pendingMaturities.isEmpty() && isPendingLabelMature(pendingMaturities.peek(), timestampNs)) {
+            PendingLabel pending = pendingMaturities.remove();
+            LevelKey key = new LevelKey(pending.bid, pending.priceTick);
+            if (pendingLabels.get(key) != pending) {
                 continue;
             }
             if (pending.currentSize < getMinimumSize()) {
@@ -230,6 +232,7 @@ public class OrderWallLabelTracker {
         if (pending == null) {
             pending = new PendingLabel(isBid, priceTick, size, timestampNs);
             pendingLabels.put(key, pending);
+            pendingMaturities.add(pending);
         } else {
             pending.currentSize = size;
             pending.peakSize = Math.max(pending.peakSize, size);
@@ -419,6 +422,7 @@ public class OrderWallLabelTracker {
     public synchronized void shutdown() {
         shutdown = true;
         pendingLabels.clear();
+        pendingMaturities.clear();
         pendingDecreases.clear();
         currentDisplaySizes.clear();
         currentRawSizes.clear();

@@ -66,6 +66,26 @@ class NativeExecutionTest {
             assertEquals(2, rig.mutations.get());
         }
     }
+    @Test void cutoffRemovesLiquidityAndItsOutstandingAccountRefreshWait() throws Exception {
+        try (var rig = new Rig()) {
+            JsonObject action = rig.connectEntry();
+            JsonObject cap = json("{\"mode\":\"STRICT\",\"available\":true,\"requiredOrderSize\":5000,\"largestOrderSize\":5000}");
+            var context = rig.state.getAsJsonObject("entryContext");
+            context.add("bookmapSizeCap", cap); context.addProperty("bookmapAccountReadStartedAt", 1);
+            rig.updateState(System.currentTimeMillis()); rig.engine.route(action);
+            assertEquals("accepted", rig.finish().get("outcome").getAsString());
+            rig.engine.route(action); assertEquals(1, rig.mutations.get());
+            assertTrue(rig.events.stream().anyMatch(event -> event.has("reason")
+                    && event.get("reason").getAsString().contains("wait for broker account refresh")));
+            cap.addProperty("available", false); cap.addProperty("historyLoading", true);
+            com.bookmap.plugin.rong.miniviteapp.core.controllers.BookmapSizeCap.setSessionTime(cap,
+                    java.time.Instant.parse("2026-11-23T14:35:00Z").toEpochMilli());
+            rig.updateState(System.currentTimeMillis()); rig.engine.route(action);
+            assertEquals("accepted", rig.finish(2).get("outcome").getAsString());
+            assertEquals(2, rig.mutations.get());
+        }
+    }
+
     @Test void bookmapCapReachesBrokerAndCapturedTradingState() throws Exception {
         try (var rig = new Rig()) {
             JsonObject action = rig.connectEntry();
@@ -636,12 +656,28 @@ class NativeExecutionTest {
             assertEquals(4, rig.mutations.get());
         }
     }
-    @Test void ambiguousOutcomeRequiresReviewBeforeAnotherNativeAction() throws Exception {
+    @Test void failedAdjustmentDoesNotBlockLaterAdjustmentsOrOtherSymbols() throws Exception {
         try (var rig = new Rig()) {
-            rig.state = ExtendedExecutionPlanTest.longState(); rig.connect(); var command = action(""); command.addProperty("tradebook_id", "RangeBoundOfferReversal"); rig.mutationStatus = 503;
-            rig.engine.route(command); assertEquals("unknown", rig.finish().get("outcome").getAsString());
-            assertTrue(rig.engine.route(command)); assertEquals(4, rig.mutations.get());
-            assertTrue(rig.engine.resetAfterBrokerReview()); assertTrue(rig.engine.route(command));
+            rig.connect();
+            var command = action("Digit1"); command.addProperty("price", 11);
+            rig.mutationStatus = 503;
+            rig.engine.route(command); var failed = rig.finish();
+            assertEquals("unknown", failed.get("outcome").getAsString());
+            assertEquals(1, rig.mutations.get());
+            assertTrue(rig.logs.stream().anyMatch(line -> line.contains("HTTP 503")));
+            assertFalse(rig.engine.status().get("blocked").getAsBoolean());
+            assertFalse(failed.has("requiresReview"));
+            assertTrue(rig.events.stream().noneMatch(event -> event.get("type").getAsString().equals("execution_blocked")));
+            rig.mutationStatus = 204;
+            command.addProperty("price", 12); rig.engine.route(command);
+            assertEquals("accepted", rig.finish(2).get("outcome").getAsString());
+            assertEquals(2, rig.mutations.get());
+            var other = rig.state.deepCopy(); other.addProperty("symbol", "MSFT");
+            var update = rig.message("execution_state"); var symbols = new JsonArray(); symbols.add(other); update.add("symbols", symbols);
+            rig.engine.receive(rig.connection, update);
+            command.addProperty("symbol", "MSFT"); rig.engine.route(command);
+            assertEquals("accepted", rig.finish(3).get("outcome").getAsString());
+            assertEquals(3, rig.mutations.get());
         }
     }
     @Test void initialEntryDoesNotAddBrokerPositionOrPendingOrderRestrictions() throws Exception {
@@ -664,7 +700,7 @@ class NativeExecutionTest {
             assertTrue(result.get("reason").getAsString().contains("POST new order HTTP 400"));
             assertEquals(1, rig.mutations.get());
             assertEquals(980, rig.bodies.get(0).getAsJsonArray("orderLegCollection").get(0).getAsJsonObject().get("quantity").getAsDouble());
-            assertFalse(result.get("requiresReview").getAsBoolean());
+            assertFalse(result.has("requiresReview"));
         }
     }
     @Test void fractionalHalfSizedLegsArePassedToBrokerWithoutRounding() throws Exception {
@@ -686,24 +722,30 @@ class NativeExecutionTest {
                 .getAsJsonArray("orderLegCollection").get(0).getAsJsonObject().get("quantity").getAsDouble());
         }
     }
-    @Test void missingEntryLocationRequiresReviewWithoutResubmission() throws Exception {
+    @Test void missingEntryLocationLogsUnknownAndAllowsNextExplicitAction() throws Exception {
         try (var rig = new Rig()) {
             var entry = rig.connectEntry(); rig.omitLocation = true;
             rig.engine.route(entry); var result = rig.finish();
             assertEquals("unknown", result.get("outcome").getAsString());
-            assertTrue(result.get("requiresReview").getAsBoolean()); assertFalse(result.has("entry"));
-            rig.engine.route(entry);
+            assertFalse(result.has("entry")); assertFalse(result.has("requiresReview"));
             assertEquals(1, rig.mutations.get());
+            rig.omitLocation = false; rig.engine.route(entry);
+            assertEquals("accepted", rig.finish(2).get("outcome").getAsString());
+            assertEquals(2, rig.mutations.get());
         }
     }
-    @Test void entryStateFailureBlocksFurtherExecution() throws Exception {
+    @Test void entryStateFailureIsLoggedWithoutBlockingFurtherExecution() throws Exception {
         try (var rig = new Rig()) {
             var entry = rig.connectEntry();
-            rig.updateState(System.currentTimeMillis()-1); rig.engine.route(entry); var result = rig.finish();
+            rig.engine.route(entry); var result = rig.finish();
             var acknowledgement = rig.message("execution_entry_state"); acknowledgement.add("actionId", result.get("actionId"));
-            acknowledgement.addProperty("initialized", false); rig.engine.receive(rig.connection, acknowledgement);
-            assertTrue(rig.engine.status().get("requiresReview").getAsBoolean());
-            rig.engine.route(entry); assertEquals(1, rig.mutations.get());
+            acknowledgement.addProperty("initialized", false); acknowledgement.addProperty("reason", "state save failed");
+            rig.engine.receive(rig.connection, acknowledgement);
+            assertTrue(rig.logs.stream().anyMatch(line -> line.contains("entry state initialization failed: state save failed")));
+            assertFalse(rig.engine.status().get("blocked").getAsBoolean());
+            rig.engine.route(entry);
+            assertEquals("accepted", rig.finish(2).get("outcome").getAsString());
+            assertEquals(2, rig.mutations.get());
         }
     }
     @Test void directCancelHandlesEmptySuccessAndAcceptsRepeatedClicksWithoutReconciliation() throws Exception {
@@ -800,7 +842,7 @@ class NativeExecutionTest {
                 assertEquals(batchCount, result.getAsJsonArray("results").size());
                 assertEquals(status == 201 ? "accepted" : status == 400 ? "partial" : "unknown", result.get("outcome").getAsString());
                 assertEquals(status == 201 ? batchCount : batchCount - 1, result.get("acknowledgedRequestCount").getAsInt());
-                assertEquals(status == 503, result.get("requiresReview").getAsBoolean());
+                assertFalse(result.has("requiresReview"));
             }
         }
     }
@@ -869,7 +911,7 @@ class NativeExecutionTest {
             assertEquals("rejected", result.get("outcome").getAsString());
             assertTrue(result.get("reason").getAsString().contains("DELETE order 101 HTTP 401"));
             assertEquals(Set.of("DELETE /accounts/hash/orders/101", "DELETE /accounts/hash/orders/102"), new HashSet<>(rig.requests));
-            assertFalse(result.get("requiresReview").getAsBoolean());
+            assertFalse(result.has("requiresReview"));
         }
     }
     @Test void tokenRefreshDoesNotInterruptRunningCancel() throws Exception {
@@ -985,25 +1027,27 @@ class NativeExecutionTest {
             var result = rig.finish(); String reason = result.get("reason").getAsString();
             assertEquals("unknown", result.get("outcome").getAsString());
             assertTrue(reason.contains("POST new order failed")); assertTrue(reason.contains("IOException"));
-            assertTrue(reason.contains("broker outcome unknown")); assertTrue(result.get("requiresReview").getAsBoolean());
+            assertTrue(reason.contains("broker outcome unknown")); assertFalse(result.has("requiresReview"));
             assertEquals(1, rig.mutations.get());
             assertEquals(1, result.get("unknownRequestCount").getAsInt());
             assertEquals(0, result.get("acknowledgedRequestCount").getAsInt());
+            rig.closeMutationResponse = false; rig.engine.route(entry);
+            assertEquals("accepted", rig.finish(2).get("outcome").getAsString());
+            assertEquals(2, rig.mutations.get());
         }
     }
-    @Test void brokerMutationDetailsAndReviewReasonReachLifecycleLogs() throws Exception {
+    @Test void brokerMutationDetailsReachLifecycleLogsWithoutBlocking() throws Exception {
         for (int status : new int[]{400, 503}) try (var rig = new Rig()) {
             rig.connect(); rig.mutationStatus = status;
             rig.mutationBody = "{\"message\":\"Cannot cancel this order\",\"refreshToken\":\"fake-refresh-token\"}";
             rig.engine.route(action("KeyC")); String reason = rig.finish().get("reason").getAsString();
             assertTrue(reason.contains("DELETE order 101 HTTP " + status));
             assertTrue(reason.contains("Cannot cancel this order")); assertFalse(reason.contains("fake-refresh-token"));
-            if (status == 503) {
-                assertEquals(reason, rig.engine.status().get("reason").getAsString());
-                rig.engine.route(action("KeyC"));
-                assertTrue(rig.events.stream().anyMatch(event -> event.get("type").getAsString().equals("execution_blocked")
-                        && event.get("reason").getAsString().contains("Cannot cancel this order")));
-            }
+            assertTrue(rig.logs.stream().anyMatch(line -> line.contains("Cannot cancel this order")));
+            assertFalse(rig.engine.status().get("blocked").getAsBoolean());
+            rig.mutationStatus = 204; rig.engine.route(action("KeyC"));
+            assertEquals("accepted", rig.finish(2).get("outcome").getAsString());
+            assertEquals(4, rig.mutations.get());
         }
     }
     @Test void badUpdatesAndPlanErrorsExposeTheirCauseToViteApp() throws Exception {
@@ -1020,15 +1064,13 @@ class NativeExecutionTest {
         String reason = ExecutionDiagnostics.describe(error);
         assertTrue(reason.contains("SSLHandshakeException: untrusted certificate")); assertFalse(reason.contains("fake-access-token"));
     }
-    @Test void ambiguousBrokerFailureHoldsExecutionUntilExplicitReview() throws Exception {
+    @Test void ambiguousBrokerFailureDoesNotBlockNextExplicitAction() throws Exception {
         try (var rig = new Rig()) {
             rig.connect(); rig.mutationStatus = 503; rig.engine.route(action("KeyC"));
             assertEquals("unknown", rig.finish().get("outcome").getAsString());
-            rig.updateState(System.currentTimeMillis()+10); rig.engine.route(action("KeyC"));
-            assertEquals(2, rig.mutations.get()); assertTrue(rig.engine.status().get("requiresReview").getAsBoolean());
-            rig.engine.route(action("KeyC"));
             assertEquals(2, rig.mutations.get());
-            assertTrue(rig.engine.resetAfterBrokerReview());
+            assertFalse(rig.engine.status().get("blocked").getAsBoolean());
+            assertFalse(rig.engine.status().has("requiresReview"));
             rig.mutationStatus = 200; rig.engine.route(action("KeyC"));
             assertEquals("accepted", rig.finish(2).get("outcome").getAsString());
             assertEquals(4, rig.mutations.get());
@@ -1060,7 +1102,7 @@ class NativeExecutionTest {
             state.add("symbols", symbols); rig.engine.receive(reconnected, state);
             rig.allowMutation.countDown(); var result = rig.finish();
             assertEquals("accepted", result.get("outcome").getAsString());
-            assertFalse(result.get("requiresReview").getAsBoolean()); assertEquals(2, rig.mutations.get());
+            assertFalse(result.has("requiresReview")); assertEquals(2, rig.mutations.get());
             assertSame(reconnected, rig.eventConnections.get(rig.eventConnections.size()-1));
             rig.state.add("entries", new JsonArray()); rig.updateState(System.currentTimeMillis()+10);
             assertFalse(rig.engine.status().get("blocked").getAsBoolean());

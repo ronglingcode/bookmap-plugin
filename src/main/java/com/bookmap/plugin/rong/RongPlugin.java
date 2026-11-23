@@ -212,7 +212,7 @@ public class RongPlugin implements CustomModuleAdapter,
             }
             instanceCount++;
             marketDataDispatcher = new MarketDataDispatcher(cleanAlias,
-                    message -> PluginLog.action(cleanAlias, "ERROR: " + message));
+                    message -> PluginLog.action(cleanAlias, message));
             initialized = true;
         }
         this.vwapIndicator = api.registerIndicatorModifiable("VWAP", GraphType.PRIMARY);
@@ -247,6 +247,7 @@ public class RongPlugin implements CustomModuleAdapter,
         indicatorConfig.addChangeListener(this);
         sharedServer.registerSymbol(cleanAlias, orderBook, info.pips);
         sharedServer.registerMarketDataHealth(cleanAlias, marketDataDispatcher::healthy);
+        sharedServer.registerMarketDataStatus(cleanAlias, marketDataDispatcher::status);
         sharedServer.publishCairoChart(cleanAlias, runMode.dataMode);
         sharedServer.beginSessionHistory(cleanAlias);
         sharedServer.registerVwapUpdateListener(cleanAlias, vwapUpdateListener);
@@ -365,7 +366,7 @@ public class RongPlugin implements CustomModuleAdapter,
         if (!initialized) return;
         initialized = false;
         MarketDataDispatcher dispatcher = marketDataDispatcher;
-        if (dispatcher != null) dispatcher.close();
+        if (dispatcher != null) { dispatcher.close(); synchronized (dispatcher) { /* finish active state reduction */ } }
         try {
             stopAttachment();
         } finally {
@@ -618,19 +619,15 @@ public class RongPlugin implements CustomModuleAdapter,
     @Override
     public void onDepth(boolean isBid, int price, int size) {
         if (price <= 0 || size < 0) return;
-        dispatchMarketData(() -> processDepth(isBid, price, size));
+        dispatchMarketData("depth", () -> processDepth(isBid, price, size));
     }
 
-    private void dispatchMarketData(Runnable task) {
+    private void dispatchMarketData(String kind, Runnable task) {
         if (!initialized) return;
         MarketDataDispatcher dispatcher = marketDataDispatcher;
         // Unattached test/offline instances can exercise processing without a live worker.
         if (dispatcher == null) { task.run(); return; }
-        dispatcher.submit(() -> {
-            synchronized (this) {
-                if (initialized) task.run();
-            }
-        });
+        dispatcher.submit(kind, () -> { if (initialized) task.run(); });
     }
 
     private void processDepth(boolean isBid, int price, int size) {
@@ -677,7 +674,7 @@ public class RongPlugin implements CustomModuleAdapter,
     @Override
     public void onTrade(double price, int size, TradeInfo tradeInfo) {
         if (!Double.isFinite(price) || price < 0.5 || price > Integer.MAX_VALUE || size <= 0) return;
-        dispatchMarketData(() -> processTrade(price, size, tradeInfo));
+        dispatchMarketData("trade", () -> processTrade(price, size, tradeInfo));
     }
 
     private void processTrade(double price, int size, TradeInfo tradeInfo) {
@@ -746,7 +743,7 @@ public class RongPlugin implements CustomModuleAdapter,
 
     @Override
     public void onTimestamp(long timestampNs) {
-        dispatchMarketData(() -> processTimestamp(timestampNs));
+        dispatchMarketData("timestamp", () -> processTimestamp(timestampNs));
     }
 
     private void processTimestamp(long timestampNs) {
@@ -793,7 +790,7 @@ public class RongPlugin implements CustomModuleAdapter,
 
     @Override
     public void onBbo(int bidPrice, int bidSize, int askPrice, int askSize) {
-        dispatchMarketData(() -> processBbo(bidPrice, bidSize, askPrice, askSize));
+        dispatchMarketData("bbo", () -> processBbo(bidPrice, bidSize, askPrice, askSize));
     }
 
     private void processBbo(int bidPrice, int bidSize, int askPrice, int askSize) {
@@ -820,7 +817,7 @@ public class RongPlugin implements CustomModuleAdapter,
 
     @Override
     public void onSnapshotEnd() {
-        dispatchMarketData(() -> processSnapshotEnd());
+        dispatchMarketData("snapshot_end", () -> processSnapshotEnd());
     }
 
     private void processSnapshotEnd() {
@@ -835,7 +832,7 @@ public class RongPlugin implements CustomModuleAdapter,
 
     @Override
     public void onRealtimeStart() {
-        dispatchMarketData(() -> processRealtimeStart());
+        dispatchMarketData("realtime_start", () -> processRealtimeStart());
     }
 
     private void processRealtimeStart() {
@@ -849,10 +846,6 @@ public class RongPlugin implements CustomModuleAdapter,
             wallChangeTracker.markReady();
         }
         markPatternEventsReady();
-    }
-
-    public static void resetNativeExecutionAfterBrokerReview() {
-        if (nativeTrading != null) nativeTrading.resetAfterBrokerReview();
     }
 
     public static synchronized void restartNativeTrading() {

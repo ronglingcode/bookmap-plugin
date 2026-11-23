@@ -1,88 +1,45 @@
 package com.bookmap.plugin.rong;
 
-import java.util.concurrent.ArrayBlockingQueue;
-import java.util.concurrent.atomic.AtomicBoolean;
+import com.google.gson.JsonObject;
 import java.util.function.Consumer;
 import java.util.function.LongSupplier;
 
-/** Ordered, bounded callback handoff. Producers never wait for processing or UI work. */
+/** Synchronous, ordered state reduction. There is no raw-event queue or worker. */
 public final class MarketDataDispatcher implements AutoCloseable {
-    private static final long MAX_LAG_NS = 250_000_000L;
-    private final ArrayBlockingQueue<Work> queue;
-    private final AtomicBoolean failed = new AtomicBoolean();
-    private final Consumer<String> failure;
+    private final Consumer<String> notice;
     private final LongSupplier clock;
-    private final Thread worker;
-    private volatile boolean closed;
-    private volatile Work current;
+    private volatile boolean closed, failed;
+    private long processed, maxProcessingNs;
+    private String slowestCallback = "", failureReason = "";
 
-    private static final class Work {
-        final Runnable task;
-        final long enqueued;
-        Work(Runnable task, long enqueued) { this.task = task; this.enqueued = enqueued; }
+    public MarketDataDispatcher(String symbol, Consumer<String> notice) {
+        this(System::nanoTime, notice);
     }
-
-    public MarketDataDispatcher(String symbol, Consumer<String> failure) {
-        this(symbol, 32768, System::nanoTime, failure);
+    MarketDataDispatcher(LongSupplier clock, Consumer<String> notice) {
+        this.clock = clock; this.notice = notice;
     }
-
-    MarketDataDispatcher(String symbol, int capacity, LongSupplier clock, Consumer<String> failure) {
-        this.queue = new ArrayBlockingQueue<>(capacity);
-        this.clock = clock;
-        this.failure = failure;
-        worker = new Thread(this::run, "bmtrader-market-" + symbol);
-        worker.setDaemon(true);
-        worker.start();
-    }
-
-    public boolean submit(Runnable task) {
-        if (closed || failed.get()) return false;
-        if (queue.offer(new Work(task, clock.getAsLong()))) return true;
-        fail("market-data queue overflow; disable and re-enable the addon to rebuild liquidity state");
-        return false;
-    }
-
-    // RongPlugin retains its package while this class is relocated by obfuscation.
-    // Method-reference linkage requires public access across that package boundary.
-    public boolean healthy() {
-        if (closed || failed.get()) return false;
-        Work active = current, next = queue.peek();
-        long now = clock.getAsLong();
-        return (active == null || now - active.enqueued <= MAX_LAG_NS)
-                && (next == null || now - next.enqueued <= MAX_LAG_NS);
-    }
-
-    private void run() {
-        try {
-            while (!closed && !failed.get()) {
-                Work work = queue.take();
-                current = work;
-                try {
-                    if (!closed && !failed.get()) work.task.run();
-                } finally { current = null; }
-            }
-        } catch (InterruptedException interrupted) {
-            Thread.currentThread().interrupt();
-        } catch (Throwable error) {
-            fail("market-data processing failed (" + error.getClass().getSimpleName()
-                    + "); disable and re-enable the addon to rebuild liquidity state");
-        } finally { queue.clear(); }
-    }
-
-    private void fail(String reason) {
-        if (failed.compareAndSet(false, true)) {
-            queue.clear();
-            worker.interrupt();
-            // In particular, overflow reporting must not run on Bookmap's producer thread.
-            Thread reporter = new Thread(() -> failure.accept(reason), "bmtrader-market-warning");
-            reporter.setDaemon(true);
-            reporter.start();
+    public boolean submit(Runnable task) { return submit("callback", task); }
+    public synchronized boolean submit(String kind, Runnable task) {
+        if (closed || failed) return false;
+        long started = clock.getAsLong();
+        try { task.run(); processed++; return true; }
+        catch (RuntimeException error) {
+            failed = true; failureReason = "processing failed (" + error.getClass().getSimpleName() + "); counters incomplete";
+            notice.accept("ERROR: Market data " + failureReason); return false;
+        } finally {
+            long elapsed = Math.max(0, clock.getAsLong() - started);
+            if (elapsed > maxProcessingNs) { maxProcessingNs = elapsed; slowestCallback = kind; }
         }
     }
-
-    @Override public void close() {
-        closed = true;
-        queue.clear();
-        worker.interrupt();
+    public boolean healthy() { return !closed && !failed; }
+    public synchronized JsonObject status() {
+        JsonObject value = new JsonObject();
+        value.addProperty("marketDataState", closed ? "stopped" : failed ? "failed" : "current");
+        value.addProperty("healthy", healthy()); value.addProperty("queueDepth", 0);
+        value.addProperty("lagMillis", 0); value.addProperty("processedEvents", processed);
+        value.addProperty("maxProcessingMicros", maxProcessingNs / 1000L);
+        value.addProperty("slowestCallback", slowestCallback); value.addProperty("marketDataError", failureReason);
+        return value;
     }
+    @Override public void close() { closed = true; }
 }

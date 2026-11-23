@@ -184,7 +184,7 @@ public class ChartHoverHotkeyHandler implements ScreenSpacePainterFactory {
             Toolkit.getDefaultToolkit().addAWTEventListener(awtListener,
                 AWTEvent.MOUSE_MOTION_EVENT_MASK);
             // Recheck stationary pointers too: chart scales and window boundaries can change.
-            hoverDisplayTimer = new javax.swing.Timer(100, event -> refreshHoverDisplay());
+            hoverDisplayTimer = new javax.swing.Timer(200, event -> refreshHoverDisplay());
             hoverDisplayTimer.start();
         }
     }

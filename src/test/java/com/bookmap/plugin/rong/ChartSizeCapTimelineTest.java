@@ -26,7 +26,7 @@ class ChartSizeCapTimelineTest {
             AtomicLong chart = new AtomicLong(open - 5000), wall = new AtomicLong(chart.get() + delay);
             try (PremarketSizeThreshold policy = new PremarketSizeThreshold("TEST", chart::get, wall::get,
                     (symbol, start, end) -> List.of(bar(start, 370, 360, 500000), bar(open - 60000, 370, 360, 3000000)))) {
-                SignalWebSocketServer server = new SignalWebSocketServer(0, 0);
+                SignalWebSocketServer server = new SignalWebSocketServer(0, 0, () -> java.time.Instant.parse("2026-11-23T14:30:00Z").toEpochMilli());
                 OrderBookState book = new OrderBookState(); server.registerSymbol("TEST", book, .01);
                 server.registerSizeThreshold("TEST", policy);
                 server.observeSessionTime("TEST", chart.get() * 1_000_000L);

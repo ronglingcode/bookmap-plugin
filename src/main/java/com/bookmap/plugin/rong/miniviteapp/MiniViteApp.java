@@ -30,8 +30,7 @@ public final class MiniViteApp implements AutoCloseable {
     private final ExecutorService executor = Executors.newCachedThreadPool(task -> {
         Thread thread = new Thread(task, "bmtrader-native-execution"); thread.setDaemon(true); return thread;
     });
-    private boolean requiresReview, closed;
-    private String reviewReason = "";
+    private boolean closed;
     private Object connection;
     private String account = "", token = "";
     private long expiresAt;
@@ -65,18 +64,13 @@ public final class MiniViteApp implements AutoCloseable {
         json.addProperty("enabled", !closed);
         json.addProperty("exitsEnabled", !closed); json.addProperty("entriesEnabled", !closed);
         json.addProperty("extendedEnabled", !closed);
-        json.addProperty("blocked", requiresReview);
-        json.addProperty("requiresReview", requiresReview);
-        json.addProperty("reason", reviewReason);
+        json.addProperty("blocked", false);
+        json.addProperty("reason", "");
         return json;
     }
     public synchronized void unregister(String symbol) {
         snapshots.remove(symbolKey.apply(symbol));
         marketData.remove(symbolKey.apply(symbol));
-    }
-    public synchronized boolean resetAfterBrokerReview() {
-        requiresReview = false; reviewReason = "";
-        log.accept("", "Execution review block cleared by user; reset did not verify broker order state"); return true;
     }
     public synchronized boolean receive(Object connection, JsonObject json) {
         String type = Models.string(json, "type");
@@ -98,10 +92,8 @@ public final class MiniViteApp implements AutoCloseable {
                 marketData.put(symbolKey.apply(Models.string(json, "symbol")), json.deepCopy());
             } else if (type.equals("execution_entry_state")) {
                 if (!Models.bool(json, "initialized")) {
-                    requiresReview = true;
-                    reviewReason = ExecutionDiagnostics.sanitize("entry state initialization failed: " + Models.string(json, "reason"), token, account);
-                    log.accept(Models.string(json, "symbol"), "Native requires review: " + reviewReason);
-                    sender.accept(connection, status());
+                    String reason = ExecutionDiagnostics.sanitize("entry state initialization failed: " + Models.string(json, "reason"), token, account);
+                    log.accept(Models.string(json, "symbol"), "Native " + reason);
                 }
             }
         } catch (RuntimeException error) {
@@ -127,7 +119,6 @@ public final class MiniViteApp implements AutoCloseable {
         try {
             long now = System.currentTimeMillis();
             Models.require(!closed, "native executor stopped");
-            Models.require(!requiresReview, "broker review required: " + reviewReason);
             Models.require(state != null, "execution inputs unavailable");
             if (marketData.containsKey(symbol)) state = new Snapshot(state, marketData.get(symbol));
             boolean hoverEntry = HoverShareEntry.isChartDigit(action, key) && state.netQuantity == 0 && state.pairs.isEmpty();
@@ -191,7 +182,9 @@ public final class MiniViteApp implements AutoCloseable {
                 Models.require(stopClaim != null, "Select stop: hover + Z");
                 plan.selectedStopGuard = stopClaim::requireFresh;
             }
-            boolean cappedOpening = state.entryContext != null && state.entryContext.has("bookmapSizeCap") && BookmapSizeCap.hasOpening(plan);
+            boolean cappedOpening = state.entryContext != null && state.entryContext.has("bookmapSizeCap") && BookmapSizeCap.hasOpening(plan)
+                    && (BookmapSizeCap.mode(state.entryContext.getAsJsonObject("bookmapSizeCap")) == BookmapSizeCap.Mode.NORMAL_1R
+                        || BookmapSizeCap.liquidityRequired(state.entryContext.getAsJsonObject("bookmapSizeCap")));
             if (cappedOpening) Models.require(!cappedEntryRefreshAfter.containsKey(symbol), "Bookmap size cap: wait for broker account refresh before another entry");
             BookmapSizeCap.apply(state, plan);
             for (String warning : plan.warnings) log.accept(symbol, warning);
@@ -247,7 +240,7 @@ public final class MiniViteApp implements AutoCloseable {
             try { plan.selectedStopGuard.run(); }
             catch (RuntimeException error) {
                 finishExecution(actionId, state, plan, new JsonArray(), 0, 0, 0, 0, false,
-                        "rejected", error.getMessage(), false);
+                        "rejected", error.getMessage());
                 return;
             }
         }
@@ -300,9 +293,9 @@ public final class MiniViteApp implements AutoCloseable {
                 ? state.entries.isEmpty() ? "No pending entry orders found in the execution snapshot"
                 : "No pending entries selected by the stop-only cancellation rule"
                 : "Execution plan contains no broker requests";
-        if (unknown) reason += "; broker outcome unknown; review orders before resetting";
+        if (unknown) reason += "; broker outcome unknown";
         finishExecution(actionId, state, plan, results, attempted, acknowledged, rejected, uncertain,
-                entryAccepted, outcome, reason, unknown);
+                entryAccepted, outcome, reason);
     }
     private JsonObject executeRequest(String accountHash, String actionId, Snapshot state, Plan plan,
             Request request, int index) {
@@ -332,15 +325,14 @@ public final class MiniViteApp implements AutoCloseable {
             result.addProperty("outcome", dispatched ? "unknown" : "rejected");
             result.addProperty("reason", operation + " failed: "
                     + ExecutionDiagnostics.describe(error, accessToken, accountHash)
-                    + (dispatched ? "; no classified broker result; broker outcome unknown; review orders before resetting" : "; request not attempted"));
+                    + (dispatched ? "; no classified broker result; broker outcome unknown" : "; request not attempted"));
             return result;
         }
     }
     private void finishExecution(String actionId, Snapshot state, Plan plan, JsonArray results,
             int attempted, int acknowledged, int rejected, int uncertain, boolean entryAccepted,
-            String outcome, String reason, boolean unknown) {
+            String outcome, String reason) {
         synchronized (this) {
-            if (unknown) { requiresReview = true; reviewReason = reason; }
             if (cappedEntryRefreshAfter.containsKey(state.symbol) && BookmapSizeCap.hasOpening(plan)) {
                 if (acknowledged == 0 && uncertain == 0) cappedEntryRefreshAfter.remove(state.symbol);
                 else cappedEntryRefreshAfter.put(state.symbol, System.currentTimeMillis());
@@ -348,7 +340,7 @@ public final class MiniViteApp implements AutoCloseable {
             JsonObject finished = message("execution_result"); finished.addProperty("actionId", actionId);
             finished.addProperty("symbol", state.symbol); finished.addProperty("action", plan.action);
             finished.addProperty("outcome", outcome); finished.addProperty("reason", reason);
-            finished.addProperty("requiresReview", requiresReview); finished.add("results", results);
+            finished.add("results", results);
             finished.addProperty("plannedRequestCount", plan.requests.size());
             finished.addProperty("attemptedRequestCount", attempted);
             finished.addProperty("acknowledgedRequestCount", acknowledged);
@@ -374,7 +366,7 @@ public final class MiniViteApp implements AutoCloseable {
                 + " request(s)" + (exitPairCount == 0 ? "" : " (" + exitPairCount + " planned exit pairs)")
                 + "; final order state unconfirmed";
         if (outcome.equals("no_op")) return label + ": no requests sent; " + reason;
-        String result = outcome.equals("unknown") ? "outcome unknown; review broker orders before resetting"
+        String result = outcome.equals("unknown") ? "broker outcome unknown"
                 : outcome.equals("partial") ? "partially acknowledged" : "rejected";
         return label + ": " + result + " (" + acknowledged + "/" + attempted + " acknowledged, "
                 + rejected + " rejected, " + uncertain + " unknown)" + (reason.isEmpty() ? "" : "; " + reason);

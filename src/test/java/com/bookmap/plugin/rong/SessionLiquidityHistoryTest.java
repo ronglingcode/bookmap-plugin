@@ -18,7 +18,7 @@ class SessionLiquidityHistoryTest {
     private void history(Scenario scenario) throws Exception {
         withIsolatedActivation(() -> {
             Object saved = field("sharedServer").get(null);
-            SignalWebSocketServer server = new SignalWebSocketServer(0, 0);
+            SignalWebSocketServer server = new SignalWebSocketServer(0, 0, () -> java.time.Instant.parse("2026-11-23T14:30:00Z").toEpochMilli());
             try {
                 field("sharedServer").set(null, server);
                 RongPlugin plugin = PatternEventCallbacksTest.callbackPlugin();
