@@ -60,7 +60,7 @@ class FilledExecutionPipelineTest {
             return new HttpPort.Response(200, "[" + order + "]");
         };
         JsonArray orders = new ReadApi(http).getOrderHistory("account", "token", "2026-10-02", false, 59);
-        assertEquals("2026-08-04T00:00:00.000Z", fromEnteredTime.get());
+        assertEquals("2026-08-04T04:00:00.000Z", fromEnteredTime.get());
 
         JsonObject account = JsonParser.parseString("{\"currentBalances\":{\"liquidationValue\":25000}}").getAsJsonObject();
         JsonObject projected = AccountProjection.projectAccount(account, orders, "2026-10-02", symbol -> 237.12);

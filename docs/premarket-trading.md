@@ -17,6 +17,7 @@ Enter a whole-share quantity. The editable **Offset (%)** defaults to **1**:
 | Sell Ask | Current ask |
 | Buy Limit | Exact price from the Limit price textbox |
 | Sell Limit | Exact price from the Limit price textbox |
+| Cancel All | Cancel every working order for this chart symbol; do not close the position |
 | Flatten | Full remaining long position below bid, or full remaining short position above ask |
 
 Every new order and hover-price replacement is a standalone equity `LIMIT`
@@ -90,3 +91,16 @@ native-runtime restart, to avoid duplicate orders.
 Hover tooltips are disabled in the manual ticket. Button clicks and input errors
 are logged, and the ticket displays runtime submission, acceptance, or rejection
 messages directly. An accepted order is still not a confirmed fill.
+
+**Cancel All** ignores the Shares, Offset, and Limit price inputs. It is available
+even outside the order-entry session, confirms cancellation, and never submits
+a closing order. An order can still fill while cancellation is in flight.
+
+Account state normally refreshes every three seconds; manual order actions request
+an immediate refresh and follow-ups at 500 ms and 1,000 ms. Account-stream events
+also trigger refreshes. Chart display updates are batched at approximately 200 ms.
+Order-query boundaries cover midnight-to-midnight in America/New_York, including
+after-hours orders whose UTC timestamp falls on the following date. Confirmed
+fills use the existing execution-marker pipeline; confirmed terminal orders remove
+their pending chart lines. Broker fill and cancellation reports also update the
+ticket status instead of leaving the initial acceptance message indefinitely.

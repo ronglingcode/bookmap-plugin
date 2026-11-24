@@ -11,7 +11,7 @@ import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.*;
 
 class BrokerReadParityTest {
-    @Test void agreesWithProductionTypeScript() throws Exception {
+    @Test void agreesWithProductionTypeScriptExceptCorrectedEasternDateWindows() throws Exception {
         JsonArray fixtures = JsonParser.parseReader(new InputStreamReader(getClass().getResourceAsStream("/broker-read-fixtures.json"), StandardCharsets.UTF_8)).getAsJsonArray();
         for (JsonElement value : fixtures) {
             JsonObject fixture = value.getAsJsonObject(); String name = fixture.get("name").getAsString();
@@ -41,7 +41,19 @@ class BrokerReadParityTest {
             } catch (Exception failure) { error = failure.getMessage(); }
             if (fixture.has("error")) assertEquals(fixture.get("error").getAsString(), error, name);
             else { assertNull(error, name); assertEquals(fixture.get("result"), result, name); }
-            if (fixture.has("requests")) assertEquals(fixture.get("requests"), requests, name);
+            if (fixture.has("requests")) {
+                JsonArray expected = fixture.getAsJsonArray("requests").deepCopy(), actual = requests.deepCopy();
+                if (fixture.has("method") && fixture.get("method").getAsString().equals("getOrders")) {
+                    // These legacy TS fixtures use UTC midnight. Eastern session boundaries are
+                    // intentionally different and are verified by AfterHoursOrderRefreshTest.
+                    // Retain parity for request counts, endpoint, headers and other parameters.
+                    for (JsonArray list : new JsonArray[]{expected, actual}) for (JsonElement request : list) {
+                        JsonObject query = request.getAsJsonObject().getAsJsonObject("query");
+                        query.remove("fromEnteredTime"); query.remove("toEnteredTime");
+                    }
+                }
+                assertEquals(expected, actual, name);
+            }
         }
     }
 }

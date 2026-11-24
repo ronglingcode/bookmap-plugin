@@ -32,4 +32,5 @@ public final class MarketClock {
         return value.getDayOfWeek().getValue() <= 5 && (minute >= 420 && minute < 570 || minute >= 960 && minute < 1200);
     }
     public static String addDays(String date, int days) { return LocalDate.parse(date).plusDays(days).toString(); }
+    public static long dayStartMillis(String date) { return LocalDate.parse(date).atStartOfDay(MARKET_ZONE).toInstant().toEpochMilli(); }
 }

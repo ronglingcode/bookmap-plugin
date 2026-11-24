@@ -155,6 +155,17 @@ class PremarketTradingTest {
             h.now.set(Instant.parse("2026-11-24T01:00:00Z").toEpochMilli()); h.trading.dispatch(action(operation, 3)); assertEquals(1, h.posted.size());
         }
     }
+    @Test void cancelAllIgnoresQuantityAndOffsetAndNeverPlacesAClosingOrder() {
+        try (Harness h = new Harness()) {
+            h.now.set(Instant.parse("2026-11-24T02:00:00Z").toEpochMilli());
+            h.net = 10; h.working();
+            h.trading.dispatch(PremarketTradingPanel.action("AMD", "cancel_all", "invalid", "invalid"));
+            assertEquals(List.of("45"), h.canceled); assertTrue(h.posted.isEmpty());
+            h.confirm = true; h.delayed.remove(0).run();
+            assertTrue(h.posted.isEmpty()); assertEquals(0, h.positionReads);
+            assertFalse(h.trading.isBusy("AMD")); assertTrue(h.logs.stream().anyMatch(log -> log.contains("Cancel All: cancellation confirmed")));
+        }
+    }
     @Test void hoverLimitChoosesSideAtMidpointWithExactPriceAndCurrentQuantity() {
         for (double price : new double[]{99, 102}) try (Harness h = new Harness()) {
             h.trading.dispatch(PremarketTradingPanel.fixedAction("AMD", "hover_limit", "7", "" + price));

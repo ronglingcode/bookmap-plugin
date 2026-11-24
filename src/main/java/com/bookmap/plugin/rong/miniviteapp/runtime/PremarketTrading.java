@@ -33,8 +33,24 @@ public final class PremarketTrading implements AutoCloseable {
     private final Runnable refresh;
     private final Set<String> busy = new HashSet<>(), review = new HashSet<>();
     private final Map<String, Set<String>> submitted = new HashMap<>();
+    private final Map<String, Double> reportedFills = new HashMap<>();
     private final PremarketOrderIndex orderIndex = new PremarketOrderIndex();
-    public void observeOrders(JsonArray orders) { orderIndex.observe(orders); }
+    public void observeOrders(JsonArray orders) {
+        orderIndex.observe(orders);
+        List<String[]> notices = new ArrayList<>();
+        synchronized (this) {
+            for (var entry : submitted.entrySet()) for (String id : new HashSet<>(entry.getValue())) {
+                JsonObject raw = find(orders, id); if (raw.size() == 0) continue;
+                String status = string(raw, "status"); double filled = number(raw, "filledQuantity");
+                if (filled > reportedFills.getOrDefault(id, 0.0) || TERMINAL.contains(status)) {
+                    notices.add(new String[]{entry.getKey(), "Premarket order " + id + ": broker reports " + status + ", filled " + filled + " of " + number(raw, "quantity") + " shares"});
+                    reportedFills.put(id, filled);
+                }
+                if (TERMINAL.contains(status)) { entry.getValue().remove(id); reportedFills.remove(id); }
+            }
+        }
+        for (String[] notice : notices) log.accept(notice[0], notice[1]);
+    }
     public JsonArray ordersForChart(String symbol) { return orderIndex.snapshot(symbol); }
     private volatile boolean closed;
 
@@ -45,17 +61,21 @@ public final class PremarketTrading implements AutoCloseable {
     }
     private void require(boolean condition, String reason) { if (!condition) throw new IllegalArgumentException(reason); }
     private void check() {
+        checkEnabled();
+        require(MarketClock.isExtendedTradingTime(now.getAsLong()), "manual extended-hours controls are available 07:00–09:30 and 16:00–20:00 ET on weekdays");
+    }
+    private void checkEnabled() {
         require(!closed, "runtime stopped");
         require(enabled.getAsBoolean(), "premarket trading is disabled");
-        require(MarketClock.isExtendedTradingTime(now.getAsLong()), "manual extended-hours controls are available 07:00–09:30 and 16:00–20:00 ET on weekdays");
     }
     public boolean dispatch(JsonObject action) {
         if (string(action, "type").equals("premarket_adjust")) return dispatchAdjustment(action);
         if (!string(action, "type").equals("premarket_order")) return false;
         String symbol = string(action, "symbol").trim();
         try {
-            check(); require(symbol.matches("[A-Z][A-Z0-9./-]{0,14}"), "invalid symbol");
             String operation = string(action, "operation");
+            if (operation.equals("cancel_all")) checkEnabled(); else check();
+            require(symbol.matches("[A-Z][A-Z0-9./-]{0,14}"), "invalid symbol");
             double fixedPrice = 0;
             if (operation.endsWith("_limit")) {
                 fixedPrice = number(action, "price");
@@ -69,10 +89,11 @@ public final class PremarketTrading implements AutoCloseable {
                     operation = fixedPrice > midpoint ? "sell_limit" : "buy_limit";
                 }
             }
-            require(Set.of("buy_now", "buy_bid", "sell_now", "sell_ask", "buy_limit", "sell_limit", "flatten").contains(operation), "invalid premarket action");
+            require(Set.of("buy_now", "buy_bid", "sell_now", "sell_ask", "buy_limit", "sell_limit", "flatten", "cancel_all").contains(operation), "invalid premarket action");
             double quantity = number(action, "quantity"), offset = number(action, "offsetPercent");
-            require(operation.equals("flatten") || Double.isFinite(quantity) && quantity > 0 && quantity == Math.rint(quantity) && quantity <= Integer.MAX_VALUE, "enter a positive whole-share quantity");
-            require(fixedPrice > 0 || Double.isFinite(offset) && offset > 0 && offset < 100, "offset must be greater than 0 and less than 100 percent");
+            boolean cancelOnly = operation.equals("cancel_all");
+            require(cancelOnly || operation.equals("flatten") || Double.isFinite(quantity) && quantity > 0 && quantity == Math.rint(quantity) && quantity <= Integer.MAX_VALUE, "enter a positive whole-share quantity");
+            require(cancelOnly || fixedPrice > 0 || Double.isFinite(offset) && offset > 0 && offset < 100, "offset must be greater than 0 and less than 100 percent");
             synchronized (this) {
                 require(!review.contains(symbol), "broker outcome uncertain; review broker orders and restart native trading before another action");
                 require(busy.add(symbol), "previous premarket action is still running");
@@ -85,7 +106,8 @@ public final class PremarketTrading implements AutoCloseable {
     }
     private void prepare(String symbol, String operation, double quantity, double offset, double fixedPrice) {
         try {
-            check(); JsonArray orders = broker.orders(); List<String> working = workingOrders(orders, symbol);
+            if (operation.equals("cancel_all")) checkEnabled(); else check();
+            JsonArray orders = broker.orders(); List<String> working = workingOrders(orders, symbol);
             Set<String> recent; synchronized (this) { recent = new HashSet<>(submitted.getOrDefault(symbol, Set.of())); }
             for (String id : recent) {
                 // A newly accepted order may not yet appear in the list endpoint. Check it by ID.
@@ -95,13 +117,13 @@ public final class PremarketTrading implements AutoCloseable {
                     working.add(id); orders.add(raw);
                 } else synchronized (this) { submitted.getOrDefault(symbol, new HashSet<>()).remove(id); }
             }
-            if (operation.equals("flatten")) {
+            if (operation.equals("flatten") || operation.equals("cancel_all")) {
                 for (String id : working) {
-                    check();
+                    if (operation.equals("cancel_all")) checkEnabled(); else check();
                     // A lost response may mean the cancellation reached the broker. Never retry mutations.
                     cancelAndReconcile(symbol, id);
                 }
-                awaitCanceled(symbol, working, offset, 0);
+                awaitCanceled(symbol, working, offset, 0, operation.equals("cancel_all"));
             } else {
                 double net = broker.position(symbol);
                 boolean buy = operation.startsWith("buy");
@@ -122,25 +144,27 @@ public final class PremarketTrading implements AutoCloseable {
             }
         } catch (Exception error) { failed(symbol, error); }
     }
-    private void awaitCanceled(String symbol, List<String> canceled, double offset, int attempt) {
+    private void awaitCanceled(String symbol, List<String> canceled, double offset, int attempt, boolean cancelOnly) {
         try {
-            check(); boolean pending = false;
+            if (cancelOnly) checkEnabled(); else check();
+            boolean pending = false;
             for (String id : canceled) {
                 String status = string(broker.order(id), "status");
                 require(!status.equals("REPLACED"), "order replaced elsewhere; reconcile working orders before Flatten");
                 if (!TERMINAL.contains(status)) pending = true;
             }
             if (pending) {
-                require(attempt < 20, "cancellation not confirmed; no closing order submitted, check broker and press Flatten again");
+                require(attempt < 20, "cancellation not confirmed; no new order submitted, check broker orders before retrying");
                 scheduler.after(250, () -> {
                     if (closed) { finish(symbol); return; }
-                    try { executor.execute(() -> awaitCanceled(symbol, canceled, offset, attempt + 1)); }
+                    try { executor.execute(() -> awaitCanceled(symbol, canceled, offset, attempt + 1, cancelOnly)); }
                     catch (RuntimeException error) { failed(symbol, error); }
                 });
                 return;
             }
             // Check the complete list again: a bracket child or replacement can activate during cancellation.
-            require(workingOrders(broker.orders(), symbol).isEmpty(), "working orders remain after cancellation; no closing order submitted, press Flatten again");
+            require(workingOrders(broker.orders(), symbol).isEmpty(), "working orders remain after cancellation; no new order submitted, reconcile and retry the requested action");
+            if (cancelOnly) { log.accept(symbol, "Premarket Cancel All: cancellation confirmed; no position-closing order submitted"); finish(symbol); return; }
             double net = broker.position(symbol);
             if (net == 0) log.accept(symbol, "Premarket Flatten: broker position is flat; working orders canceled");
             else submit(symbol, Math.abs(net), net < 0, true, true, offset);

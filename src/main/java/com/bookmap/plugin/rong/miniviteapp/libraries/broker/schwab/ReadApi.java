@@ -63,8 +63,8 @@ public final class ReadApi {
     }
     /** Live trading: exactly one order query, regardless of root/nested record count. */
     public JsonArray getOrders(String account, String token, String date) throws Exception {
-        long start = Instant.parse(date + "T00:00:00Z").toEpochMilli();
-        long end = Instant.parse(LocalDate.parse(date).plusDays(1) + "T00:00:00Z").toEpochMilli();
+        long start = MarketClock.dayStartMillis(date);
+        long end = MarketClock.dayStartMillis(MarketClock.addDays(date, 1));
         long started = System.nanoTime();
         try {
             return readOrderWindow(account, token, start, end);
@@ -78,13 +78,13 @@ public final class ReadApi {
     }
     public JsonArray getOrderHistory(String account, String token, String date, boolean useTimeWindows, int lookbackDays) throws Exception {
         if (lookbackDays < 0 || lookbackDays > 59) throw new IllegalArgumentException("Order lookback must be 0-59 days");
-        long start = Instant.parse(LocalDate.parse(date).minusDays(lookbackDays) + "T00:00:00Z").toEpochMilli(), end = Instant.parse(LocalDate.parse(date).plusDays(1) + "T00:00:00Z").toEpochMilli();
+        long start = MarketClock.dayStartMillis(MarketClock.addDays(date, -lookbackDays)), end = MarketClock.dayStartMillis(MarketClock.addDays(date, 1));
         Map<String, JsonObject> orders = new LinkedHashMap<>();
         int[] requests = {0}; long started = System.nanoTime(); boolean complete = false;
         try {
             if (!useTimeWindows) window(account, token, start, end, orders, requests);
             else {
-                long today = Instant.parse(date + "T00:00:00Z").toEpochMilli();
+                long today = MarketClock.dayStartMillis(date);
                 // Only pre-split today; older history subdivides on demand.
                 if (start < today) window(account, token, start, today, orders, requests);
                 for (long from = today; from < end; from += 3600000L) {

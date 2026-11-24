@@ -188,7 +188,7 @@ class TradingRuntimeTest {
             if (path.endsWith("/orders")) {
                 if (method.equals("POST")) { mutations.incrementAndGet(); return new HttpPort.Response(201, "", Map.of("Location", "https://fake.invalid/orders/123")); }
                 String date = com.bookmap.plugin.rong.miniviteapp.core.marketdata.MarketClock.marketTime(now.get()).date;
-                assertEquals("fromEnteredTime=" + date + "T00:00:00.000Z&toEnteredTime=" + java.time.LocalDate.parse(date).plusDays(1) + "T00:00:00.000Z&maxResults=500", uri.getQuery(),
+                assertEquals("fromEnteredTime=" + date + "T04:00:00.000Z&toEnteredTime=" + java.time.LocalDate.parse(date).plusDays(1) + "T04:00:00.000Z&maxResults=500", uri.getQuery(),
                         "Startup, account refresh and cancellation reads must request only today's orders");
                 return new HttpPort.Response(200, orderData.get());
             }

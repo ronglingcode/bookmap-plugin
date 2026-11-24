@@ -184,7 +184,7 @@ class OrderPaginationTest {
             AtomicInteger requests = new AtomicInteger(); List<String> diagnostics = new ArrayList<>();
             ReadApi api = new ReadApi((uri, method, headers, body) -> {
                 requests.incrementAndGet(); assertEquals("GET", method);
-                assertEquals("fromEnteredTime=2026-10-01T00:00:00.000Z&toEnteredTime=2026-10-02T00:00:00.000Z&maxResults=500", uri.getQuery());
+                assertEquals("fromEnteredTime=2026-10-01T04:00:00.000Z&toEnteredTime=2026-10-02T04:00:00.000Z&maxResults=500", uri.getQuery());
                 return new HttpPort.Response(200, response.toString());
             }, diagnostics::add);
             assertEquals(response, api.getOrders("account", "token", DATE));

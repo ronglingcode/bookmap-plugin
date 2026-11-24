@@ -26,6 +26,7 @@ public final class PremarketTradingPanel extends JPanel implements AutoCloseable
     private final SignalWebSocketServer.AccountStateListener accountListener = this::updateAccount;
     private final Timer timer;
     private volatile boolean closed;
+    private Boolean sessionActive;
 
     public PremarketTradingPanel(String symbol, SignalWebSocketServer server) {
         this.symbol = symbol; this.server = server;
@@ -55,6 +56,9 @@ public final class PremarketTradingPanel extends JPanel implements AutoCloseable
             public void changedUpdate(DocumentEvent event) { updateSession(); }
         });
         publishShares();
+        JButton cancelAll = button("Cancel All", "cancel_all", false);
+        cancelAll.setBackground(new Color(75, 85, 100));
+        JPanel cancel = new JPanel(new BorderLayout()); cancel.add(cancelAll, BorderLayout.CENTER); add(cancel);
         JButton flatten = button("Flatten", "flatten", false);
         JPanel exit = new JPanel(new BorderLayout()); exit.add(flatten, BorderLayout.CENTER); add(exit);
         add(account); add(status);
@@ -88,6 +92,9 @@ public final class PremarketTradingPanel extends JPanel implements AutoCloseable
         action.addProperty("price", price); return action;
     }
     public static JsonObject action(String symbol, String operation, String shares, String percent) {
+        if (operation.equals("cancel_all")) {
+            JsonObject action = new JsonObject(); action.addProperty("type", "premarket_order"); action.addProperty("symbol", symbol); action.addProperty("operation", operation); return action;
+        }
         double count = 0, padding;
         try { if (!operation.equals("flatten")) count = Double.parseDouble(shares.trim()); padding = Double.parseDouble(percent.trim()); }
         catch (RuntimeException error) { throw new IllegalArgumentException("Enter whole shares and a numeric offset percentage"); }
@@ -102,10 +109,12 @@ public final class PremarketTradingPanel extends JPanel implements AutoCloseable
         for (JButton button : buttons) {
             boolean valid = active;
             String operation = (String) button.getClientProperty("operation");
+            if (operation.equals("cancel_all")) valid = true;
             if (operation.endsWith("_limit")) try { fixedAction(symbol, operation, quantity.getText(), limitPrice.getText()); } catch (IllegalArgumentException error) { valid = false; }
             button.setEnabled(valid);
         }
-        if (!active) status("Outside extended hours: weekdays 07:00–09:30 and 16:00–20:00 ET");
+        if (!active && !Boolean.FALSE.equals(sessionActive)) status("Outside extended hours: weekdays 07:00–09:30 and 16:00–20:00 ET");
+        sessionActive = active;
     }
     private void status(String text) { status.setText(VerticalWindowLayout.wrapText(text, 200)); }
     private void updateAccount(AccountStateDefinition state) {
