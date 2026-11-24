@@ -22,9 +22,9 @@ class PremarketPanelTest {
                     inspect(panel, buttons, inputs);
                     for (JButton button : buttons) assertNull(button.getToolTipText());
                     for (JTextField field : inputs) assertNull(field.getToolTipText());
-                    assertEquals(java.util.List.of("Buy Now", "Buy Bid", "Sell Now", "Sell Ask", "Buy Limit", "Sell Limit", "Cancel All", "Flatten"),
+                    assertEquals(java.util.List.of("Set Stop", "Buy Now", "Buy Bid", "Sell Now", "Sell Ask", "Buy Limit", "Sell Limit", "Cancel All", "Flatten"),
                             buttons.stream().map(JButton::getText).collect(java.util.stream.Collectors.toList()));
-                    assertEquals(3, inputs.size()); assertEquals("", inputs.get(0).getText()); assertEquals("1", inputs.get(1).getText()); assertEquals("", inputs.get(2).getText());
+                    assertEquals(4, inputs.size()); assertEquals("", inputs.get(0).getText()); assertEquals("1", inputs.get(1).getText()); assertEquals("", inputs.get(2).getText());
                     server.setPremarketMode(() -> true);
                     ArrayList<com.google.gson.JsonObject> sent = new ArrayList<>(); server.setTradingDispatch(sent::add);
                     inputs.get(0).setText("25");

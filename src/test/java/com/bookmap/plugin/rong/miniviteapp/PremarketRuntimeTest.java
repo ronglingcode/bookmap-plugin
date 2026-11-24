@@ -16,7 +16,7 @@ class PremarketRuntimeTest {
     static class Harness implements AutoCloseable {
         final AtomicLong now = new AtomicLong(Instant.parse("2026-11-23T14:00:00Z").toEpochMilli());
         final List<JsonObject> posted = new CopyOnWriteArrayList<>(); final List<String> logs = new CopyOnWriteArrayList<>();
-        boolean enabled, storeOrders; final AtomicInteger targetedReads = new AtomicInteger();
+        boolean enabled, storeOrders, cancelPending; final AtomicInteger targetedReads = new AtomicInteger();
         final Map<String, JsonObject> brokerOrders = new LinkedHashMap<>();
         final List<String> replaced = new ArrayList<>();
         final JsonObject secrets = json("{\"access_token\":\"fake-token\",\"accountHashValue\":\"selected-account\",\"expires_at\":9999999999999}");
@@ -38,7 +38,7 @@ class PremarketRuntimeTest {
             if (path.contains("/orders/")) {
                 String id = path.substring(path.lastIndexOf('/') + 1);
                 if (method.equals("DELETE")) {
-                    replaced.add(id); brokerOrders.get(id).addProperty("status", "CANCELED"); return new HttpPort.Response(204, "");
+                    replaced.add(id); brokerOrders.get(id).addProperty("status", cancelPending ? "PENDING_CANCEL" : "CANCELED"); return new HttpPort.Response(204, "");
                 }
                 if (method.equals("PUT")) {
                     replaced.add(id); brokerOrders.get(id).addProperty("status", "REPLACED");
@@ -81,11 +81,14 @@ class PremarketRuntimeTest {
         }
     }
     @Test void automaticProtectionDoesNotObserveOrClosePremarketAndStartsFreshAtOpen() throws Exception {
-        try (Harness h = new Harness()) {
+        for (boolean enabled : new boolean[]{false, true}) try (Harness h = new Harness()) {
+            h.enabled = enabled;
             h.runtime.start().join();
+            if (enabled) h.runtime.dispatch(json("{\"symbol\":\"AMD\",\"keyCode\":\"KeyZ\",\"price\":99}"));
             for (int i = 0; i < 5; i++) { h.now.addAndGet(11000); h.runtime.refreshAccount(); }
             assertTrue(h.posted.isEmpty()); assertTrue(h.logs.stream().noneMatch(log -> log.contains("without stop loss")));
             h.now.set(Instant.parse("2026-11-23T14:30:00Z").toEpochMilli()); h.runtime.refreshAccount();
+            assertEquals(0, h.runtime.premarketStop("AMD").size(), "Local stop cannot count as regular-session broker protection");
             assertTrue(h.posted.isEmpty()); assertTrue(h.logs.stream().anyMatch(log -> log.contains("without stop loss")));
             h.now.addAndGet(11001); h.runtime.refreshAccount();
             long deadline = System.nanoTime() + 2_000_000_000L;
@@ -94,9 +97,42 @@ class PremarketRuntimeTest {
             assertEquals("MARKET", h.posted.get(0).get("orderType").getAsString(), "Existing regular-session automatic protection still operates");
         }
     }
-    @Test void chartDigitCancelsThenResubmitsExactPremarketOrderWithoutPlanOrSelectedStop() {
+    @Test void zSelectionAndNumberedOrdersSwitchBackToRegularCommandsAtTheOpen() {
+        try (Harness h = new Harness()) {
+            h.enabled = true; h.storeOrders = true; h.runtime.attachSymbol("AMD"); h.runtime.start().join();
+            h.runtime.dispatch(json("{\"symbol\":\"AMD\",\"keyCode\":\"KeyZ\",\"price\":95}"));
+            assertEquals(95, h.runtime.premarketStop("AMD").get("price").getAsDouble());
+            assertEquals(0, h.runtime.selectedStop().get("price").getAsDouble());
+            h.runtime.dispatch(PremarketTradingPanel.action("AMD", "buy_bid", "3", "1"));
+            h.now.set(Instant.parse("2026-11-23T14:30:00Z").toEpochMilli());
+            h.runtime.dispatch(json("{\"symbol\":\"AMD\",\"keyCode\":\"KeyZ\",\"price\":98}"));
+            assertEquals(98, h.runtime.selectedStop().get("price").getAsDouble());
+            assertEquals(0, h.runtime.premarketStop("AMD").size());
+            assertFalse(h.runtime.view("AMD", "test").has("premarketOrders"));
+            h.runtime.dispatch(json("{\"symbol\":\"AMD\",\"keyCode\":\"Digit1\",\"price\":99,\"premarketOrderId\":\"123\",\"source\":\"bookmap_chart_hotkey\"}"));
+            assertTrue(h.replaced.isEmpty()); assertEquals(1, h.posted.size());
+            assertTrue(h.logs.stream().noneMatch(s -> s.contains("Normal trading action blocked")));
+        }
+    }
+    @Test void unfinishedExtendedHoursCancellationDoesNotBlockRegularMissingStopProtection() throws Exception {
+        try (Harness h = new Harness()) {
+            h.enabled = true; h.storeOrders = true; h.runtime.attachSymbol("AMD"); h.runtime.start().join();
+            h.runtime.dispatch(json("{\"symbol\":\"AMD\",\"keyCode\":\"KeyZ\",\"price\":95}"));
+            h.runtime.dispatch(PremarketTradingPanel.action("AMD", "buy_bid", "3", "1"));
+            h.cancelPending = true; h.runtime.dispatch(PremarketTradingPanel.action("AMD", "flatten", "", "1"));
+            h.now.set(Instant.parse("2026-11-23T14:30:00Z").toEpochMilli()); h.runtime.refreshAccount();
+            h.now.addAndGet(11001); h.runtime.refreshAccount();
+            long deadline = System.nanoTime() + 2_000_000_000L;
+            while (h.posted.size() < 2 && System.nanoTime() < deadline) Thread.sleep(5);
+            assertTrue(h.posted.size() >= 2, h.logs.toString());
+            assertEquals("MARKET", h.posted.get(1).get("orderType").getAsString());
+            assertTrue(h.logs.stream().noneMatch(s -> s.contains("Normal trading action blocked")));
+        }
+    }
+    @Test void chartDigitCancelsThenResubmitsExactPremarketOrderWithLocalStopAndWithoutPlan() {
         try (Harness h = new Harness()) {
             h.storeOrders = true; h.enabled = true; h.runtime.attachSymbol("AMD"); h.runtime.start().join();
+            h.runtime.dispatch(json("{\"symbol\":\"AMD\",\"keyCode\":\"KeyZ\",\"price\":95}"));
             h.runtime.dispatch(PremarketTradingPanel.action("AMD", "buy_bid", "3", "1"));
             assertEquals(1, h.runtime.view("AMD", "test").getAsJsonArray("premarketOrders").size());
             h.runtime.dispatch(json("{\"symbol\":\"AMD\",\"keyCode\":\"Digit1\",\"price\":99.5,\"source\":\"bookmap_chart_hotkey\"}"));

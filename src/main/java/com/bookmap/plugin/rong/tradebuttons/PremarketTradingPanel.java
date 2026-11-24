@@ -20,6 +20,9 @@ public final class PremarketTradingPanel extends JPanel implements AutoCloseable
     private final JTextField quantity = new JTextField("", 7);
     private final JTextField offset = new JTextField("1", 5);
     private final JTextField limitPrice = new JTextField("", 7);
+    private final JTextField stopPrice = new JTextField("", 7);
+    private final JLabel stopStatus = new JLabel();
+    private final JButton setStop = new JButton("Set Stop");
     private final JLabel account = new JLabel("Position: waiting for broker");
     private final JLabel status = new JLabel();
     private final List<JButton> buttons = new ArrayList<>();
@@ -33,11 +36,22 @@ public final class PremarketTradingPanel extends JPanel implements AutoCloseable
         quantity.putClientProperty("bmtrader.premarketNumberInput", true);
         limitPrice.putClientProperty("bmtrader.premarketNumberInput", true);
         offset.putClientProperty("bmtrader.premarketNumberInput", true);
+        stopPrice.putClientProperty("bmtrader.premarketNumberInput", true);
         setLayout(new BoxLayout(this, BoxLayout.Y_AXIS));
         setBorder(BorderFactory.createTitledBorder("Premarket / After-hours"));
         JPanel inputs = new JPanel(new GridLayout(2, 2, 4, 4));
         inputs.add(new JLabel("Shares")); inputs.add(quantity);
         inputs.add(new JLabel("Offset (%)")); inputs.add(offset); add(inputs);
+        JPanel stopRow = new JPanel(new GridLayout(1, 2, 4, 4));
+        stopRow.add(stopPrice); stopRow.add(setStop); add(stopRow); add(stopStatus);
+        setStop.addActionListener(event -> {
+            try {
+                JsonObject action = new JsonObject(); action.addProperty("type", "premarket_stop"); action.addProperty("symbol", symbol);
+                double price = Double.parseDouble(stopPrice.getText().trim());
+                if (!com.bookmap.plugin.rong.miniviteapp.runtime.PremarketTrading.validFixedPrice(price)) throw new IllegalArgumentException("Enter a positive stop price at the supported increment");
+                action.addProperty("price", price); server.dispatchTradingAction(action);
+            } catch (IllegalArgumentException error) { status("Stop blocked: " + error.getMessage()); }
+        });
         JPanel grid = new JPanel(new GridLayout(2, 2, 6, 6));
         grid.add(button("Buy Now", "buy_now", true)); grid.add(button("Buy Bid", "buy_bid", true));
         grid.add(button("Sell Now", "sell_now", false)); grid.add(button("Sell Ask", "sell_ask", false)); add(grid);
@@ -62,8 +76,8 @@ public final class PremarketTradingPanel extends JPanel implements AutoCloseable
         JButton flatten = button("Flatten", "flatten", false);
         JPanel exit = new JPanel(new BorderLayout()); exit.add(flatten, BorderLayout.CENTER); add(exit);
         add(account); add(status);
-        status("Extended-hours limits. Automatic stop protection runs during regular hours only.");
-        JLabel note = new JLabel(VerticalWindowLayout.wrapText("Hover + L: buy below midpoint, sell above. Uses Shares. Now limits cross the spread; fills are not guaranteed. Results: Action Log.", 200)); add(note);
+        status("Select local stop with hover + Z before entry. No broker stop is sent.");
+        JLabel note = new JLabel(VerticalWindowLayout.wrapText("Hover + Z: set or move local stop. Triggers 1 cent beyond level; cancels orders, then exits 1 cent past bid/ask. Keep plugin and data running. Hover + L: limit entry. Fills are not guaranteed. Results: Action Log.", 200)); add(note);
         for (Component child : getComponents()) if (child instanceof JComponent) ((JComponent) child).setAlignmentX(Component.LEFT_ALIGNMENT);
         server.registerAccountStateListener(accountListener);
         server.registerPremarketStatus(symbol, text -> SwingUtilities.invokeLater(() -> { if (!closed) status(text); }));
@@ -106,10 +120,15 @@ public final class PremarketTradingPanel extends JPanel implements AutoCloseable
     }
     private void updateSession() {
         boolean active = MarketClock.isExtendedTradingTime(System.currentTimeMillis());
+        setStop.setEnabled(active);
+        JsonObject stop = server.premarketStop(symbol);
+        stopStatus.setText(VerticalWindowLayout.wrapText(stop.has("price")
+                ? "Local stop: " + stop.get("price").getAsString() + " — " + stop.get("status").getAsString()
+                : "Local stop: hover + Z, or enter price", 200));
         for (JButton button : buttons) {
             boolean valid = active;
             String operation = (String) button.getClientProperty("operation");
-            if (operation.equals("cancel_all")) valid = true;
+            if (operation.equals("cancel_all")) valid = !MarketClock.isRegularTradingTime(System.currentTimeMillis());
             if (operation.endsWith("_limit")) try { fixedAction(symbol, operation, quantity.getText(), limitPrice.getText()); } catch (IllegalArgumentException error) { valid = false; }
             button.setEnabled(valid);
         }

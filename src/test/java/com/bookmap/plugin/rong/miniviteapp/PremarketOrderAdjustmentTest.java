@@ -22,6 +22,7 @@ class PremarketOrderAdjustmentTest {
             trader = new PremarketTrading(this, Runnable::run, (delay, task) -> () -> {},
                     () -> Instant.parse("2026-11-23T14:00:00Z").toEpochMilli(), () -> true,
                     symbol -> json("{\"bid\":100,\"ask\":101}"), (symbol, message) -> logs.add(message), () -> traderObserve());
+            trader.selectStop("AMD", 95, 0);
         }
         void traderObserve() { trader.observeOrders(orders()); }
         public JsonArray orders() { JsonArray all = new JsonArray(); raw.values().forEach(order -> all.add(order.deepCopy())); return all; }

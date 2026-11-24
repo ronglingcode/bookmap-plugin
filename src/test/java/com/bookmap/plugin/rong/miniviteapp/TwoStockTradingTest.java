@@ -17,6 +17,12 @@ class TwoStockTradingTest {
     private static JsonObject json(String value) { return JsonParser.parseString(value).getAsJsonObject(); }
 
     @Test void secondStockCanEnterWhileFirstIsHeldAndBothSurviveConfigRefresh() throws Exception {
+        secondStockScenario(false);
+    }
+    @Test void enablingExtendedHoursDoesNotChangeRegularEntriesBracketsOrSavedState() throws Exception {
+        secondStockScenario(true);
+    }
+    private void secondStockScenario(boolean extendedHoursEnabled) throws Exception {
         JsonArray fixtures = JsonParser.parseReader(new InputStreamReader(getClass().getResourceAsStream("/state-fixtures.json"), StandardCharsets.UTF_8)).getAsJsonArray();
         JsonObject config = null, saved = null;
         for (JsonElement item : fixtures) {
@@ -69,7 +75,9 @@ class TwoStockTradingTest {
                     public void log(String symbol, String value) { logs.add(value); }
                     public void notify(String symbol, String value) { logs.add(value); }
                 })) {
+            runtime.setPremarketTrading(() -> extendedHoursEnabled, symbol -> { throw new AssertionError("Regular trading must never use the extended-hours quote handler"); });
             runtime.start().get(2, TimeUnit.SECONDS);
+            assertFalse(runtime.view("TSLA", "test").has("premarketOrders"));
             for (String symbol : List.of("AAPL", "TSLA")) assertTrue(runtime.view(symbol, "test").has("market"), symbol);
             runtime.dispatch(json("{\"symbol\":\"TSLA\",\"keyCode\":\"KeyZ\",\"price\":9}"));
             assertTrue(runtime.dispatch(json("{\"symbol\":\"TSLA\",\"tradebook_id\":\"GapGiveAndGoBookmapReversal\",\"entry_method\":\"0.1 R\",\"use_market_order\":true,\"price\":10}")));

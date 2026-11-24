@@ -133,12 +133,16 @@ public final class TradingRuntime implements AutoCloseable {
                 premarketRead(() -> {
                     JsonObject original = new JsonObject(); original.addProperty("orderID", id);
                     var request = new com.bookmap.plugin.rong.miniviteapp.models.Models.Request("DELETE", new com.bookmap.plugin.rong.miniviteapp.models.Models.Order(original, ""), null);
-                    requireAccepted(ordersApi.mutate(accountHash(), oauth.accessToken(false), request)); return null;
+                    String hash = accountHash(), token = oauth.accessToken(false);
+                    requirePremarketMutation(false);
+                    requireAccepted(ordersApi.mutate(hash, token, request)); return null;
                 });
             }
             public String submit(JsonObject order) throws Exception {
                 return premarketRead(() -> {
-                    var result = ordersApi.mutate(accountHash(), oauth.accessToken(false), new com.bookmap.plugin.rong.miniviteapp.models.Models.Request("POST", null, order));
+                    String hash = accountHash(), token = oauth.accessToken(false);
+                    requirePremarketMutation(true);
+                    var result = ordersApi.mutate(hash, token, new com.bookmap.plugin.rong.miniviteapp.models.Models.Request("POST", null, order));
                     requireAccepted(result); return result.newOrderId;
                 });
             }
@@ -190,7 +194,11 @@ public final class TradingRuntime implements AutoCloseable {
             ledger = TradeLedger.projectTradeLedger(object(projected, "executions"), number(policy, "dailyMaxLoss"));
         }
         execution.observeBrokerOrders(orders);
-        observe("Premarket order observation", () -> premarket.observeOrders(orders));
+        if (MarketClock.isExtendedTradingTime(now.getAsLong())) {
+            observe("Premarket order observation", () -> premarket.observeOrders(orders));
+            if (premarketEnabled.getAsBoolean())
+                observe("Premarket stop positions", () -> premarket.observePositions(object(projected, "positions"), orders, readStartedAt));
+        }
         projections.put("diagnostics", () -> { logNativeOrders(orders, date); logNativeFills(projected, date); });
     }
     private <T> CompletableFuture<T> supplyBrokerRead(Callable<T> request) {
@@ -202,6 +210,11 @@ public final class TradingRuntime implements AutoCloseable {
         if (result.outcome.equals("rejected")) throw new PremarketTrading.RejectedOrderException("Broker rejected: " + result.reason);
         if (!result.outcome.equals("accepted")) throw new IllegalStateException("Broker " + result.outcome + ": " + result.reason);
     }
+    private void requirePremarketMutation(boolean orderEntry) {
+        if (stopped || !premarketEnabled.getAsBoolean() || MarketClock.isRegularTradingTime(now.getAsLong())
+                || orderEntry && !MarketClock.isExtendedTradingTime(now.getAsLong()))
+            throw new PremarketTrading.RejectedOrderException("Extended-hours session ended or manual trading disabled; no broker mutation sent");
+    }
     private <T> T premarketRead(Callable<T> request) throws Exception {
         try { if (stopped) throw new IllegalStateException("Runtime stopped"); return request.call(); }
         catch (PremarketTrading.RejectedOrderException error) { failure("", "Premarket broker rejection", error); throw error; }
@@ -212,7 +225,8 @@ public final class TradingRuntime implements AutoCloseable {
     }
     public void attachSymbol(String symbol) {
         boolean restart;
-        synchronized (lock) { accountSymbols.add(symbol); restart = chartSymbols.add(symbol) && streams != null; }
+        synchronized (lock) { accountSymbols.add(symbol); restart = chartSymbols.add(symbol) && streams != null
+                && !MarketClock.isRegularTradingTime(now.getAsLong()); }
         events.message(view(symbol, "account_ready"));
         if (restart) executor.execute(() -> { MarketStreams previous; synchronized (lock) { if (stopped) return; previous = streams; } if (previous != null) previous.close(); startStreamsAndHistory(); });
     }
@@ -225,26 +239,39 @@ public final class TradingRuntime implements AutoCloseable {
         }
         CompletableFuture.runAsync(() -> {
             try {
+                // Keep the established regular-session startup prerequisites and state restoration.
+                // Broker-only startup is an extended-hours workflow, never a regular-entry fallback.
+                boolean regular = MarketClock.isRegularTradingTime(now.getAsLong());
+                TradingConfig.Result regularConfig = null;
+                if (regular) {
+                    if (massiveKey.isBlank()) throw new IllegalArgumentException("Massive API key missing from local secrets");
+                    regularConfig = TradingConfig.readTradingConfig(firestore.fetchConfigData());
+                    validateProfile(regularConfig.profile);
+                }
                 String token = oauth.accessToken(false), date = MarketClock.marketTime(now.getAsLong()).date;
                 long readStartedAt = now.getAsLong();
                 JsonObject raw = reads.getAccount(token);
                 JsonArray orders = reads.getOrders(accountHash(), token, date);
-                premarket.observeOrders(orders);
+                if (MarketClock.isExtendedTradingTime(now.getAsLong())) premarket.observeOrders(orders);
                 logNativeOrders(orders, date);
                 JsonObject projected = AccountProjection.projectAccount(raw, orders, date, this::price);
                 execution.observeBrokerOrders(orders);
                 logNativeFills(projected, date);
+                JsonObject restored = regular ? firestore.getTradingState(regularConfig.profile) : null;
                 synchronized (lock) {
-                    if (stopped) return; config = TradingConfig.emptyConfig("momentumSimple"); account = projected; accountReadStartedAt = readStartedAt; ledger = TradeLedger.projectTradeLedger(object(projected, "executions"), number(policy, "dailyMaxLoss"));
-                    state = new TradeState(date, number(projected, "currentBalance"), now.getAsLong(), null);
+                    if (stopped) return; config = regular ? regularConfig : TradingConfig.emptyConfig("momentumSimple"); account = projected; accountReadStartedAt = readStartedAt; ledger = TradeLedger.projectTradeLedger(object(projected, "executions"), number(policy, "dailyMaxLoss"));
+                    state = new TradeState(date, number(projected, "currentBalance"), now.getAsLong(), restored);
+                    planStateLoaded = regular;
                 }
+                if (regular) startStreamsAndHistory();
                 publishToken(); publishAccount(); checkStopLossProtection();
                 repeat(30000, this::refreshToken); repeat(3000, this::refreshAccount); repeat(60000, this::refreshConfig);
                 repeat(200, () -> { projections.retry(); projections.put("market", this::publishDirty); });
                 repeat(20000, () -> projections.put("discipline", this::disciplineJobs));
                 events.status("schwab", "account ready");
-                events.log("", "Native broker account initialized; loading optional trading plans independently");
-                refreshConfig();
+                events.log("", regular ? "Native trading runtime initialized; account, configuration and saved trade state loaded"
+                        : "Native broker account initialized; loading optional trading plans independently");
+                if (!regular) refreshConfig();
             } catch (Exception error) {
                 events.status("schwab", "startup failed");
                 events.status("massiveHistory", "startup failed");
@@ -267,6 +294,7 @@ public final class TradingRuntime implements AutoCloseable {
     private double price(String symbol) { var value = market.getState(symbol); double price = value == null ? 0 : number(value.metrics(), "currentPrice"); if (price > 0) return price; synchronized (lock) { JsonObject quote = quotes.get(symbol); double bid = number(quote, "bidPrice"), ask = number(quote, "askPrice"); return bid > 0 && ask > 0 ? (bid + ask) / 2 : Math.max(bid, ask); } }
     public void observeBookmapTrade(String symbol, double price, long timestampMs) {
         if (stopped) return;
+        if (premarketEnabled.getAsBoolean() && MarketClock.isExtendedTradingTime(now.getAsLong())) premarket.observeTrade(symbol, price, timestampMs);
         if (market.acceptBookmapTrade(symbol, price, timestampMs)) synchronized (lock) { dirty.add(symbol); }
     }
     public List<Candle> premarketMinuteBars(String symbol, long from, long toInclusive) throws Exception {
@@ -330,13 +358,16 @@ public final class TradingRuntime implements AutoCloseable {
     }
     public java.net.URI authorizationUrl() throws Exception { return oauth.authorizationUrl(); }
     private void startStreamsAndHistory() {
-        List<String> symbols; synchronized (lock) { if (stopped) return; Set<String> watched = new LinkedHashSet<>(config.symbols); watched.addAll(chartSymbols); symbols = new ArrayList<>(watched); }
+        List<String> symbols; synchronized (lock) { if (stopped) return; Set<String> watched = new LinkedHashSet<>(config.symbols);
+            if (!MarketClock.isRegularTradingTime(now.getAsLong())) watched.addAll(chartSymbols); symbols = new ArrayList<>(watched); }
         // Register loading buffers before subscribing, so history/live overlap never loses prints.
         symbols.forEach(this::loadMarket);
         AtomicBoolean massiveReady = new AtomicBoolean(), massiveTradeReceived = new AtomicBoolean();
         MarketStreams next = new MarketStreams(sockets, scheduler, executor, symbols, () -> massiveKey,
             () -> { String token = oauth.accessToken(false); publishToken(); return new MarketStreams.Credentials(reads.getStreamerInfo(token), token); }, new MarketStreams.Events() {
                 public void trade(Trade trade) {
+                    if (premarketEnabled.getAsBoolean() && MarketClock.isExtendedTradingTime(now.getAsLong()) && !trade.conditions.contains(2))
+                        premarket.observeTrade(trade.symbol, trade.price, trade.timestamp);
                     if (massiveTradeReceived.compareAndSet(false, true)) events.status("massiveStream", "receiving trades");
                     if (market.acceptTrade(trade)) synchronized (lock) { dirty.add(trade.symbol); }
                 }
@@ -371,6 +402,7 @@ public final class TradingRuntime implements AutoCloseable {
     private void loadMarket(String symbol) {
         if (massiveKey.isBlank()) { events.status("massiveHistory", "API key missing"); return; }
         JsonObject plan; synchronized (lock) { if (stopped || config == null) return; JsonObject selected = selectedPlan(symbol); plan = selected == null ? new JsonObject() : selected; }
+        if (plan.size() == 0 && MarketClock.isRegularTradingTime(now.getAsLong())) return;
         synchronized (lock) { eligibility.put(symbol, "startup eligibility pending"); }
         events.status("massiveHistory", "loading");
         JsonObject correction = object(plan, "vwapCorrection");
@@ -437,7 +469,6 @@ public final class TradingRuntime implements AutoCloseable {
         for (String symbol : decision.close) {
             if (!MarketClock.isRegularTradingTime(now.getAsLong())) return;
             if (!autoCloseUnprotectedPositions.getAsBoolean()) return;
-            if (premarket.isBusy(symbol)) { stopLossMonitor.retryClose(symbol); continue; }
             events.notify(symbol, "ERROR: Missing stop-loss coverage for more than 10 seconds; closing FULL position");
             JsonObject action = message("native_job"); action.addProperty("symbol", symbol); action.addProperty("keyCode", "SafetyClosePosition");
             dispatch(action);
@@ -462,7 +493,11 @@ public final class TradingRuntime implements AutoCloseable {
         if (stopped || !configReading.compareAndSet(false, true)) return;
         service(executor, configReading, "Config refresh", () -> {
             try {
-                TradingConfig.Result loaded = TradingConfig.readAvailableTradingConfig(firestore.fetchConfigData(), reason -> events.log("", "Normal trading plan unavailable: " + reason)); validateProfile(loaded.profile);
+                JsonObject rawConfig = firestore.fetchConfigData();
+                TradingConfig.Result loaded = MarketClock.isRegularTradingTime(now.getAsLong())
+                        ? TradingConfig.readTradingConfig(rawConfig)
+                        : TradingConfig.readAvailableTradingConfig(rawConfig, reason -> events.log("", "Normal trading plan unavailable: " + reason));
+                validateProfile(loaded.profile);
                 String date = MarketClock.marketTime(now.getAsLong()).date; boolean rollover;
                 synchronized (lock) { rollover = !string(state.snapshot(), "date").equals(TradeState.dateLabel(date)) && !string(state.snapshot(), "date").equals(date); }
                 boolean first; synchronized (lock) { first = !planStateLoaded; }
@@ -477,7 +512,7 @@ public final class TradingRuntime implements AutoCloseable {
                     for (String symbol : loaded.symbols) if (histories.containsKey(symbol)) { JsonObject history = histories.get(symbol); eligibility.put(symbol, StartupEligibility.evaluate(loaded.plan(symbol), price(symbol), number(history, "sharesOutstanding"), object(history, "premarketDollarCollection"), array(history, "dailyBars"))); }
                 }
                 if (rollover) for (String symbol : loaded.symbols) market.forget(symbol);
-                removed.forEach(symbol -> { execution.unregister(symbol); synchronized (lock) { if (!chartSymbols.contains(symbol)) { market.forget(symbol); histories.remove(symbol); } eligibility.remove(symbol); manual.remove(symbol); } events.message(view(symbol, "account_ready")); });
+                removed.forEach(symbol -> { execution.unregister(symbol); synchronized (lock) { if (MarketClock.isRegularTradingTime(now.getAsLong()) || !chartSymbols.contains(symbol)) { market.forget(symbol); histories.remove(symbol); } eligibility.remove(symbol); manual.remove(symbol); } events.message(view(symbol, "account_ready")); });
                 if (restart || first) { if (previous != null) previous.close(); startStreamsAndHistory(); }
                 publishAccount();
             } catch (Exception error) {
@@ -495,12 +530,13 @@ public final class TradingRuntime implements AutoCloseable {
         JsonObject value = message(type); value.addProperty("symbol", symbol); value.addProperty("timestamp", now.getAsLong());
         value.addProperty("consumerFailures", events.failures());
         value.addProperty("coalescedProjections", projections.coalesced()); value.addProperty("coalescedStateWrites", stateWriter.coalesced());
-        if (premarketEnabled.getAsBoolean()) value.add("premarketOrders", premarket.ordersForChart(symbol));
+        if (premarketEnabled.getAsBoolean() && MarketClock.isExtendedTradingTime(now.getAsLong())) value.add("premarketOrders", premarket.ordersForChart(symbol));
         if (type.equals("market_update")) { var loaded = market.getState(symbol); if (loaded != null) value.add("market", loaded.metrics()); return value; }
         synchronized (lock) { if (config != null) { JsonObject plan = selectedPlan(symbol); if (plan != null) value.add("plan", plan.deepCopy()); value.add("tradingSettings", config.tradingSettings.deepCopy()); value.add("policy", policy.deepCopy()); }
             if (account != null) { value.add("account", account.deepCopy()); value.addProperty("accountAsOf", accountReadStartedAt); } if (ledger != null) value.add("ledger", ledger.deepCopy()); if (state != null) value.add("state", state.snapshot()); if (histories.containsKey(symbol)) value.add("history", histories.get(symbol).deepCopy()); }
         var loaded = market.getState(symbol); if (loaded != null) value.add("market", loaded.snapshot()); return value;
     }
+    public JsonObject premarketStop(String symbol) { return stopped ? new JsonObject() : premarket.stopView(symbol); }
     private volatile java.util.function.Function<String, JsonObject> entrySizeCapProvider;
     public void setEntrySizeCapProvider(java.util.function.Function<String, JsonObject> provider) { entrySizeCapProvider = provider; }
     public void setAutoCloseUnprotectedPositions(BooleanSupplier enabled) {
@@ -551,13 +587,21 @@ public final class TradingRuntime implements AutoCloseable {
         if (premarket.dispatch(action)) return true;
         if (premarket.chartDigit(action)) return true;
         if (stopped) return false; String symbol = string(action, "symbol").trim(), type = string(action, "type"), key = string(action, "keyCode"); if (key.isEmpty()) key = string(action, "key_code");
-        if ((premarketEnabled.getAsBoolean() && MarketClock.isExtendedTradingTime(now.getAsLong()) || premarket.isBusy(symbol))
-                && !Set.of("account_refresh", "manual_inputs", "clear_selected_stop", "core_plan_update").contains(type)
+        boolean extended = premarketEnabled.getAsBoolean() && MarketClock.isExtendedTradingTime(now.getAsLong());
+        if (extended
+                && !Set.of("account_refresh", "manual_inputs", "clear_selected_stop", "core_plan_update", "premarket_stop").contains(type)
                 && !Set.of("KeyZ", "Space").contains(key)) {
             if (key.equals("SafetyClosePosition")) stopLossMonitor.retryClose(symbol);
             events.log(symbol, "Normal trading action blocked: use the separate premarket limit controls"); return true;
         }
         try {
+            if (type.equals("premarket_stop") || extended && key.equals("KeyZ")) {
+                try {
+                    double net; synchronized (lock) { net = number(object(object(account, "positions"), symbol), "netQuantity"); }
+                    premarket.selectStop(symbol, number(action, "price"), net);
+                } catch (RuntimeException error) { events.log(symbol, "Premarket stop blocked: " + error.getMessage()); }
+                return true;
+            }
             if (type.equals("clear_selected_stop")) { selectedStop.clear(); return true; }
             if (type.equals("account_refresh")) {
                 events.log(symbol, "Manual account refresh requested");

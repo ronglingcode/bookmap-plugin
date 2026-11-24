@@ -27,8 +27,16 @@ import com.google.gson.JsonObject;
 
 public class SignalWebSocketServer extends WebSocketServer {
     private com.bookmap.plugin.rong.pricelines.SelectedStopManager selectedStopManager;
+    private com.bookmap.plugin.rong.pricelines.PremarketStopLineManager premarketStopManager;
+    private final Map<String, JsonObject> premarketStops = new ConcurrentHashMap<>();
+    public JsonObject premarketStop(String symbol) { return premarketStops.getOrDefault(SymbolUtils.cleanSymbol(symbol), new JsonObject()).deepCopy(); }
+    public void updatePremarketStop(String symbol, JsonObject value) {
+        premarketStops.put(SymbolUtils.cleanSymbol(symbol), value.deepCopy());
+        if (premarketStopManager != null) premarketStopManager.update(symbol, value);
+    }
     public void setSelectedStopStore(com.bookmap.plugin.rong.pricelines.PriceLineStore store) {
         selectedStopManager = new com.bookmap.plugin.rong.pricelines.SelectedStopManager(store);
+        premarketStopManager = new com.bookmap.plugin.rong.pricelines.PremarketStopLineManager(store);
     }
     public void updateSelectedStop(JsonObject stop) {
         String symbol = getString(stop, "symbol");
@@ -234,7 +242,8 @@ public class SignalWebSocketServer extends WebSocketServer {
             } catch (IllegalArgumentException error) { String reason = "Hover + L blocked: " + error.getMessage(); PluginLog.action(symbol, reason); publishPremarketStatus(symbol, reason); }
             return;
         }
-        if (key.matches("Digit[1-9]") && premarketMode.getAsBoolean()) {
+        if (key.matches("Digit[1-9]") && premarketMode.getAsBoolean()
+                && com.bookmap.plugin.rong.miniviteapp.core.marketdata.MarketClock.isExtendedTradingTime(System.currentTimeMillis())) {
             AccountStateDefinition shown = symbolToAccountState.get(SymbolUtils.cleanSymbol(getString(local, "symbol")));
             boolean hasManual = shown != null && shown.getOpenOrders().stream().anyMatch(order -> "PREMARKET".equals(order.getRole()));
             if (hasManual || com.bookmap.plugin.rong.miniviteapp.core.marketdata.MarketClock.isExtendedTradingTime(System.currentTimeMillis())) {
@@ -431,6 +440,7 @@ public class SignalWebSocketServer extends WebSocketServer {
         symbolToOrderBook.put(symbol, orderBook);
         symbolToPips.put(symbol, pips);
         if (selectedStopManager != null) selectedStopManager.register(symbol, pips);
+        if (premarketStopManager != null) premarketStopManager.register(symbol, pips);
     }
 
     /** Unregister a symbol when its plugin instance stops. */
@@ -442,6 +452,8 @@ public class SignalWebSocketServer extends WebSocketServer {
         cairoReplayDepth.remove(symbol);
         cairoLive.chart(symbol, BookmapRunMode.detect("unknown").dataMode, false);
         if (selectedStopManager != null) selectedStopManager.unregister(symbol);
+        if (premarketStopManager != null) premarketStopManager.unregister(symbol);
+        premarketStops.remove(SymbolUtils.cleanSymbol(symbol));
         com.bookmap.plugin.rong.signal.CairoPatternFeed feed = patternFeeds.remove(symbol);
         if (feed != null) {
             feed.close(); observationWorker.execute(() -> { JsonObject terminal = feed.terminal(); if (terminal != null) broadcast(terminal.toString()); });

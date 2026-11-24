@@ -10,7 +10,7 @@ import com.bookmap.plugin.rong.miniviteapp.core.marketdata.MarketClock;
 import com.bookmap.plugin.rong.miniviteapp.ports.SocketPort;
 import static com.bookmap.plugin.rong.miniviteapp.models.DomainJson.*;
 
-/** Independent manual limit-order workflow. Never invokes plan, stop, or risk-sizing handlers. */
+/** Independent extended-hours limits and local stops. Never invokes regular-session strategy handlers. */
 public final class PremarketTrading implements AutoCloseable {
     public static final class RejectedOrderException extends RuntimeException {
         public RejectedOrderException(String message) { super(message); }
@@ -36,6 +36,52 @@ public final class PremarketTrading implements AutoCloseable {
     private final Map<String, Set<String>> submitted = new HashMap<>();
     private final Map<String, Double> reportedFills = new HashMap<>();
     private final PremarketOrderIndex orderIndex = new PremarketOrderIndex();
+    private final PremarketStopMonitor stops;
+    private final Map<String, Integer> stopExits = new HashMap<>();
+    public JsonObject stopView(String symbol) { return stops.view(symbol); }
+    public void selectStop(String symbol, double price, double net) {
+        check(); require(symbol.matches("[A-Z][A-Z0-9./-]{0,14}"), "invalid symbol");
+        stops.select(symbol, price, net);
+        synchronized (this) { stopSymbols.add(symbol); }
+        log.accept(symbol, "Premarket local stop selected at " + number(stops.view(symbol), "price") + "; hover + Z to adjust");
+    }
+    public void observePositions(JsonObject positions, JsonArray orders, long readStartedAt) {
+        Set<String> symbols;
+        synchronized (this) { symbols = new HashSet<>(stopSymbols); }
+        for (String symbol : symbols) {
+            boolean recent; synchronized (this) { recent = !submitted.getOrDefault(symbol, Set.of()).isEmpty(); }
+            stops.position(symbol, number(object(positions, symbol), "netQuantity"), readStartedAt, recent || !workingOrders(orders, symbol).isEmpty());
+            startStopExit(symbol);
+        }
+    }
+    private final Set<String> stopSymbols = new HashSet<>();
+    public void observeTrade(String symbol, double price, long timestamp) {
+        stops.trade(symbol, price, timestamp); startStopExit(symbol);
+    }
+    private void startStopExit(String symbol) {
+        boolean uncertain, warn = false;
+        synchronized (this) {
+            if (closed || busy.contains(symbol)) return;
+            if (stops.exitStarted(symbol)) return;
+            uncertain = reconciliation.unresolved(symbol);
+            if (uncertain) {
+                if (!stops.triggered(symbol)) return;
+                String status = "EXIT BLOCKED: uncertain broker outcome; awaiting broker reconciliation";
+                warn = !status.equals(string(stops.view(symbol), "status"));
+                stops.status(symbol, status);
+            } else {
+                int direction = stops.claimExit(symbol); if (direction == 0) return;
+                busy.add(symbol); stopExits.put(symbol, direction);
+            }
+        }
+        if (uncertain) {
+            if (warn) log.accept(symbol, "Premarket local stop EXIT BLOCKED: broker outcome uncertain; inspect broker orders and position immediately");
+            return;
+        }
+        log.accept(symbol, "Premarket local stop triggered; canceling all symbol orders before a full-position limit exit");
+        try { executor.execute(() -> prepare(symbol, "stop_exit", 0, 0, 0)); }
+        catch (RuntimeException error) { failed(symbol, error); }
+    }
     public void observeOrders(JsonArray orders) {
         reconciliation.observe(orders);
         orderIndex.observe(orders);
@@ -62,6 +108,7 @@ public final class PremarketTrading implements AutoCloseable {
         this.enabled = enabled; this.quotes = quotes;
         reconciliation = new OpeningReconciliation(now);
         this.log = com.bookmap.plugin.rong.miniviteapp.ExecutionLog.isolated(log, error -> {}); this.refresh = refresh;
+        this.stops = new PremarketStopMonitor(now, enabled);
     }
     private void require(boolean condition, String reason) { if (!condition) throw new IllegalArgumentException(reason); }
     private void check() {
@@ -71,6 +118,7 @@ public final class PremarketTrading implements AutoCloseable {
     private void checkEnabled() {
         require(!closed, "runtime stopped");
         require(enabled.getAsBoolean(), "premarket trading is disabled");
+        require(!MarketClock.isRegularTradingTime(now.getAsLong()), "premarket actions are disabled during the regular session");
     }
     public boolean dispatch(JsonObject action) {
         if (string(action, "type").equals("premarket_adjust")) return dispatchAdjustment(action);
@@ -120,7 +168,7 @@ public final class PremarketTrading implements AutoCloseable {
                     working.add(id); orders.add(raw);
                 } else synchronized (this) { submitted.getOrDefault(symbol, new HashSet<>()).remove(id); }
             }
-            if (operation.equals("flatten") || operation.equals("cancel_all")) {
+            if (operation.equals("flatten") || operation.equals("stop_exit") || operation.equals("cancel_all")) {
                 for (String id : working) {
                     if (operation.equals("cancel_all")) checkEnabled(); else check();
                     // A lost response may mean the cancellation reached the broker. Never retry mutations.
@@ -141,6 +189,13 @@ public final class PremarketTrading implements AutoCloseable {
                     reserved += Math.max(0, number(pending, "quantity") - number(pending, "filledQuantity"));
                 }
                 require(!closing || quantity + reserved <= Math.abs(net), "quantity exceeds unreserved shares in the position; close it first, then open the opposite side");
+                require(!stops.triggered(symbol), "local stop triggered; new manual orders are blocked during exit");
+                if (!closing) {
+                    JsonObject quote = quotes.apply(symbol);
+                    double entryPrice = fixedPrice > 0 ? fixedPrice : number(quote, buy ? operation.endsWith("now") ? "ask" : "bid" : operation.endsWith("now") ? "bid" : "ask");
+                    stops.requireEntry(symbol, buy, entryPrice, net);
+                    synchronized (this) { stopSymbols.add(symbol); }
+                }
                 if (fixedPrice > 0) { check(); post(symbol, limitOrder(symbol, quantity, fixedPrice, buy, closing)); }
                 else submit(symbol, quantity, buy, closing, operation.endsWith("now"), offset);
                 finish(symbol);
@@ -174,6 +229,8 @@ public final class PremarketTrading implements AutoCloseable {
                 finish(symbol); return;
             }
             double net = broker.position(symbol);
+            Integer stopDirection; synchronized (this) { stopDirection = stopExits.get(symbol); }
+            require(stopDirection == null || net == 0 || (net > 0 ? 1 : -1) == stopDirection, "position direction changed; local stop exit stopped for broker review");
             if (net == 0) log.accept(symbol, "Premarket Flatten: broker position is flat; working orders canceled");
             else submit(symbol, Math.abs(net), net < 0, true, true, offset);
             finish(symbol);
@@ -183,7 +240,8 @@ public final class PremarketTrading implements AutoCloseable {
         check(); JsonObject quote = quotes.apply(symbol);
         double bid = number(quote, "bid"), ask = number(quote, "ask");
         require(Double.isFinite(bid) && Double.isFinite(ask) && bid > 0 && ask >= bid, "live bid/ask unavailable");
-        double price = aggressive ? (buy ? ask * (1 + offset / 100) : bid * (1 - offset / 100)) : buy ? bid : ask;
+        double price = aggressive ? offset == 0 ? BigDecimal.valueOf(buy ? ask : bid).add(new BigDecimal(buy ? "0.01" : "-0.01")).doubleValue()
+                : (buy ? ask * (1 + offset / 100) : bid * (1 - offset / 100)) : buy ? bid : ask;
         // Round aggressive orders outward. Passive orders retain the exact quote, including sub-dollar ticks.
         if (aggressive) price = BigDecimal.valueOf(price).setScale(price >= 1 ? 2 : 4, buy ? RoundingMode.CEILING : RoundingMode.FLOOR).doubleValue();
         require(Double.isFinite(price) && price > 0, "invalid limit price");
@@ -192,16 +250,20 @@ public final class PremarketTrading implements AutoCloseable {
         post(symbol, payload);
     }
     private void post(String symbol, JsonObject payload) throws Exception {
-        require(!closed && enabled.getAsBoolean(), "premarket trading is disabled or stopped");
+        check();
         log.accept(symbol, "Premarket submitting " + string(payload.getAsJsonArray("orderLegCollection").get(0).getAsJsonObject(), "instruction")
                 + " " + number(payload.getAsJsonArray("orderLegCollection").get(0).getAsJsonObject(), "quantity") + " shares, extended-hours LIMIT " + number(payload, "price"));
+        require(!string(payload.getAsJsonArray("orderLegCollection").get(0).getAsJsonObject(), "positionEffect").equals("OPENING")
+                || !stops.triggered(symbol), "local stop triggered; no new opening order submitted");
         String id = submitTracked(symbol, payload);
         remember(symbol, id, payload);
         log.accept(symbol, "Premarket order " + id + " accepted; fill is not yet confirmed. Any unfilled quantity remains working.");
+        synchronized (this) { if (stopExits.containsKey(symbol)) stops.status(symbol, "Exit accepted; awaiting fill (unfilled shares remain at risk)"); }
     }
     private void remember(String symbol, String id, JsonObject payload) {
         synchronized (this) { submitted.computeIfAbsent(symbol, ignored -> new HashSet<>()).add(id); }
         JsonObject raw = accepted(id, payload); orderIndex.acceptLocal(raw);
+        if (string(payload.getAsJsonArray("orderLegCollection").get(0).getAsJsonObject(), "positionEffect").equals("OPENING")) stops.entryAccepted(symbol);
     }
     private static JsonObject accepted(String id, JsonObject payload) {
         JsonObject raw = payload.deepCopy(); raw.addProperty("orderId", id); raw.addProperty("status", "WORKING");
@@ -216,7 +278,7 @@ public final class PremarketTrading implements AutoCloseable {
     }
     public boolean chartDigit(JsonObject action) {
         String key = string(action, "keyCode"); if (key.isEmpty()) key = string(action, "key_code");
-        if (!key.matches("Digit[1-9]") || !enabled.getAsBoolean()) return false;
+        if (!key.matches("Digit[1-9]") || !enabled.getAsBoolean() || !MarketClock.isExtendedTradingTime(now.getAsLong())) return false;
         String symbol = string(action, "symbol"), id = action.has("premarketOrderId") ? string(action, "premarketOrderId") : orderIndex.id(symbol, Integer.parseInt(key.substring(5)));
         if (!action.has("premarketOrderId") && id.isEmpty() && !MarketClock.isExtendedTradingTime(now.getAsLong())) return false;
         JsonObject edit = action.deepCopy(); edit.addProperty("type", "premarket_adjust"); edit.addProperty("orderId", id);
@@ -225,7 +287,8 @@ public final class PremarketTrading implements AutoCloseable {
     private boolean dispatchAdjustment(JsonObject action) {
         String symbol = string(action, "symbol"), id = string(action, "orderId"); double price = number(action, "price");
         try {
-            require(!closed && enabled.getAsBoolean(), "premarket trading is disabled or stopped");
+            check();
+            require(!stops.triggered(symbol), "local stop triggered; order adjustments are blocked during exit");
             require(id.matches("[0-9]+"), "no numbered premarket limit order for this key");
             require(price > 0 && Double.isFinite(price), "hover a valid chart price");
             synchronized (this) {
@@ -238,7 +301,8 @@ public final class PremarketTrading implements AutoCloseable {
     }
     private void adjust(String symbol, String id, double price) {
         try {
-            require(!closed && enabled.getAsBoolean(), "premarket trading is disabled or stopped");
+            check();
+            require(!stops.triggered(symbol), "local stop triggered; no replacement submitted");
             JsonObject raw = broker.order(id);
             require(symbol.equals(PremarketOrderIndex.symbol(raw)) && PremarketOrderIndex.isManualLimit(raw) && PremarketOrderIndex.live(raw), "numbered order changed or is no longer working");
             // Cancel first and size from its final cumulative fills, never a stale pre-PUT snapshot.
@@ -248,7 +312,8 @@ public final class PremarketTrading implements AutoCloseable {
     }
     private void awaitAdjustment(String symbol, String id, JsonObject original, double price, int attempt) {
         try {
-            require(!closed && enabled.getAsBoolean(), "premarket trading is disabled or stopped");
+            check();
+            require(!stops.triggered(symbol), "local stop triggered; no replacement submitted");
             JsonObject raw = broker.order(id);
             if (!TERMINAL.contains(string(raw, "status"))) {
                 require(attempt < 20, "cancellation not confirmed; no replacement submitted");
@@ -282,7 +347,8 @@ public final class PremarketTrading implements AutoCloseable {
             }
             double rounded = roundedPrice(price); require(rounded > 0, "invalid limit price");
             JsonObject payload = limitOrder(symbol, remaining, rounded, buy, closing);
-            require(!closed && enabled.getAsBoolean(), "premarket trading is disabled or stopped");
+            check();
+            require(!stops.triggered(symbol), "local stop triggered; no replacement submitted");
             reconciliation.observe(broker.orders());
             String replacement = submitTracked(symbol, payload);
             synchronized (this) { submitted.computeIfAbsent(symbol, ignored -> new HashSet<>()).remove(id); }
@@ -329,6 +395,7 @@ public final class PremarketTrading implements AutoCloseable {
     }
     private void failed(String symbol, Exception error) {
         // Vendor exceptions are sanitized by the enclosing broker adapter; never print request/credential data.
+        synchronized (this) { if (stopExits.containsKey(symbol)) stops.status(symbol, "EXIT STOPPED: " + error.getMessage() + "; inspect broker and use Flatten"); }
         log.accept(symbol, "Premarket action stopped: " + error.getMessage()); finish(symbol);
     }
     private static double roundedPrice(double price) { return BigDecimal.valueOf(price).setScale(price >= 1 ? 2 : 4, RoundingMode.HALF_UP).doubleValue(); }
@@ -352,9 +419,12 @@ public final class PremarketTrading implements AutoCloseable {
         }
     }
     private void finish(String symbol) {
-        orderIndex.release(symbol); synchronized (this) { busy.remove(symbol); }
-        if (!closed) try { refresh.run(); } catch (RuntimeException error) { log.accept(symbol, "Premarket account refresh deferred; retry on next poll"); }
+        orderIndex.release(symbol); synchronized (this) { busy.remove(symbol); stopExits.remove(symbol); }
+        if (!closed) {
+            startStopExit(symbol);
+            try { refresh.run(); } catch (RuntimeException error) { log.accept(symbol, "Premarket account refresh deferred; retry on next poll"); }
+        }
     }
     public synchronized boolean isBusy(String symbol) { return busy.contains(symbol); }
-    @Override public void close() { closed = true; }
+    @Override public void close() { closed = true; stops.close(); }
 }

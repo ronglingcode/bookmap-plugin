@@ -61,6 +61,8 @@ class TradingRuntimeTest {
             CompletableFuture<Void> first = runtime.start(); assertSame(first, runtime.start());
             while (!queued.isEmpty()) queued.remove(0).run(); first.join();
             assertSame(first, runtime.start()); assertEquals(2, sockets.size());
+            runtime.attachSymbol("AMD");
+            assertEquals(2, sockets.size(), "Attaching an unrelated regular-session chart cannot restart strategy streams");
             runtime.dispatch(json("{\"type\":\"manual_inputs\",\"symbol\":\"AAPL\",\"fixedQuantity\":20}"));
             runtime.dispatch(json("{\"type\":\"manual_inputs\",\"symbol\":\"TSLA\",\"fixedQuantity\":30}"));
             assertEquals(20, runtime.manualInputs("AAPL").get("fixedQuantity").getAsInt());

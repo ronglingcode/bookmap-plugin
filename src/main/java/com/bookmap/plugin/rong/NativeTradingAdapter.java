@@ -57,6 +57,8 @@ public final class NativeTradingAdapter implements AutoCloseable {
     private void publishSelectedStop() {
         NativeRuntime current = runtime;
         display.updateSelectedStop(current == null || closed ? new JsonObject() : current.trading.selectedStop());
+        for (String symbol : apis.keySet()) display.updatePremarketStop(symbol,
+                current == null || closed ? new JsonObject() : current.trading.premarketStop(symbol));
     }
     public NativeTradingAdapter(SignalWebSocketServer display, IndicatorConfig settings) {
         this(display, settings, new NativeConnectionStatus());

@@ -37,7 +37,9 @@ class PremarketLimitRoutingTest {
             server.setPremarketMode(() -> true); List<JsonObject> sent = new ArrayList<>(); server.setTradingDispatch(sent::add);
             server.acceptLocalMessage(JsonParser.parseString("{\"type\":\"account_state\",\"symbol\":\"AMD\",\"openOrders\":[{\"orderID\":\"123\",\"role\":\"PREMARKET\",\"pairIndex\":1,\"orderType\":\"LIMIT\",\"price\":100,\"quantity\":10,\"isBuy\":true}],\"executions\":[]}").getAsJsonObject());
             server.dispatchTradingAction(key("AMD", "Digit1", 99));
-            assertEquals("123", sent.get(0).get("premarketOrderId").getAsString());
+            if (com.bookmap.plugin.rong.miniviteapp.core.marketdata.MarketClock.isExtendedTradingTime(System.currentTimeMillis()))
+                assertEquals("123", sent.get(0).get("premarketOrderId").getAsString());
+            else assertFalse(sent.get(0).has("premarketOrderId"), "Premarket labels must not capture regular-session hotkeys");
         } finally { server.shutdown(); }
     }
 }

@@ -17,6 +17,7 @@ public class PriceLine {
         EXIT_ORDER("Exit", new Color(120, 120, 120)),
         ENTRY_ORDER("Entry", new Color(70, 170, 255)),
         SELECTED_STOP("Stop", new Color(255, 120, 90)),
+        PREMARKET_STOP("PM Local Stop", new Color(255, 120, 90)),
 
         // Camarilla Pivot levels - resistance (warm colors)
         CAM_R1("R1", new Color(255, 200, 200)),

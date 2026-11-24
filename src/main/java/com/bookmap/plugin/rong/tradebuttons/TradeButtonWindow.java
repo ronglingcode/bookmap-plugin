@@ -99,6 +99,7 @@ public class TradeButtonWindow {
     private JPanel buttonPanel;
     private PremarketTradingPanel premarketPanel;
     private volatile boolean premarketEnabled;
+    private boolean premarketPanelShown;
     private List<TradebookButtonGroup> currentTradebooks = Collections.emptyList();
     public void setPremarketEnabled(boolean enabled) {
         premarketEnabled = enabled;
@@ -445,7 +446,8 @@ public class TradeButtonWindow {
         buttonPanel.setPreferredSize(null);
         buttonPanel.setLayout(new BoxLayout(buttonPanel, BoxLayout.Y_AXIS));
         addFullWidth(createModePanel());
-        if (premarketEnabled) {
+        premarketPanelShown = premarketEnabled && !com.bookmap.plugin.rong.miniviteapp.core.marketdata.MarketClock.isRegularTradingTime(System.currentTimeMillis());
+        if (premarketPanelShown) {
             if (premarketPanel == null) premarketPanel = new PremarketTradingPanel(symbol, server);
             addFullWidth(premarketPanel);
         } else if (premarketPanel != null) { premarketPanel.close(); premarketPanel = null; }
@@ -897,6 +899,8 @@ public class TradeButtonWindow {
             return;
         }
         wallThresholdTimer = new Timer(WALL_THRESHOLD_REFRESH_MS, e -> {
+            boolean showPremarket = premarketEnabled && !com.bookmap.plugin.rong.miniviteapp.core.marketdata.MarketClock.isRegularTradingTime(System.currentTimeMillis());
+            if (showPremarket != premarketPanelShown) buttonRefresh.request(currentTradebooks);
             updateWallThresholdLabel();
         });
         wallThresholdTimer.setRepeats(true);

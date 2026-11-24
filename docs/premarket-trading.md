@@ -3,7 +3,8 @@
 In addon settings, enable **Enable Premarket / After-hours Trading**. The preference is saved
 and applies to every live chart immediately and on subsequent loads. The
 additional panel does not require a selected watchlist entry, trading plan,
-Firestore state, Massive history, a selected stop, or strategy sizing inputs.
+Firestore state, Massive history, or strategy sizing inputs. Opening orders
+require a selected local stop; closing orders, Cancel All, and Flatten do not.
 Local broker credentials are still required. Replay and observer modes do not
 activate live trading.
 
@@ -11,9 +12,9 @@ Enter a whole-share quantity. The editable **Offset (%)** defaults to **1**:
 
 | Control | Limit price |
 | --- | --- |
-| Buy Now | Ask × (1 + offset / 100), rounded outward |
+| Buy Now | Ask * (1 + offset / 100), rounded outward |
 | Buy Bid | Current bid |
-| Sell Now | Bid × (1 − offset / 100), rounded outward |
+| Sell Now | Bid * (1 - offset / 100), rounded outward |
 | Sell Ask | Current ask |
 | Buy Limit | Exact price from the Limit price textbox |
 | Sell Limit | Exact price from the Limit price textbox |
@@ -26,6 +27,41 @@ and no protective bracket. Aggressive limits improve execution likelihood;
 acceptance does not mean a fill, and partial or unfilled orders can remain working.
 There is no market-order fallback or automatic chasing. Inspect the Action Log
 for broker results and the chart/account display for working orders and fills.
+
+## Local stop loss (premarket and after-hours)
+
+Before entry, hover the intended stop level on this chart and press **Z**, or
+enter a price next to **Set Stop** in the extended-hours ticket. A long entry
+requires a stop below its entry price; a short entry requires a stop above it.
+The chart displays a separate **PM LOCAL STOP** line and the ticket shows its
+current status. This is local monitoring, not a working broker stop order.
+
+After entry, hover another price and press **Z** again, or use **Set Stop**, to
+move the monitored level. It does not expire after 30 seconds, and switching
+charts or pressing Space does not erase protection on a held position. Each
+symbol has its own stop.
+
+A fresh live trade **at or below stop minus $0.01** triggers a long exit; a trade
+**at or above stop plus $0.01** triggers a short exit. Prints from Bookmap or the
+live Massive stream can trigger it; stale, future-dated, and out-of-order prints
+are ignored. An accepted entry is monitored immediately, even before the next
+account refresh. A breach also cancels its unfilled entry shares.
+
+On a trigger, the plugin cancels every working order for the symbol, confirms
+cancellation, rereads the broker position, and submits only its remaining shares:
+**SELL at bid minus $0.01**, or **BUY_TO_COVER at ask plus $0.01**. The stop exit
+uses this fixed penny offset regardless of the ticket's Offset (%). No order
+is sent if cancellation is unconfirmed, the quote is unavailable, or the
+position changed to the opposite direction. A triggered stop is latched to
+prevent duplicate submissions. Acceptance does not guarantee a fill; if its
+closing limit remains working or the exit is blocked, inspect the Action Log
+and broker, then use Flatten to reconcile and replace it.
+
+Keep the plugin, native runtime, live data, and broker connection running.
+Local stops are not saved across a restart or converted into broker stops.
+They clear when the position is confirmed flat with no working orders, when
+the feature is disabled, or when that extended-hours session ends. Morning
+stops do not carry into after-hours or into regular hours.
 
 For a fixed price, enter **Shares** and **Limit price**, then press **Buy Limit**
 or **Sell Limit**. These actions do not use the offset and do not require a live
@@ -64,16 +100,27 @@ hotkey captures the displayed broker order ID so stale labels cannot move a new
 order that reused the slot. Restarting the runtime rebuilds numbering from broker orders.
 The existing numpad market-out shortcuts are not premarket order edits.
 
-The manual entry/Flatten buttons operate on weekdays at 07:00�09:30 and
-16:00�20:00 Eastern. The broker determines holiday availability. Automatic
-stop-loss protection does not observe, warn, or close positions outside the regular
-session, regardless of the toggle. At the open, its regular-session behavior resumes
-according to the existing protection setting, with a fresh grace period. With
-manual extended-hours mode enabled, regular strategy trading commands are blocked
-during premarket and after-hours; use the separate limit controls. Existing numbered premarket limits
-can still be moved after the open while the feature remains enabled.
+The manual entry/Flatten buttons and local stops operate on weekdays at
+07:00–09:30 and 16:00–20:00 Eastern. The broker determines holiday availability.
+The existing missing-broker-stop protection runs only during the regular
+session and starts with a fresh grace period at the open, according to its
+existing protection setting. A local extended-hours stop does not count as a
+broker stop after the open. With manual extended-hours mode enabled, regular
+strategy commands are blocked during premarket and after-hours; use the
+separate limit controls.
 
-Broker account startup is independent of optional plan loading. Invalid individual
+During regular hours, the extended-hours ticket is hidden and its mutations,
+number-key interception, local monitoring, and order projection are disabled.
+Z and the number keys use their regular-session handlers. Queued cancellation
+or replacement work rechecks the session before any new mutation, and cannot
+submit an extended-hours exit or replacement after the open. Previously
+accepted SEAMLESS orders can still exist at the broker; this does not cancel
+or transform them automatically at 09:30. Normal broker account, transport,
+market-data, and drawing infrastructure remains shared. Regular-session
+startup retains its required plan validation, market-data credentials, and
+saved trade-state loading; regular strategy order builders are unchanged.
+
+Extended-hours broker account startup is independent of optional plan loading. Invalid individual
 plans suppress their normal entry buttons; valid plans can still load. Chart
 market data can load for attached symbols without a plan. Missing market-data
 credentials/history do not prevent manual broker orders. Missing local secrets
@@ -81,8 +128,8 @@ retain the plugin's existing activation behavior.
 
 If cancellation is rejected because the order has already finished, its broker
 state and the remaining exposure are reconciled. Definite broker rejections do
-not permanently lock the symbol. Automatic protection deferred by an in-progress
-premarket edit is retried after the open without restarting its grace period.
+not permanently lock the symbol. An unfinished extended-hours action does not
+block regular-session commands or regular missing-stop protection.
 
 Mutations are never automatically retried. A lost submission response restricts
 new submissions for that symbol while polling looks for a unique new broker order
@@ -97,7 +144,7 @@ are logged, and the ticket displays runtime submission, acceptance, or rejection
 messages directly. An accepted order is still not a confirmed fill.
 
 **Cancel All** ignores the Shares, Offset, and Limit price inputs. It is available
-even outside the order-entry session, confirms cancellation, and never submits
+outside the order-entry session except during regular hours, confirms cancellation, and never submits
 a closing order. An order can still fill while cancellation is in flight.
 
 Account state normally refreshes every three seconds; manual order actions request
