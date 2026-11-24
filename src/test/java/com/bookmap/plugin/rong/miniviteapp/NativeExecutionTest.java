@@ -13,6 +13,36 @@ import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.*;
 
 class NativeExecutionTest {
+    @Test void productionRecoveryDoesNotReplayLostOpeningAndResumesAfterBrokerMatch() throws Exception {
+        try (var rig = new Rig()) {
+            JsonObject entry = rig.connectEntry();
+            rig.engine.enableRecovery(command -> rig.updateState(System.currentTimeMillis()));
+            rig.closeMutationResponse = true; rig.engine.route(entry);
+            rig.engine.pendingCommands().get(3, TimeUnit.SECONDS);
+            assertEquals("unknown", rig.finish().get("outcome").getAsString()); assertEquals(1, rig.mutations.get());
+            rig.closeMutationResponse = false; rig.engine.route(entry); rig.engine.pendingCommands().get(3, TimeUnit.SECONDS);
+            assertEquals(1, rig.mutations.get(), "Unconfirmed opening must not be replayed");
+            assertTrue(rig.events.stream().anyMatch(event -> event.has("reason") && event.get("reason").getAsString().contains("Opening outcome still unconfirmed")));
+            rig.engine.route(action("KeyC")); rig.engine.pendingCommands().get(3, TimeUnit.SECONDS);
+            assertEquals("no_op", rig.finish(2).get("outcome").getAsString(), "Cancel remains usable");
+            JsonObject observed = rig.bodies.get(0).deepCopy(); observed.addProperty("orderId", "999"); observed.addProperty("status", "FILLED");
+            JsonArray orders = new JsonArray(); orders.add(observed); rig.engine.observeBrokerOrders(orders);
+            rig.engine.route(entry); rig.engine.pendingCommands().get(3, TimeUnit.SECONDS);
+            assertEquals("accepted", rig.finish(3).get("outcome").getAsString()); assertEquals(2, rig.mutations.get());
+        }
+    }
+    @Test void productionLaneSerializesRepeatedMarketExitsUntilFreshPreparation() throws Exception {
+        try (var rig = new Rig()) {
+            rig.state = fixture("market out smallest first tie"); rig.connect();
+            AtomicInteger preparations = new AtomicInteger();
+            rig.engine.enableRecovery(command -> { preparations.incrementAndGet(); rig.updateState(System.currentTimeMillis()); });
+            rig.allowMutation = new CountDownLatch(1); rig.engine.route(action("KeyM"));
+            assertTrue(rig.mutationEntered.await(3, TimeUnit.SECONDS)); rig.engine.route(action("KeyM"));
+            assertEquals(1, preparations.get()); assertEquals(1, rig.mutations.get());
+            rig.allowMutation.countDown(); rig.engine.pendingCommands().get(3, TimeUnit.SECONDS);
+            assertEquals(2, preparations.get()); assertEquals(2, rig.mutations.get());
+        }
+    }
     @Test void localSizingRejectionDoesNotConsumeSelectedStop() throws Exception {
         try (var rig = new Rig()) {
             JsonObject action = rig.connectEntry();

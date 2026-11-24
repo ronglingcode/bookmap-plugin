@@ -35,6 +35,8 @@ public final class SelectedStop {
     private double price;
     private long selectedAt;
     private Claim reserved;
+    private long generation;
+    public synchronized long generation() { return generation; }
 
     public SelectedStop() { this(System::nanoTime); }
     public SelectedStop(LongSupplier clock) { this.clock = clock; }
@@ -42,10 +44,11 @@ public final class SelectedStop {
         Models.require(symbol != null && !symbol.isBlank() && Models.positive(price), "Hover stop price and press Z");
         this.symbol = symbol; this.price = Math.round(price * 100) / 100.0;
         reserved = null;
+        generation++;
         Models.require(this.price > 0, "Invalid stop price");
         selectedAt = clock.getAsLong();
     }
-    public synchronized void clear() { symbol = ""; price = 0; reserved = null; }
+    public synchronized void clear() { symbol = ""; price = 0; reserved = null; generation++; }
     private boolean fresh() { long age = clock.getAsLong() - selectedAt; return price > 0 && age >= 0 && age < LIFETIME_NS; }
     public synchronized Claim consume(String symbol) {
         boolean valid = fresh() && this.symbol.equals(symbol);
