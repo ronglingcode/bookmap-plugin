@@ -68,9 +68,12 @@ class ChartHotkeyCaptureTest {
         log.setEditable(false);
         ChartHoverHotkeyHandler.focusHoveredChart(chart, log);
         assertEquals(2, chart.focusRequests);
+        JTextField shares = new JTextField("25"); shares.putClientProperty("bmtrader.premarketNumberInput", true);
+        ChartHoverHotkeyHandler.focusHoveredChart(chart, shares);
+        assertEquals(3, chart.focusRequests, "Moving from the premarket ticket to the chart enables hover shortcuts without an extra click");
         chart.setName("annotation editor");
         ChartHoverHotkeyHandler.focusHoveredChart(chart, new JPanel());
-        assertEquals(2, chart.focusRequests);
+        assertEquals(3, chart.focusRequests);
     }
 
     @Test

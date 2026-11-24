@@ -20,8 +20,10 @@ public final class MarketStreams implements AutoCloseable {
         public Credentials(JsonObject info, String token) { this.info = info; this.token = token; }
     }
     private final ManagedSocket massive, schwab;
+    private final boolean useMassive;
     public MarketStreams(SocketPort sockets, SocketPort.Scheduler scheduler, Executor executor, List<String> symbols, Supplier<String> key,
                          Callable<Credentials> credentials, Events events) {
+        useMassive = !symbols.isEmpty() && !key.get().isBlank();
         massive = new ManagedSocket(sockets, scheduler, executor, () -> new ManagedSocket.Setup() {
             public String url() { return com.bookmap.plugin.rong.miniviteapp.libraries.massive.StreamingProtocol.STREAM_URL; }
             public void opened(SocketPort.Connection socket) { socket.send(com.bookmap.plugin.rong.miniviteapp.libraries.massive.StreamingProtocol.loginRequest(key.get()).toString()); }
@@ -49,6 +51,6 @@ public final class MarketStreams implements AutoCloseable {
             };
         }, status -> events.status("schwab", status));
     }
-    public void start() { massive.start(); schwab.start(); }
+    public void start() { if (useMassive) massive.start(); schwab.start(); }
     @Override public void close() { massive.close(); schwab.close(); }
 }

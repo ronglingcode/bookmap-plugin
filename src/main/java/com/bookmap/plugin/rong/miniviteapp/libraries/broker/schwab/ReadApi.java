@@ -40,6 +40,14 @@ public final class ReadApi {
                 || !value.getAsJsonArray().get(0).getAsJsonObject().has("securitiesAccount")) throw new IOException("Schwab account response missing securitiesAccount");
         return value.getAsJsonArray().get(0).getAsJsonObject().getAsJsonObject("securitiesAccount");
     }
+    public JsonObject getAccount(String account, String token) throws Exception {
+        JsonElement value = read("accounts/" + encode(account) + "?fields=positions", token);
+        if (!value.isJsonObject() || !value.getAsJsonObject().has("securitiesAccount")) throw new IOException("Schwab account response missing securitiesAccount");
+        return value.getAsJsonObject().getAsJsonObject("securitiesAccount");
+    }
+    public JsonObject getOrder(String account, String token, String id) throws Exception {
+        return read("accounts/" + encode(account) + "/orders/" + encode(id), token).getAsJsonObject();
+    }
     public JsonObject getStreamerInfo(String token) throws Exception {
         JsonElement value = read("userPreference", token); JsonObject info = null;
         if (value.isJsonObject()) {

@@ -74,14 +74,14 @@ public class PendingEntryOrderManager implements SignalWebSocketServer.AccountSt
             }
             lines.add(new EntryOrderLine(
                     order.getPrice(),
-                    order.isBuy() ? "BUY ENTRY" : "SELL ENTRY",
+                    "PREMARKET".equals(order.getRole()) ? order.getPairIndex() + (order.isBuy() ? ":PM BUY LIMIT" : ":PM SELL LIMIT") : order.isBuy() ? "BUY ENTRY" : "SELL ENTRY",
                     order.isBuy() ? BUY_ENTRY_COLOR : SELL_ENTRY_COLOR));
         }
         return lines;
     }
 
     private boolean isPendingEntry(AccountOrderDefinition order) {
-        return order != null && "ENTRY".equalsIgnoreCase(order.getRole());
+        return order != null && ("ENTRY".equalsIgnoreCase(order.getRole()) || "PREMARKET".equalsIgnoreCase(order.getRole()));
     }
 
     private List<EntryOrderLine> aggregateLines(List<EntryOrderLine> lines) {

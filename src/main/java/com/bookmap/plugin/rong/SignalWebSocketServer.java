@@ -73,10 +73,23 @@ public class SignalWebSocketServer extends WebSocketServer {
     public void registerPatterns(String alias, com.bookmap.plugin.rong.signal.CairoPatternFeed feed) { patternFeeds.put(alias, feed); }
     private java.util.function.Consumer<JsonObject> tradingDispatch = action -> PluginLog.action(SymbolUtils.cleanSymbol(getString(action, "symbol")), "Native runtime unavailable; no action sent");
     public void setTradingDispatch(java.util.function.Consumer<JsonObject> dispatch) { tradingDispatch = dispatch; }
+    private final Map<String, String> premarketShares = new ConcurrentHashMap<>();
+    private java.util.function.BooleanSupplier premarketMode = () -> false;
+    public void setPremarketMode(java.util.function.BooleanSupplier enabled) { premarketMode = enabled; }
+    public void setPremarketShares(String symbol, String shares) { premarketShares.put(SymbolUtils.cleanSymbol(symbol), shares); }
+    public void removePremarketShares(String symbol) { premarketShares.remove(SymbolUtils.cleanSymbol(symbol)); }
+    private final Map<String, java.util.function.Consumer<String>> premarketStatus = new ConcurrentHashMap<>();
+    public void registerPremarketStatus(String symbol, java.util.function.Consumer<String> listener) { premarketStatus.put(SymbolUtils.cleanSymbol(symbol), listener); }
+    public void unregisterPremarketStatus(String symbol) { premarketStatus.remove(SymbolUtils.cleanSymbol(symbol)); }
+    public void publishPremarketStatus(String symbol, String text) {
+        java.util.function.Consumer<String> listener = premarketStatus.get(SymbolUtils.cleanSymbol(symbol));
+        if (listener != null) listener.accept(text);
+    }
     private final Map<String, PremarketSizeThreshold> sizeThresholds = new ConcurrentHashMap<>();
     private final Map<String, SessionOrderSizeTracker> sessionOrderSizes = new ConcurrentHashMap<>();
     private final Set<String> sessionHistoryLoading = ConcurrentHashMap.newKeySet();
     private final Map<String, java.util.function.BooleanSupplier> marketDataHealth = new ConcurrentHashMap<>();
+    private final Map<String, JsonObject> premarketInsideQuotes = new ConcurrentHashMap<>();
     private final Map<String, java.util.function.Supplier<JsonObject>> marketDataStatus = new ConcurrentHashMap<>();
     void registerMarketDataStatus(String symbol, java.util.function.Supplier<JsonObject> status) {
         marketDataStatus.put(SymbolUtils.cleanSymbol(symbol), status);
@@ -137,6 +150,10 @@ public class SignalWebSocketServer extends WebSocketServer {
         if (book == null || pips == null || !Double.isFinite(pips) || pips <= 0) return;
         if (entryBidReclaimManager != null) entryBidReclaimManager.onBid(clean,
                 bid > 0 ? BookmapPriceNormalizer.toWirePrice(bid, pips) : Double.NaN);
+        JsonObject inside = new JsonObject();
+        inside.addProperty("bid", bid > 0 ? BookmapPriceNormalizer.toWirePrice(bid, pips) : 0);
+        inside.addProperty("ask", ask > 0 ? BookmapPriceNormalizer.toWirePrice(ask, pips) : 0);
+        inside.addProperty("receivedAt", System.currentTimeMillis()); premarketInsideQuotes.put(clean, inside);
         sessionOrderSizes.computeIfAbsent(clean, ignored -> new SessionOrderSizeTracker()).onBbo(
                 bid > 0 ? BookmapPriceNormalizer.toWirePrice(bid, pips) : Double.NaN,
                 ask > 0 ? BookmapPriceNormalizer.toWirePrice(ask, pips) : Double.NaN, timestampNs, book, pips);
@@ -209,6 +226,28 @@ public class SignalWebSocketServer extends WebSocketServer {
     /** All local actions go directly to the standalone runtime. */
     public void dispatchTradingAction(JsonObject action) {
         JsonObject local = action.deepCopy(); String key = getString(local, "keyCode"); if (key.isEmpty()) key = getString(local, "key_code");
+        if (key.equals("KeyL")) {
+            String symbol = SymbolUtils.cleanSymbol(getString(local, "symbol"));
+            if (!premarketMode.getAsBoolean() || !premarketShares.containsKey(symbol)) {
+                PluginLog.action(symbol, "Hover + L ignored: enable premarket trading and enter shares in this chart's panel"); return;
+            }
+            try {
+                double price = com.bookmap.plugin.rong.miniviteapp.runtime.PremarketTrading.snapChartPrice(getWirePrice(local, "price"));
+                JsonObject limit = com.bookmap.plugin.rong.tradebuttons.PremarketTradingPanel.fixedAction(symbol, "hover_limit", premarketShares.get(symbol), Double.toString(price));
+                limit.add("hoverQuote", premarketQuote(symbol)); tradingDispatch.accept(limit);
+            } catch (IllegalArgumentException error) { String reason = "Hover + L blocked: " + error.getMessage(); PluginLog.action(symbol, reason); publishPremarketStatus(symbol, reason); }
+            return;
+        }
+        if (key.matches("Digit[1-9]") && premarketMode.getAsBoolean()) {
+            AccountStateDefinition shown = symbolToAccountState.get(SymbolUtils.cleanSymbol(getString(local, "symbol")));
+            boolean hasManual = shown != null && shown.getOpenOrders().stream().anyMatch(order -> "PREMARKET".equals(order.getRole()));
+            if (hasManual || com.bookmap.plugin.rong.miniviteapp.core.marketdata.MarketClock.isExtendedTradingTime(System.currentTimeMillis())) {
+                String id = ""; int index = Integer.parseInt(key.substring(5));
+                if (shown != null) for (AccountOrderDefinition order : shown.getOpenOrders())
+                    if ("PREMARKET".equals(order.getRole()) && order.getPairIndex() == index) id = order.getOrderId();
+                local.addProperty("premarketOrderId", id);
+            }
+        }
         boolean hoverShareDigit = key.matches("Digit[1-5]") && getString(local, "source").equals("bookmap_chart_hotkey");
         if (hoverShareDigit) {
             String symbol = getString(local, "symbol");
@@ -403,6 +442,7 @@ public class SignalWebSocketServer extends WebSocketServer {
     public void unregisterSymbol(String symbol) {
         marketDataHealth.remove(symbol);
         if (entryBidReclaimManager != null) entryBidReclaimManager.unregister(symbol);
+        premarketInsideQuotes.remove(symbol);
         marketDataStatus.remove(symbol);
         cairoDepthTimes.remove(symbol);
         cairoReplayDepth.remove(symbol);
@@ -485,6 +525,14 @@ public class SignalWebSocketServer extends WebSocketServer {
             }
             return BookmapPriceNormalizer.toWirePrice(priceTick, pips);
         }
+    }
+    /** Read the chart's inside market at execution time, without any plan/history dependency. */
+    public JsonObject premarketQuote(String symbol) {
+        String clean = SymbolUtils.cleanSymbol(symbol); JsonObject quote = new JsonObject();
+        if (!marketDataHealthy(clean)) return quote;
+        JsonObject inside = premarketInsideQuotes.get(clean);
+        if (inside == null || System.currentTimeMillis() - inside.get("receivedAt").getAsLong() > 10000) return quote;
+        return inside.deepCopy();
     }
 
     RegularSessionHighLowTracker.Snapshot getRegularSessionHighLow(String symbol) {

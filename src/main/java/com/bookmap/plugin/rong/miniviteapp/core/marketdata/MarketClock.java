@@ -21,5 +21,15 @@ public final class MarketClock {
         }
     }
     public static Time marketTime(long epochMs) { return new Time(Instant.ofEpochMilli(epochMs).atZone(MARKET_ZONE)); }
+    public static boolean isRegularTradingTime(long epochMs) {
+        ZonedDateTime value = Instant.ofEpochMilli(epochMs).atZone(MARKET_ZONE);
+        int minute = value.getHour() * 60 + value.getMinute();
+        return value.getDayOfWeek().getValue() <= 5 && minute >= 570 && minute < 960;
+    }
+    public static boolean isExtendedTradingTime(long epochMs) {
+        ZonedDateTime value = Instant.ofEpochMilli(epochMs).atZone(MARKET_ZONE);
+        int minute = value.getHour() * 60 + value.getMinute();
+        return value.getDayOfWeek().getValue() <= 5 && (minute >= 420 && minute < 570 || minute >= 960 && minute < 1200);
+    }
     public static String addDays(String date, int days) { return LocalDate.parse(date).plusDays(days).toString(); }
 }

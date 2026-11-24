@@ -42,6 +42,12 @@ public final class NativeViews {
         List<JsonObject> result = new ArrayList<>();
         if (string(view, "type").equals("market_update")) return vwapPoints(view);
         JsonArray pairs = sortedExitPairs(array(object(account, "exitPairs"), symbol)), entries = array(object(account, "entryOrders"), symbol); JsonObject position = object(object(account, "positions"), symbol); double net = number(position, "netQuantity");
+        JsonArray manualLimits = array(view, "premarketOrders"); Set<String> manualIds = new HashSet<>();
+        manualLimits.forEach(item -> manualIds.add(string(item.getAsJsonObject(), "orderID")));
+        JsonArray normalPairs = new JsonArray(), normalEntries = new JsonArray();
+        for (JsonElement item : pairs) if (!manualIds.contains(string(object(item.getAsJsonObject(), "LIMIT"), "orderID"))) normalPairs.add(item);
+        for (JsonElement item : entries) if (!manualIds.contains(string(item.getAsJsonObject(), "orderID"))) normalEntries.add(item);
+        pairs = normalPairs; entries = normalEntries;
         JsonObject saved = object(object(object(view, "state"), "stateBySymbol"), symbol), active = object(saved, net > 0 ? "breakoutTradeStateForLong" : "breakoutTradeStateForShort"), captured = object(active, "plan");
         JsonObject buttons = msg(view, "trade_button_config"); JsonArray groups = new JsonArray();
         if (plan.has("long") && plan.has("short")) for (JsonElement item : TradingConfig.createTradebookDefinitions(plan)) { JsonObject definition = item.getAsJsonObject(), group = new JsonObject(); String id = string(definition, "tradebookID"); String[] names = NAMES.getOrDefault(id, new String[]{id, id});
@@ -86,6 +92,7 @@ public final class NativeViews {
         result.add(keys);
         JsonObject exits = msg(view, "exit_order_pairs_config"); JsonArray indexed = pairs.deepCopy(); for (int i = 0; i < indexed.size(); i++) indexed.get(i).getAsJsonObject().addProperty("index", i + 1); exits.add("pairs", indexed); result.add(exits);
         JsonObject accountView = msg(view, "account_state"); JsonArray open = new JsonArray(); entries.forEach(item -> order(open, item.getAsJsonObject(), "ENTRY", null, 0)); for (int i = 0; i < pairs.size(); i++) { JsonObject pair = pairs.get(i).getAsJsonObject(); order(open, object(pair, "STOP"), "STOP", pair, i + 1); order(open, object(pair, "LIMIT"), "LIMIT", pair, i + 1); }
+        manualLimits.forEach(item -> open.add(item.deepCopy()));
         double risk = positionRisk(net, number(position, "averagePrice"), pairs, number(market, "lowOfDay"), number(market, "highOfDay")), multiple = Math.round(risk / (number(policy, "riskDollars") > 0 ? number(policy, "riskDollars") : 1000) * 1000) / 1000.0;
         if (net != 0 && number(position, "averagePrice") > 0) { JsonObject pos = position.deepCopy(); pos.addProperty("symbol", symbol); pos.addProperty("riskPercent", multiple * 100 > 2 ? Math.round(multiple * 100) : Math.round(multiple * 1000) / 10.0);
             double label = multiple >= 10 ? Math.round(multiple) : Math.round(multiple * 100) / 100.0; pos.addProperty("riskText", multiple > 0 ? (net > 0 ? "+" : "-") + java.math.BigDecimal.valueOf(label).stripTrailingZeros().toPlainString() + "R" : ""); accountView.add("position", pos); }

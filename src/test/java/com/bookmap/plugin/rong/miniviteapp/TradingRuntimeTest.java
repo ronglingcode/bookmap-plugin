@@ -128,57 +128,38 @@ class TradingRuntimeTest {
                 }
             }
     }
-    @Test void invalidSelectedPlanStopsBeforeVendorConnectionsAndUpdatesEveryStatus() throws Exception {
-        JsonArray fixtures = JsonParser.parseReader(new InputStreamReader(getClass().getResourceAsStream("/state-fixtures.json"), StandardCharsets.UTF_8)).getAsJsonArray();
-        JsonObject config = null;
-        for (JsonElement item : fixtures) {
-            JsonObject fixture = item.getAsJsonObject();
-            if (fixture.get("name").getAsString().equals("stock selections config"))
-                config = fixture.getAsJsonArray("args").get(0).getAsJsonObject().deepCopy();
-        }
-        assertNotNull(config);
-        JsonObject plan = config.getAsJsonArray("plans").get(0).getAsJsonObject();
-        plan.addProperty("symbol", "PCVX");
-        plan.getAsJsonObject("long").addProperty("enabled", false);
-        JsonObject shortPlan = plan.getAsJsonObject("short");
-        shortPlan.addProperty("enabled", true);
-        shortPlan.addProperty("firstTargetToAdd", "0");
-        JsonArray selections = new JsonArray(); selections.add("PCVX"); config.add("stockSelections", selections);
+    @Test void invalidSelectedPlanDoesNotPreventBrokerStartup() throws Exception {
+        JsonObject config = json("{\"plans\":[{\"symbol\":\"PCVX\"}],\"stockSelections\":[\"PCVX\"]}");
         JsonObject document = new JsonObject(); document.add("fields", DocumentCodec.encodeFields(config));
-        JsonObject row = new JsonObject(); row.add("document", document);
-        JsonArray rows = new JsonArray(); rows.add(row);
-        AtomicInteger configReads = new AtomicInteger();
+        JsonObject row = new JsonObject(); row.add("document", document); JsonArray rows = new JsonArray(); rows.add(row);
+        List<String> logs = new ArrayList<>(); List<JsonObject> emitted = new ArrayList<>();
+        JsonObject secrets = json("{\"access_token\":\"fake-token\",\"accountHashValue\":\"fake-account\",\"expires_at\":9999999999999}");
         HttpPort http = (uri, method, headers, body) -> {
-            assertTrue(uri.getPath().endsWith(":runQuery"), "Invalid plan must stop startup before broker or market requests");
-            configReads.incrementAndGet(); return new HttpPort.Response(200, rows.toString());
+            if (uri.getPath().endsWith(":runQuery")) return new HttpPort.Response(200, rows.toString());
+            if (uri.getPath().endsWith("/tradingState")) return new HttpPort.Response(404, "{}");
+            if (uri.getPath().endsWith("/userPreference")) return new HttpPort.Response(503, "{}");
+            if (uri.getPath().endsWith("/accounts")) return new HttpPort.Response(200, "[{\"securitiesAccount\":{\"positions\":[],\"currentBalances\":{\"liquidationValue\":25000}}}]");
+            if (uri.getPath().endsWith("/orders")) return new HttpPort.Response(200, "[]");
+            throw new AssertionError("Unexpected request " + uri);
         };
         CredentialPort credentials = new CredentialPort() {
-            public JsonObject loadSchwab() { return new JsonObject(); }
-            public void saveSchwab(JsonObject value) { fail("Invalid plan must not rotate tokens"); }
+            public JsonObject loadSchwab() { return secrets.deepCopy(); }
+            public void saveSchwab(JsonObject value) { fail("Valid token must not rotate"); }
         };
-        NativeConnectionStatus status = new NativeConnectionStatus(); status.setStarting();
-        List<String> logs = new ArrayList<>();
-        List<JsonObject> emitted = new ArrayList<>();
         try (TradingRuntime runtime = new TradingRuntime(http, credentials,
-                json("{\"firebaseConfig\":{\"projectId\":\"fake-project\"},\"massive\":{\"apiKey\":\"fake-massive\"}}"),
-                (url, handlers) -> { throw new AssertionError("Invalid plan must not open streams"); },
-                (delay, task) -> { throw new AssertionError("Invalid plan must not start timers"); },
-                Runnable::run, System::currentTimeMillis, new TradingRuntime.Events() {
+                json("{\"firebaseConfig\":{\"projectId\":\"fake-project\"}}"),
+                (uri, handlers) -> new Socket(), (delay, task) -> () -> {}, Runnable::run,
+                () -> Instant.parse("2026-11-23T14:00:00Z").toEpochMilli(), new TradingRuntime.Events() {
                     public void message(JsonObject value) { emitted.add(value.deepCopy()); }
                     public void log(String symbol, String value) { logs.add(value); }
-                    public void notify(String symbol, String value) { fail("Unexpected notification"); }
-                    public void status(String source, String value) { status.update(source, value); }
+                    public void notify(String symbol, String value) { logs.add(value); }
                 })) {
-            CompletionException error = assertThrows(CompletionException.class, () -> runtime.start().join());
-            assertEquals("PCVX missing first target to add", error.getCause().getMessage());
-            assertTrue(emitted.isEmpty(), "Failed startup must not publish trading state");
+            runtime.attachSymbol("PCVX"); runtime.start().join();
+            assertTrue(runtime.view("PCVX", "test").has("account"));
+            assertFalse(runtime.view("PCVX", "test").has("plan"));
+            assertTrue(logs.stream().anyMatch(value -> value.contains("Normal trading plan unavailable")));
             runtime.dispatch(json("{\"symbol\":\"PCVX\",\"keyCode\":\"KeyB\"}"));
             assertTrue(emitted.stream().anyMatch(value -> value.get("type").getAsString().equals("execution_blocked")));
-            assertEquals(1, configReads.get());
-            assertEquals("startup failed", status.snapshot().getSchwab());
-            assertEquals("startup failed", status.snapshot().getMassiveHistory());
-            assertEquals("startup failed", status.snapshot().getMassiveStream());
-            assertTrue(logs.stream().anyMatch(value -> value.contains("PCVX missing first target to add")));
         }
     }
     @Test void standaloneStartupRenewalAcceptedEntryPersistenceAndTeardown() throws Exception {

@@ -146,10 +146,24 @@ class ChartHoverHotkeyHandlerTest {
 
     @Test
     void removedTrailingKeysAreNotConsumedAsChartHotkeys() {
-        for (String key : new String[]{"j", "k", "l"}) {
+        for (String key : new String[]{"j", "k"}) {
             assertFalse(ChartHoverHotkeyHandler.isChartHotkey(key));
             assertFalse(ChartHoverHotkeyHandler.isPriceIndependentHotkey(key));
         }
+        assertTrue(ChartHoverHotkeyHandler.isChartHotkey("l"));
+        assertFalse(ChartHoverHotkeyHandler.isPriceIndependentHotkey("l"));
+        assertEquals("KeyL", ChartHoverHotkeyHandler.toViteKeyCode("l"));
+    }
+    @Test void limitHotkeyIgnoresAutoRepeatUntilReleased() {
+        SignalWebSocketServer server = new SignalWebSocketServer(0, 90);
+        try {
+            ChartHoverHotkeyHandler handler = new ChartHoverHotkeyHandler(server, new com.bookmap.plugin.rong.IndicatorConfig());
+            Canvas chart = new Canvas();
+            KeyEvent down = new KeyEvent(chart, KeyEvent.KEY_PRESSED, 1, 0, KeyEvent.VK_L, 'l');
+            KeyEvent up = new KeyEvent(chart, KeyEvent.KEY_RELEASED, 2, 0, KeyEvent.VK_L, 'l');
+            assertTrue(handler.acceptLimitKeyEvent(down)); assertFalse(handler.acceptLimitKeyEvent(down));
+            assertFalse(handler.acceptLimitKeyEvent(up)); assertTrue(handler.acceptLimitKeyEvent(down));
+        } finally { server.shutdown(); }
     }
 
     @Test

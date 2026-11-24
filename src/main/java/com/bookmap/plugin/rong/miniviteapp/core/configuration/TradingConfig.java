@@ -102,6 +102,33 @@ public final class TradingConfig {
     public static Result readTradingConfig(JsonObject raw) {
         return readTradingConfig(raw, MAX_TRADABLE_STOCKS_COUNT);
     }
+    public static Result emptyConfig(String profile) {
+        JsonObject raw = new JsonObject(); raw.add("plans", new JsonArray());
+        raw.addProperty("activeProfileName", profile); return new Result(raw, List.of());
+    }
+    /** A bad or unfinished plan disables only its normal entry controls, never broker startup. */
+    public static Result readAvailableTradingConfig(JsonObject raw, java.util.function.Consumer<String> diagnostic) {
+        if (raw == null || !raw.has("plans") || !raw.get("plans").isJsonArray()
+                || !raw.has("stockSelections") || !raw.get("stockSelections").isJsonArray())
+            throw new IllegalArgumentException("Trading configuration missing plans/stockSelections");
+        List<String> valid = new ArrayList<>();
+        if (raw.getAsJsonArray("stockSelections").size() > MAX_TRADABLE_STOCKS_COUNT) {
+            List<String> selections = new ArrayList<>(); raw.getAsJsonArray("stockSelections").forEach(value -> selections.add(value.getAsString()));
+            throw new IllegalArgumentException("more than " + MAX_TRADABLE_STOCKS_COUNT + " stocks in watchlist: " + String.join(", ", selections));
+        }
+        JsonObject clean = raw.deepCopy(); JsonArray plans = new JsonArray();
+        for (JsonElement selection : raw.getAsJsonArray("stockSelections")) {
+            try {
+                String symbol = selection.getAsString();
+                JsonObject plan = null;
+                for (JsonElement item : raw.getAsJsonArray("plans")) if (item.isJsonObject() && symbol.equals(string(item.getAsJsonObject(), "symbol"))) { plan = item.getAsJsonObject(); break; }
+                String error = plan == null ? symbol + " missing trading plans" : validateTradingPlan(plan);
+                if (!error.isEmpty()) { diagnostic.accept(error); continue; }
+                if (!valid.contains(symbol) && valid.size() < MAX_TRADABLE_STOCKS_COUNT) { valid.add(symbol); plans.add(plan.deepCopy()); }
+            } catch (RuntimeException error) { diagnostic.accept("Malformed selected plan: " + error.getClass().getSimpleName()); }
+        }
+        clean.add("plans", plans); return new Result(clean, valid);
+    }
     public static Result readTradingConfig(JsonObject raw, int maxStocks) {
         if (raw == null || !raw.has("plans") || !raw.get("plans").isJsonArray() || !raw.has("stockSelections") || !raw.get("stockSelections").isJsonArray()) throw new IllegalArgumentException("Trading configuration missing plans/stockSelections");
         List<String> symbols = new ArrayList<>();

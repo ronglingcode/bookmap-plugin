@@ -23,6 +23,7 @@ public class IndicatorConfig {
     public static final String VWAP = "vwap";
     public static final String TRADING_NOTIFICATION_SOUND = "trading_notification_sound";
     public static final String AUTO_CLOSE_UNPROTECTED_POSITIONS = "auto_close_unprotected_positions";
+    public static final String PREMARKET_TRADING = "premarket_trading";
 
     private final Preferences preferences = Preferences.userRoot().node("com/bookmap/plugin/rong");
     private final Map<String, Boolean> enabled = new ConcurrentHashMap<>();
@@ -47,6 +48,7 @@ public class IndicatorConfig {
         enabled.put(TRADING_NOTIFICATION_SOUND, true);
         enabled.put(AUTO_CLOSE_UNPROTECTED_POSITIONS,
                 preferences.getBoolean(AUTO_CLOSE_UNPROTECTED_POSITIONS, true));
+        enabled.put(PREMARKET_TRADING, preferences.getBoolean(PREMARKET_TRADING, false));
     }
 
     public boolean isEnabled(String indicatorKey) {
@@ -65,7 +67,7 @@ public class IndicatorConfig {
 
     public void setEnabled(String indicatorKey, boolean value) {
         enabled.put(indicatorKey, value);
-        if (AUTO_CLOSE_UNPROTECTED_POSITIONS.equals(indicatorKey)) {
+        if (AUTO_CLOSE_UNPROTECTED_POSITIONS.equals(indicatorKey) || PREMARKET_TRADING.equals(indicatorKey)) {
             preferences.putBoolean(indicatorKey, value);
             try {
                 preferences.flush();

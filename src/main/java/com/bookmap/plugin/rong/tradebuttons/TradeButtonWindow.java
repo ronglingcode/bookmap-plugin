@@ -97,6 +97,13 @@ public class TradeButtonWindow {
             Collections.newSetFromMap(new ConcurrentHashMap<>());
     private JFrame frame;
     private JPanel buttonPanel;
+    private PremarketTradingPanel premarketPanel;
+    private volatile boolean premarketEnabled;
+    private List<TradebookButtonGroup> currentTradebooks = Collections.emptyList();
+    public void setPremarketEnabled(boolean enabled) {
+        premarketEnabled = enabled;
+        SwingUtilities.invokeLater(() -> { if (!disposed && buttonPanel != null) renderButtons(currentTradebooks); });
+    }
     private HotkeyRiskPanel hotkeyRiskPanel;
     private JLabel shiftModeLabel;
     private JLabel wallThresholdLabel;
@@ -430,6 +437,7 @@ public class TradeButtonWindow {
         if (disposed || buttonPanel == null) {
             return;
         }
+        currentTradebooks = tradebooks == null ? Collections.emptyList() : tradebooks;
         longEntryButtons.clear();
         shortEntryButtons.clear();
         if (hotkeyRiskPanel != null) hotkeyRiskPanel.dispose();
@@ -437,9 +445,15 @@ public class TradeButtonWindow {
         buttonPanel.setPreferredSize(null);
         buttonPanel.setLayout(new BoxLayout(buttonPanel, BoxLayout.Y_AXIS));
         addFullWidth(createModePanel());
-        addFullWidth(createHotkeyPanel());
-        hotkeyRiskPanel = new HotkeyRiskPanel(server.getHotkeyRiskSelection(), symbol);
-        addFullWidth(hotkeyRiskPanel);
+        if (premarketEnabled) {
+            if (premarketPanel == null) premarketPanel = new PremarketTradingPanel(symbol, server);
+            addFullWidth(premarketPanel);
+        } else if (premarketPanel != null) { premarketPanel.close(); premarketPanel = null; }
+        if (!currentTradebooks.isEmpty()) {
+            addFullWidth(createHotkeyPanel());
+            hotkeyRiskPanel = new HotkeyRiskPanel(server.getHotkeyRiskSelection(), symbol);
+            addFullWidth(hotkeyRiskPanel);
+        }
 
         boolean hasTradebookButtons = false;
         JPanel tradebookGrid = new JPanel(new GridLayout(0, 1, 6, 6));
@@ -455,7 +469,7 @@ public class TradeButtonWindow {
             addFullWidth(tradebookGrid);
         }
         if (!hasTradebookButtons) {
-            JLabel waitingLabel = new JLabel("Waiting for buttons", SwingConstants.CENTER);
+            JLabel waitingLabel = new JLabel(VerticalWindowLayout.wrapText("Normal entry unavailable: no valid trading plan", CONTENT_WIDTH), SwingConstants.CENTER);
             waitingLabel.setAlignmentX(Component.LEFT_ALIGNMENT);
             buttonPanel.add(waitingLabel);
         }
@@ -1138,6 +1152,7 @@ public class TradeButtonWindow {
 
     public void dispose() {
         disposed = true;
+        if (premarketPanel != null) SwingUtilities.invokeLater(() -> { if (premarketPanel != null) { premarketPanel.close(); premarketPanel = null; } });
         SwingUtilities.invokeLater(buttonRefresh::stop);
         if (hotkeyRiskPanel != null) hotkeyRiskPanel.dispose();
         if (wallThresholdTimer != null) {

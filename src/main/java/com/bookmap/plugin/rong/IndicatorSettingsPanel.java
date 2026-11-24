@@ -63,10 +63,15 @@ public class IndicatorSettingsPanel extends StrategyPanel {
         gbc.gridy++;
         JCheckBox autoClose = new JCheckBox("Auto-close positions without stop loss",
                 config.isEnabled(IndicatorConfig.AUTO_CLOSE_UNPROTECTED_POSITIONS));
-        autoClose.setToolTipText("Close the full position after more than 10 seconds of missing stop-loss coverage.");
+        autoClose.setToolTipText("Close the full position after more than 10 seconds of missing stop-loss coverage. Regular session only.");
         autoClose.addActionListener(e ->
                 config.setEnabled(IndicatorConfig.AUTO_CLOSE_UNPROTECTED_POSITIONS, autoClose.isSelected()));
         add(autoClose, gbc);
+        gbc.gridy++;
+        JCheckBox premarket = new JCheckBox("Enable Premarket / After-hours Trading", config.isEnabled(IndicatorConfig.PREMARKET_TRADING));
+        premarket.setToolTipText("Show manual extended-hours limit controls on every live chart, without a trading plan. Saved for the next plugin load.");
+        premarket.addActionListener(e -> config.setEnabled(IndicatorConfig.PREMARKET_TRADING, premarket.isSelected()));
+        add(premarket, gbc);
         } else {
             gbc.gridy++; add(new JLabel("Observer mode: native trading is inactive"), gbc);
         }

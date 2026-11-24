@@ -10,6 +10,13 @@ import java.util.List;
 import static org.junit.jupiter.api.Assertions.*;
 
 class StopLossMonitorTest {
+    @Test void deferredCloseIsRetriedWithoutRestartingTheGracePeriod() {
+        StopLossMonitor monitor = new StopLossMonitor(); JsonObject exposure = account(100, 0);
+        monitor.observe(exposure, 0); assertEquals(List.of("OFF_WATCHLIST"), monitor.observe(exposure, 11000).close);
+        monitor.retryClose("OFF_WATCHLIST");
+        assertEquals(List.of("OFF_WATCHLIST"), monitor.observe(exposure, 11001).close);
+        assertTrue(monitor.observe(exposure, 11002).close.isEmpty());
+    }
     static JsonObject json(String value) { return JsonParser.parseString(value).getAsJsonObject(); }
     static JsonObject account(double net, double covered) {
         return json("{\"positions\":{\"OFF_WATCHLIST\":{\"netQuantity\":" + net + "}},\"exitPairs\":{\"OFF_WATCHLIST\":[{\"STOP\":{\"orderID\":\"s\",\"quantity\":" + covered + ",\"price\":10,\"isBuy\":" + (net < 0) + "}}]}}");

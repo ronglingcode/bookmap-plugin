@@ -327,6 +327,7 @@ public class RongPlugin implements CustomModuleAdapter,
         } else if (nativeExecution) {
             tradeButtonWindow = new TradeButtonWindow(
                     cleanAlias, sharedServer, wallThresholdConfig::getThresholdFloor, nativeConnectionStatus);
+            tradeButtonWindow.setPremarketEnabled(indicatorConfig.isEnabled(IndicatorConfig.PREMARKET_TRADING));
         }
     }
 
@@ -867,6 +868,10 @@ public class RongPlugin implements CustomModuleAdapter,
     @Override
     public void onIndicatorConfigChanged(String indicatorKey, boolean enabled) {
         if (!initialized) return;
+        if (IndicatorConfig.PREMARKET_TRADING.equals(indicatorKey)) {
+            if (tradeButtonWindow != null) tradeButtonWindow.setPremarketEnabled(enabled);
+            return;
+        }
 
         if (IndicatorConfig.VWAP.equals(indicatorKey)) {
             updateVwapIndicatorVisibility();

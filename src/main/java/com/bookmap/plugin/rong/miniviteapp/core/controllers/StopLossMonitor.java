@@ -18,6 +18,8 @@ public final class StopLossMonitor {
     }
     private final Map<String, Exposure> exposed = new HashMap<>();
     private boolean autoCloseEnabled = true;
+    public synchronized void reset() { exposed.clear(); }
+    public synchronized void retryClose(String symbol) { Exposure exposure = exposed.get(symbol); if (exposure != null) exposure.closing = false; }
 
     public Decision observe(JsonObject account, long now) {
         return observe(account, now, true);

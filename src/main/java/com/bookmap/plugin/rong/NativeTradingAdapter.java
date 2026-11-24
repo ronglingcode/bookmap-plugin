@@ -64,6 +64,7 @@ public final class NativeTradingAdapter implements AutoCloseable {
     public NativeTradingAdapter(SignalWebSocketServer display, IndicatorConfig settings,
             NativeConnectionStatus connectionStatus) {
         this.display = display; this.settings = settings; this.connectionStatus = connectionStatus;
+        display.setPremarketMode(() -> !closed && settings.isEnabled(IndicatorConfig.PREMARKET_TRADING));
         display.setTradingDispatch(this::dispatch); display.setManualInputs(symbol -> runtime == null || closed ? new JsonObject() : runtime.trading.manualInputs(symbol)); display.setRetestNotification(this::notifyUser);
         display.setSessionLevelsProvider(symbol -> {
             NativeRuntime current = runtime;
@@ -74,14 +75,14 @@ public final class NativeTradingAdapter implements AutoCloseable {
             return current == null || closed ? null : current.trading.cairoMinuteBars(symbol);
         });
     }
-    public void attach(String symbol, Api api) { apis.put(symbol, api); }
+    public void attach(String symbol, Api api) { apis.put(symbol, api); NativeRuntime current = runtime; if (current != null) current.trading.attachSymbol(symbol); }
     public void detach(String symbol) { apis.remove(symbol); }
     public synchronized void start() {
         if (closed || runtime != null) return;
         connectionStatus.setStarting();
         try { runtime = new NativeRuntime(new TradingRuntime.Events() {
             public void message(JsonObject value) { NativeTradingAdapter.this.accept(value); }
-            public void log(String symbol, String value) { PluginLog.action(symbol, value); }
+            public void log(String symbol, String value) { PluginLog.action(symbol, value); if (value.startsWith("Premarket")) display.publishPremarketStatus(symbol, value); }
             public void detail(String symbol, String value) { PluginLog.detail(symbol, value); }
             public void summary(String symbol, String value, String screenMessage) { PluginLog.summary(symbol, value, screenMessage); }
             public void transition(String symbol, String value) { PluginLog.transition(symbol, value); }
@@ -95,12 +96,17 @@ public final class NativeTradingAdapter implements AutoCloseable {
             runtime.trading.setEntrySizeCapProvider(display::entrySizeCap);
             runtime.trading.setAutoCloseUnprotectedPositions(
                     () -> settings.isEnabled(IndicatorConfig.AUTO_CLOSE_UNPROTECTED_POSITIONS));
+            runtime.trading.setPremarketTrading(() -> settings.isEnabled(IndicatorConfig.PREMARKET_TRADING), display::premarketQuote);
+            apis.keySet().forEach(runtime.trading::attachSymbol);
             runtime.start(); stopDisplayTimer.start();
         }
         catch (Exception error) { connectionStatus.setUnavailable("startup failed"); PluginLog.action("", "Native startup unavailable. Check local secrets at " + LocalCredentials.defaultPath() + "; then use Restart Native Trading."); }
     }
     public void dispatch(JsonObject action) {
-        if (runtime == null || closed || !runtime.trading.dispatch(action)) PluginLog.action(string(action, "symbol"), "Native runtime unavailable; no native action dispatched");
+        if (runtime == null || closed || !runtime.trading.dispatch(action)) {
+            String reason = "Native runtime unavailable; no native action dispatched";
+            PluginLog.action(string(action, "symbol"), reason); display.publishPremarketStatus(string(action, "symbol"), reason);
+        }
     }
     public void observeBookmapTrade(String symbol, double price, long timestampNs) {
         NativeRuntime current = runtime;
