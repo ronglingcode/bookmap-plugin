@@ -7,6 +7,25 @@ import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.*;
 
 class SelectedStopTest {
+    @Test void failedValidationReleasesReservationWithoutExtendingExpiry() {
+        AtomicLong time = new AtomicLong(); SelectedStop stop = new SelectedStop(time::get);
+        stop.select("AAPL", 99); SelectedStop.Claim first = stop.reserve("AAPL");
+        assertThrows(IllegalArgumentException.class, () -> stop.reserve("AAPL"));
+        time.set(20_000_000_000L); first.release();
+        assertEquals(10, stop.view().get("remainingSeconds").getAsInt());
+        SelectedStop.Claim second = stop.reserve("AAPL");
+        assertThrows(IllegalArgumentException.class, first::commit);
+        second.commit(); second.commit();
+        assertEquals(0, stop.view().get("price").getAsDouble());
+        assertThrows(IllegalArgumentException.class, () -> stop.reserve("AAPL"));
+    }
+    @Test void expiredOrReplacedReservationCannotSubmitOrClearNewSelection() {
+        AtomicLong time = new AtomicLong(); SelectedStop stop = new SelectedStop(time::get);
+        stop.select("AAPL", 99); SelectedStop.Claim first = stop.reserve("AAPL");
+        stop.select("AAPL", 98); assertThrows(IllegalArgumentException.class, first::commit);
+        first.release(); SelectedStop.Claim second = stop.reserve("AAPL");
+        time.set(SelectedStop.LIFETIME_NS); assertThrows(IllegalArgumentException.class, second::commit);
+    }
     @Test void countdownRoundsUpAndClearsAtExpiryOrConsumption() {
         AtomicLong time = new AtomicLong(); SelectedStop stop = new SelectedStop(time::get);
         stop.select("AAPL", 99);

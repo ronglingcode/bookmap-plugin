@@ -159,6 +159,7 @@ class TradingRuntimeTest {
             assertFalse(runtime.view("PCVX", "test").has("plan"));
             assertTrue(logs.stream().anyMatch(value -> value.contains("Normal trading plan unavailable")));
             runtime.dispatch(json("{\"symbol\":\"PCVX\",\"keyCode\":\"KeyB\"}"));
+            runtime.pendingCommands().get(2, TimeUnit.SECONDS);
             assertTrue(emitted.stream().anyMatch(value -> value.get("type").getAsString().equals("execution_blocked")));
         }
     }
@@ -235,10 +236,12 @@ class TradingRuntimeTest {
             // A real native decision and fake broker acceptance initialize state locally, without a ViteApp ACK.
             JsonObject action = json("{\"symbol\":\"AAPL\",\"tradebook_id\":\"GapGiveAndGoBookmapReversal\",\"entry_method\":\"0.1 R\",\"use_market_order\":true,\"price\":10}");
             runtime.dispatch(action);
+            runtime.pendingCommands().get(2, TimeUnit.SECONDS);
             assertEquals(0, mutations.get(), "Every production entry requires fresh human stop selection");
             runtime.dispatch(json("{\"symbol\":\"AAPL\",\"keyCode\":\"KeyZ\",\"price\":9}"));
             assertEquals(9, runtime.selectedStop().get("price").getAsDouble());
             runtime.dispatch(action);
+            runtime.pendingCommands().get(2, TimeUnit.SECONDS);
             assertEquals(0, runtime.selectedStop().get("price").getAsDouble(), "Entry consumes the selected stop");
             long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(2); while (emitted.stream().noneMatch(event -> event.has("outcome")) && System.nanoTime() < deadline) Thread.sleep(5);
             assertEquals(1, mutations.get(), logs.toString()); assertTrue(emitted.stream().anyMatch(event -> event.has("outcome") && event.get("outcome").getAsString().equals("accepted")), emitted.toString());
@@ -295,6 +298,7 @@ class TradingRuntimeTest {
             JsonObject beforeI = runtime.view("MSFT", "test").getAsJsonObject("state").deepCopy();
             int mutationsBeforeI = mutations.get();
             runtime.dispatch(json("{\"symbol\":\"MSFT\",\"keyCode\":\"KeyI\",\"price\":19.95}"));
+            runtime.pendingCommands().get(2, TimeUnit.SECONDS);
             assertEquals(beforeI, runtime.view("MSFT", "test").getAsJsonObject("state"));
             assertEquals(mutationsBeforeI, mutations.get());
             positionData.set("[]"); now.addAndGet(3000); runtime.refreshAccount();
@@ -305,9 +309,10 @@ class TradingRuntimeTest {
             // The cache has only terminal fills. Cancel must discover a newly submitted broker order.
             orderData.set("[{\"orderId\":\"456\",\"orderStrategyType\":\"TRIGGER\",\"orderType\":\"STOP\",\"status\":\"WORKING\",\"cancelable\":true,\"quantity\":10,\"price\":9,\"orderLegCollection\":[{\"instruction\":\"BUY\",\"instrument\":{\"symbol\":\"AAPL\",\"assetType\":\"EQUITY\"}}]}]");
             runtime.dispatch(json("{\"symbol\":\"AAPL\",\"keyCode\":\"KeyC\"}"));
+            runtime.pendingCommands().get(2, TimeUnit.SECONDS);
             deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(2);
             while (canceledOrders.isEmpty() && System.nanoTime() < deadline) Thread.sleep(5);
-            assertEquals(List.of("/trader/v1/accounts/fake-account/orders/456"), canceledOrders);
+            assertEquals(List.of("/trader/v1/accounts/fake-account/orders/456"), canceledOrders, logs.toString());
             Socket schwab = sockets.get(sockets.size() - 1);
             schwab.handlers.message(schwab, "{\"response\":[{\"service\":\"ADMIN\",\"command\":\"LOGIN\",\"content\":{\"code\":0}}]}");
             assertTrue(schwab.sent.stream().anyMatch(value -> value.contains("ACCT_ACTIVITY") && value.contains("0,1,2,3")));
@@ -328,21 +333,22 @@ class TradingRuntimeTest {
             int tasksBeforeFlatten = tasks.size();
             runtime.dispatch(json("{\"symbol\":\"AAPL\",\"keyCode\":\"KeyF\"}"));
             deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(2);
-            while (tasks.subList(tasksBeforeFlatten, tasks.size()).stream().noneMatch(task -> task.delay == 1000 && !task.canceled) && System.nanoTime() < deadline) Thread.sleep(5);
-            assertEquals(readsBeforeFlatten + 1, accountReads.get());
-            Task followup500 = tasks.subList(tasksBeforeFlatten, tasks.size()).stream().filter(task -> task.delay == 500 && !task.canceled).findFirst().orElseThrow();
-            Task followup1000 = tasks.subList(tasksBeforeFlatten, tasks.size()).stream().filter(task -> task.delay == 1000 && !task.canceled).reduce((a, b) -> b).orElseThrow();
+            runtime.pendingCommands().get(2, TimeUnit.SECONDS);
+            assertEquals(readsBeforeFlatten + 2, accountReads.get(), "Fresh exposure check plus post-mutation refresh");
+            Task followup500 = tasks.stream().filter(task -> task.delay == 500 && !task.canceled).findFirst().orElseThrow();
+            Task followup1000 = tasks.stream().filter(task -> task.delay == 1000 && !task.canceled).reduce((a, b) -> b).orElseThrow();
             positionData.set("[]"); now.addAndGet(500); followup500.canceled = true; followup500.run.run();
-            assertEquals(readsBeforeFlatten + 2, accountReads.get());
+            assertEquals(readsBeforeFlatten + 3, accountReads.get());
             assertEquals(0, runtime.view("AAPL", "test").getAsJsonObject("account").getAsJsonObject("positions").size());
             limited.set(true); now.addAndGet(500); followup1000.canceled = true; followup1000.run.run();
-            assertEquals(readsBeforeFlatten + 3, accountReads.get());
-            runtime.refreshAccount(); assertEquals(readsBeforeFlatten + 3, accountReads.get(), "429 backoff must remain respected");
+            assertEquals(readsBeforeFlatten + 4, accountReads.get());
+            runtime.refreshAccount(); assertEquals(readsBeforeFlatten + 4, accountReads.get(), "429 backoff must remain respected");
             limited.set(false);
             orderData.set("invalid JSON");
             runtime.dispatch(json("{\"symbol\":\"AAPL\",\"keyCode\":\"KeyC\"}"));
+            runtime.pendingCommands().get(2, TimeUnit.SECONDS);
             assertEquals(1, canceledOrders.size());
-            assertTrue(emitted.stream().anyMatch(event -> event.has("reason") && event.get("reason").getAsString().contains("no cancellation attempted")));
+            assertTrue(emitted.stream().anyMatch(event -> event.has("reason") && event.get("reason").getAsString().contains("no mutation attempted")));
             runtime.close(); assertTrue(sockets.stream().allMatch(socket -> socket.closed)); assertTrue(tasks.stream().allMatch(task -> task.canceled)); int readCount = accountReads.get(); tasks.forEach(task -> task.run.run()); runtime.refreshAccount(); assertEquals(readCount, accountReads.get());
             assertTrue(logs.stream().noneMatch(value -> value.contains("fake-secret") || value.contains("fake-refresh")));
         }

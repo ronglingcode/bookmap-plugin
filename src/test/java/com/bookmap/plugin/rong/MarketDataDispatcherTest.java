@@ -38,4 +38,26 @@ class MarketDataDispatcherTest {
         assertFalse(reducer.submit(() -> fail("detached callback")));
         assertEquals("stopped", reducer.status().get("marketDataState").getAsString());
     }
+    @Test void failedCoreConsumerDoesNotStopOtherConsumersOrFutureEvents() {
+        AtomicInteger total = new AtomicInteger();
+        try (var reducer = new MarketDataDispatcher("TEST", message -> { throw new IllegalStateException("Log unavailable"); })) {
+            assertTrue(reducer.submit(() -> {
+                reducer.reduce("liquidity", () -> { throw new IllegalArgumentException(); });
+                reducer.reduce("price", total::incrementAndGet);
+            }));
+            assertTrue(reducer.submit(total::incrementAndGet));
+            assertEquals(2, total.get()); assertFalse(reducer.healthy());
+            assertEquals(1, reducer.status().get("processingFailures").getAsLong());
+        }
+    }
+    @Test void optionalDisplayFailureRetriesAfterCooldownWithoutInvalidatingEvidence() {
+        AtomicLong time = new AtomicLong(); AtomicInteger attempts = new AtomicInteger();
+        try (var reducer = new MarketDataDispatcher(time::get, message -> {})) {
+            reducer.optional("display", () -> { attempts.incrementAndGet(); throw new IllegalStateException(); });
+            reducer.optional("display", attempts::incrementAndGet); assertEquals(1, attempts.get());
+            time.set(1_000_000_000L); reducer.optional("display", attempts::incrementAndGet);
+            assertEquals(2, attempts.get()); assertTrue(reducer.healthy());
+            assertEquals(1, reducer.status().get("observerFailures").getAsLong());
+        }
+    }
 }

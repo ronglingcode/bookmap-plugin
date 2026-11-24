@@ -13,6 +13,71 @@ import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.*;
 
 class NativeExecutionTest {
+    @Test void brokenLogsAndDisplayCannotPreventSubmissionOrChangeBrokerOutcome() throws Exception {
+        AtomicInteger mutations = new AtomicInteger(); List<JsonObject> results = new CopyOnWriteArrayList<>();
+        var api = new Api((uri, method, headers, body) -> {
+            mutations.incrementAndGet(); return new com.bookmap.plugin.rong.miniviteapp.ports.HttpPort.Response(204, "");
+        }, (symbol, message) -> { throw new IllegalStateException("Logger unavailable"); });
+        try (var engine = new MiniViteApp(api, (connection, event) -> {
+            results.add(event.deepCopy()); throw new IllegalStateException("Display unavailable");
+        }, (symbol, message) -> { throw new IllegalStateException("Logger unavailable"); }, String::trim)) {
+            engine.enableRecovery(command -> {});
+            engine.receive(this, json("{\"type\":\"execution_token\",\"accountHash\":\"fake\",\"accessToken\":\"fake\",\"expiresAt\":9999999999999}"));
+            JsonObject update = json("{\"type\":\"execution_state\",\"symbols\":[]}");
+            update.getAsJsonArray("symbols").add(fixture("market out smallest first tie")); engine.receive(this, update);
+            engine.route(action("KeyM")); engine.pendingCommands().get(2, TimeUnit.SECONDS);
+            assertEquals(1, mutations.get());
+            assertTrue(results.stream().anyMatch(event -> event.has("outcome") && event.get("outcome").getAsString().equals("accepted")));
+            assertTrue(engine.status().get("consumerFailures").getAsLong() > 0);
+            engine.route(action("KeyM")); engine.pendingCommands().get(2, TimeUnit.SECONDS); assertEquals(2, mutations.get());
+        }
+    }
+    @Test void productionRecoveryDoesNotReplayLostOpeningAndResumesAfterBrokerMatch() throws Exception {
+        try (var rig = new Rig()) {
+            JsonObject entry = rig.connectEntry();
+            rig.engine.enableRecovery(command -> rig.updateState(System.currentTimeMillis()));
+            rig.closeMutationResponse = true; rig.engine.route(entry);
+            rig.engine.pendingCommands().get(3, TimeUnit.SECONDS);
+            assertEquals("unknown", rig.finish().get("outcome").getAsString()); assertEquals(1, rig.mutations.get());
+            rig.closeMutationResponse = false; rig.engine.route(entry); rig.engine.pendingCommands().get(3, TimeUnit.SECONDS);
+            assertEquals(1, rig.mutations.get(), "Unconfirmed opening must not be replayed");
+            assertTrue(rig.events.stream().anyMatch(event -> event.has("reason") && event.get("reason").getAsString().contains("Opening outcome still unconfirmed")));
+            rig.engine.route(action("KeyC")); rig.engine.pendingCommands().get(3, TimeUnit.SECONDS);
+            assertEquals("no_op", rig.finish(2).get("outcome").getAsString(), "Cancel remains usable");
+            JsonObject observed = rig.bodies.get(0).deepCopy(); observed.addProperty("orderId", "999"); observed.addProperty("status", "FILLED");
+            observed.addProperty("enteredTime", java.time.Instant.now().toString());
+            JsonArray orders = new JsonArray(); orders.add(observed); rig.engine.observeBrokerOrders(orders);
+            rig.engine.route(entry); rig.engine.pendingCommands().get(3, TimeUnit.SECONDS);
+            assertEquals("accepted", rig.finish(3).get("outcome").getAsString()); assertEquals(2, rig.mutations.get());
+        }
+    }
+    @Test void productionLaneSerializesRepeatedMarketExitsUntilFreshPreparation() throws Exception {
+        try (var rig = new Rig()) {
+            rig.state = fixture("market out smallest first tie"); rig.connect();
+            AtomicInteger preparations = new AtomicInteger();
+            rig.engine.enableRecovery(command -> { preparations.incrementAndGet(); rig.updateState(System.currentTimeMillis()); });
+            rig.allowMutation = new CountDownLatch(1); rig.engine.route(action("KeyM"));
+            assertTrue(rig.mutationEntered.await(3, TimeUnit.SECONDS)); rig.engine.route(action("KeyM"));
+            assertEquals(1, preparations.get()); assertEquals(1, rig.mutations.get());
+            rig.allowMutation.countDown(); rig.engine.pendingCommands().get(3, TimeUnit.SECONDS);
+            assertEquals(2, preparations.get()); assertEquals(2, rig.mutations.get());
+        }
+    }
+    @Test void localSizingRejectionDoesNotConsumeSelectedStop() throws Exception {
+        try (var rig = new Rig()) {
+            JsonObject action = rig.connectEntry();
+            var stop = new com.bookmap.plugin.rong.miniviteapp.core.controllers.SelectedStop();
+            rig.engine.requireSelectedStop(stop); stop.select("AAPL", 9.5);
+            var context = rig.state.getAsJsonObject("entryContext");
+            context.add("bookmapSizeCap", json("{\"mode\":\"PROPORTIONAL\",\"maxRiskMultiple\":0}"));
+            rig.updateState(System.currentTimeMillis()); rig.engine.route(action);
+            assertEquals(0, rig.mutations.get()); assertEquals(9.5, stop.view().get("price").getAsDouble());
+            context.add("bookmapSizeCap", json("{\"mode\":\"PROPORTIONAL\",\"maxRiskMultiple\":1}"));
+            rig.updateState(System.currentTimeMillis()); rig.engine.route(action);
+            assertEquals("accepted", rig.finish().get("outcome").getAsString());
+            assertEquals(0, stop.view().get("price").getAsDouble()); assertEquals(1, rig.mutations.get());
+        }
+    }
     @Test void wallOutButtonsRouteDirectlyAndReplaceOnlyOneOrTwoLimits() throws Exception {
         for (int count : new int[]{1, 2}) try (var rig = new Rig()) {
             rig.connect();
@@ -231,7 +296,7 @@ class NativeExecutionTest {
             rig.engine.route(command); assertEquals(1, rig.mutations.get());
             stop.select("AAPL", isLong ? 11 : 9); rig.engine.route(command);
             assertEquals(1, rig.mutations.get(), "Wrong-side stop cannot open exposure");
-            assertEquals(0, stop.view().get("price").getAsDouble());
+            assertEquals(isLong ? 11 : 9, stop.view().get("price").getAsDouble(), "Local rejection preserves selection and its original expiry");
         }
     }
     @Test void reloadAndSwapCannotBypassFreshStopAndExitOnlySwapStillWorks() throws Exception {

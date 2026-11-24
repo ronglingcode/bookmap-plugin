@@ -84,9 +84,13 @@ state and the remaining exposure are reconciled. Definite broker rejections do
 not permanently lock the symbol. Automatic protection deferred by an in-progress
 premarket edit is retried after the open without restarting its grace period.
 
-Mutations are never automatically retried. A lost/uncertain mutation response
-blocks further premarket mutations for that symbol until broker review and a
-native-runtime restart, to avoid duplicate orders.
+Mutations are never automatically retried. A lost submission response restricts
+new submissions for that symbol while polling looks for a unique new broker order
+matching its payload and submission time. Cancel All remains available, and
+confirmation resumes normal operation without a runtime restart. An absent or
+ambiguous broker record remains unconfirmed. Cancellation errors are reconciled
+against current broker order status on the next explicit action; they do not
+permanently disable the symbol. See [execution resilience](execution-resilience.md).
 
 Hover tooltips are disabled in the manual ticket. Button clicks and input errors
 are logged, and the ticket displays runtime submission, acceptance, or rejection

@@ -46,8 +46,11 @@ public final class TradingRuntime implements AutoCloseable {
     private final SocketPort sockets;
     private final SocketPort.Scheduler scheduler;
     private final Executor executor;
+    private final RuntimeWork work;
+    private final LatestTasks projections;
+    private final CoalescingStateWriter stateWriter;
     private final LongSupplier now;
-    private final Events events;
+    private final IsolatedEvents events;
     private final MiniViteApp execution;
     private final PremarketTrading premarket;
     private volatile BooleanSupplier premarketEnabled = () -> false;
@@ -71,15 +74,21 @@ public final class TradingRuntime implements AutoCloseable {
     private TradingConfig.Result config;
     private TradeState state;
     private MarketStreams streams;
-    private CompletableFuture<Void> persistence = CompletableFuture.completedFuture(null);
     private volatile boolean stopped;
     private CompletableFuture<Void> startup;
     private long revision, nextAccountRead, accountBackoffUntil, accountReadStartedAt;
     private Runnable accountRetry;
+    private final Set<Long> accountFollowups = new HashSet<>();
     private String lastNativeOrdersLog, lastNativeFillsLog;
+    private final FreshRead<Void> brokerObservations = new FreshRead<>();
     public TradingRuntime(HttpPort http, CredentialPort credentials, JsonObject sections, SocketPort sockets, SocketPort.Scheduler scheduler,
             Executor executor, LongSupplier now, Events events) {
-        this.credentials = credentials; this.sockets = sockets; this.scheduler = scheduler; this.executor = executor; this.now = now; this.events = events;
+        this(http, credentials, sections, sockets, scheduler, RuntimeWork.using(executor), now, events);
+    }
+    public TradingRuntime(HttpPort http, CredentialPort credentials, JsonObject sections, SocketPort sockets, SocketPort.Scheduler scheduler,
+            RuntimeWork work, LongSupplier now, Events events) {
+        this.work = work; this.credentials = credentials; this.sockets = sockets; this.scheduler = scheduler; this.executor = work.background; this.now = now; this.events = new IsolatedEvents(events, work.display);
+        projections = new LatestTasks(work.display, error -> failure("", "Deferred projection", error));
         oauth = new OAuth(http, credentials, java.net.URI.create("https://api.schwabapi.com/v1/oauth/token"), now);
         HttpPort authenticatedReads = (uri, method, headers, body) -> {
             HttpPort.Response response = http.request(uri, method, headers, body);
@@ -93,10 +102,11 @@ public final class TradingRuntime implements AutoCloseable {
             }
             return response;
         };
-        reads = new ReadApi(authenticatedReads, value -> events.detail("", value));
+        reads = new ReadApi(authenticatedReads, value -> this.events.detail("", value));
         priceHistory = new PriceHistoryApi(authenticatedReads);
         JsonObject firebase = object(sections, "firebaseConfig");
         firestore = new com.bookmap.plugin.rong.miniviteapp.libraries.firestore.Api(http, string(firebase, "projectId"), () -> string(firebase, "apiKey"), () -> "", now);
+        stateWriter = new CoalescingStateWriter(work.persistence, scheduler, firestore::setTradingState, error -> failure("", "State persistence; retry pending", error));
         massiveKey = string(object(sections, "massive"), "apiKey"); massive = new com.bookmap.plugin.rong.miniviteapp.libraries.massive.Api(http, () -> massiveKey);
         market = new MarketLoader(massive, executor, now);
         if (object(sections, "tradingPolicy").has("coreTargetEnabled")) policy.addProperty("coreTargetEnabled", bool(object(sections, "tradingPolicy"), "coreTargetEnabled"));
@@ -132,8 +142,61 @@ public final class TradingRuntime implements AutoCloseable {
                     requireAccepted(result); return result.newOrderId;
                 });
             }
-        }, executor, scheduler, now, () -> !stopped && premarketEnabled.getAsBoolean(),
-                symbol -> premarketQuotes.apply(symbol), events::log, this::refreshAccountWithFollowups);
+        }, work.broker, scheduler, now, () -> !stopped && premarketEnabled.getAsBoolean(),
+                symbol -> premarketQuotes.apply(symbol), this.events::log, this::refreshAccountWithFollowups);
+        execution.enableRecovery(this::prepareExecution, now);
+    }
+    private void prepareExecution(JsonObject action) throws Exception {
+        if (stopped) throw new IllegalStateException("Native runtime stopped");
+        String symbol = string(action, "symbol").trim();
+        boolean refresh;
+        synchronized (lock) {
+            if (account == null || state == null) throw new IllegalStateException("Broker account not ready");
+            refresh = MiniViteApp.commandPriority(action) == 0 || now.getAsLong() - accountReadStartedAt > 3000;
+        }
+        refresh |= execution.needsReconciliation(symbol) || execution.hasUncertainOpening(symbol);
+        if (refresh) {
+            brokerObservations.read(System.nanoTime(), () -> { readBrokerObservation(); return null; });
+            execution.accountReconciled(symbol);
+        }
+        publishToken();
+        boolean held;
+        synchronized (lock) { held = number(object(object(account, "positions"), symbol), "netQuantity") != 0
+                || array(object(account, "exitPairs"), symbol).size() > 0; }
+        if (MiniViteApp.commandPriority(action, held) < 2) {
+            JsonObject input;
+            synchronized (lock) { input = exitInputs(symbol); input.getAsJsonObject("entryContext").addProperty("bookmapAccountReadStartedAt", accountReadStartedAt); }
+            JsonObject update = message("execution_state"); JsonArray symbols = new JsonArray(); symbols.add(input);
+            update.add("symbols", symbols); execution.receive(this, update);
+        } else publishInputs(symbol);
+    }
+    /** Shared by polling and command recovery; one coherent observation replaces derived state. */
+    private void readBrokerObservation() throws Exception {
+        synchronized (lock) {
+            if (stopped) throw new IllegalStateException("Native runtime stopped");
+            if (now.getAsLong() < accountBackoffUntil) throw new IllegalStateException("Broker read rate limited; recovery scheduled");
+        }
+        String token = oauth.accessToken(false), date = MarketClock.marketTime(now.getAsLong()).date;
+        long readStartedAt = now.getAsLong();
+        String hash = accountHash();
+        CompletableFuture<JsonObject> accountRead = supplyBrokerRead(() -> reads.getAccount(token));
+        CompletableFuture<JsonArray> ordersRead = supplyBrokerRead(() -> reads.getOrders(hash, token, date));
+        CompletableFuture.allOf(accountRead, ordersRead).join();
+        JsonObject raw = accountRead.join(); JsonArray orders = ordersRead.join();
+        JsonObject projected = AccountProjection.projectAccount(raw, orders, date, this::price);
+        synchronized (lock) {
+            if (stopped) return;
+            account = projected; accountReadStartedAt = readStartedAt;
+            ledger = TradeLedger.projectTradeLedger(object(projected, "executions"), number(policy, "dailyMaxLoss"));
+        }
+        execution.observeBrokerOrders(orders);
+        observe("Premarket order observation", () -> premarket.observeOrders(orders));
+        projections.put("diagnostics", () -> { logNativeOrders(orders, date); logNativeFills(projected, date); });
+    }
+    private <T> CompletableFuture<T> supplyBrokerRead(Callable<T> request) {
+        return CompletableFuture.supplyAsync(() -> {
+            try { return request.call(); } catch (Exception error) { throw new CompletionException(error); }
+        }, work.accountRequests);
     }
     private static void requireAccepted(Api.Result result) {
         if (result.outcome.equals("rejected")) throw new PremarketTrading.RejectedOrderException("Broker rejected: " + result.reason);
@@ -169,14 +232,16 @@ public final class TradingRuntime implements AutoCloseable {
                 premarket.observeOrders(orders);
                 logNativeOrders(orders, date);
                 JsonObject projected = AccountProjection.projectAccount(raw, orders, date, this::price);
+                execution.observeBrokerOrders(orders);
                 logNativeFills(projected, date);
                 synchronized (lock) {
                     if (stopped) return; config = TradingConfig.emptyConfig("momentumSimple"); account = projected; accountReadStartedAt = readStartedAt; ledger = TradeLedger.projectTradeLedger(object(projected, "executions"), number(policy, "dailyMaxLoss"));
                     state = new TradeState(date, number(projected, "currentBalance"), now.getAsLong(), null);
                 }
                 publishToken(); publishAccount(); checkStopLossProtection();
-                repeat(30000, this::refreshToken); repeat(3000, this::refreshAccount); repeat(60000, this::refreshConfig); repeat(200, this::publishDirty);
-                repeat(20000, this::disciplineJobs);
+                repeat(30000, this::refreshToken); repeat(3000, this::refreshAccount); repeat(60000, this::refreshConfig);
+                repeat(200, () -> { projections.retry(); projections.put("market", this::publishDirty); });
+                repeat(20000, () -> projections.put("discipline", this::disciplineJobs));
                 events.status("schwab", "account ready");
                 events.log("", "Native broker account initialized; loading optional trading plans independently");
                 refreshConfig();
@@ -257,7 +322,7 @@ public final class TradingRuntime implements AutoCloseable {
     }
     public void refreshToken() {
         if (stopped || !tokenReading.compareAndSet(false, true)) return;
-        executor.execute(() -> { try { oauth.accessToken(false); publishToken(); } catch (Exception error) { failure("", "Token refresh", error); } finally { tokenReading.set(false); } });
+        service(work.broker, tokenReading, "Token refresh", () -> { try { oauth.accessToken(false); publishToken(); } catch (Exception error) { failure("", "Token refresh", error); } finally { tokenReading.set(false); } });
     }
     public void exchangeAuthorizationCode(String callbackUrl) {
         if (stopped) return;
@@ -327,8 +392,12 @@ public final class TradingRuntime implements AutoCloseable {
     public void refreshAccountWithFollowups() {
         if (stopped) return;
         refreshAccount(true);
-        after(500, () -> refreshAccount(true));
-        after(1000, () -> refreshAccount(true));
+        accountFollowup(500); accountFollowup(1000);
+    }
+    private void accountFollowup(long delay) {
+        synchronized (lock) { if (stopped || !accountFollowups.add(delay)) return; }
+        try { after(delay, () -> { synchronized (lock) { accountFollowups.remove(delay); } refreshAccount(true); }); }
+        catch (RuntimeException error) { synchronized (lock) { accountFollowups.remove(delay); } throw error; }
     }
     private void refreshAccount(boolean afterMutation) {
         if (stopped) return;
@@ -338,18 +407,13 @@ public final class TradingRuntime implements AutoCloseable {
         }
         if (!accountReading.compareAndSet(false, true)) { if (afterMutation) accountUrgentAgain.set(true); accountAgain.set(true); return; }
         synchronized (lock) { nextAccountRead = now.getAsLong() + 3000; }
-        executor.execute(() -> {
+        service(work.broker, accountReading, "Account refresh", () -> {
             long started = now.getAsLong();
             try {
-                String token = oauth.accessToken(false), date = MarketClock.marketTime(now.getAsLong()).date;
-                long readStartedAt = now.getAsLong();
-                JsonObject raw = reads.getAccount(token); JsonArray orders = reads.getOrders(accountHash(), token, date);
-                premarket.observeOrders(orders);
-                logNativeOrders(orders, date);
-                JsonObject projected = AccountProjection.projectAccount(raw, orders, date, this::price);
-                logNativeFills(projected, date);
-                synchronized (lock) { if (stopped) return; account = projected; accountReadStartedAt = readStartedAt; ledger = TradeLedger.projectTradeLedger(object(projected, "executions"), number(policy, "dailyMaxLoss")); }
-                publishToken(); publishAccount(); checkStopLossProtection(); disciplineJobs(); accountNotifications();
+                brokerObservations.read(0, () -> { readBrokerObservation(); return null; });
+                publishToken(); projections.put("account", this::publishAccount);
+                observe("Stop-loss protection", this::checkStopLossProtection);
+                projections.put("discipline", () -> { disciplineJobs(); accountNotifications(); });
             } catch (Exception error) { failure("", "Account refresh", error); accountAgain.set(true); }
             finally {
                 events.detail("", "Native account refresh: durationMs=" + Math.max(0, now.getAsLong() - started) + "; urgent=" + afterMutation);
@@ -396,7 +460,7 @@ public final class TradingRuntime implements AutoCloseable {
     }
     public void refreshConfig() {
         if (stopped || !configReading.compareAndSet(false, true)) return;
-        executor.execute(() -> {
+        service(executor, configReading, "Config refresh", () -> {
             try {
                 TradingConfig.Result loaded = TradingConfig.readAvailableTradingConfig(firestore.fetchConfigData(), reason -> events.log("", "Normal trading plan unavailable: " + reason)); validateProfile(loaded.profile);
                 String date = MarketClock.marketTime(now.getAsLong()).date; boolean rollover;
@@ -425,10 +489,12 @@ public final class TradingRuntime implements AutoCloseable {
         });
     }
     private void publishAccount() { List<String> symbols; synchronized (lock) { if (stopped || config == null) return; accountSymbols.addAll(config.symbols); for (String field : new String[]{"positions", "entryOrders", "exitPairs", "executions"}) accountSymbols.addAll(object(account, field).keySet()); symbols = new ArrayList<>(accountSymbols); }
-        symbols.forEach(symbol -> { publishInputs(symbol); events.message(view(symbol, "account_ready")); }); }
+        symbols.forEach(symbol -> { observe("Execution input publication", () -> publishInputs(symbol)); observe("Account view", () -> events.message(view(symbol, "account_ready"))); }); }
     private void publishDirty() { List<String> symbols; synchronized (lock) { if (stopped) return; symbols = new ArrayList<>(dirty); dirty.clear(); } symbols.forEach(symbol -> { events.message(view(symbol, "market_update")); priceNotifications(symbol); }); }
     public JsonObject view(String symbol, String type) {
         JsonObject value = message(type); value.addProperty("symbol", symbol); value.addProperty("timestamp", now.getAsLong());
+        value.addProperty("consumerFailures", events.failures());
+        value.addProperty("coalescedProjections", projections.coalesced()); value.addProperty("coalescedStateWrites", stateWriter.coalesced());
         if (premarketEnabled.getAsBoolean()) value.add("premarketOrders", premarket.ordersForChart(symbol));
         if (type.equals("market_update")) { var loaded = market.getState(symbol); if (loaded != null) value.add("market", loaded.metrics()); return value; }
         synchronized (lock) { if (config != null) { JsonObject plan = selectedPlan(symbol); if (plan != null) value.add("plan", plan.deepCopy()); value.add("tradingSettings", config.tradingSettings.deepCopy()); value.add("policy", policy.deepCopy()); }
@@ -509,44 +575,10 @@ public final class TradingRuntime implements AutoCloseable {
             if (key.equals("KeyE") || key.equals("KeyR") || key.equals("KeyV")) { events.log(symbol, key + " native command is disabled; no broker requests attempted"); return true; }
             if (key.equals("KeyC")) {
                 selectedStop.clear();
-                JsonObject command = action.deepCopy();
-                executor.execute(() -> cancelCurrentEntries(symbol, command));
-                return true;
             }
             if (!string(action, "retest_warning").isEmpty()) events.notify(symbol, string(action, "retest_warning"));
-            publishInputs(symbol); return execution.route(action);
+            return execution.route(action);
         } catch (RuntimeException error) { failure(symbol, "Native command", error); if (type.equals("core_plan_update")) { JsonObject view = view(symbol, "command_state"); view.addProperty("requestId", string(action, "requestId")); view.addProperty("updateStatus", "error"); view.addProperty("error", error.getMessage()); events.message(view); } return true; }
-    }
-    private void cancelCurrentEntries(String symbol, JsonObject command) {
-        try {
-            events.detail(symbol, "Cancel requested; refreshing broker orders before selecting entries; no cancellation attempted yet");
-            String token = oauth.accessToken(false), date = MarketClock.marketTime(now.getAsLong()).date;
-            JsonArray orders = reads.getOrders(accountHash(), token, date);
-            logNativeOrders(orders, date);
-            // Project only order state; do not overwrite the cached positions or trade ledger.
-            JsonObject raw = new JsonObject(), balances = new JsonObject();
-            balances.addProperty("liquidationValue", 0); raw.add("currentBalances", balances);
-            JsonObject projected = AccountProjection.projectAccount(raw, orders, date, this::price);
-            JsonObject input;
-            synchronized (lock) {
-                if (stopped) return;
-                if (state == null || account == null) throw new IllegalStateException("Native account is not ready");
-                input = exitInputs(symbol);
-            }
-            input.add("entries", array(object(projected, "entryOrders"), symbol));
-            input.add("pairs", array(object(projected, "exitPairs"), symbol));
-            events.detail(symbol, "Cancel broker order refresh completed; fetched=" + orders.size()
-                    + "; pendingEntries=" + input.getAsJsonArray("entries").size()
-                    + "; exitPairs=" + input.getAsJsonArray("pairs").size()
-                    + "; selection=STOP entries only");
-            publishToken();
-            JsonObject update = message("execution_state"); JsonArray symbols = new JsonArray(); symbols.add(input); update.add("symbols", symbols);
-            synchronized (execution) { execution.receive(this, update); execution.route(command); }
-        } catch (Exception error) {
-            failure(symbol, "Cancel preparation; cancellation not attempted", error);
-            JsonObject blocked = message("execution_blocked"); blocked.addProperty("symbol", symbol);
-            blocked.addProperty("reason", "Cancel preparation failed; no cancellation attempted"); events.message(blocked);
-        }
     }
     public JsonObject manualInputs(String symbol) { synchronized (lock) { return manual.getOrDefault(symbol, new JsonObject()).deepCopy(); } }
     /** On-demand journaling read; never replace or lock the live account cache during I/O. */
@@ -575,13 +607,18 @@ public final class TradingRuntime implements AutoCloseable {
     }
     private void executionEvent(JsonObject result) {
         String symbol = string(result, "symbol");
+        if (string(result, "type").equals("execution_blocked") && string(result, "keyCode").equals("SafetyClosePosition"))
+            stopLossMonitor.retryClose(symbol);
+        if (string(result, "type").equals("execution_result") && string(result, "action").equals("stop_loss_safety_close")
+                && number(result, "acknowledgedRequestCount") == 0 && number(result, "unknownRequestCount") == 0)
+            stopLossMonitor.retryClose(symbol);
         if (result.has("entry")) {
             boolean changed; synchronized (lock) { JsonObject plan = config == null ? null : selectedPlan(symbol); changed = state != null && state.acceptEntry(symbol, object(result, "entry"), object(plan, "atr"), now.getAsLong()); }
             if (changed) persistState();
         }
         events.message(result.deepCopy());
         if (string(result, "type").equals("execution_result")) {
-            publishInputs(symbol);
+            observe("Execution input publication", () -> publishInputs(symbol));
             if (number(result, "attemptedRequestCount") > 0) refreshAccountWithFollowups();
             else refreshAccount();
         }
@@ -639,9 +676,9 @@ public final class TradingRuntime implements AutoCloseable {
         if (persist) persistState(); notices.forEach(value -> events.notify(symbol, value));
     }
     public void persistState() {
-        JsonObject saved; String profile; CompletableFuture<Void> previous, next = new CompletableFuture<>();
-        synchronized (lock) { if (stopped || state == null || config == null || !planStateLoaded) return; saved = state.snapshot(); profile = config.profile; previous = persistence; persistence = next; }
-        previous.handle((value, error) -> null).thenRunAsync(() -> { try { firestore.setTradingState(profile, saved); } catch (Exception error) { failure("", "State persistence", error); } finally { next.complete(null); } }, executor);
+        JsonObject saved; String profile;
+        synchronized (lock) { if (stopped || state == null || config == null || !planStateLoaded) return; saved = state.snapshot(); profile = config.profile; }
+        stateWriter.put(profile, saved);
     }
     private void after(long delay, Runnable task) {
         synchronized (lock) {
@@ -655,7 +692,11 @@ public final class TradingRuntime implements AutoCloseable {
         }
     }
     private void repeat(long delay, Runnable task) {
-        synchronized (lock) { if (stopped) return; final Runnable[] cancel = new Runnable[1]; cancel[0] = scheduler.after(delay, () -> { synchronized (lock) { timers.remove(cancel[0]); if (stopped) return; } task.run(); repeat(delay, task); }); timers.add(cancel[0]); }
+        synchronized (lock) { if (stopped) return; final Runnable[] cancel = new Runnable[1]; cancel[0] = scheduler.after(delay, () -> {
+            synchronized (lock) { timers.remove(cancel[0]); if (stopped) return; }
+            try { task.run(); } catch (RuntimeException error) { failure("", "Periodic task", error); }
+            finally { repeat(delay, task); }
+        }); timers.add(cancel[0]); }
     }
     private void failure(String symbol, String operation, Throwable error) {
         if (stopped) return; String reason;
@@ -663,7 +704,15 @@ public final class TradingRuntime implements AutoCloseable {
         catch (Exception ignored) { reason = error.getClass().getSimpleName(); }
         events.log(symbol, operation + " failed: " + reason);
     }
-    public CompletableFuture<Void> pendingPersistence() { synchronized (lock) { return persistence; } }
-    @Override public void close() { premarket.close(); MarketStreams previous; List<Runnable> cancel; synchronized (lock) { stopped = true; previous = streams; cancel = new ArrayList<>(timers); timers.clear(); if (accountRetry != null) { cancel.add(accountRetry); accountRetry = null; } } cancel.forEach(Runnable::run); if (previous != null) previous.close(); market.close(); execution.close(); }
+    private void observe(String operation, Runnable action) {
+        try { action.run(); } catch (RuntimeException error) { failure("", operation, error); }
+    }
+    private void service(Executor target, AtomicBoolean busy, String operation, Runnable task) {
+        try { target.execute(task); }
+        catch (RejectedExecutionException error) { busy.set(false); failure("", operation + "; capacity unavailable, retry on next tick", error); }
+    }
+    public CompletableFuture<Void> pendingPersistence() { return stateWriter.pending(); }
+    public CompletableFuture<Void> pendingCommands() { return execution.pendingCommands(); }
+    @Override public void close() { premarket.close(); MarketStreams previous; List<Runnable> cancel; synchronized (lock) { stopped = true; previous = streams; cancel = new ArrayList<>(timers); timers.clear(); if (accountRetry != null) { cancel.add(accountRetry); accountRetry = null; } } cancel.forEach(Runnable::run); if (previous != null) previous.close(); market.close(); execution.close(); projections.close(); stateWriter.close(); }
 }
 

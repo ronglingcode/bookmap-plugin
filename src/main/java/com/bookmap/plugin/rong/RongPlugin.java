@@ -630,6 +630,14 @@ public class RongPlugin implements CustomModuleAdapter,
         if (dispatcher == null) { task.run(); return; }
         dispatcher.submit(kind, () -> { if (initialized) task.run(); });
     }
+    private void reduceMarketComponent(String name, Runnable task) {
+        MarketDataDispatcher dispatcher = marketDataDispatcher;
+        if (dispatcher == null) task.run(); else dispatcher.reduce(name, task);
+    }
+    private void updateMarketObserver(String name, Runnable task) {
+        MarketDataDispatcher dispatcher = marketDataDispatcher;
+        if (dispatcher == null) task.run(); else dispatcher.optional(name, task);
+    }
 
     private void processDepth(boolean isBid, int price, int size) {
         if (!initialized) return;
@@ -638,19 +646,16 @@ public class RongPlugin implements CustomModuleAdapter,
         if (price <= 0 || size < 0) return;
         long eventTimeNs = getEventTimeNs();
         PatternEvent.TimestampProvenance provenance = patternEventProvenance();
-        if (wallChangeTracker != null) {
-            wallChangeTracker.onDepth(isBid, price, size, eventTimeNs);
-        }
-        if (sharedServer != null) sharedServer.observeSessionDepth(alias, isBid, price, size, lastTimestampNs);
-        if (sharedServer != null && runMode == BookmapRunMode.REPLAY) {
-            sharedServer.observeCairoReplayDepth(alias, isBid, price, size, lastTimestampNs);
-        }
         synchronized (orderBook) {
             orderBook.update(isBid, price, size);
             if (sharedServer != null && runMode.dataMode.equals("live") && !sessionHistoryLoading) {
                 sharedServer.markCairoLiveDepth(alias, lastTimestampNs);
             }
         }
+        if (sharedServer != null) reduceMarketComponent("session-depth", () -> sharedServer.observeSessionDepth(alias, isBid, price, size, lastTimestampNs));
+        if (sharedServer != null && runMode == BookmapRunMode.REPLAY)
+            reduceMarketComponent("replay-depth", () -> sharedServer.observeCairoReplayDepth(alias, isBid, price, size, lastTimestampNs));
+        if (wallChangeTracker != null) reduceMarketComponent("wall-changes", () -> wallChangeTracker.onDepth(isBid, price, size, eventTimeNs));
         if (bidBreakdownMonitor != null) {
             bidBreakdownMonitor.onDepth(isBid, price, size, lastTimestampNs, patternMonitorSnapshotComplete);
             bidBreakdownPainter.refresh();
@@ -685,6 +690,19 @@ public class RongPlugin implements CustomModuleAdapter,
         long eventTimeNs = getEventTimeNs();
         PatternEvent.TimestampProvenance provenance = patternEventProvenance();
         double realPrice = BookmapPriceNormalizer.toWirePrice(price, instrumentInfo.pips);
+        int priceTick = (int) Math.round(price);
+        NativeTradingAdapter trading = nativeTrading;
+        if (trading != null) reduceMarketComponent("trading-price", () -> trading.observeBookmapTrade(alias, realPrice, eventTimeNs));
+        if (sharedServer != null) {
+            reduceMarketComponent("session-levels", () -> sharedServer.updateRegularSessionHighLow(alias, realPrice, eventTimeNs));
+            reduceMarketComponent("session-trade", () -> {
+                sharedServer.observeSessionTime(alias, lastTimestampNs);
+                if (sessionHistoryLoading) sharedServer.observeSessionHistoricalTrade(alias, priceTick, size,
+                        tradeInfo == null ? null : tradeInfo.isBidAggressor, lastTimestampNs);
+                else sharedServer.observeSessionTrade(alias, priceTick, size, tradeInfo == null ? null : tradeInfo.isBidAggressor,
+                        lastTimestampNs, patternMonitorSnapshotComplete);
+            });
+        }
         ReplayVwap recorded = replayVwap;
         if (recorded != null) {
             recorded.trade(realPrice, size, lastTimestampNs);
@@ -694,11 +712,10 @@ public class RongPlugin implements CustomModuleAdapter,
                 lastReplayVwapPoint = lastTimestampNs;
             }
         }
-        if (sharedServer != null) sharedServer.publishCairoTrade(alias, runMode.dataMode, realPrice, lastTimestampNs, size, recorded);
+        if (sharedServer != null) reduceMarketComponent("cairo-trade", () -> sharedServer.publishCairoTrade(alias, runMode.dataMode, realPrice, lastTimestampNs, size, recorded));
         ReplayTradeWindow replay = replayTradeWindow;
         if (replay != null) replay.observeTrade(realPrice, lastTimestampNs);
         wallChangeStockPrice = realPrice;
-        int priceTick = (int) Math.round(price);
         if (falseBreakoutMonitor != null) {
             falseBreakoutMonitor.onTrade(priceTick, size, tradeInfo == null ? null : tradeInfo.isBidAggressor,
                     lastTimestampNs, patternMonitorSnapshotComplete);
@@ -709,27 +726,14 @@ public class RongPlugin implements CustomModuleAdapter,
                     lastTimestampNs, patternMonitorSnapshotComplete);
             reclaimSecondBidPainter.refresh();
         }
-        if (sharedServer != null) {
-            sharedServer.observeSessionTime(alias, lastTimestampNs);
-            if (sessionHistoryLoading) {
-                sharedServer.observeSessionHistoricalTrade(alias, priceTick, size,
-                        tradeInfo == null ? null : tradeInfo.isBidAggressor, lastTimestampNs);
-            } else {
-                sharedServer.observeSessionTrade(alias, priceTick, size, tradeInfo == null ? null : tradeInfo.isBidAggressor,
-                        lastTimestampNs, patternMonitorSnapshotComplete);
-            }
-            sharedServer.updateRegularSessionHighLow(alias, realPrice, eventTimeNs);
-        }
         if (bidBreakdownMonitor != null) {
             bidBreakdownMonitor.onTrade(priceTick, size, lastTimestampNs, patternMonitorSnapshotComplete);
             bidBreakdownPainter.refresh();
         }
-        NativeTradingAdapter trading = nativeTrading;
-        if (trading != null) trading.observeBookmapTrade(alias, realPrice, eventTimeNs);
         if (wallChangeTracker != null) {
             wallChangeTracker.onTrade(priceTick, size, tradeInfo);
         }
-        flushPendingVwapPoints();
+        updateMarketObserver("vwap-display", this::flushPendingVwapPoints);
 
         if (patternEvents != null) synchronized (patternEventLock) {
             if (shouldRunPatternEvents()) patternEvents.onTrade(priceTick, size,
