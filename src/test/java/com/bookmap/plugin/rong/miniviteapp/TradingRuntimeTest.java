@@ -333,11 +333,10 @@ class TradingRuntimeTest {
             int tasksBeforeFlatten = tasks.size();
             runtime.dispatch(json("{\"symbol\":\"AAPL\",\"keyCode\":\"KeyF\"}"));
             deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(2);
-            while (tasks.subList(tasksBeforeFlatten, tasks.size()).stream().noneMatch(task -> task.delay == 1000 && !task.canceled) && System.nanoTime() < deadline) Thread.sleep(5);
             runtime.pendingCommands().get(2, TimeUnit.SECONDS);
             assertEquals(readsBeforeFlatten + 2, accountReads.get(), "Fresh exposure check plus post-mutation refresh");
-            Task followup500 = tasks.subList(tasksBeforeFlatten, tasks.size()).stream().filter(task -> task.delay == 500 && !task.canceled).findFirst().orElseThrow();
-            Task followup1000 = tasks.subList(tasksBeforeFlatten, tasks.size()).stream().filter(task -> task.delay == 1000 && !task.canceled).reduce((a, b) -> b).orElseThrow();
+            Task followup500 = tasks.stream().filter(task -> task.delay == 500 && !task.canceled).findFirst().orElseThrow();
+            Task followup1000 = tasks.stream().filter(task -> task.delay == 1000 && !task.canceled).reduce((a, b) -> b).orElseThrow();
             positionData.set("[]"); now.addAndGet(500); followup500.canceled = true; followup500.run.run();
             assertEquals(readsBeforeFlatten + 3, accountReads.get());
             assertEquals(0, runtime.view("AAPL", "test").getAsJsonObject("account").getAsJsonObject("positions").size());

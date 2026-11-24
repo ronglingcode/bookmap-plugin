@@ -281,6 +281,8 @@ public final class MiniViteApp implements AutoCloseable {
             Set<String> unique = new HashSet<>();
             for (var request : plan.requests) Models.require(request.orderId.isEmpty() || unique.add(request.orderId), "duplicate order in execution plan");
             String actionId = UUID.randomUUID().toString();
+            plan.plannedNs = System.nanoTime();
+            plan.commandCreatedNs = action.has("bookmapCommandCreatedNs") ? action.get("bookmapCommandCreatedNs").getAsLong() : plan.plannedNs;
             completions.put(actionId, completion);
             String capturedAccount = account;
             if (token.isEmpty() || expiresAt <= now)
@@ -294,6 +296,7 @@ public final class MiniViteApp implements AutoCloseable {
                 started.addProperty("exitPairCount", state.pairs.size());
             }
             started.addProperty("clearPending", plan.clearPending); started.addProperty("revision", state.revision);
+            started.addProperty("queueWaitMs", Math.max(0, plan.plannedNs - plan.commandCreatedNs) / 1_000_000L);
             if (cappedOpening) cappedEntryRefreshAfter.put(symbol, Long.MAX_VALUE);
             sender.accept(connection, started);
             log.detail(symbol, "Native " + plan.action + " planned " + plan.requests.size()
@@ -407,6 +410,7 @@ public final class MiniViteApp implements AutoCloseable {
             Request request, int index) {
         String accessToken = "";
         boolean dispatched = false;
+        long dispatchedAt = 0;
         OpeningReconciliation.Intent intent = null;
         OpeningReconciliation recovery = isProtectedEntry(request) ? openingRecovery : closingRecovery;
         String operation = request.method + (request.orderId.isEmpty() ? " new order" : " order " + request.orderId);
@@ -418,6 +422,7 @@ public final class MiniViteApp implements AutoCloseable {
                     + index + "/" + plan.requests.size() + ": attempting " + operation);
             if (commands != null && request.method.equals("POST")) intent = recovery.begin(state.symbol, request.body);
             dispatched = true;
+            dispatchedAt = System.nanoTime();
             Api.Result response = isProtectedEntry(request) && request.method.equals("POST")
                     ? api.mutateEntry(accountHash, accessToken, request, state.symbol)
                     : api.mutate(accountHash, accessToken, request);
@@ -428,13 +433,20 @@ public final class MiniViteApp implements AutoCloseable {
                     + (response.newOrderId.isEmpty() ? "" : "; newOrderId=" + response.newOrderId)
                     + (response.reason.isEmpty() ? "" : "; " + response.reason));
             if (intent != null) recovery.complete(intent, response.outcome.equals("unknown"));
-            JsonObject result = response.toJson(); result.addProperty("attempted", true); return result;
+            JsonObject result = response.toJson(); result.addProperty("attempted", true);
+            result.addProperty("commandToSubmitMs", Math.max(0, dispatchedAt - plan.commandCreatedNs) / 1_000_000L);
+            result.addProperty("brokerRoundTripMs", Math.max(0, System.nanoTime() - dispatchedAt) / 1_000_000L);
+            return result;
         } catch (Exception error) {
             if (intent != null) recovery.complete(intent, dispatched);
             JsonObject result = new JsonObject();
             result.addProperty("method", request.method); result.addProperty("orderId", request.orderId);
             result.addProperty("attempted", dispatched);
             result.addProperty("outcome", dispatched ? "unknown" : "rejected");
+            if (dispatched) {
+                result.addProperty("commandToSubmitMs", Math.max(0, dispatchedAt - plan.commandCreatedNs) / 1_000_000L);
+                result.addProperty("brokerRoundTripMs", Math.max(0, System.nanoTime() - dispatchedAt) / 1_000_000L);
+            }
             result.addProperty("reason", operation + " failed: "
                     + ExecutionDiagnostics.describe(error, accessToken, accountHash)
                     + (dispatched ? "; no classified broker result; broker outcome unknown" : "; request not attempted"));
@@ -455,6 +467,7 @@ public final class MiniViteApp implements AutoCloseable {
             JsonObject finished = message("execution_result"); finished.addProperty("actionId", actionId);
             finished.addProperty("symbol", state.symbol); finished.addProperty("action", plan.action);
             finished.addProperty("outcome", outcome); finished.addProperty("reason", reason);
+            finished.addProperty("commandElapsedMs", Math.max(0, System.nanoTime() - plan.commandCreatedNs) / 1_000_000L);
             finished.add("results", results);
             finished.addProperty("plannedRequestCount", plan.requests.size());
             finished.addProperty("attemptedRequestCount", attempted);
@@ -470,6 +483,7 @@ public final class MiniViteApp implements AutoCloseable {
                     + "; planned=" + plan.requests.size() + "; attempted=" + attempted
                     + "; acknowledged=" + acknowledged + "; rejected=" + rejected + "; unknown=" + uncertain
                     + "; notAttempted=" + (plan.requests.size() - attempted)
+                    + "; elapsedMs=" + finished.get("commandElapsedMs").getAsLong()
                     + (exitPairCount == 0 ? "" : "; plannedExitPairs=" + exitPairCount) + (reason.isEmpty() ? "" : "; " + reason),
                     actionSummary(plan.action, outcome, attempted, acknowledged, rejected, uncertain, reason, exitPairCount));
             CompletableFuture<Void> completion = completions.remove(actionId);

@@ -46,6 +46,9 @@ public final class TradingRuntime implements AutoCloseable {
     private final SocketPort sockets;
     private final SocketPort.Scheduler scheduler;
     private final Executor executor;
+    private final RuntimeWork work;
+    private final LatestTasks projections;
+    private final CoalescingStateWriter stateWriter;
     private final LongSupplier now;
     private final IsolatedEvents events;
     private final MiniViteApp execution;
@@ -71,16 +74,21 @@ public final class TradingRuntime implements AutoCloseable {
     private TradingConfig.Result config;
     private TradeState state;
     private MarketStreams streams;
-    private CompletableFuture<Void> persistence = CompletableFuture.completedFuture(null);
     private volatile boolean stopped;
     private CompletableFuture<Void> startup;
     private long revision, nextAccountRead, accountBackoffUntil, accountReadStartedAt;
     private Runnable accountRetry;
+    private final Set<Long> accountFollowups = new HashSet<>();
     private String lastNativeOrdersLog, lastNativeFillsLog;
     private final FreshRead<Void> brokerObservations = new FreshRead<>();
     public TradingRuntime(HttpPort http, CredentialPort credentials, JsonObject sections, SocketPort sockets, SocketPort.Scheduler scheduler,
             Executor executor, LongSupplier now, Events events) {
-        this.credentials = credentials; this.sockets = sockets; this.scheduler = scheduler; this.executor = executor; this.now = now; this.events = new IsolatedEvents(events);
+        this(http, credentials, sections, sockets, scheduler, RuntimeWork.using(executor), now, events);
+    }
+    public TradingRuntime(HttpPort http, CredentialPort credentials, JsonObject sections, SocketPort sockets, SocketPort.Scheduler scheduler,
+            RuntimeWork work, LongSupplier now, Events events) {
+        this.work = work; this.credentials = credentials; this.sockets = sockets; this.scheduler = scheduler; this.executor = work.background; this.now = now; this.events = new IsolatedEvents(events, work.display);
+        projections = new LatestTasks(work.display, error -> failure("", "Deferred projection", error));
         oauth = new OAuth(http, credentials, java.net.URI.create("https://api.schwabapi.com/v1/oauth/token"), now);
         HttpPort authenticatedReads = (uri, method, headers, body) -> {
             HttpPort.Response response = http.request(uri, method, headers, body);
@@ -98,6 +106,7 @@ public final class TradingRuntime implements AutoCloseable {
         priceHistory = new PriceHistoryApi(authenticatedReads);
         JsonObject firebase = object(sections, "firebaseConfig");
         firestore = new com.bookmap.plugin.rong.miniviteapp.libraries.firestore.Api(http, string(firebase, "projectId"), () -> string(firebase, "apiKey"), () -> "", now);
+        stateWriter = new CoalescingStateWriter(work.persistence, scheduler, firestore::setTradingState, error -> failure("", "State persistence; retry pending", error));
         massiveKey = string(object(sections, "massive"), "apiKey"); massive = new com.bookmap.plugin.rong.miniviteapp.libraries.massive.Api(http, () -> massiveKey);
         market = new MarketLoader(massive, executor, now);
         if (object(sections, "tradingPolicy").has("coreTargetEnabled")) policy.addProperty("coreTargetEnabled", bool(object(sections, "tradingPolicy"), "coreTargetEnabled"));
@@ -133,7 +142,7 @@ public final class TradingRuntime implements AutoCloseable {
                     requireAccepted(result); return result.newOrderId;
                 });
             }
-        }, executor, scheduler, now, () -> !stopped && premarketEnabled.getAsBoolean(),
+        }, work.broker, scheduler, now, () -> !stopped && premarketEnabled.getAsBoolean(),
                 symbol -> premarketQuotes.apply(symbol), this.events::log, this::refreshAccountWithFollowups);
         execution.enableRecovery(this::prepareExecution, now);
     }
@@ -166,7 +175,11 @@ public final class TradingRuntime implements AutoCloseable {
         }
         String token = oauth.accessToken(false), date = MarketClock.marketTime(now.getAsLong()).date;
         long readStartedAt = now.getAsLong();
-        JsonObject raw = reads.getAccount(token); JsonArray orders = reads.getOrders(accountHash(), token, date);
+        String hash = accountHash();
+        CompletableFuture<JsonObject> accountRead = supplyBrokerRead(() -> reads.getAccount(token));
+        CompletableFuture<JsonArray> ordersRead = supplyBrokerRead(() -> reads.getOrders(hash, token, date));
+        CompletableFuture.allOf(accountRead, ordersRead).join();
+        JsonObject raw = accountRead.join(); JsonArray orders = ordersRead.join();
         JsonObject projected = AccountProjection.projectAccount(raw, orders, date, this::price);
         synchronized (lock) {
             if (stopped) return;
@@ -175,7 +188,12 @@ public final class TradingRuntime implements AutoCloseable {
         }
         execution.observeBrokerOrders(orders);
         observe("Premarket order observation", () -> premarket.observeOrders(orders));
-        observe("Order diagnostics", () -> logNativeOrders(orders, date)); observe("Fill diagnostics", () -> logNativeFills(projected, date));
+        projections.put("diagnostics", () -> { logNativeOrders(orders, date); logNativeFills(projected, date); });
+    }
+    private <T> CompletableFuture<T> supplyBrokerRead(Callable<T> request) {
+        return CompletableFuture.supplyAsync(() -> {
+            try { return request.call(); } catch (Exception error) { throw new CompletionException(error); }
+        }, work.accountRequests);
     }
     private static void requireAccepted(Api.Result result) {
         if (result.outcome.equals("rejected")) throw new PremarketTrading.RejectedOrderException("Broker rejected: " + result.reason);
@@ -218,8 +236,9 @@ public final class TradingRuntime implements AutoCloseable {
                     state = new TradeState(date, number(projected, "currentBalance"), now.getAsLong(), null);
                 }
                 publishToken(); publishAccount(); checkStopLossProtection();
-                repeat(30000, this::refreshToken); repeat(3000, this::refreshAccount); repeat(60000, this::refreshConfig); repeat(200, this::publishDirty);
-                repeat(20000, this::disciplineJobs);
+                repeat(30000, this::refreshToken); repeat(3000, this::refreshAccount); repeat(60000, this::refreshConfig);
+                repeat(200, () -> { projections.retry(); projections.put("market", this::publishDirty); });
+                repeat(20000, () -> projections.put("discipline", this::disciplineJobs));
                 events.status("schwab", "account ready");
                 events.log("", "Native broker account initialized; loading optional trading plans independently");
                 refreshConfig();
@@ -300,7 +319,7 @@ public final class TradingRuntime implements AutoCloseable {
     }
     public void refreshToken() {
         if (stopped || !tokenReading.compareAndSet(false, true)) return;
-        executor.execute(() -> { try { oauth.accessToken(false); publishToken(); } catch (Exception error) { failure("", "Token refresh", error); } finally { tokenReading.set(false); } });
+        service(work.broker, tokenReading, "Token refresh", () -> { try { oauth.accessToken(false); publishToken(); } catch (Exception error) { failure("", "Token refresh", error); } finally { tokenReading.set(false); } });
     }
     public void exchangeAuthorizationCode(String callbackUrl) {
         if (stopped) return;
@@ -370,8 +389,12 @@ public final class TradingRuntime implements AutoCloseable {
     public void refreshAccountWithFollowups() {
         if (stopped) return;
         refreshAccount(true);
-        after(500, () -> refreshAccount(true));
-        after(1000, () -> refreshAccount(true));
+        accountFollowup(500); accountFollowup(1000);
+    }
+    private void accountFollowup(long delay) {
+        synchronized (lock) { if (stopped || !accountFollowups.add(delay)) return; }
+        try { after(delay, () -> { synchronized (lock) { accountFollowups.remove(delay); } refreshAccount(true); }); }
+        catch (RuntimeException error) { synchronized (lock) { accountFollowups.remove(delay); } throw error; }
     }
     private void refreshAccount(boolean afterMutation) {
         if (stopped) return;
@@ -381,13 +404,13 @@ public final class TradingRuntime implements AutoCloseable {
         }
         if (!accountReading.compareAndSet(false, true)) { if (afterMutation) accountUrgentAgain.set(true); accountAgain.set(true); return; }
         synchronized (lock) { nextAccountRead = now.getAsLong() + 3000; }
-        executor.execute(() -> {
+        service(work.broker, accountReading, "Account refresh", () -> {
             long started = now.getAsLong();
             try {
                 brokerObservations.read(0, () -> { readBrokerObservation(); return null; });
-                publishToken(); observe("Account publication", this::publishAccount);
+                publishToken(); projections.put("account", this::publishAccount);
                 observe("Stop-loss protection", this::checkStopLossProtection);
-                observe("Discipline jobs", this::disciplineJobs); observe("Account notifications", this::accountNotifications);
+                projections.put("discipline", () -> { disciplineJobs(); accountNotifications(); });
             } catch (Exception error) { failure("", "Account refresh", error); accountAgain.set(true); }
             finally {
                 events.detail("", "Native account refresh: durationMs=" + Math.max(0, now.getAsLong() - started) + "; urgent=" + afterMutation);
@@ -434,7 +457,7 @@ public final class TradingRuntime implements AutoCloseable {
     }
     public void refreshConfig() {
         if (stopped || !configReading.compareAndSet(false, true)) return;
-        executor.execute(() -> {
+        service(executor, configReading, "Config refresh", () -> {
             try {
                 TradingConfig.Result loaded = TradingConfig.readAvailableTradingConfig(firestore.fetchConfigData(), reason -> events.log("", "Normal trading plan unavailable: " + reason)); validateProfile(loaded.profile);
                 String date = MarketClock.marketTime(now.getAsLong()).date; boolean rollover;
@@ -468,6 +491,7 @@ public final class TradingRuntime implements AutoCloseable {
     public JsonObject view(String symbol, String type) {
         JsonObject value = message(type); value.addProperty("symbol", symbol); value.addProperty("timestamp", now.getAsLong());
         value.addProperty("consumerFailures", events.failures());
+        value.addProperty("coalescedProjections", projections.coalesced()); value.addProperty("coalescedStateWrites", stateWriter.coalesced());
         if (premarketEnabled.getAsBoolean()) value.add("premarketOrders", premarket.ordersForChart(symbol));
         if (type.equals("market_update")) { var loaded = market.getState(symbol); if (loaded != null) value.add("market", loaded.metrics()); return value; }
         synchronized (lock) { if (config != null) { JsonObject plan = selectedPlan(symbol); if (plan != null) value.add("plan", plan.deepCopy()); value.add("tradingSettings", config.tradingSettings.deepCopy()); value.add("policy", policy.deepCopy()); }
@@ -649,9 +673,9 @@ public final class TradingRuntime implements AutoCloseable {
         if (persist) persistState(); notices.forEach(value -> events.notify(symbol, value));
     }
     public void persistState() {
-        JsonObject saved; String profile; CompletableFuture<Void> previous, next = new CompletableFuture<>();
-        synchronized (lock) { if (stopped || state == null || config == null || !planStateLoaded) return; saved = state.snapshot(); profile = config.profile; previous = persistence; persistence = next; }
-        previous.handle((value, error) -> null).thenRunAsync(() -> { try { firestore.setTradingState(profile, saved); } catch (Exception error) { failure("", "State persistence", error); } finally { next.complete(null); } }, executor);
+        JsonObject saved; String profile;
+        synchronized (lock) { if (stopped || state == null || config == null || !planStateLoaded) return; saved = state.snapshot(); profile = config.profile; }
+        stateWriter.put(profile, saved);
     }
     private void after(long delay, Runnable task) {
         synchronized (lock) {
@@ -680,8 +704,12 @@ public final class TradingRuntime implements AutoCloseable {
     private void observe(String operation, Runnable action) {
         try { action.run(); } catch (RuntimeException error) { failure("", operation, error); }
     }
-    public CompletableFuture<Void> pendingPersistence() { synchronized (lock) { return persistence; } }
+    private void service(Executor target, AtomicBoolean busy, String operation, Runnable task) {
+        try { target.execute(task); }
+        catch (RejectedExecutionException error) { busy.set(false); failure("", operation + "; capacity unavailable, retry on next tick", error); }
+    }
+    public CompletableFuture<Void> pendingPersistence() { return stateWriter.pending(); }
     public CompletableFuture<Void> pendingCommands() { return execution.pendingCommands(); }
-    @Override public void close() { premarket.close(); MarketStreams previous; List<Runnable> cancel; synchronized (lock) { stopped = true; previous = streams; cancel = new ArrayList<>(timers); timers.clear(); if (accountRetry != null) { cancel.add(accountRetry); accountRetry = null; } } cancel.forEach(Runnable::run); if (previous != null) previous.close(); market.close(); execution.close(); }
+    @Override public void close() { premarket.close(); MarketStreams previous; List<Runnable> cancel; synchronized (lock) { stopped = true; previous = streams; cancel = new ArrayList<>(timers); timers.clear(); if (accountRetry != null) { cancel.add(accountRetry); accountRetry = null; } } cancel.forEach(Runnable::run); if (previous != null) previous.close(); market.close(); execution.close(); projections.close(); stateWriter.close(); }
 }
 

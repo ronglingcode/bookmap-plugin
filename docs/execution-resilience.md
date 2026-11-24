@@ -46,3 +46,29 @@ counts remain visible in runtime/execution status. Periodic jobs schedule their
 next tick even when a callback throws. A locally blocked or definitively rejected
 missing-stop safety close becomes eligible for another check without resetting
 the original grace period; ambiguous submissions retain reconciliation protection.
+
+## Background work and diagnostics
+
+Production uses separate bounded worker pools for broker services, independent
+account HTTP requests, history/configuration work, cloud writes and display work.
+Account and order reads run concurrently, then publish one combined observation.
+This reduces waiting between requests; it does not make the broker's separate
+endpoints an atomic snapshot. Caller-supplied single-thread executors retain
+sequential reads so they cannot deadlock waiting for their own queue.
+
+Replaceable projections and order/fill diagnostic snapshots coalesce while a
+consumer is slow. Raw market events and execution commands are excluded from
+this queue. Notifications, sound and history-display callbacks run on display
+capacity. Repeated mutations share pending 500 ms and 1 s follow-up reads.
+
+Cloud persistence retains the latest complete snapshot per profile and writes
+one at a time. Failed writes retry after 1, 2, 4, 8, 16 and then 30 seconds,
+superseding stale pending snapshots without replaying old state. Shutdown cancels
+the retry timer and attempts the dirty write directly. A failed final write
+completes exceptionally rather than leaving workers waiting indefinitely.
+These are cloud snapshots, not an execution-command journal.
+
+Execution events expose queue wait, command-to-submit, broker round-trip and total
+command duration. Runtime views expose observer failures and coalesced projection
+and persistence counts. These identify where latency occurs; they are not a claim
+of measured live-broker speedup.

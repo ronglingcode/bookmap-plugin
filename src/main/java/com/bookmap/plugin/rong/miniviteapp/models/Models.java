@@ -120,6 +120,7 @@ public final class Models {
         public Runnable selectedStopGuard;
         public Runnable selectedStopCommit;
         public Runnable selectedStopRelease;
+        public long commandCreatedNs, plannedNs;
         public Plan(String action) { this.action = action; }
         public JsonArray toJson() {
             JsonArray result = new JsonArray();
