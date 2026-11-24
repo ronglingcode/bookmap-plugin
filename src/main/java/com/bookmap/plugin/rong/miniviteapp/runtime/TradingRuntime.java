@@ -47,7 +47,7 @@ public final class TradingRuntime implements AutoCloseable {
     private final SocketPort.Scheduler scheduler;
     private final Executor executor;
     private final LongSupplier now;
-    private final Events events;
+    private final IsolatedEvents events;
     private final MiniViteApp execution;
     private final PremarketTrading premarket;
     private volatile BooleanSupplier premarketEnabled = () -> false;
@@ -80,7 +80,7 @@ public final class TradingRuntime implements AutoCloseable {
     private final FreshRead<Void> brokerObservations = new FreshRead<>();
     public TradingRuntime(HttpPort http, CredentialPort credentials, JsonObject sections, SocketPort sockets, SocketPort.Scheduler scheduler,
             Executor executor, LongSupplier now, Events events) {
-        this.credentials = credentials; this.sockets = sockets; this.scheduler = scheduler; this.executor = executor; this.now = now; this.events = events;
+        this.credentials = credentials; this.sockets = sockets; this.scheduler = scheduler; this.executor = executor; this.now = now; this.events = new IsolatedEvents(events);
         oauth = new OAuth(http, credentials, java.net.URI.create("https://api.schwabapi.com/v1/oauth/token"), now);
         HttpPort authenticatedReads = (uri, method, headers, body) -> {
             HttpPort.Response response = http.request(uri, method, headers, body);
@@ -94,7 +94,7 @@ public final class TradingRuntime implements AutoCloseable {
             }
             return response;
         };
-        reads = new ReadApi(authenticatedReads, value -> events.detail("", value));
+        reads = new ReadApi(authenticatedReads, value -> this.events.detail("", value));
         priceHistory = new PriceHistoryApi(authenticatedReads);
         JsonObject firebase = object(sections, "firebaseConfig");
         firestore = new com.bookmap.plugin.rong.miniviteapp.libraries.firestore.Api(http, string(firebase, "projectId"), () -> string(firebase, "apiKey"), () -> "", now);
@@ -134,7 +134,7 @@ public final class TradingRuntime implements AutoCloseable {
                 });
             }
         }, executor, scheduler, now, () -> !stopped && premarketEnabled.getAsBoolean(),
-                symbol -> premarketQuotes.apply(symbol), events::log, this::refreshAccountWithFollowups);
+                symbol -> premarketQuotes.apply(symbol), this.events::log, this::refreshAccountWithFollowups);
         execution.enableRecovery(this::prepareExecution, now);
     }
     private void prepareExecution(JsonObject action) throws Exception {
@@ -174,7 +174,8 @@ public final class TradingRuntime implements AutoCloseable {
             ledger = TradeLedger.projectTradeLedger(object(projected, "executions"), number(policy, "dailyMaxLoss"));
         }
         execution.observeBrokerOrders(orders);
-        premarket.observeOrders(orders); logNativeOrders(orders, date); logNativeFills(projected, date);
+        observe("Premarket order observation", () -> premarket.observeOrders(orders));
+        observe("Order diagnostics", () -> logNativeOrders(orders, date)); observe("Fill diagnostics", () -> logNativeFills(projected, date));
     }
     private static void requireAccepted(Api.Result result) {
         if (result.outcome.equals("rejected")) throw new PremarketTrading.RejectedOrderException("Broker rejected: " + result.reason);
@@ -384,7 +385,9 @@ public final class TradingRuntime implements AutoCloseable {
             long started = now.getAsLong();
             try {
                 brokerObservations.read(0, () -> { readBrokerObservation(); return null; });
-                publishToken(); publishAccount(); checkStopLossProtection(); disciplineJobs(); accountNotifications();
+                publishToken(); observe("Account publication", this::publishAccount);
+                observe("Stop-loss protection", this::checkStopLossProtection);
+                observe("Discipline jobs", this::disciplineJobs); observe("Account notifications", this::accountNotifications);
             } catch (Exception error) { failure("", "Account refresh", error); accountAgain.set(true); }
             finally {
                 events.detail("", "Native account refresh: durationMs=" + Math.max(0, now.getAsLong() - started) + "; urgent=" + afterMutation);
@@ -460,10 +463,11 @@ public final class TradingRuntime implements AutoCloseable {
         });
     }
     private void publishAccount() { List<String> symbols; synchronized (lock) { if (stopped || config == null) return; accountSymbols.addAll(config.symbols); for (String field : new String[]{"positions", "entryOrders", "exitPairs", "executions"}) accountSymbols.addAll(object(account, field).keySet()); symbols = new ArrayList<>(accountSymbols); }
-        symbols.forEach(symbol -> { publishInputs(symbol); events.message(view(symbol, "account_ready")); }); }
+        symbols.forEach(symbol -> { observe("Execution input publication", () -> publishInputs(symbol)); observe("Account view", () -> events.message(view(symbol, "account_ready"))); }); }
     private void publishDirty() { List<String> symbols; synchronized (lock) { if (stopped) return; symbols = new ArrayList<>(dirty); dirty.clear(); } symbols.forEach(symbol -> { events.message(view(symbol, "market_update")); priceNotifications(symbol); }); }
     public JsonObject view(String symbol, String type) {
         JsonObject value = message(type); value.addProperty("symbol", symbol); value.addProperty("timestamp", now.getAsLong());
+        value.addProperty("consumerFailures", events.failures());
         if (premarketEnabled.getAsBoolean()) value.add("premarketOrders", premarket.ordersForChart(symbol));
         if (type.equals("market_update")) { var loaded = market.getState(symbol); if (loaded != null) value.add("market", loaded.metrics()); return value; }
         synchronized (lock) { if (config != null) { JsonObject plan = selectedPlan(symbol); if (plan != null) value.add("plan", plan.deepCopy()); value.add("tradingSettings", config.tradingSettings.deepCopy()); value.add("policy", policy.deepCopy()); }
@@ -576,13 +580,18 @@ public final class TradingRuntime implements AutoCloseable {
     }
     private void executionEvent(JsonObject result) {
         String symbol = string(result, "symbol");
+        if (string(result, "type").equals("execution_blocked") && string(result, "keyCode").equals("SafetyClosePosition"))
+            stopLossMonitor.retryClose(symbol);
+        if (string(result, "type").equals("execution_result") && string(result, "action").equals("stop_loss_safety_close")
+                && number(result, "acknowledgedRequestCount") == 0 && number(result, "unknownRequestCount") == 0)
+            stopLossMonitor.retryClose(symbol);
         if (result.has("entry")) {
             boolean changed; synchronized (lock) { JsonObject plan = config == null ? null : selectedPlan(symbol); changed = state != null && state.acceptEntry(symbol, object(result, "entry"), object(plan, "atr"), now.getAsLong()); }
             if (changed) persistState();
         }
         events.message(result.deepCopy());
         if (string(result, "type").equals("execution_result")) {
-            publishInputs(symbol);
+            observe("Execution input publication", () -> publishInputs(symbol));
             if (number(result, "attemptedRequestCount") > 0) refreshAccountWithFollowups();
             else refreshAccount();
         }
@@ -656,13 +665,20 @@ public final class TradingRuntime implements AutoCloseable {
         }
     }
     private void repeat(long delay, Runnable task) {
-        synchronized (lock) { if (stopped) return; final Runnable[] cancel = new Runnable[1]; cancel[0] = scheduler.after(delay, () -> { synchronized (lock) { timers.remove(cancel[0]); if (stopped) return; } task.run(); repeat(delay, task); }); timers.add(cancel[0]); }
+        synchronized (lock) { if (stopped) return; final Runnable[] cancel = new Runnable[1]; cancel[0] = scheduler.after(delay, () -> {
+            synchronized (lock) { timers.remove(cancel[0]); if (stopped) return; }
+            try { task.run(); } catch (RuntimeException error) { failure("", "Periodic task", error); }
+            finally { repeat(delay, task); }
+        }); timers.add(cancel[0]); }
     }
     private void failure(String symbol, String operation, Throwable error) {
         if (stopped) return; String reason;
         try { JsonObject value = credentials.loadSchwab(); reason = ExecutionDiagnostics.describe(error, string(value, "access_token"), string(value, "refresh_token"), string(value, "accountHashValue"), massiveKey); }
         catch (Exception ignored) { reason = error.getClass().getSimpleName(); }
         events.log(symbol, operation + " failed: " + reason);
+    }
+    private void observe(String operation, Runnable action) {
+        try { action.run(); } catch (RuntimeException error) { failure("", operation, error); }
     }
     public CompletableFuture<Void> pendingPersistence() { synchronized (lock) { return persistence; } }
     public CompletableFuture<Void> pendingCommands() { return execution.pendingCommands(); }

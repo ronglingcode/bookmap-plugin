@@ -13,6 +13,25 @@ import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.*;
 
 class NativeExecutionTest {
+    @Test void brokenLogsAndDisplayCannotPreventSubmissionOrChangeBrokerOutcome() throws Exception {
+        AtomicInteger mutations = new AtomicInteger(); List<JsonObject> results = new CopyOnWriteArrayList<>();
+        var api = new Api((uri, method, headers, body) -> {
+            mutations.incrementAndGet(); return new com.bookmap.plugin.rong.miniviteapp.ports.HttpPort.Response(204, "");
+        }, (symbol, message) -> { throw new IllegalStateException("Logger unavailable"); });
+        try (var engine = new MiniViteApp(api, (connection, event) -> {
+            results.add(event.deepCopy()); throw new IllegalStateException("Display unavailable");
+        }, (symbol, message) -> { throw new IllegalStateException("Logger unavailable"); }, String::trim)) {
+            engine.enableRecovery(command -> {});
+            engine.receive(this, json("{\"type\":\"execution_token\",\"accountHash\":\"fake\",\"accessToken\":\"fake\",\"expiresAt\":9999999999999}"));
+            JsonObject update = json("{\"type\":\"execution_state\",\"symbols\":[]}");
+            update.getAsJsonArray("symbols").add(fixture("market out smallest first tie")); engine.receive(this, update);
+            engine.route(action("KeyM")); engine.pendingCommands().get(2, TimeUnit.SECONDS);
+            assertEquals(1, mutations.get());
+            assertTrue(results.stream().anyMatch(event -> event.has("outcome") && event.get("outcome").getAsString().equals("accepted")));
+            assertTrue(engine.status().get("consumerFailures").getAsLong() > 0);
+            engine.route(action("KeyM")); engine.pendingCommands().get(2, TimeUnit.SECONDS); assertEquals(2, mutations.get());
+        }
+    }
     @Test void productionRecoveryDoesNotReplayLostOpeningAndResumesAfterBrokerMatch() throws Exception {
         try (var rig = new Rig()) {
             JsonObject entry = rig.connectEntry();

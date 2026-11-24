@@ -28,7 +28,10 @@ public final class Api {
     public Api(URI base) { this(base, (symbol, message) -> { }); }
     public Api(URI base, BiConsumer<String, String> log) { this(base, nativeHttp(), log); }
     public Api(HttpPort http, BiConsumer<String, String> log) { this(URI.create("https://api.schwabapi.com/trader/v1/"), http, log); }
-    public Api(URI base, HttpPort http, BiConsumer<String, String> log) { this.base = base; this.http = http; this.log = log; }
+    public Api(URI base, HttpPort http, BiConsumer<String, String> log) {
+        this.base = base; this.http = http;
+        this.log = com.bookmap.plugin.rong.miniviteapp.ExecutionLog.isolated(log, error -> { });
+    }
     private static HttpPort nativeHttp() {
         HttpClient client = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(5)).followRedirects(HttpClient.Redirect.NEVER).build();
         return (uri, method, headers, body) -> {

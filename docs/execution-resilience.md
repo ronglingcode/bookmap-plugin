@@ -29,3 +29,20 @@ Selecting another stop while they wait invalidates the older command. Local
 validation releases a reservation; the first opening dispatch consumes it.
 Independent requests within a workflow stage still run concurrently, with bounded
 workers; dependent stages wait for preceding results.
+
+## Failure isolation
+
+Market ingestion remains synchronous and ordered. A failed component no longer
+turns off subsequent callbacks. Price, session-level and liquidity consumers are
+isolated so that one cannot prevent the others from receiving the event. Core
+exceptions keep an explicit incomplete-evidence flag: a restart with a fresh
+source snapshot is required before those counters can be trusted again. Continuing
+to receive events does not reconstruct a lost trade or depth update.
+
+Stateless display projections retry after a cooldown. Raw trades/depth updates
+are never sampled or skipped by that cooldown. Logging and display callbacks are
+isolated from order submission and broker-result classification; their failure
+counts remain visible in runtime/execution status. Periodic jobs schedule their
+next tick even when a callback throws. A locally blocked or definitively rejected
+missing-stop safety close becomes eligible for another check without resetting
+the original grace period; ambiguous submissions retain reconciliation protection.

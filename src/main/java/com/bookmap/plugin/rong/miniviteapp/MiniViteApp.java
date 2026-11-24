@@ -28,6 +28,7 @@ public final class MiniViteApp implements AutoCloseable {
     private final Api api;
     private final BiConsumer<Object, JsonObject> sender;
     private final ExecutionLog log;
+    private final java.util.concurrent.atomic.AtomicLong consumerFailures = new java.util.concurrent.atomic.AtomicLong();
     private final Function<String, String> symbolKey;
     private static ExecutorService pool(int threads, int capacity, String name) {
         return new ThreadPoolExecutor(threads, threads, 0, TimeUnit.MILLISECONDS, new ArrayBlockingQueue<>(capacity), task -> {
@@ -94,7 +95,11 @@ public final class MiniViteApp implements AutoCloseable {
     }
     public MiniViteApp(Api api, BiConsumer<Object, JsonObject> sender, BiConsumer<String, String> log,
             Function<String, String> symbolKey) {
-        this.api = api; this.sender = sender; this.log = ExecutionLog.from(log); this.symbolKey = symbolKey;
+        this.api = api; this.log = ExecutionLog.isolated(log, error -> consumerFailures.incrementAndGet()); this.symbolKey = symbolKey;
+        this.sender = (connection, message) -> {
+            try { sender.accept(connection, message); }
+            catch (RuntimeException error) { consumerFailures.incrementAndGet(); this.log.accept(Models.string(message, "symbol"), "Execution consumer failed: " + error.getClass().getSimpleName()); }
+        };
     }
     private JsonObject message(String type) {
         JsonObject json = new JsonObject(); json.addProperty("type", type);
@@ -108,6 +113,7 @@ public final class MiniViteApp implements AutoCloseable {
         json.addProperty("extendedEnabled", !closed);
         json.addProperty("blocked", false);
         json.addProperty("reason", "");
+        json.addProperty("consumerFailures", consumerFailures.get());
         return json;
     }
     public synchronized void unregister(String symbol) {
@@ -167,6 +173,7 @@ public final class MiniViteApp implements AutoCloseable {
             try {
             if (error == null) return;
             JsonObject blocked = message("execution_blocked"); blocked.addProperty("symbol", symbol);
+            blocked.addProperty("keyCode", Models.string(command, "keyCode"));
             String reason;
             reason = ExecutionDiagnostics.describe(error, token, account);
             blocked.addProperty("reason", "Command preparation failed; no mutation attempted: " + reason);
@@ -306,6 +313,7 @@ public final class MiniViteApp implements AutoCloseable {
                     : "build " + (entry ? "wall_reversal_entry" : key) + " plan failed: " + ExecutionDiagnostics.describe(error, token, account);
             log.accept(symbol, "Native blocked: " + reason + "; no broker requests attempted for this action");
             JsonObject blocked = message("execution_blocked"); blocked.addProperty("symbol", symbol);
+            blocked.addProperty("keyCode", key);
             blocked.addProperty("reason", reason); sender.accept(connection, blocked);
         }
         return true;
