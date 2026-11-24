@@ -87,14 +87,11 @@ public final class Handler {
         }
     }
     private static void checkAdjustment(Snapshot state, ExitPair pair, double price, boolean stop) {
-        if (!stop) EntryBidReclaimRules.check(state, pair.originalPartial);
         Order leg = stop ? pair.stop : pair.limit;
         Models.require(leg != null && Models.positive(leg.price), "missing exit leg price");
         boolean earlier = stop ? (state.netQuantity > 0 ? price > leg.price : price < leg.price)
                 : (state.netQuantity > 0 ? price < leg.price : price > leg.price);
-        // A manually marked short-entry bid unlocks profit-target moves immediately.
-        if (stop || !EntryBidReclaimRules.hasMarkedBid(state))
-            CoreTargetExitRules.check(state, pair, price, earlier);
+        CoreTargetExitRules.check(state, pair, price, earlier);
     }
     public static Plan flattenPostionKeyPressed(Snapshot state) {
         Models.require(state.netQuantity != 0 && state.rulesSupported, "missing position or unsupported flatten rules");

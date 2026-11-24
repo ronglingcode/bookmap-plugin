@@ -289,44 +289,15 @@ class TradingRuntimeTest {
             for (Format format : Format.values()) { String report = runtime.exportExecutions(format); assertTrue(report.contains("AAPL")); assertTrue(report.contains("MSFT")); }
             assertEquals(callsBeforeExport + Format.values().length, httpCalls.get(), "Each export fetches fresh broker history");
             assertEquals(beforeExport, runtime.view("MSFT", "test"), "Journaling must not replace the live account cache");
-            // Entry-bid marking is persisted and displayed without creating a broker order.
+            // Retired I commands cannot mark state or submit orders.
             positionData.set("[{\"instrument\":{\"symbol\":\"MSFT\",\"assetType\":\"EQUITY\"},\"shortQuantity\":10,\"averagePrice\":20}]");
             now.addAndGet(3000); runtime.refreshAccount();
-            int mutationsBeforeMarker = mutations.get();
+            JsonObject beforeI = runtime.view("MSFT", "test").getAsJsonObject("state").deepCopy();
+            int mutationsBeforeI = mutations.get();
             runtime.dispatch(json("{\"symbol\":\"MSFT\",\"keyCode\":\"KeyI\",\"price\":19.95}"));
-            JsonObject shortTrade = runtime.view("MSFT", "test").getAsJsonObject("state")
-                    .getAsJsonObject("stateBySymbol").getAsJsonObject("MSFT").getAsJsonObject("breakoutTradeStateForShort");
-            assertEquals(19.95, shortTrade.get("entryBidToReclaim").getAsDouble());
-            assertEquals(19.95, com.bookmap.plugin.rong.miniviteapp.core.controllers.NativeViews
-                    .project(runtime.view("MSFT", "command_state")).stream()
-                    .filter(message -> message.get("type").getAsString().equals("entry_bid_reclaim_config"))
-                    .findFirst().orElseThrow().get("entryBidToReclaim").getAsDouble());
-            runtime.dispatch(json("{\"symbol\":\"MSFT\",\"keyCode\":\"KeyI\",\"shiftKey\":true}"));
-            assertEquals(19.95, runtime.view("MSFT", "test").getAsJsonObject("state").getAsJsonObject("stateBySymbol")
-                    .getAsJsonObject("MSFT").getAsJsonObject("breakoutTradeStateForShort").get("entryBidToReclaim").getAsDouble());
-            runtime.dispatch(json("{\"symbol\":\"MSFT\",\"keyCode\":\"KeyI\",\"shift_key\":true,\"price\":20.2}"));
-            assertEquals(20.2, runtime.view("MSFT", "test").getAsJsonObject("state").getAsJsonObject("stateBySymbol")
-                    .getAsJsonObject("MSFT").getAsJsonObject("breakoutTradeStateForShort").get("entryBidToReclaim").getAsDouble());
-            for (int mask = 0; mask < 16; mask++) {
-                JsonObject marker = json("{\"symbol\":\"MSFT\",\"keyCode\":\"KeyI\"}");
-                marker.addProperty("shiftKey", (mask & 1) != 0);
-                marker.addProperty("ctrlKey", (mask & 2) != 0);
-                marker.addProperty("altKey", (mask & 4) != 0);
-                marker.addProperty("metaKey", (mask & 8) != 0);
-                double price = (2010 + mask) / 100.0;
-                marker.addProperty("price", price);
-                assertTrue(runtime.dispatch(marker));
-                assertEquals(price, runtime.view("MSFT", "test").getAsJsonObject("state").getAsJsonObject("stateBySymbol")
-                        .getAsJsonObject("MSFT").getAsJsonObject("breakoutTradeStateForShort").get("entryBidToReclaim").getAsDouble(),
-                        "I must mark the hover price regardless of modifier combination " + mask);
-            }
-            runtime.dispatch(json("{\"symbol\":\"MSFT\",\"keyCode\":\"KeyI\",\"price\":20.1}"));
+            assertEquals(beforeI, runtime.view("MSFT", "test").getAsJsonObject("state"));
+            assertEquals(mutationsBeforeI, mutations.get());
             positionData.set("[]"); now.addAndGet(3000); runtime.refreshAccount();
-            assertFalse(runtime.view("MSFT", "test").getAsJsonObject("state").getAsJsonObject("stateBySymbol")
-                    .getAsJsonObject("MSFT").getAsJsonObject("breakoutTradeStateForShort").has("entryBidToReclaim"));
-            runtime.dispatch(json("{\"symbol\":\"MSFT\",\"keyCode\":\"KeyI\",\"price\":20.1}"));
-            assertTrue(logs.stream().anyMatch(line -> line.contains("requires an active short position")));
-            assertEquals(mutationsBeforeMarker, mutations.get());
             runtime.pendingPersistence().get(2, TimeUnit.SECONDS);
             long sameDay = now.get(); now.addAndGet(86400000);
             assertThrows(IllegalStateException.class, () -> runtime.exportExecutions(Format.SUMMARY), "Yesterday's cached fills must not be exported as today"); now.set(sameDay);

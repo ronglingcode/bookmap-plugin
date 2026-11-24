@@ -26,10 +26,8 @@ import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 
 public class SignalWebSocketServer extends WebSocketServer {
-    private com.bookmap.plugin.rong.pricelines.EntryBidReclaimManager entryBidReclaimManager;
     private com.bookmap.plugin.rong.pricelines.SelectedStopManager selectedStopManager;
-    public void setEntryBidReclaimStore(com.bookmap.plugin.rong.pricelines.PriceLineStore store) {
-        entryBidReclaimManager = new com.bookmap.plugin.rong.pricelines.EntryBidReclaimManager(store);
+    public void setSelectedStopStore(com.bookmap.plugin.rong.pricelines.PriceLineStore store) {
         selectedStopManager = new com.bookmap.plugin.rong.pricelines.SelectedStopManager(store);
     }
     public void updateSelectedStop(JsonObject stop) {
@@ -148,8 +146,6 @@ public class SignalWebSocketServer extends WebSocketServer {
         String clean = SymbolUtils.cleanSymbol(symbol);
         OrderBookState book = symbolToOrderBook.get(clean); Double pips = symbolToPips.get(clean);
         if (book == null || pips == null || !Double.isFinite(pips) || pips <= 0) return;
-        if (entryBidReclaimManager != null) entryBidReclaimManager.onBid(clean,
-                bid > 0 ? BookmapPriceNormalizer.toWirePrice(bid, pips) : Double.NaN);
         JsonObject inside = new JsonObject();
         inside.addProperty("bid", bid > 0 ? BookmapPriceNormalizer.toWirePrice(bid, pips) : 0);
         inside.addProperty("ask", ask > 0 ? BookmapPriceNormalizer.toWirePrice(ask, pips) : 0);
@@ -434,14 +430,12 @@ public class SignalWebSocketServer extends WebSocketServer {
     public void registerSymbol(String symbol, OrderBookState orderBook, double pips) {
         symbolToOrderBook.put(symbol, orderBook);
         symbolToPips.put(symbol, pips);
-        if (entryBidReclaimManager != null) entryBidReclaimManager.register(symbol, pips);
         if (selectedStopManager != null) selectedStopManager.register(symbol, pips);
     }
 
     /** Unregister a symbol when its plugin instance stops. */
     public void unregisterSymbol(String symbol) {
         marketDataHealth.remove(symbol);
-        if (entryBidReclaimManager != null) entryBidReclaimManager.unregister(symbol);
         premarketInsideQuotes.remove(symbol);
         marketDataStatus.remove(symbol);
         cairoDepthTimes.remove(symbol);
@@ -978,11 +972,6 @@ public class SignalWebSocketServer extends WebSocketServer {
             }
             if ("core_plan_config".equals(type)) {
                 handleCorePlanConfig(json);
-                return;
-            }
-            if ("entry_bid_reclaim_config".equals(type) && entryBidReclaimManager != null) {
-                entryBidReclaimManager.update(getString(json, "symbol"), getBoolean(json, "isShort"),
-                        getWirePrice(json, "entryBidToReclaim"), getWirePrice(json, "averagePrice"));
                 return;
             }
         }
@@ -1734,8 +1723,7 @@ public class SignalWebSocketServer extends WebSocketServer {
                 || "exit_order_pair_config".equals(type)
                 || "account_state".equals(type)
                 || "vwap_update".equals(type)
-                || "core_plan_config".equals(type)
-                || "entry_bid_reclaim_config".equals(type);
+                || "core_plan_config".equals(type);
     }
 
     private String getString(JsonObject json, String field) {

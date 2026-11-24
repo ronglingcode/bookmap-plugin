@@ -81,7 +81,7 @@ public class ChartHoverHotkeyHandler implements ScreenSpacePainterFactory {
     /** Chart hotkeys dispatched from the currently hovered Bookmap chart. */
     private static final Set<String> CHART_HOTKEYS =
             Set.of(
-                    "a", "b", "c", "f", "g", "h", "i", "l", "m", "s", "t", "w", "p", "z", "space",
+                    "a", "b", "c", "f", "g", "h", "l", "m", "s", "t", "w", "p", "z", "space",
                     "1", "2", "3", "4", "5", "6", "7", "8", "9", "0",
                     "numpad1", "numpad2", "numpad3", "numpad4", "numpad5",
                     "numpad6", "numpad7", "numpad8", "numpad9", "numpad0");
