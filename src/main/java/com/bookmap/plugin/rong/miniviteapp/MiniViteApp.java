@@ -116,6 +116,7 @@ public final class MiniViteApp implements AutoCloseable {
         int wallOutCount = WallOut.count(action);
         String symbol = symbolKey.apply(Models.string(action, "symbol"));
         Snapshot state = snapshots.get(symbol);
+        SelectedStop.Claim stopClaim = null;
         try {
             long now = System.currentTimeMillis();
             Models.require(!closed, "native executor stopped");
@@ -140,10 +141,9 @@ public final class MiniViteApp implements AutoCloseable {
                     || key.equals("KeyW") && !pendingSameSide);
             if (selectedStop != null && key.equals("RefreshEntryStop"))
                 throw new IllegalArgumentException("Selected entry stops cannot be automatically widened");
-            SelectedStop.Claim stopClaim = null;
             if (selectedStop != null && openingAction) {
                 if (hoverEntry) selectedStop.select(symbol, Models.number(action, "hoverStopPrice"));
-                stopClaim = selectedStop.consume(symbol);
+                stopClaim = selectedStop.reserve(symbol);
                 double stop = stopClaim.price;
                 JsonObject prices = new JsonObject();
                 prices.addProperty("currentPrice", state.currentPrice); prices.addProperty("bid", state.bid); prices.addProperty("ask", state.ask);
@@ -178,9 +178,12 @@ public final class MiniViteApp implements AutoCloseable {
                             ? Handler.marketOutPartials(state, 2)
                     : key.equals("KeyW") ? ExtendedHandler.swap(state, action)
                     : KeyboardHandler.handleKeyPressed(state, key, shift, Models.number(action, "price"));
+            if (stopClaim != null) plan.selectedStopRelease = stopClaim::release;
             if (selectedStop != null && BookmapSizeCap.hasOpening(plan)) {
                 Models.require(stopClaim != null, "Select stop: hover + Z");
                 plan.selectedStopGuard = stopClaim::requireFresh;
+                plan.selectedStopCommit = stopClaim::commit;
+                plan.selectedStopRelease = stopClaim::release;
             }
             boolean cappedOpening = state.entryContext != null && state.entryContext.has("bookmapSizeCap") && BookmapSizeCap.hasOpening(plan)
                     && (BookmapSizeCap.mode(state.entryContext.getAsJsonObject("bookmapSizeCap")) == BookmapSizeCap.Mode.NORMAL_1R
@@ -212,8 +215,12 @@ public final class MiniViteApp implements AutoCloseable {
             log.detail(symbol, "Native " + plan.action + " planned " + plan.requests.size()
                     + " broker request(s); actionId=" + actionId + "; no requests attempted yet");
             Snapshot executionState = state;
-            executor.execute(() -> execute(capturedAccount, actionId, executionState, plan));
+            executor.execute(() -> {
+                try { execute(capturedAccount, actionId, executionState, plan); }
+                finally { if (plan.selectedStopRelease != null) plan.selectedStopRelease.run(); }
+            });
         } catch (RuntimeException error) {
+            if (stopClaim != null) stopClaim.release();
             String reason = error instanceof IllegalArgumentException && error.getMessage() != null && error.getMessage().startsWith("checkRule:")
                     ? ExecutionDiagnostics.sanitize(error.getMessage(), token, account)
                     : "build " + (entry ? "wall_reversal_entry" : key) + " plan failed: " + ExecutionDiagnostics.describe(error, token, account);
@@ -305,6 +312,7 @@ public final class MiniViteApp implements AutoCloseable {
         try {
             accessToken = guard(plan);
             if (isProtectedEntry(request) && plan.selectedStopGuard != null) plan.selectedStopGuard.run();
+            if (isProtectedEntry(request) && plan.selectedStopCommit != null) plan.selectedStopCommit.run();
             log.detail(state.symbol, "Native " + plan.action + " actionId=" + actionId + " request "
                     + index + "/" + plan.requests.size() + ": attempting " + operation);
             dispatched = true;

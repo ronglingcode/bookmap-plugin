@@ -118,6 +118,8 @@ public final class Models {
         public boolean clearPending;
         public JsonObject entry;
         public Runnable selectedStopGuard;
+        public Runnable selectedStopCommit;
+        public Runnable selectedStopRelease;
         public Plan(String action) { this.action = action; }
         public JsonArray toJson() {
             JsonArray result = new JsonArray();

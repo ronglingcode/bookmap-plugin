@@ -13,6 +13,21 @@ import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.*;
 
 class NativeExecutionTest {
+    @Test void localSizingRejectionDoesNotConsumeSelectedStop() throws Exception {
+        try (var rig = new Rig()) {
+            JsonObject action = rig.connectEntry();
+            var stop = new com.bookmap.plugin.rong.miniviteapp.core.controllers.SelectedStop();
+            rig.engine.requireSelectedStop(stop); stop.select("AAPL", 9.5);
+            var context = rig.state.getAsJsonObject("entryContext");
+            context.add("bookmapSizeCap", json("{\"mode\":\"PROPORTIONAL\",\"maxRiskMultiple\":0}"));
+            rig.updateState(System.currentTimeMillis()); rig.engine.route(action);
+            assertEquals(0, rig.mutations.get()); assertEquals(9.5, stop.view().get("price").getAsDouble());
+            context.add("bookmapSizeCap", json("{\"mode\":\"PROPORTIONAL\",\"maxRiskMultiple\":1}"));
+            rig.updateState(System.currentTimeMillis()); rig.engine.route(action);
+            assertEquals("accepted", rig.finish().get("outcome").getAsString());
+            assertEquals(0, stop.view().get("price").getAsDouble()); assertEquals(1, rig.mutations.get());
+        }
+    }
     @Test void wallOutButtonsRouteDirectlyAndReplaceOnlyOneOrTwoLimits() throws Exception {
         for (int count : new int[]{1, 2}) try (var rig = new Rig()) {
             rig.connect();
@@ -231,7 +246,7 @@ class NativeExecutionTest {
             rig.engine.route(command); assertEquals(1, rig.mutations.get());
             stop.select("AAPL", isLong ? 11 : 9); rig.engine.route(command);
             assertEquals(1, rig.mutations.get(), "Wrong-side stop cannot open exposure");
-            assertEquals(0, stop.view().get("price").getAsDouble());
+            assertEquals(isLong ? 11 : 9, stop.view().get("price").getAsDouble(), "Local rejection preserves selection and its original expiry");
         }
     }
     @Test void reloadAndSwapCannotBypassFreshStopAndExitOnlySwapStillWorks() throws Exception {

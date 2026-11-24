@@ -32,9 +32,11 @@ includes the same countdown and shows `n/a` when no selection is active for that
 Modifier keys do not change Z's behavior.
 
 The selection is local, single-use and symbol-specific. It disappears when an
-entry attempt consumes it, 30 seconds elapse, the highlighted chart symbol
-changes, Space or Cancel Entry is pressed, or native trading restarts. Rejected
-entry attempts also require a fresh selection. Repeated entry presses cannot
+opening request begins dispatch, 30 seconds elapse, the highlighted chart symbol
+changes, Space or Cancel Entry is pressed, or native trading restarts. Local
+validation failures release the reservation without extending the original expiry.
+Broker rejections and unknown submission outcomes require a fresh selection.
+Repeated entry presses cannot
 reuse one selection. Missing, expired and wrong-side stops block entry before
 any broker request. A queued entry is checked again before dispatch.
 
