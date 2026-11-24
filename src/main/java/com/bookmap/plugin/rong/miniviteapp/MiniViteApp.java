@@ -54,6 +54,7 @@ public final class MiniViteApp implements AutoCloseable {
     public synchronized void enableRecovery(Preparation preparation, java.util.function.LongSupplier clock) {
         Models.require(commands == null, "Recovery already enabled");
         this.clock = clock;
+        openingRecovery.setClock(clock); closingRecovery.setClock(clock);
         this.preparation = Objects.requireNonNull(preparation); commands = new SymbolCommandQueue();
     }
     public void observeBrokerOrders(JsonArray orders) { openingRecovery.observe(orders); closingRecovery.observe(orders); }
@@ -72,6 +73,10 @@ public final class MiniViteApp implements AutoCloseable {
         if (Set.of("KeyA", "KeyB", "KeyS", "KeyW").contains(key) || EntryHandler.supports(action, key)
                 || action.has("hoverStopPrice") || HoverShareEntry.isChartDigit(action, key)) return 2;
         return 1;
+    }
+    public static int commandPriority(JsonObject action, boolean held) {
+        String key = Models.string(action, "keyCode"); if (key.isEmpty()) key = Models.string(action, "key_code");
+        return held && HoverShareEntry.isChartDigit(action, key) ? 1 : commandPriority(action);
     }
     private boolean closed;
     private Object connection;
@@ -164,7 +169,12 @@ public final class MiniViteApp implements AutoCloseable {
         command.addProperty("bookmapCommandCreatedNs", System.nanoTime());
         synchronized (this) { if (selectedStop != null) command.addProperty("bookmapStopGeneration", selectedStop.generation()); }
         CompletableFuture<Void> notification = new CompletableFuture<>(); commandNotifications.add(notification);
-        queue.submit(symbol, commandPriority(command), () -> {
+        int priority;
+        synchronized (this) {
+            Snapshot snapshot = snapshots.get(symbol);
+            priority = commandPriority(command, snapshot != null && (snapshot.netQuantity != 0 || !snapshot.pairs.isEmpty()));
+        }
+        queue.submit(symbol, priority, () -> {
             CompletableFuture<Void> completion = new CompletableFuture<>();
             try { preparation.prepare(command); routeNow(command, completion); }
             catch (Exception error) { completion.completeExceptionally(error); }

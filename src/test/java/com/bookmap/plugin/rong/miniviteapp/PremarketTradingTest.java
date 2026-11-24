@@ -10,6 +10,29 @@ import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.*;
 
 class PremarketTradingTest {
+    @Test void lostPostAllowsCancelAllAndResumesWithoutRestartAfterMatchingBrokerObservation() {
+        try (Harness h = new Harness()) {
+            h.failPost = true; h.trading.dispatch(action("buy_now", 5));
+            h.trading.dispatch(action("buy_now", 5)); assertEquals(1, h.posted.size());
+            h.trading.dispatch(action("cancel_all", 0));
+            assertTrue(h.logs.stream().anyMatch(log -> log.contains("previous submission remains unconfirmed")));
+            assertFalse(h.trading.isBusy("AMD")); assertEquals(1, h.posted.size());
+            JsonObject observed = h.posted.get(0).deepCopy(); observed.addProperty("orderId", "456"); observed.addProperty("status", "FILLED");
+            observed.addProperty("enteredTime", Instant.ofEpochMilli(h.now.get()).toString());
+            observed.addProperty("quantity", 5); observed.getAsJsonArray("orderLegCollection").get(0).getAsJsonObject().remove("quantity");
+            h.orders.add(observed); h.trading.observeOrders(h.orders);
+            h.failPost = false; h.net = 5; h.trading.dispatch(action("sell_now", 5));
+            assertEquals(2, h.posted.size(), h.logs.toString()); assertFalse(h.trading.isBusy("AMD"));
+        }
+    }
+    @Test void failedCancelCanBeReconciledByNextExplicitActionWithoutRestart() {
+        try (Harness h = new Harness()) {
+            h.working(); h.failCancel = true; h.trading.dispatch(action("cancel_all", 0));
+            assertEquals(1, h.canceled.size()); assertFalse(h.trading.isBusy("AMD"));
+            h.failCancel = false; h.confirm = true; h.trading.dispatch(action("cancel_all", 0));
+            assertEquals(2, h.canceled.size()); assertFalse(h.trading.isBusy("AMD")); assertTrue(h.posted.isEmpty());
+        }
+    }
     static JsonObject json(String text) { return JsonParser.parseString(text).getAsJsonObject(); }
     static JsonObject action(String operation, int quantity) { return PremarketTradingPanel.action("AMD", operation, "" + quantity, "1"); }
     static class Harness implements AutoCloseable, PremarketTrading.Broker {

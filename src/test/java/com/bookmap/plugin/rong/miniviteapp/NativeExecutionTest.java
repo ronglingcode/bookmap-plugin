@@ -45,6 +45,7 @@ class NativeExecutionTest {
             rig.engine.route(action("KeyC")); rig.engine.pendingCommands().get(3, TimeUnit.SECONDS);
             assertEquals("no_op", rig.finish(2).get("outcome").getAsString(), "Cancel remains usable");
             JsonObject observed = rig.bodies.get(0).deepCopy(); observed.addProperty("orderId", "999"); observed.addProperty("status", "FILLED");
+            observed.addProperty("enteredTime", java.time.Instant.now().toString());
             JsonArray orders = new JsonArray(); orders.add(observed); rig.engine.observeBrokerOrders(orders);
             rig.engine.route(entry); rig.engine.pendingCommands().get(3, TimeUnit.SECONDS);
             assertEquals("accepted", rig.finish(3).get("outcome").getAsString()); assertEquals(2, rig.mutations.get());

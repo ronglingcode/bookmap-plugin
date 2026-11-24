@@ -4,22 +4,27 @@ import com.google.gson.*;
 import java.math.BigDecimal;
 import java.util.*;
 
-/** Never replay an ambiguous opening POST. Resolve it against a newly observed broker order. */
+/** Never replay an ambiguous POST. Resolve it against a new, timestamped broker order. */
 public final class OpeningReconciliation {
     public static final class Intent {
         final String symbol;
         final JsonObject order;
         final Set<String> previousIds;
+        final long submittedAt;
         boolean unknown, observed;
-        Intent(String symbol, JsonObject order, Set<String> previousIds) {
+        Intent(String symbol, JsonObject order, Set<String> previousIds, long submittedAt) {
             this.symbol = symbol; this.order = order.deepCopy(); this.previousIds = previousIds;
+            this.submittedAt = submittedAt;
         }
     }
     private Set<String> lastIds = Collections.emptySet();
-    private JsonArray lastOrders = new JsonArray();
     private final List<Intent> pending = new ArrayList<>();
+    private java.util.function.LongSupplier clock;
+    public OpeningReconciliation() { this(System::currentTimeMillis); }
+    public OpeningReconciliation(java.util.function.LongSupplier clock) { this.clock = clock; }
+    public synchronized void setClock(java.util.function.LongSupplier clock) { this.clock = clock; }
     public synchronized Intent begin(String symbol, JsonObject order) {
-        Intent intent = new Intent(symbol, order, new HashSet<>(lastIds)); pending.add(intent); return intent;
+        Intent intent = new Intent(symbol, order, new HashSet<>(lastIds), clock.getAsLong()); pending.add(intent); return intent;
     }
     public synchronized void complete(Intent intent, boolean unknown) {
         intent.unknown = unknown;
@@ -32,18 +37,34 @@ public final class OpeningReconciliation {
         Set<String> ids = new HashSet<>();
         for (JsonElement item : orders) if (item.isJsonObject() && item.getAsJsonObject().has("orderId"))
             ids.add(item.getAsJsonObject().get("orderId").getAsString());
-        lastIds = ids; lastOrders = orders.deepCopy();
+        lastIds = ids;
         for (Intent intent : pending) {
             int matches = 0;
-            for (JsonElement item : lastOrders) {
+            for (JsonElement item : orders) {
                 if (!item.isJsonObject()) continue;
                 JsonObject order = item.getAsJsonObject();
                 if (order.has("orderId") && !intent.previousIds.contains(order.get("orderId").getAsString())
-                        && contains(order, intent.order)) matches++;
+                        && enteredAfter(order, intent.submittedAt) && contains(normalized(order), intent.order)) matches++;
             }
             intent.observed = matches == 1;
         }
         pending.removeIf(intent -> intent.unknown && intent.observed);
+    }
+    private static boolean enteredAfter(JsonObject order, long submittedAt) {
+        if (!order.has("enteredTime")) return false;
+        try {
+            return com.bookmap.plugin.rong.miniviteapp.libraries.broker.schwab.SchwabTime
+                    .executionMillis(order.get("enteredTime").getAsString()) >= submittedAt - 2000;
+        } catch (RuntimeException error) { return false; }
+    }
+    private static JsonObject normalized(JsonObject order) {
+        JsonObject normalized = order.deepCopy();
+        JsonArray legs = normalized.getAsJsonArray("orderLegCollection");
+        if (legs != null && legs.size() == 1 && legs.get(0).isJsonObject() && order.has("quantity")) {
+            JsonObject leg = legs.get(0).getAsJsonObject();
+            if (!leg.has("quantity")) leg.add("quantity", order.get("quantity"));
+        }
+        return normalized;
     }
     private static boolean contains(JsonElement actual, JsonElement expected) {
         if (actual == null) return false;

@@ -15,9 +15,15 @@ an entry plan, liquidity provider or cloud configuration refresh.
 
 Opening and uncovered-position closing POSTs are never retried automatically.
 If a response is lost, the relevant symbol's subsequent POSTs are restricted
-until a new broker order uniquely matches the captured payload and was absent
-from the pre-submission order set. Broker polling can resolve this without a
+until a new broker order uniquely matches the captured payload, was absent from
+the pre-submission order set, and has a broker entry timestamp consistent with
+submission time (two seconds of clock tolerance). Missing timestamps do not
+resolve an unknown outcome. Broker polling can resolve this without a
 manual reset. Unrelated symbols and working-order controls remain available.
+Extended-hours submissions use the same reconciliation policy. Cancel All remains
+available there; a failed cancellation can be checked on the next explicit action
+without a restart. A cancellation report distinguishes known canceled orders
+from an earlier submission that is still unconfirmed.
 An absent or ambiguous broker record is not treated as proof that nothing was
 submitted. If the broker never exposes that record, resolution still requires
 checking the broker; the program cannot safely manufacture a definitive outcome.

@@ -160,7 +160,10 @@ public final class TradingRuntime implements AutoCloseable {
             execution.accountReconciled(symbol);
         }
         publishToken();
-        if (MiniViteApp.commandPriority(action) < 2) {
+        boolean held;
+        synchronized (lock) { held = number(object(object(account, "positions"), symbol), "netQuantity") != 0
+                || array(object(account, "exitPairs"), symbol).size() > 0; }
+        if (MiniViteApp.commandPriority(action, held) < 2) {
             JsonObject input;
             synchronized (lock) { input = exitInputs(symbol); input.getAsJsonObject("entryContext").addProperty("bookmapAccountReadStartedAt", accountReadStartedAt); }
             JsonObject update = message("execution_state"); JsonArray symbols = new JsonArray(); symbols.add(input);

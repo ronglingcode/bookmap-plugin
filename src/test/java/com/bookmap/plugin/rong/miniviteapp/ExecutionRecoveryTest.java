@@ -9,6 +9,11 @@ import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.*;
 
 class ExecutionRecoveryTest {
+    @Test void heldChartDigitsRemainManagementCommands() {
+        JsonObject command = JsonParser.parseString("{\"keyCode\":\"Digit1\",\"source\":\"bookmap_chart_hotkey\"}").getAsJsonObject();
+        assertEquals(2, MiniViteApp.commandPriority(command, false));
+        assertEquals(1, MiniViteApp.commandPriority(command, true));
+    }
     @Test void urgentExitSupersedesQueuedEntriesAndOtherSymbolsKeepRunning() throws Exception {
         try (SymbolCommandQueue queue = new SymbolCommandQueue()) {
             CompletableFuture<Void> inFlight = new CompletableFuture<>();
@@ -47,6 +52,9 @@ class ExecutionRecoveryTest {
         JsonObject unrelated = submitted.deepCopy(); unrelated.addProperty("orderId", 2); unrelated.addProperty("price", 11);
         JsonArray after = before.deepCopy(); after.add(unrelated); recovery.observe(after); assertTrue(recovery.unresolved("A"));
         JsonObject matched = submitted.deepCopy(); matched.addProperty("orderId", 3); matched.addProperty("status", "FILLED"); matched.addProperty("price", "10.00");
+        matched.addProperty("enteredTime", java.time.Instant.now().minusSeconds(10).toString());
+        after.add(matched); recovery.observe(after); assertTrue(recovery.unresolved("A"), "An old identical order cannot resolve a new submission");
+        matched.addProperty("enteredTime", java.time.Instant.now().toString()); after.remove(after.size() - 1);
         after.add(matched); recovery.observe(after); assertFalse(recovery.unresolved("A"));
         var rejected = recovery.begin("A", submitted); recovery.complete(rejected, false); assertFalse(recovery.unresolved("A"));
     }
