@@ -61,7 +61,7 @@ Keep the plugin, native runtime, live data, and broker connection running.
 Local stops are not saved across a restart or converted into broker stops.
 They clear when the position is confirmed flat with no working orders, when
 the feature is disabled, or when that extended-hours session ends. Morning
-stops do not carry into after-hours or into regular hours.
+stops do not carry into after-hours or past the 09:28 regular-order handover.
 
 For a fixed price, enter **Shares** and **Limit price**, then press **Buy Limit**
 or **Sell Limit**. These actions do not use the offset and do not require a live
@@ -101,7 +101,13 @@ order that reused the slot. Restarting the runtime rebuilds numbering from broke
 The existing numpad market-out shortcuts are not premarket order edits.
 
 The manual entry/Flatten buttons and local stops operate on weekdays at
-07:00–09:30 and 16:00–20:00 Eastern. The broker determines holiday availability.
+07:00–09:28 and 16:00–20:00 Eastern. At exactly 09:28, the extended-hours ticket,
+local stops, and extended-hours hotkeys stop operating, and regular trading
+controls take over. Regular orders keep `session: NORMAL`, `duration: DAY`,
+including stop, limit, and market orders; there is no extra market-order block
+during 09:28–09:30. The broker handles their activation and execution.
+Market-data session boundaries and automatic missing-stop protection still use
+the actual 09:30 open. The broker determines holiday availability.
 The existing missing-broker-stop protection runs only during the regular
 session and starts with a fresh grace period at the open, according to its
 existing protection setting. A local extended-hours stop does not count as a
@@ -109,13 +115,13 @@ broker stop after the open. With manual extended-hours mode enabled, regular
 strategy commands are blocked during premarket and after-hours; use the
 separate limit controls.
 
-During regular hours, the extended-hours ticket is hidden and its mutations,
+During the regular-order window (09:28–16:00), the extended-hours ticket is hidden and its mutations,
 number-key interception, local monitoring, and order projection are disabled.
 Z and the number keys use their regular-session handlers. Queued cancellation
 or replacement work rechecks the session before any new mutation, and cannot
-submit an extended-hours exit or replacement after the open. Previously
+submit an extended-hours exit or replacement at or after 09:28. Previously
 accepted SEAMLESS orders can still exist at the broker; this does not cancel
-or transform them automatically at 09:30. Normal broker account, transport,
+or transform them automatically at 09:28. Normal broker account, transport,
 market-data, and drawing infrastructure remains shared. Regular-session
 startup retains its required plan validation, market-data credentials, and
 saved trade-state loading; regular strategy order builders are unchanged.
@@ -144,7 +150,7 @@ are logged, and the ticket displays runtime submission, acceptance, or rejection
 messages directly. An accepted order is still not a confirmed fill.
 
 **Cancel All** ignores the Shares, Offset, and Limit price inputs. It is available
-outside the order-entry session except during regular hours, confirms cancellation, and never submits
+outside the order-entry session except during the regular-order window (09:28–16:00), confirms cancellation, and never submits
 a closing order. An order can still fill while cancellation is in flight.
 
 Account state normally refreshes every three seconds; manual order actions request

@@ -128,11 +128,11 @@ public final class PremarketTradingPanel extends JPanel implements AutoCloseable
         for (JButton button : buttons) {
             boolean valid = active;
             String operation = (String) button.getClientProperty("operation");
-            if (operation.equals("cancel_all")) valid = !MarketClock.isRegularTradingTime(System.currentTimeMillis());
+            if (operation.equals("cancel_all")) valid = !MarketClock.isRegularOrderTime(System.currentTimeMillis());
             if (operation.endsWith("_limit")) try { fixedAction(symbol, operation, quantity.getText(), limitPrice.getText()); } catch (IllegalArgumentException error) { valid = false; }
             button.setEnabled(valid);
         }
-        if (!active && !Boolean.FALSE.equals(sessionActive)) status("Outside extended hours: weekdays 07:00–09:30 and 16:00–20:00 ET");
+        if (!active && !Boolean.FALSE.equals(sessionActive)) status("Outside extended hours: weekdays 07:00–09:28 and 16:00–20:00 ET");
         sessionActive = active;
     }
     private void status(String text) { status.setText(VerticalWindowLayout.wrapText(text, 200)); }

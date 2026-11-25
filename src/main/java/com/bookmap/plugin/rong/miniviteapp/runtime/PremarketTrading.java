@@ -113,12 +113,12 @@ public final class PremarketTrading implements AutoCloseable {
     private void require(boolean condition, String reason) { if (!condition) throw new IllegalArgumentException(reason); }
     private void check() {
         checkEnabled();
-        require(MarketClock.isExtendedTradingTime(now.getAsLong()), "manual extended-hours controls are available 07:00–09:30 and 16:00–20:00 ET on weekdays");
+        require(MarketClock.isExtendedTradingTime(now.getAsLong()), "manual extended-hours controls are available 07:00–09:28 and 16:00–20:00 ET on weekdays");
     }
     private void checkEnabled() {
         require(!closed, "runtime stopped");
         require(enabled.getAsBoolean(), "premarket trading is disabled");
-        require(!MarketClock.isRegularTradingTime(now.getAsLong()), "premarket actions are disabled during the regular session");
+        require(!MarketClock.isRegularOrderTime(now.getAsLong()), "premarket actions are disabled during the regular order window (09:28–16:00 ET)");
     }
     public boolean dispatch(JsonObject action) {
         if (string(action, "type").equals("premarket_adjust")) return dispatchAdjustment(action);

@@ -97,14 +97,14 @@ class PremarketRuntimeTest {
             assertEquals("MARKET", h.posted.get(0).get("orderType").getAsString(), "Existing regular-session automatic protection still operates");
         }
     }
-    @Test void zSelectionAndNumberedOrdersSwitchBackToRegularCommandsAtTheOpen() {
+    @Test void zSelectionAndNumberedOrdersSwitchBackToRegularCommandsTwoMinutesBeforeOpen() {
         try (Harness h = new Harness()) {
             h.enabled = true; h.storeOrders = true; h.runtime.attachSymbol("AMD"); h.runtime.start().join();
             h.runtime.dispatch(json("{\"symbol\":\"AMD\",\"keyCode\":\"KeyZ\",\"price\":95}"));
             assertEquals(95, h.runtime.premarketStop("AMD").get("price").getAsDouble());
             assertEquals(0, h.runtime.selectedStop().get("price").getAsDouble());
             h.runtime.dispatch(PremarketTradingPanel.action("AMD", "buy_bid", "3", "1"));
-            h.now.set(Instant.parse("2026-11-23T14:30:00Z").toEpochMilli());
+            h.now.set(Instant.parse("2026-11-23T14:28:00Z").toEpochMilli());
             h.runtime.dispatch(json("{\"symbol\":\"AMD\",\"keyCode\":\"KeyZ\",\"price\":98}"));
             assertEquals(98, h.runtime.selectedStop().get("price").getAsDouble());
             assertEquals(0, h.runtime.premarketStop("AMD").size());
@@ -112,6 +112,36 @@ class PremarketRuntimeTest {
             h.runtime.dispatch(json("{\"symbol\":\"AMD\",\"keyCode\":\"Digit1\",\"price\":99,\"premarketOrderId\":\"123\",\"source\":\"bookmap_chart_hotkey\"}"));
             assertTrue(h.replaced.isEmpty()); assertEquals(1, h.posted.size());
             assertTrue(h.logs.stream().noneMatch(s -> s.contains("Normal trading action blocked")));
+        }
+    }
+    @Test void regularMarketOrdersAreAllowedFrom928WithoutAnExtraMarketOrderBlock() throws Exception {
+        for (String time : new String[]{"2026-11-23T14:28:00Z", "2026-11-23T14:29:59Z", "2026-11-23T14:30:00Z"}) {
+            try (Harness h = new Harness()) {
+                h.enabled = true; h.runtime.start().join();
+                h.runtime.dispatch(json("{\"symbol\":\"AMD\",\"keyCode\":\"KeyF\"}"));
+                assertTrue(h.posted.isEmpty(), "Regular flatten is blocked before the handover");
+                h.now.set(Instant.parse(time).toEpochMilli());
+                h.runtime.dispatch(json("{\"symbol\":\"AMD\",\"keyCode\":\"KeyF\"}"));
+                h.runtime.pendingCommands().get(2, java.util.concurrent.TimeUnit.SECONDS);
+                assertEquals(1, h.posted.size(), h.logs.toString());
+                JsonObject order = h.posted.get(0);
+                assertEquals("MARKET", order.get("orderType").getAsString());
+                assertEquals("NORMAL", order.get("session").getAsString());
+                assertEquals("DAY", order.get("duration").getAsString());
+            }
+        }
+    }
+    @Test void extendedTicketAndCancelAllAreDisabledAt928() {
+        try (Harness h = new Harness()) {
+            h.enabled = true; h.storeOrders = true; h.runtime.start().join();
+            h.runtime.dispatch(json("{\"symbol\":\"AMD\",\"keyCode\":\"KeyZ\",\"price\":95}"));
+            h.runtime.dispatch(PremarketTradingPanel.action("AMD", "buy_bid", "3", "1"));
+            h.now.set(Instant.parse("2026-11-23T14:28:00Z").toEpochMilli());
+            h.runtime.dispatch(PremarketTradingPanel.action("AMD", "sell_now", "3", "1"));
+            h.runtime.dispatch(PremarketTradingPanel.action("AMD", "cancel_all", "", ""));
+            assertEquals(1, h.posted.size());
+            assertTrue(h.replaced.isEmpty());
+            assertEquals(0, h.runtime.premarketStop("AMD").size());
         }
     }
     @Test void unfinishedExtendedHoursCancellationDoesNotBlockRegularMissingStopProtection() throws Exception {

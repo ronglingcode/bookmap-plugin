@@ -211,7 +211,7 @@ public final class TradingRuntime implements AutoCloseable {
         if (!result.outcome.equals("accepted")) throw new IllegalStateException("Broker " + result.outcome + ": " + result.reason);
     }
     private void requirePremarketMutation(boolean orderEntry) {
-        if (stopped || !premarketEnabled.getAsBoolean() || MarketClock.isRegularTradingTime(now.getAsLong())
+        if (stopped || !premarketEnabled.getAsBoolean() || MarketClock.isRegularOrderTime(now.getAsLong())
                 || orderEntry && !MarketClock.isExtendedTradingTime(now.getAsLong()))
             throw new PremarketTrading.RejectedOrderException("Extended-hours session ended or manual trading disabled; no broker mutation sent");
     }

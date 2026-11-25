@@ -26,10 +26,16 @@ public final class MarketClock {
         int minute = value.getHour() * 60 + value.getMinute();
         return value.getDayOfWeek().getValue() <= 5 && minute >= 570 && minute < 960;
     }
+    /** Regular order controls take over two minutes before the actual market open. */
+    public static boolean isRegularOrderTime(long epochMs) {
+        ZonedDateTime value = Instant.ofEpochMilli(epochMs).atZone(MARKET_ZONE);
+        int minute = value.getHour() * 60 + value.getMinute();
+        return value.getDayOfWeek().getValue() <= 5 && minute >= 568 && minute < 960;
+    }
     public static boolean isExtendedTradingTime(long epochMs) {
         ZonedDateTime value = Instant.ofEpochMilli(epochMs).atZone(MARKET_ZONE);
         int minute = value.getHour() * 60 + value.getMinute();
-        return value.getDayOfWeek().getValue() <= 5 && (minute >= 420 && minute < 570 || minute >= 960 && minute < 1200);
+        return value.getDayOfWeek().getValue() <= 5 && (minute >= 420 && minute < 568 || minute >= 960 && minute < 1200);
     }
     public static String addDays(String date, int days) { return LocalDate.parse(date).plusDays(days).toString(); }
     public static long dayStartMillis(String date) { return LocalDate.parse(date).atStartOfDay(MARKET_ZONE).toInstant().toEpochMilli(); }

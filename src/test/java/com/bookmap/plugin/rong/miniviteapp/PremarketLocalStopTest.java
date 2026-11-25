@@ -139,11 +139,11 @@ class PremarketLocalStopTest {
             assertEquals("SELL", leg.get("instruction").getAsString()); assertEquals(4, leg.get("quantity").getAsInt());
         }
     }
-    @Test void delayedManualReplacementCannotSubmitAfterTheOpen() {
+    @Test void delayedManualReplacementCannotSubmitAfter928Handover() {
         try (Harness h = new Harness()) {
             h.select(99); h.entry(true); h.confirmCancel = false;
             h.trading.chartDigit(json("{\"symbol\":\"AMD\",\"keyCode\":\"Digit1\",\"price\":99.5}"));
-            h.now.set(Instant.parse("2026-11-23T14:30:00Z").toEpochMilli());
+            h.now.set(Instant.parse("2026-11-23T14:28:00Z").toEpochMilli());
             h.orders.get("101").addProperty("status", "CANCELED"); h.delayed.remove(0).run();
             assertEquals(1, h.posted.size()); assertFalse(h.trading.isBusy("AMD"));
         }
@@ -180,10 +180,10 @@ class PremarketLocalStopTest {
             assertTrue(h.trading.stopView("AMD").get("status").getAsString().startsWith("EXIT STOPPED"));
         }
     }
-    @Test void canceledStopExitCannotSubmitAfterTheOpenAndRegularDigitsAreNotIntercepted() {
+    @Test void canceledStopExitCannotSubmitAfter928AndRegularDigitsAreNotIntercepted() {
         try (Harness h = new Harness()) {
             h.net = 10; h.select(100); h.working("1", true); h.confirmCancel = false; h.trade(99.99);
-            h.now.set(Instant.parse("2026-11-23T14:30:00Z").toEpochMilli());
+            h.now.set(Instant.parse("2026-11-23T14:28:00Z").toEpochMilli());
             h.orders.get("1").addProperty("status", "CANCELED"); h.delayed.remove(0).run();
             h.trade(98); assertTrue(h.posted.isEmpty()); assertEquals(0, h.trading.stopView("AMD").size());
             assertFalse(h.trading.chartDigit(json("{\"symbol\":\"AMD\",\"keyCode\":\"Digit1\",\"price\":99,\"premarketOrderId\":\"1\"}")));
