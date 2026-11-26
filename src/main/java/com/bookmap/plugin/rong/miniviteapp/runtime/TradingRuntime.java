@@ -560,6 +560,7 @@ public final class TradingRuntime implements AutoCloseable {
         var capProvider = entrySizeCapProvider;
         if (capProvider != null) {
             JsonObject cap = capProvider.apply(symbol).deepCopy();
+            cap.addProperty("symbol", symbol);
             com.bookmap.plugin.rong.miniviteapp.core.controllers.BookmapSizeCap.setSessionTime(cap, now.getAsLong());
             if (!string(cap, "sessionDate").equals(MarketClock.marketTime(now.getAsLong()).date)) {
                 cap.addProperty("available", false); cap.addProperty("maxRiskMultiple", 0);

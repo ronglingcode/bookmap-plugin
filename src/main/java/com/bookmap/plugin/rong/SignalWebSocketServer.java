@@ -168,6 +168,7 @@ public class SignalWebSocketServer extends WebSocketServer {
         PremarketSizeThreshold policy = sizeThresholds.get(clean);
         int required = policy == null ? PremarketSizeThreshold.FALLBACK : policy.threshold();
         JsonObject cap = new JsonObject();
+        cap.addProperty("symbol", clean);
         // One coherent tracker snapshot serves entries, the Trade window, and Bid Breakdown.
         if (tracker == null) { fillSizeCap(cap, null, null, false, "", required); }
         else synchronized (tracker) {
