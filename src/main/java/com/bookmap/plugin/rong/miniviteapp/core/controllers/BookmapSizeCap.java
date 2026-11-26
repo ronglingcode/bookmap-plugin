@@ -17,8 +17,6 @@ public final class BookmapSizeCap {
     }
     /** Programmer-only switch for the liquidity policy used by this build. */
     public static final Mode ACTIVE_MODE = Mode.STRICT;
-    /** Symbols exempt from the executed-liquidity entry requirement. */
-    public static final Set<String> LIQUIDITY_GATE_WHITELIST = Set.of("DELL");
 
     public static Mode mode(JsonObject cap) {
         return cap.has("mode") ? Mode.valueOf(Models.string(cap, "mode")) : ACTIVE_MODE;
@@ -39,9 +37,7 @@ public final class BookmapSizeCap {
 
     /** Use a clock independent of Bookmap callbacks, which can stop after an overflow. */
     public static void setSessionTime(JsonObject cap, long epochMillis) {
-        boolean whitelisted = LIQUIDITY_GATE_WHITELIST.contains(Models.string(cap, "symbol").trim().toUpperCase(Locale.ROOT));
-        cap.addProperty("liquidityWhitelisted", whitelisted);
-        cap.addProperty("liquidityRequired", !whitelisted && com.bookmap.plugin.rong.miniviteapp.core.marketdata.MarketClock
+        cap.addProperty("liquidityRequired", com.bookmap.plugin.rong.miniviteapp.core.marketdata.MarketClock
                 .marketTime(epochMillis).minutesSinceMarketOpen < 5);
     }
 

@@ -19,7 +19,7 @@ Cairo's price/candle feed continues independently.
    `node scripts/importSecrets.mjs ..\secrets\storeSecrets.js`.
    See [credential setup](config/README.md).
 3. In Bookmap, open API Plugins Configuration, add
-   `build/libs/lingrong1988_bmtrader_1.50.jar`, and attach bmtrader to a chart.
+   `build/libs/lingrong1988_bmtrader_1.49.jar`, and attach bmtrader to a chart.
 4. The first attachment starts the trading runtime; the final detachment stops it.
    Check the bmtrader Logs window for startup errors. Settings offer
    **Restart Native Trading / Reload Secrets**, **Open Schwab Authorization**,
@@ -120,8 +120,6 @@ with the rebuilt plugin. No deployment is performed by the build.
 
 The liquidity entry requirement automatically turns off at 09:35 America/New_York,
 five minutes after market open. It applies again before the next session's cutoff.
-DELL is exempt from this executed-liquidity gate at all times through
-`BookmapSizeCap.LIQUIDITY_GATE_WHITELIST`; the Trade window shows the exemption.
 Other entry rules and exit/cancel/flatten controls remain unchanged.
 
 The session tracker expires removed levels through an expiration queue instead of
@@ -205,7 +203,7 @@ TypeScript fixtures check Java parity; fake services cover standalone startup,
 renewal, requests, persistence and teardown. No live orders or real Firestore writes
 are sent by these checks.
 
-Share only `build/libs/lingrong1988_bmtrader_1.50.jar`. Unobfuscated intermediates
+Share only `build/libs/lingrong1988_bmtrader_1.49.jar`. Unobfuscated intermediates
 and the private mapping remain under `build/intermediates` and
 `build/private/obfuscation`. Obfuscation does not prevent reverse engineering.
 

@@ -6,19 +6,6 @@ import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.*;
 
 class StrictLiquidityModeTest {
-    @Test void dellStatusExplainsWhitelistExemptionBeforeCutoff() {
-        var server = new SignalWebSocketServer(0, 0,
-                () -> java.time.Instant.parse("2026-11-25T14:30:00Z").toEpochMilli());
-        try {
-            String text = TradeButtonWindow.liquidityStatusText(server.entrySizeCap("DELL:NYSE:STOCKS@BMD"));
-            assertTrue(text.contains("Liquidity requirement OFF"));
-            assertTrue(text.contains("whitelist"));
-            assertFalse(text.contains("09:35"));
-            assertFalse(text.contains("ENTRY BLOCKED"));
-            assertTrue(TradeButtonWindow.liquidityStatusText(server.entrySizeCap("NVDA")).contains("ENTRY BLOCKED"));
-        } finally { server.shutdown(); }
-    }
-
     @Test void failedWorkerOverridesHistoryLoadingAndNeverClaimsZeroFills() {
         JsonObject cap = new SignalWebSocketServer(0, 0,
                 () -> java.time.Instant.parse("2026-11-23T14:30:00Z").toEpochMilli()).entrySizeCap("TEST");

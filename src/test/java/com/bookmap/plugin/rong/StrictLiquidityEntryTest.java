@@ -52,44 +52,6 @@ class StrictLiquidityEntryTest {
     private double quantity(Plan plan) {
         return plan.requests.get(0).body.getAsJsonArray("orderLegCollection").get(0).getAsJsonObject().get("quantity").getAsDouble();
     }
-    @Test void dellWhitelistBypassesMissingLiquidityForBothSidesAndAllEntryTypes() {
-        var clock = new java.util.concurrent.atomic.AtomicLong(Instant.parse("2026-11-25T14:30:00Z").toEpochMilli());
-        var server = new SignalWebSocketServer(0, 0, clock::get);
-        try {
-            for (String symbol : new String[]{"DELL", "DELL:NYSE:STOCKS@BMD"}) {
-                JsonObject cap = server.entrySizeCap(symbol);
-                assertTrue(cap.get("liquidityWhitelisted").getAsBoolean());
-                assertFalse(cap.get("available").getAsBoolean());
-                assertEquals(0, cap.get("largestOrderSize").getAsLong());
-                cap.addProperty("historyLoading", true);
-                for (long time : new long[]{clock.get() - 60_000, clock.get(), clock.get() + 24 * 3600_000}) {
-                    // Native execution refreshes the session clock after receiving the cap.
-                    BookmapSizeCap.setSessionTime(cap, time);
-                    assertFalse(BookmapSizeCap.liquidityRequired(cap));
-                    assertTrue(BookmapSizeCap.liquidityQualified(cap));
-                    JsonObject json = state(cap); json.addProperty("symbol", "DELL");
-                    for (boolean isLong : new boolean[]{true, false})
-                        for (String type : new String[]{"MARKET", "LIMIT", "STOP", "STOP_LIMIT"}) {
-                            Plan plan = new Plan("wall_reversal_entry");
-                            plan.requests.add(new Request("POST", null, OrderFactory.createOneEntryWithTwoExits(
-                                    "DELL", isLong, type, 100, 100, isLong ? 110 : 90, isLong ? 95 : 105)));
-                            JsonObject original = plan.requests.get(0).body.deepCopy();
-                            BookmapSizeCap.apply(new Snapshot(json), plan);
-                            assertEquals(original, plan.requests.get(0).body);
-                        }
-                }
-            }
-            for (String symbol : new String[]{"NVDA", "DELLX"}) {
-                JsonObject cap = server.entrySizeCap(symbol);
-                assertFalse(cap.get("liquidityWhitelisted").getAsBoolean());
-                assertTrue(BookmapSizeCap.liquidityRequired(cap));
-                assertFalse(BookmapSizeCap.liquidityQualified(cap));
-                assertThrows(IllegalArgumentException.class, () -> BookmapSizeCap.apply(
-                        new Snapshot(state(cap)), entry(true, "LIMIT", 100)));
-            }
-        } finally { server.shutdown(); }
-    }
-
     @Test void sixtyFourMillionAndHigherPremarketVolumesRequireExactlyFortyThousandFilledShares() {
         for (double volume : new double[]{64000000, 100000000, Double.MAX_VALUE}) {
             long chartTime = OPEN / 1_000_000L;

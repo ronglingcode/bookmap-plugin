@@ -622,7 +622,7 @@ public class TradeButtonWindow {
         if (BookmapSizeCap.mode(cap) == Mode.NORMAL_1R)
             return prefix + "NORMAL 1R: risk capped at 1.00R<br>No qualifying wall fills required.";
         if (!BookmapSizeCap.liquidityRequired(cap))
-            return prefix + "Liquidity requirement OFF<br>" + liquidityExemptionText(cap);
+            return prefix + "Liquidity requirement OFF<br>Disabled from 09:35 New York time.";
         String state = cap.has("marketDataState") ? cap.get("marketDataState").getAsString() : "";
         if (state.equals("failed") || state.equals("stopped"))
             return prefix + "<b>ENTRY BLOCKED: liquidity evidence unavailable</b>";
@@ -649,12 +649,6 @@ public class TradeButtonWindow {
                 + String.format(Locale.US, "%.2fR", cap.get("maxRiskMultiple").getAsDouble())
                 + "<br>PROPORTIONAL: size capped by qualifying liquidity"
                 + "<br>Uses the larger result from either rule.";
-    }
-
-    private static String liquidityExemptionText(JsonObject cap) {
-        return cap.has("liquidityWhitelisted") && cap.get("liquidityWhitelisted").getAsBoolean()
-                ? "Symbol is on the liquidity gate whitelist."
-                : "Disabled from 09:35 New York time.";
     }
 
     private void setConnectionStatus(NativeConnectionStatus.Snapshot status) {
@@ -935,7 +929,7 @@ public class TradeButtonWindow {
         wallThresholdLabel.setForeground(blocked ? new Color(150, 20, 20) : THRESHOLD_TEXT_COLOR);
         String capText = liquidityStatusText(cap);
         String capDescription = !BookmapSizeCap.liquidityRequired(cap) && BookmapSizeCap.mode(cap) != Mode.NORMAL_1R
-                ? liquidityExemptionText(cap)
+                ? "Liquidity entry requirement disabled from 09:35 New York time (five minutes after market open)."
                 : BookmapSizeCap.mode(cap) == Mode.NORMAL_1R
                 ? "Normal mode: 1R total risk ceiling; existing position and pending entries consume this budget. No qualifying wall fills required."
                 : "Single wall: executions at one wall episode or a single historical trade since market open. "
